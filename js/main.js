@@ -104,16 +104,28 @@
     document.body.insertAdjacentHTML('afterbegin', buildTopbar() + buildHeader() + buildGnb());
     document.body.insertAdjacentHTML('beforeend', buildFooter());
 
-    var lg = document.getElementById('btn-logout');
-    if (lg) lg.addEventListener('click', function (e) {
-      e.preventDefault();
-      if (window.SHSCloud && SHSCloud.enabled()) {
-        SHSCloud.signOut().then(function () { location.href = 'index.html'; });
-        return;
+    /* 로그아웃: 이메일 세션과 구글(서버) 세션을 모두 정리한다.
+     * 서버 응답이 늦어도 1.5초 후에는 반드시 홈으로 이동한다. */
+    function doLogout(e) {
+      if (e) e.preventDefault();
+      try { SHSAuth.logout(); } catch (x) {}
+      var moved = false;
+      function go() {
+        if (moved) return;
+        moved = true;
+        location.href = 'index.html';
       }
-      SHSAuth.logout();
-      location.href = 'index.html';
-    });
+      if (window.SHSCloud && SHSCloud.enabled()) {
+        SHSCloud.signOut().then(go, go);
+        setTimeout(go, 1500);
+      } else {
+        go();
+      }
+    }
+    window.SHSLogout = doLogout;
+
+    var lg = document.getElementById('btn-logout');
+    if (lg) lg.addEventListener('click', doLogout);
 
     /* 구글 로그인(서버) 세션 확인 후 상단바를 그 정보로 바꾼다.
      * 로그인 직후에는 주소 끝에 인증 토큰이 붙어 돌아오므로,
@@ -135,10 +147,7 @@
             '<span>(' + SHSCloud.roleName(p.role) + (p.title ? ' · ' + p.title : '') + ')</span>' +
             '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
           var lo = document.getElementById('btn-logout2');
-          if (lo) lo.addEventListener('click', function (ev) {
-            ev.preventDefault();
-            SHSCloud.signOut().then(function () { location.href = 'index.html'; });
-          });
+          if (lo) lo.addEventListener('click', window.SHSLogout);
         }
 
         /* 아직 성명·소속 교회를 등록하지 않은 회원은 등록 화면으로 안내한다. */
