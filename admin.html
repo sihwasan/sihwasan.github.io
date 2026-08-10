@@ -97,7 +97,17 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       html += '</tbody></table>';
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
+
+      /* 노회 명단·상비부 관리 영역 */
+      html += '<h2>노회 명단 관리</h2>';
+      html += '<p>가입 시 등급 자동 부여의 기준이 되는 명단입니다. 성명과 소속 교회가 이 명단과 일치하면 해당 등급이 자동으로 부여됩니다.</p>';
+      html += '<div id="roster-area"><p style="color:var(--gray-5)">명단을 불러오는 중...</p></div>';
+      html += '<h2>상비부 배정 관리</h2>';
+      html += '<div id="committee-area"><p style="color:var(--gray-5)">상비부 정보를 불러오는 중...</p></div>';
+
       area.innerHTML = html;
+      renderRoster();
+      renderCommittees();
 
       function updateRole(id, role, label) {
         SHSCloud.init().then(function (c) {
@@ -121,6 +131,142 @@ document.addEventListener('DOMContentLoaded', function () {
           var sel = area.querySelector('select[data-crole="' + b.dataset.cassign + '"]');
           if (!confirm('등급을 ' + SHSCloud.roleName(sel.value) + '(으)로 변경하시겠습니까?')) return;
           updateRole(b.dataset.cassign, sel.value, '등급 변경');
+        });
+      });
+    });
+  }
+
+  /* ---------- 노회 명단 관리 (추가·수정·삭제) ---------- */
+  var ROSTER_ROLES = { member: '정회원', officer: '임원', president: '노회장', clerk: '서기', staff: '간사' };
+
+  function renderRoster() {
+    var box = document.getElementById('roster-area');
+    SHSCloud.init().then(function (c) {
+      return c.from('roster').select('*').order('id');
+    }).then(function (r) {
+      if (r.error) {
+        box.innerHTML = '<div class="notice-banner">명단을 불러오지 못했습니다: ' + e(r.error.message) + '</div>';
+        return;
+      }
+      var rows = r.data || [];
+      var html = '';
+      html += '<div class="admin-card" style="margin-bottom:16px"><div class="inline-form">' +
+        '<div class="field"><label>성명</label><input type="text" id="ro-name"></div>' +
+        '<div class="field"><label>소속 교회</label><input type="text" id="ro-church"></div>' +
+        '<div class="field"><label>직분</label><select id="ro-pos">' +
+        ['목사', '부목사', '원로목사', '은퇴목사', '장로', '간사'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="field"><label>부여 등급</label><select id="ro-role">' +
+        Object.keys(ROSTER_ROLES).map(function (k) { return '<option value="' + k + '">' + ROSTER_ROLES[k] + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="field"><label>임원 직책 (해당 시)</label><input type="text" id="ro-title" placeholder="예: 부서기"></div>' +
+        '<button class="btn" id="ro-add">추가</button>' +
+        '</div><div class="form-msg" id="ro-msg"></div></div>';
+
+      html += '<table class="tbl"><thead><tr><th>번호</th><th>성명</th><th>소속 교회</th><th>직분</th><th>부여 등급</th><th>임원 직책</th><th style="width:80px">관리</th></tr></thead><tbody>';
+      rows.forEach(function (m, i) {
+        html += '<tr><td>' + (i + 1) + '</td><td>' + e(m.name) + '</td><td>' + e(m.church) + '</td>' +
+          '<td>' + e(m.position || '-') + '</td>' +
+          '<td><span class="role-badge">' + (ROSTER_ROLES[m.role] || m.role) + '</span></td>' +
+          '<td>' + e(m.officer_title || '-') + '</td>' +
+          '<td><button class="btn danger sm" data-rodel="' + m.id + '" data-roname="' + e(m.name) + '">삭제</button></td></tr>';
+      });
+      html += '</tbody></table>';
+      html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '명. 수정이 필요하면 해당 행을 삭제한 후 다시 추가해 주세요. 모든 변경은 감사 기록으로 남습니다.</p>';
+      box.innerHTML = html;
+
+      document.getElementById('ro-add').addEventListener('click', function () {
+        var msg = document.getElementById('ro-msg');
+        var d = {
+          name: document.getElementById('ro-name').value.trim(),
+          church: document.getElementById('ro-church').value.trim(),
+          position: document.getElementById('ro-pos').value,
+          role: document.getElementById('ro-role').value,
+          officer_title: document.getElementById('ro-title').value.trim() || null
+        };
+        if (!d.name || !d.church) {
+          msg.className = 'form-msg err';
+          msg.textContent = '성명과 소속 교회를 입력해 주세요.';
+          return;
+        }
+        SHSCloud.init().then(function (c) {
+          return c.from('roster').insert(d);
+        }).then(function (res) {
+          if (res.error) {
+            msg.className = 'form-msg err';
+            msg.textContent = res.error.code === '23505' ? '이미 명단에 있는 회원입니다.' : res.error.message;
+            return;
+          }
+          SHSCloud.log('create', '명단 추가', d.name + ' (' + d.church + ', ' + (ROSTER_ROLES[d.role] || d.role) + ')');
+          renderRoster();
+        });
+      });
+
+      box.querySelectorAll('button[data-rodel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('"' + b.dataset.roname + '" 님을 명단에서 삭제하시겠습니까?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('roster').delete().eq('id', b.dataset.rodel);
+          }).then(function (res) {
+            if (res.error) { alert('삭제하지 못했습니다: ' + res.error.message); return; }
+            SHSCloud.log('delete', '명단 삭제', b.dataset.roname);
+            renderRoster();
+          });
+        });
+      });
+    });
+  }
+
+  /* ---------- 상비부 배정 관리 ---------- */
+  function renderCommittees() {
+    var box = document.getElementById('committee-area');
+    SHSCloud.init().then(function (c) {
+      return c.from('committees').select('*').order('sort');
+    }).then(function (r) {
+      if (r.error || !(r.data && r.data.length)) {
+        box.innerHTML = '<div class="notice-banner">상비부 정보가 아직 서버에 등록되지 않았습니다. ' +
+          '노회 사무실에 문의하여 상비부 등록(03_committees.sql)을 진행해 주세요.</div>';
+        return;
+      }
+      var html = '';
+      r.data.forEach(function (cm) {
+        html += '<div class="admin-card" style="margin-bottom:16px" data-cmt="' + e(cm.name) + '">' +
+          '<h3 style="margin-top:0">' + e(cm.name) + '</h3>' +
+          '<div class="inline-form" style="margin-bottom:8px">' +
+          '<div class="field"><label>부장</label><input type="text" data-f="head" value="' + e(cm.head || '') + '"></div>' +
+          '<div class="field"><label>서기</label><input type="text" data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
+          '<div class="field"><label>회계</label><input type="text" data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
+          '</div>' +
+          '<div class="field"><label>1년조</label><input type="text" data-f="y1" value="' + e(cm.y1 || '') + '"></div>' +
+          '<div class="field"><label>2년조</label><input type="text" data-f="y2" value="' + e(cm.y2 || '') + '"></div>' +
+          '<div class="field"><label>3년조</label><input type="text" data-f="y3" value="' + e(cm.y3 || '') + '"></div>' +
+          '<button class="btn sm" data-cmsave="' + e(cm.name) + '">저장</button>' +
+          '<span class="form-msg" data-cmmsg="' + e(cm.name) + '" style="margin-left:10px"></span>' +
+          '</div>';
+      });
+      box.innerHTML = html;
+
+      box.querySelectorAll('button[data-cmsave]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var name = b.dataset.cmsave;
+          var card = box.querySelector('div[data-cmt="' + name + '"]');
+          var upd = { updated_at: new Date().toISOString() };
+          card.querySelectorAll('input[data-f]').forEach(function (inp) {
+            upd[inp.dataset.f] = inp.value.trim();
+          });
+          var msg = box.querySelector('span[data-cmmsg="' + name + '"]');
+          SHSCloud.init().then(function (c) {
+            return c.from('committees').update(upd).eq('name', name);
+          }).then(function (res) {
+            if (res.error) {
+              msg.className = 'form-msg err';
+              msg.textContent = res.error.message;
+              return;
+            }
+            SHSCloud.log('update', '상비부 배정 수정', name);
+            msg.className = 'form-msg ok';
+            msg.textContent = '저장되었습니다.';
+          });
         });
       });
     });

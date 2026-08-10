@@ -197,20 +197,33 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   var cb = document.getElementById('committees-body');
-  SHSData.committees.forEach(function (c) {
-    cb.insertAdjacentHTML('beforeend',
-      '<div class="side-box" style="margin-bottom:20px"><div class="box-head">' + c.name + '</div>' +
-      '<div class="box-body">' +
-      '<p>' + e(c.duty) + '</p>' +
-      '<table class="tbl" style="margin:10px 0 0">' +
-      '<tbody>' +
-      '<tr><th style="width:90px">임원</th><td class="left">부장 ' + dt(c.head) + ' / 서기 ' + dt(c.clerk) + ' / 회계 ' + dt(c.treasurer) + '</td></tr>' +
-      '<tr><th style="width:90px">1년조</th><td class="left">' + dl(c.y1) + '</td></tr>' +
-      '<tr><th>2년조</th><td class="left">' + dl(c.y2) + '</td></tr>' +
-      '<tr><th>3년조</th><td class="left">' + dl(c.y3) + '</td></tr>' +
-      '</tbody></table>' +
-      '</div></div>');
-  });
+  function renderCommittees(list) {
+    cb.innerHTML = '';
+    list.forEach(function (c) {
+      cb.insertAdjacentHTML('beforeend',
+        '<div class="side-box" style="margin-bottom:20px"><div class="box-head">' + e(c.name) + '</div>' +
+        '<div class="box-body">' +
+        '<p>' + e(c.duty) + '</p>' +
+        '<table class="tbl" style="margin:10px 0 0">' +
+        '<tbody>' +
+        '<tr><th style="width:90px">임원</th><td class="left">부장 ' + dt(c.head) + ' / 서기 ' + dt(c.clerk) + ' / 회계 ' + dt(c.treasurer) + '</td></tr>' +
+        '<tr><th style="width:90px">1년조</th><td class="left">' + dl(c.y1) + '</td></tr>' +
+        '<tr><th>2년조</th><td class="left">' + dl(c.y2) + '</td></tr>' +
+        '<tr><th>3년조</th><td class="left">' + dl(c.y3) + '</td></tr>' +
+        '</tbody></table>' +
+        '</div></div>');
+    });
+  }
+  renderCommittees(SHSData.committees);
+
+  /* 서버에 관리자가 수정한 상비부 배정이 있으면 그것으로 갱신한다 (정회원 이상) */
+  if (user && user.cloud && window.SHSCloud && SHSCloud.enabled()) {
+    SHSCloud.init().then(function (c) {
+      return c.from('committees').select('*').order('sort');
+    }).then(function (r) {
+      if (r && r.data && r.data.length) renderCommittees(r.data);
+    });
+  }
  });
 });
 </script>

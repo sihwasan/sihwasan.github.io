@@ -169,6 +169,9 @@
       var target = document.querySelector('.tabs button[data-tab="' + location.hash.slice(1) + '"]');
       if (target) target.click();
     }
+
+    /* 정기노회 이후 관리자에게 홈페이지 갱신 안내 */
+    getUser().then(meetingReminder);
   });
 
   /* 이름 마스킹: 개인정보 보호를 위해 비회원에게는 가운데 글자를 *로 표시 */
@@ -200,6 +203,78 @@
         return;
       }
       resolve(null);
+    });
+  }
+
+  /* ---------- 정기노회 일정 알림 ----------
+   * 노회규칙 제24조: 정기회는 연 2회.
+   *  봄  : 부활절 다음 주 월요일 (2026년 부활절 4/5 → 4/13 개회와 일치)
+   *  가을: 10월 둘째 주 주일 후 월요일
+   * 정기회가 폐회되면 간사·서기·노회장·최고관리자에게
+   * 임원 등록과 명단·상비부 갱신을 요청하는 안내를 띄운다. */
+
+  function easterDate(y) {
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100;
+    var d = Math.floor(b / 4), ee = b % 4, f = Math.floor((b + 8) / 25);
+    var g = Math.floor((b - f + 1) / 3);
+    var h = (19 * a + b - d - g + 15) % 30;
+    var i = Math.floor(c / 4), k = c % 4;
+    var l = (32 + 2 * ee + 2 * i - h - k) % 7;
+    var m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var month = Math.floor((h + l - 7 * m + 114) / 31);
+    var day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(y, month - 1, day);
+  }
+
+  function springMeeting(y) {
+    var d = easterDate(y);
+    d.setDate(d.getDate() + 8);  /* 부활절(주일) 다음 주 월요일 */
+    return d;
+  }
+
+  function fallMeeting(y) {
+    var d = new Date(y, 9, 1);   /* 10월 1일 */
+    var firstSunday = 1 + ((7 - d.getDay()) % 7);
+    return new Date(y, 9, firstSunday + 7 + 1);  /* 둘째 주 주일 + 1일(월) */
+  }
+
+  function meetingReminder(u) {
+    if (!u || !SHSAuth.canManageMembers(u)) return;
+    var today = new Date();
+    var y = today.getFullYear();
+    /* 봄 회기: 2026년 봄 = 제19회 */
+    var events = [
+      { key: 'spring' + y, date: springMeeting(y), label: '제' + (19 + (y - 2026)) + '회 봄 정기노회',
+        tasks: '신임 임원 등록(조직 페이지·명단·계정 등급), 상비부 배정 갱신, 회의록 등록' },
+      { key: 'fall' + y, date: fallMeeting(y), label: '제' + (19 + (y - 2026)) + '회기 가을 정기노회',
+        tasks: '결의사항·회의록 등록, 명단 변동 반영' }
+    ];
+    events.forEach(function (ev) {
+      var from = ev.date.getTime();
+      var until = from + 45 * 24 * 3600 * 1000;   /* 폐회 후 45일간 안내 */
+      var now = today.getTime();
+      if (now < from || now > until) return;
+      if (localStorage.getItem('shs_reminder_done_' + ev.key)) return;
+
+      var dateStr = (ev.date.getMonth() + 1) + '월 ' + ev.date.getDate() + '일';
+      var bar = document.createElement('div');
+      bar.className = 'container';
+      bar.style.marginTop = '16px';
+      bar.innerHTML =
+        '<div class="notice-banner" style="border-left:4px solid var(--accent)">' +
+        '<strong>[홈페이지 갱신 요청]</strong> ' + ev.label + '(' + dateStr + ')가 폐회되었습니다. ' +
+        '다음 사항을 갱신해 주세요: ' + ev.tasks + '. ' +
+        '<a class="btn sm" style="margin-left:8px" href="admin.html">회원 관리로 이동</a> ' +
+        '<button class="btn ghost sm" id="rem-' + ev.key + '">갱신 완료 (알림 끄기)</button>' +
+        '</div>';
+      var gnb = document.querySelector('.gnb');
+      if (gnb) gnb.insertAdjacentElement('afterend', bar);
+      var btn = document.getElementById('rem-' + ev.key);
+      if (btn) btn.addEventListener('click', function () {
+        localStorage.setItem('shs_reminder_done_' + ev.key, '1');
+        SHS.logAction('update', '정기노회 갱신 완료 확인', ev.label);
+        bar.remove();
+      });
     });
   }
 
