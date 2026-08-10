@@ -107,9 +107,31 @@
     var lg = document.getElementById('btn-logout');
     if (lg) lg.addEventListener('click', function (e) {
       e.preventDefault();
+      if (window.SHSCloud && SHSCloud.enabled()) {
+        SHSCloud.signOut().then(function () { location.href = 'index.html'; });
+        return;
+      }
       SHSAuth.logout();
       location.href = 'index.html';
     });
+
+    /* 구글 로그인(서버) 세션이 있으면 상단바를 그 정보로 바꾼다. */
+    if (window.SHSCloud && SHSCloud.enabled() && !user) {
+      SHSCloud.loadProfile().then(function (p) {
+        if (!p) return;
+        var util = document.querySelector('.topbar .util');
+        if (!util) return;
+        util.innerHTML =
+          '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
+          '<span class="user-name">' + (p.name || p.email) + '</span>' +
+          '<span>(' + SHSCloud.roleName(p.role) + (p.title ? ' · ' + p.title : '') + ')</span>' +
+          '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
+        document.getElementById('btn-logout2').addEventListener('click', function (ev) {
+          ev.preventDefault();
+          SHSCloud.signOut().then(function () { location.href = 'index.html'; });
+        });
+      });
+    }
 
     /* 탭 */
     document.querySelectorAll('.tabs').forEach(function (tabs) {

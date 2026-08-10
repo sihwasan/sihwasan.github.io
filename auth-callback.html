@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로그인 처리 중 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>회원 정보 등록</h1>
+    <div class="crumb">홈 &gt; 로그인 &gt; 회원 정보 등록</div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <div id="cb-area">
+    <p style="text-align:center;color:var(--gray-5)">로그인 정보를 확인하는 중입니다...</p>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var area = document.getElementById('cb-area');
+  var e = SHS.esc;
+
+  if (!SHSCloud.enabled()) {
+    area.innerHTML = '<div class="notice-banner">로그인 서버 설정이 완료되지 않았습니다. ' +
+      '노회 사무실(031-486-9993)로 문의해 주세요.</div>';
+    return;
+  }
+
+  SHSCloud.loadProfile().then(function (p) {
+    if (!p) {
+      area.innerHTML = '<div class="notice-banner">로그인이 확인되지 않았습니다. ' +
+        '다시 시도해 주세요. <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+      return;
+    }
+
+    /* 이미 등급을 받은 회원은 바로 홈으로 */
+    if (p.role !== 'pending' && p.church) {
+      area.innerHTML = '<div class="notice-banner"><strong>' + e(p.name || p.email) + '</strong> 님, 환영합니다. ' +
+        '현재 등급은 <strong>' + SHSCloud.roleName(p.role) + '</strong>' +
+        (p.title ? ' (' + e(p.title) + ')' : '') + '입니다.</div>' +
+        '<p style="text-align:center"><a class="btn" href="index.html">홈으로</a></p>';
+      SHSCloud.log('auth', '구글 로그인', p.email);
+      setTimeout(function () { location.href = 'index.html'; }, 1200);
+      return;
+    }
+
+    /* 처음 로그인한 회원 : 성명·소속 교회를 등록받아 명단과 대조 */
+    var churches = [];
+    SHSData.sichals.forEach(function (s) { churches = churches.concat(s.churches); });
+    churches.sort();
+
+    area.innerHTML =
+      '<div class="notice-banner">구글 로그인이 완료되었습니다. ' +
+      '노회 명단과 대조하기 위해 <strong>성명과 소속 교회</strong>를 확인해 주세요. ' +
+      '명단과 일치하면 회원 등급이 자동으로 부여됩니다.</div>' +
+      '<div class="form-card">' +
+      '<h2>회원 정보 등록</h2>' +
+      '<div class="field"><label>이메일</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
+      '<div class="field"><label>성명</label><input type="text" id="cb-name" value="' + e(p.name || '') + '"></div>' +
+      '<div class="field"><label>직분</label><select id="cb-pos">' +
+      ['목사', '부목사', '장로', '간사'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="field"><label>소속 교회</label>' +
+      '<select id="cb-church"><option value="">— 선택하세요 —</option>' +
+      churches.map(function (c) { return '<option>' + e(c) + '</option>'; }).join('') +
+      '<option value="__etc">목록에 없음 (직접 입력)</option></select></div>' +
+      '<div class="field hidden" id="cb-etc-wrap"><label>교회명 직접 입력</label>' +
+      '<input type="text" id="cb-etc" placeholder="예: 운평장로교회"></div>' +
+      '<div class="field"><label>연락처 (선택)</label><input type="tel" id="cb-phone" placeholder="010-0000-0000"></div>' +
+      '<button class="btn" id="cb-submit" style="width:100%">등록</button>' +
+      '<div class="form-msg" id="cb-msg"></div>' +
+      '</div>';
+
+    document.getElementById('cb-church').addEventListener('change', function () {
+      document.getElementById('cb-etc-wrap').classList.toggle('hidden', this.value !== '__etc');
+    });
+
+    document.getElementById('cb-submit').addEventListener('click', function () {
+      var msg = document.getElementById('cb-msg');
+      var name = document.getElementById('cb-name').value.trim();
+      var sel = document.getElementById('cb-church').value;
+      var church = sel === '__etc' ? document.getElementById('cb-etc').value.trim() : sel;
+      if (!name || !church) {
+        msg.className = 'form-msg err';
+        msg.textContent = '성명과 소속 교회를 입력해 주세요.';
+        return;
+      }
+      msg.className = 'form-msg';
+      msg.textContent = '확인 중입니다...';
+      SHSCloud.claimMembership(name, church,
+        document.getElementById('cb-pos').value,
+        document.getElementById('cb-phone').value.trim()
+      ).then(function (r) {
+        if (!r.ok) {
+          msg.className = 'form-msg err';
+          msg.textContent = r.msg;
+          return;
+        }
+        msg.className = 'form-msg ok';
+        if (r.role === 'pending') {
+          msg.textContent = '등록되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
+            '서기·간사·최고관리자 확인 후 정회원으로 전환됩니다.';
+        } else {
+          msg.textContent = '등록되었습니다. 노회 명단과 일치하여 ' +
+            (r.title ? r.title + '(' + r.roleName + ')' : r.roleName) + ' 등급이 부여되었습니다.';
+          setTimeout(function () { location.href = 'index.html'; }, 1600);
+        }
+      });
+    });
+  });
+});
+</script>
+</body>
+</html>

@@ -285,6 +285,21 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none; border-color: var(--navy);
 }
+/* 구글 로그인 */
+.btn-google {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fff; border: 1px solid var(--gray-3); color: #3c4043;
+  padding: 11px 16px; font-size: 0.95rem; font-weight: 500;
+}
+.btn-google:hover { background: var(--gray-1); border-color: var(--gray-5); }
+.login-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 20px 0; color: var(--gray-5); font-size: 0.82rem;
+}
+.login-divider::before, .login-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--gray-2);
+}
+
 .find-links {
   margin-top: 18px; text-align: center; font-size: 0.85rem; color: var(--gray-5);
 }
