@@ -57,8 +57,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
       var rows = r.data || [];
-      /* 최고관리자 계정은 최고관리자에게만 표시 */
-      var visible = rows.filter(function (p) { return p.role !== 'superadmin' || isSuper; });
+      /* 최고관리자 계정은 회원 목록에 표시하지 않는다 */
+      var visible = rows.filter(function (p) { return p.role !== 'superadmin'; });
       var pendings = visible.filter(function (p) { return p.role === 'pending'; });
 
       var html = '';
@@ -292,9 +292,9 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '</tbody></table>';
     }
 
-    /* 계정 목록 (최고관리자 계정은 최고관리자에게만 표시) */
+    /* 계정 목록 (최고관리자 계정은 회원 목록에 표시하지 않는다) */
     var visible = accounts.filter(function (a) {
-      return a.role !== 'superadmin' || isSuper;
+      return a.role !== 'superadmin';
     });
     html += '<h2>홈페이지 회원 목록</h2>';
     html += '<table class="tbl"><thead><tr><th>이메일(아이디)</th><th>성명</th><th>직분</th><th>소속</th><th>연락처</th><th>등급</th>' +
