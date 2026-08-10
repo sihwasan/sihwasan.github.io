@@ -21,6 +21,8 @@
 
 <script src="js/auth.js"></script>
 <script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -28,11 +30,121 @@ document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('my-area');
   var e = SHS.esc;
 
+  /* 구글 로그인(서버) 회원이면 서버 정보로 화면을 구성한다. */
+  if (!user && window.SHSCloud && SHSCloud.enabled()) {
+    SHSCloud.loadProfile().then(function (p) {
+      if (!p) {
+        area.innerHTML =
+          '<div class="notice-banner">로그인 후 이용할 수 있습니다. ' +
+          '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+        return;
+      }
+      renderCloud(p);
+    });
+    return;
+  }
+
   if (!user) {
     area.innerHTML =
       '<div class="notice-banner">로그인 후 이용할 수 있습니다. ' +
       '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
     return;
+  }
+
+  /* ---------- 구글 로그인 회원용 화면 ---------- */
+  function renderCloud(p) {
+    var churches = [];
+    SHSData.sichals.forEach(function (s) { churches = churches.concat(s.churches); });
+    churches.sort();
+    if (p.church && churches.indexOf(p.church) === -1) churches.unshift(p.church);
+
+    var html = '';
+    html += '<div class="notice-banner"><strong>' + e(p.name || p.email) + '</strong> 님의 현재 등급은 ' +
+      '<strong>' + SHSCloud.roleName(p.role) + '</strong>' + (p.title ? ' (' + e(p.title) + ')' : '') + '입니다. ';
+    html += p.role === 'pending'
+      ? '성명과 소속 교회가 노회 명단과 일치하지 않아 승인대기 상태입니다. 아래에서 정확히 수정하시면 등급이 자동으로 부여됩니다.'
+      : '성명 또는 소속 교회를 수정하면 노회 명단과 다시 대조하여 등급이 갱신됩니다.';
+    html += '</div>';
+
+    html += '<h2>회원 정보</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<div class="field"><label>이메일 (구글 계정)</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
+      '<div class="field"><label>성명</label><input type="text" id="q-name" value="' + e(p.name || '') + '"></div>' +
+      '<div class="field"><label>직분</label><select id="q-pos">' +
+      ['목사', '부목사', '장로', '간사'].map(function (x) {
+        return '<option' + (p.position === x ? ' selected' : '') + '>' + x + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field"><label>소속 교회</label><select id="q-church">' +
+      '<option value="">— 선택하세요 —</option>' +
+      churches.map(function (c) {
+        return '<option' + (p.church === c ? ' selected' : '') + '>' + e(c) + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field"><label>연락처 (선택)</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
+      '<button class="btn" id="q-save" style="width:100%">저장</button>' +
+      '<div class="form-msg" id="q-msg"></div>' +
+      '</div>';
+
+    html += '<h2>로그아웃</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<p style="font-size:0.88rem;color:var(--gray-7);margin-bottom:16px">' +
+      '구글 계정으로 로그인한 회원입니다. 비밀번호는 구글에서 관리하므로 이 홈페이지에 저장되지 않습니다.</p>' +
+      '<button class="btn ghost" id="q-out" style="width:100%">로그아웃</button>' +
+      '</div>';
+
+    html += '<h2>회원 탈퇴</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<p style="font-size:0.88rem;color:var(--gray-7);margin-bottom:16px">' +
+      '탈퇴하시면 회원 정보가 삭제되며 되돌릴 수 없습니다. 탈퇴 기록은 감사 기록으로 보존됩니다.</p>' +
+      '<button class="btn danger" id="q-del" style="width:100%">회원 탈퇴</button>' +
+      '<div class="form-msg" id="q-dmsg"></div>' +
+      '</div>';
+
+    area.innerHTML = html;
+
+    document.getElementById('q-save').addEventListener('click', function () {
+      var msg = document.getElementById('q-msg');
+      var name = document.getElementById('q-name').value.trim();
+      var church = document.getElementById('q-church').value;
+      if (!name || !church) {
+        msg.className = 'form-msg err';
+        msg.textContent = '성명과 소속 교회를 입력해 주세요.';
+        return;
+      }
+      msg.className = 'form-msg';
+      msg.textContent = '저장 중입니다...';
+      SHSCloud.claimMembership(name, church, document.getElementById('q-pos').value,
+        document.getElementById('q-phone').value.trim()).then(function (r) {
+        if (!r.ok) {
+          msg.className = 'form-msg err';
+          msg.textContent = r.msg;
+          return;
+        }
+        alert('저장되었습니다. 현재 등급: ' + r.roleName + (r.title ? ' (' + r.title + ')' : ''));
+        location.reload();
+      });
+    });
+
+    document.getElementById('q-out').addEventListener('click', function () {
+      SHSCloud.signOut().then(function () { location.href = 'index.html'; });
+    });
+
+    document.getElementById('q-del').addEventListener('click', function () {
+      if (!confirm('정말 탈퇴하시겠습니까? 회원 정보가 삭제되며 되돌릴 수 없습니다.')) return;
+      SHSCloud.init().then(function (c) {
+        return c.from('profiles').delete().eq('id', p.id).then(function (r) {
+          if (r.error) {
+            var msg = document.getElementById('q-dmsg');
+            msg.className = 'form-msg err';
+            msg.textContent = r.error.message;
+            return;
+          }
+          return SHSCloud.signOut().then(function () {
+            alert('탈퇴가 완료되었습니다. 그동안 이용해 주셔서 감사합니다.');
+            location.href = 'index.html';
+          });
+        });
+      });
+    });
   }
 
   function render() {

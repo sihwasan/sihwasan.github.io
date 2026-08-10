@@ -115,21 +115,37 @@
       location.href = 'index.html';
     });
 
-    /* 구글 로그인(서버) 세션이 있으면 상단바를 그 정보로 바꾼다. */
+    /* 구글 로그인(서버) 세션 확인 후 상단바를 그 정보로 바꾼다.
+     * 로그인 직후에는 주소 끝에 인증 토큰이 붙어 돌아오므로,
+     * 토큰을 처리한 뒤 주소창을 깨끗하게 정리한다. */
     if (window.SHSCloud && SHSCloud.enabled() && !user) {
+      var hadToken = location.hash.indexOf('access_token') !== -1;
+
       SHSCloud.loadProfile().then(function (p) {
+        if (hadToken) {
+          history.replaceState(null, '', location.pathname + location.search);
+        }
         if (!p) return;
+
         var util = document.querySelector('.topbar .util');
-        if (!util) return;
-        util.innerHTML =
-          '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
-          '<span class="user-name">' + (p.name || p.email) + '</span>' +
-          '<span>(' + SHSCloud.roleName(p.role) + (p.title ? ' · ' + p.title : '') + ')</span>' +
-          '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
-        document.getElementById('btn-logout2').addEventListener('click', function (ev) {
-          ev.preventDefault();
-          SHSCloud.signOut().then(function () { location.href = 'index.html'; });
-        });
+        if (util) {
+          util.innerHTML =
+            '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
+            '<span class="user-name">' + (p.name || p.email) + '</span>' +
+            '<span>(' + SHSCloud.roleName(p.role) + (p.title ? ' · ' + p.title : '') + ')</span>' +
+            '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
+          var lo = document.getElementById('btn-logout2');
+          if (lo) lo.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            SHSCloud.signOut().then(function () { location.href = 'index.html'; });
+          });
+        }
+
+        /* 아직 성명·소속 교회를 등록하지 않은 회원은 등록 화면으로 안내한다. */
+        var here = location.pathname.split('/').pop() || 'index.html';
+        if (!p.church && here !== 'auth-callback.html' && here !== 'mypage.html') {
+          location.href = 'auth-callback.html';
+        }
       });
     }
 
