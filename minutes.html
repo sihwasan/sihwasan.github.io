@@ -27,40 +27,56 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var user = SHSAuth.currentUser();
+ SHS.getUser().then(function (user) {
   var gate = document.getElementById('minutes-gate');
   var box = document.getElementById('minutes-content');
 
   if (!SHSAuth.isOfficer(user)) {
     if (!user) {
       gate.innerHTML =
-        '<div class="notice-banner">노회 회의록은 <strong>노회 임원(노회장·서기·간사)과 최고관리자</strong>만 열람할 수 있습니다. ' +
+        '<div class="notice-banner">노회 회의록은 <strong>노회 임원</strong>과 최고관리자만 열람할 수 있습니다. ' +
         '임원 계정으로 로그인해 주시기 바랍니다. <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
     } else {
       gate.innerHTML =
-        '<div class="notice-banner">노회 회의록은 <strong>노회 임원(노회장·서기·간사)과 최고관리자</strong>만 열람할 수 있는 자료입니다. ' +
+        '<div class="notice-banner">노회 회의록은 <strong>노회 임원</strong>과 최고관리자만 열람할 수 있는 자료입니다. ' +
         '현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 열람할 수 없습니다. 회의록 열람이 필요한 회원께서는 노회 사무실(031-486-9993)로 문의해 주시기 바랍니다.</div>';
     }
     return;
   }
 
-  /* 회의록 본문은 공개 저장소에 포함되지 않는 별도 파일에서 불러온다.
-   * 서버 인증(Supabase 등) 연동 전까지는 노회 내부 컴퓨터에서만 열람된다. */
+  function show(html) {
+    box.innerHTML = html;
+    box.classList.remove('hidden');
+    SHS.logAction('view', '회의록 열람', '제19회 정기노회 회의록 열람');
+  }
+
+  /* 1) 노회 내부 컴퓨터: 로컬 비공개 파일에서 불러온다.
+   * 2) 인터넷: 서버(임원 인증)에서 불러온다. 서버가 임원 여부를 확인하므로 우회할 수 없다. */
   fetch('private/minutes-content.html')
     .then(function (res) {
       if (!res.ok) throw new Error('not available');
       return res.text();
     })
-    .then(function (html) {
-      box.innerHTML = html;
-      box.classList.remove('hidden');
-      SHSAudit.log('view', '회의록 열람', '제19회 정기노회 회의록 열람');
-    })
+    .then(show)
     .catch(function () {
+      if (window.SHSCloud && SHSCloud.enabled() && user.cloud) {
+        SHSCloud.init().then(function (c) {
+          return c.from('archive_docs').select('html').eq('key', 'minutes').single();
+        }).then(function (r) {
+          if (r && r.data && r.data.html) {
+            show(r.data.html);
+          } else {
+            gate.innerHTML = '<div class="notice-banner">회의록이 아직 서버에 등록되지 않았습니다. ' +
+              '노회 사무실(031-486-9993)로 문의해 주세요.</div>';
+          }
+        });
+        return;
+      }
       gate.innerHTML =
-        '<div class="notice-banner">회의록 본문은 보안을 위해 인터넷 홈페이지에 게시하지 않습니다. ' +
-        '서버 인증 연동 후 임원에게 온라인으로 제공될 예정이며, 현재는 노회 사무실(031-486-9993)에서 열람하실 수 있습니다.</div>';
+        '<div class="notice-banner">회의록 본문은 보안을 위해 인터넷 홈페이지에 직접 게시하지 않습니다. ' +
+        '현재는 노회 사무실(031-486-9993)에서 열람하실 수 있습니다.</div>';
     });
+ });
 });
 </script>
 </body>

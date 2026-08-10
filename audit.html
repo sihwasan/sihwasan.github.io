@@ -26,7 +26,7 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var user = SHSAuth.currentUser();
+ SHS.getUser().then(function (user) {
   var area = document.getElementById('audit-area');
   var e = SHS.esc;
 
@@ -39,7 +39,33 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  SHSAudit.log('view', '감사 로그 열람', '감독 페이지 접속');
+  SHS.logAction('view', '감사 로그 열람', '감독 페이지 접속');
+
+  /* 서버 로그인(구글) 시에는 서버에 보존된 기록을, 아니면 이 컴퓨터의 기록을 본다 */
+  var cloudRows = null;
+
+  function loadRows() {
+    if (!user.cloud) {
+      return Promise.resolve(SHSAudit.list().slice().reverse().map(function (r) {
+        return { time: r.time, who: r.userName, whoSub: r.userId + (r.role !== '-' ? ' / ' + SHSAuth.roleName(r.role) : ''),
+                 type: r.type, action: r.action, detail: r.detail };
+      }));
+    }
+    if (cloudRows) return Promise.resolve(cloudRows);
+    return SHSCloud.init().then(function (c) {
+      return c.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
+    }).then(function (r) {
+      cloudRows = (r.data || []).map(function (row) {
+        return {
+          time: String(row.created_at).replace('T', ' ').slice(0, 19),
+          who: row.user_name || '-',
+          whoSub: (row.user_email || '') + (row.role ? ' / ' + SHSCloud.roleName(row.role) : ''),
+          type: row.type, action: row.action, detail: row.detail
+        };
+      });
+      return cloudRows;
+    });
+  }
 
   var html = '';
   html += '<div class="notice-banner">개인정보 열람, 자료의 추가·수정·삭제, 서류 발급, 로그인 등 주요 행위가 자동으로 기록됩니다. ' +
@@ -62,32 +88,34 @@ document.addEventListener('DOMContentLoaded', function () {
   function render() {
     var type = document.getElementById('filter-type').value;
     var q = document.getElementById('filter-text').value.trim();
-    var rows = SHSAudit.list().slice().reverse().filter(function (r) {
-      if (type && r.type !== type) return false;
-      if (q && (r.userId + r.userName + r.action + r.detail).indexOf(q) === -1) return false;
-      return true;
+    loadRows().then(function (all) {
+      var rows = all.filter(function (r) {
+        if (type && r.type !== type) return false;
+        if (q && ((r.who || '') + (r.whoSub || '') + r.action + (r.detail || '')).indexOf(q) === -1) return false;
+        return true;
+      });
+      var t = document.getElementById('log-list');
+      if (!rows.length) {
+        t.innerHTML = '<p style="color:var(--gray-5)">기록이 없습니다.</p>';
+        return;
+      }
+      var body = '';
+      rows.forEach(function (r) {
+        body += '<tr><td style="white-space:nowrap">' + e(r.time) + '</td>' +
+          '<td>' + e(r.who) + '<div style="font-size:0.78rem;color:var(--gray-5)">' + e(r.whoSub) + '</div></td>' +
+          '<td><span class="role-badge">' + SHSAudit.typeName(r.type) + '</span></td>' +
+          '<td class="left">' + e(r.action) +
+          (r.detail ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(r.detail) + '</div>' : '') + '</td></tr>';
+      });
+      t.innerHTML = '<table class="tbl"><thead><tr><th style="width:170px">일시</th><th style="width:160px">이용자</th>' +
+        '<th style="width:100px">구분</th><th>내용</th></tr></thead><tbody>' + body + '</tbody></table>' +
+        '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '건</p>';
     });
-    var t = document.getElementById('log-list');
-    if (!rows.length) {
-      t.innerHTML = '<p style="color:var(--gray-5)">기록이 없습니다.</p>';
-      return;
-    }
-    var body = '';
-    rows.forEach(function (r) {
-      body += '<tr><td style="white-space:nowrap">' + e(r.time) + '</td>' +
-        '<td>' + e(r.userName) + '<div style="font-size:0.78rem;color:var(--gray-5)">' + e(r.userId) +
-        (r.role !== '-' ? ' / ' + SHSAuth.roleName(r.role) : '') + '</div></td>' +
-        '<td><span class="role-badge">' + SHSAudit.typeName(r.type) + '</span></td>' +
-        '<td class="left">' + e(r.action) +
-        (r.detail ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(r.detail) + '</div>' : '') + '</td></tr>';
-    });
-    t.innerHTML = '<table class="tbl"><thead><tr><th style="width:170px">일시</th><th style="width:160px">이용자</th>' +
-      '<th style="width:100px">구분</th><th>내용</th></tr></thead><tbody>' + body + '</tbody></table>' +
-      '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '건</p>';
   }
   document.getElementById('filter-type').addEventListener('change', render);
   document.getElementById('filter-text').addEventListener('input', render);
   render();
+ });
 });
 </script>
 </body>

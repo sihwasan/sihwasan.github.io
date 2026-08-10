@@ -82,7 +82,7 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var user = SHSAuth.currentUser();
+ SHS.getUser().then(function (user) {
   var e = SHS.esc;
   var POSTS_KEY = 'shs_posts_v1';
 
@@ -217,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('write-form').classList.add('hidden');
     renderPosts('');
   });
+ });
 });
 </script>
 </body>

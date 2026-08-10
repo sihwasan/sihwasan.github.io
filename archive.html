@@ -62,7 +62,7 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var user = SHSAuth.currentUser();
+ SHS.getUser().then(function (user) {
   var e = SHS.esc;
 
   var tb = document.getElementById('archive-body');
@@ -101,25 +101,51 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>';
     return;
   }
-  /* 결의사항 자료는 공개 저장소에 포함되지 않는 별도 파일에서 제공된다. */
-  if (!SHSData.resolutions || !SHSData.resolutions.length) {
-    area.innerHTML =
-      '<div class="notice-banner">결의사항 자료는 보안을 위해 인터넷 홈페이지에 게시하지 않습니다. ' +
-      '서버 인증 연동 후 정회원에게 온라인으로 제공될 예정이며, 현재는 노회 사무실(031-486-9993)에서 열람하실 수 있습니다.</div>';
+  function renderResolutions(resolutions, agenda) {
+    var html = '';
+    resolutions.forEach(function (r) {
+      var items = '';
+      r.items.forEach(function (it, i) { items += '<li>' + (i + 1) + '. ' + e(it) + '</li>'; });
+      html += '<div class="side-box" style="margin-bottom:18px"><div class="box-head">' + e(r.session) + '</div>' +
+        '<div class="box-body"><ol style="list-style:none">' + items + '</ol></div></div>';
+    });
+    if (agenda && agenda.length) {
+      html += '<h3>제19회 정기노회 주요 헌의안건</h3><div class="side-box"><div class="box-body"><ol style="list-style:none">';
+      agenda.forEach(function (a, i) { html += '<li>' + (i + 1) + '. ' + e(a) + '</li>'; });
+      html += '</ol></div></div>';
+    }
+    area.innerHTML = html;
+    SHS.logAction('view', '결의사항 열람', '자료실에서 지난 회기 결의사항 열람');
+  }
+
+  /* 로컬 파일(내부 컴퓨터)이 있으면 그것을, 없으면 서버(정회원 인증)에서 불러온다. */
+  if (SHSData.resolutions && SHSData.resolutions.length) {
+    renderResolutions(SHSData.resolutions, SHSData.agenda || []);
     return;
   }
-  SHSAudit.log('view', '결의사항 열람', '자료실에서 지난 회기 결의사항 열람');
-  var html = '';
-  SHSData.resolutions.forEach(function (r) {
-    var items = '';
-    r.items.forEach(function (it, i) { items += '<li>' + (i + 1) + '. ' + e(it) + '</li>'; });
-    html += '<div class="side-box" style="margin-bottom:18px"><div class="box-head">' + e(r.session) + '</div>' +
-      '<div class="box-body"><ol style="list-style:none">' + items + '</ol></div></div>';
-  });
-  html += '<h3>제19회 정기노회 주요 헌의안건</h3><div class="side-box"><div class="box-body"><ol style="list-style:none">';
-  SHSData.agenda.forEach(function (a, i) { html += '<li>' + (i + 1) + '. ' + e(a) + '</li>'; });
-  html += '</ol></div></div>';
-  area.innerHTML = html;
+  if (window.SHSCloud && SHSCloud.enabled() && user && user.cloud) {
+    SHSCloud.init().then(function (c) {
+      return c.from('archive_docs').select('*').in('key', ['resolutions', 'agenda']);
+    }).then(function (r) {
+      var rows = (r && r.data) || [];
+      var res = null, ag = null;
+      rows.forEach(function (row) {
+        if (row.key === 'resolutions') res = row.content;
+        if (row.key === 'agenda') ag = row.content;
+      });
+      if (res && res.length) {
+        renderResolutions(res, ag || []);
+      } else {
+        area.innerHTML = '<div class="notice-banner">결의사항 자료가 아직 서버에 등록되지 않았습니다. ' +
+          '노회 사무실(031-486-9993)로 문의해 주세요.</div>';
+      }
+    });
+    return;
+  }
+  area.innerHTML =
+    '<div class="notice-banner">결의사항 자료는 보안을 위해 인터넷 홈페이지에 직접 게시하지 않습니다. ' +
+    '현재는 노회 사무실(031-486-9993)에서 열람하실 수 있습니다.</div>';
+ });
 });
 </script>
 </body>

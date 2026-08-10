@@ -180,9 +180,43 @@
     return n.charAt(0) + '**' + n.charAt(n.length - 1);
   }
 
+  /* 통합 세션 확인: 구글 로그인(서버)과 이메일 로그인(브라우저)을 모두 확인한다.
+   * 반환되는 사용자 객체는 role·title·name·church 등을 가지므로
+   * SHSAuth의 권한 판정 함수(isOfficer 등)에 그대로 전달할 수 있다. */
+  function getUser() {
+    return new Promise(function (resolve) {
+      var local = SHSAuth.currentUser();
+      if (local) { resolve(local); return; }
+      if (window.SHSCloud && SHSCloud.enabled()) {
+        SHSCloud.loadProfile().then(function (p) {
+          if (!p) { resolve(null); return; }
+          resolve({
+            id: p.id, email: p.email, name: p.name || p.email,
+            church: p.church || '', position: p.position || '',
+            phone: p.phone || '', role: p.role, title: p.title || null,
+            cloud: true
+          });
+        });
+        return;
+      }
+      resolve(null);
+    });
+  }
+
+  /* 통합 감사 로그: 서버가 연결되어 있으면 서버에, 아니면 브라우저에 기록 */
+  function logAction(type, action, detail) {
+    if (window.SHSCloud && SHSCloud.enabled() && SHSCloud.currentProfile()) {
+      SHSCloud.log(type, action, detail);
+    } else {
+      SHSAudit.log(type, action, detail);
+    }
+  }
+
   /* 전역 헬퍼 */
   window.SHS = {
     user: user,
+    getUser: getUser,
+    logAction: logAction,
     maskName: maskName,
     esc: function (s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {

@@ -26,7 +26,7 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var user = SHSAuth.currentUser();
+ SHS.getUser().then(function (user) {
   var area = document.getElementById('admin-area');
   var e = SHS.esc;
 
@@ -41,6 +41,90 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var isSuper = SHSAuth.canAssignRoles(user);
   var canApprove = SHSAuth.canApproveMembers(user);
+
+  /* ---------- 서버(구글 로그인) 회원 관리 ---------- */
+  if (user.cloud) {
+    renderCloud();
+    return;
+  }
+
+  function renderCloud() {
+    SHSCloud.init().then(function (c) {
+      return c.from('profiles').select('*').order('created_at');
+    }).then(function (r) {
+      if (r.error) {
+        area.innerHTML = '<div class="notice-banner">회원 목록을 불러오지 못했습니다: ' + e(r.error.message) + '</div>';
+        return;
+      }
+      var rows = r.data || [];
+      /* 최고관리자 계정은 최고관리자에게만 표시 */
+      var visible = rows.filter(function (p) { return p.role !== 'superadmin' || isSuper; });
+      var pendings = visible.filter(function (p) { return p.role === 'pending'; });
+
+      var html = '';
+      html += '<div class="notice-banner">서버에 등록된 실제 회원 목록입니다. ' +
+        '승인대기 회원의 정회원 설정: <strong>서기, 간사, 최고관리자</strong>' +
+        (isSuper ? ' / 등급 지정: <strong>최고관리자</strong>' : '') + '</div>';
+
+      if (pendings.length) {
+        html += '<h2>승인대기 회원</h2>';
+        html += '<p>가입 시 입력한 이름과 소속 교회가 노회 명단과 일치하지 않은 회원입니다. 확인 후 정회원으로 설정해 주세요.</p>';
+        html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속 교회</th><th style="width:130px">처리</th></tr></thead><tbody>';
+        pendings.forEach(function (p) {
+          html += '<tr><td class="left">' + e(p.email) + '</td><td>' + e(p.name || '-') + '</td>' +
+            '<td>' + e(p.position || '-') + '</td><td>' + e(p.church || '-') + '</td>' +
+            '<td>' + (canApprove ? '<button class="btn sm" data-capprove="' + e(p.id) + '">정회원 설정</button>' : '승인 권한 없음') + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+
+      html += '<h2>회원 목록 (' + visible.length + '명)</h2>';
+      html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th><th>연락처</th><th>등급</th>' +
+        (isSuper ? '<th style="width:210px">등급 변경</th>' : '') + '</tr></thead><tbody>';
+      visible.forEach(function (p) {
+        html += '<tr><td class="left">' + e(p.email) + '</td><td>' + e(p.name || '-') + '</td>' +
+          '<td>' + e(p.position || '-') + '</td><td>' + e(p.church || '-') + '</td><td>' + e(p.phone || '-') + '</td>' +
+          '<td><span class="role-badge">' + SHSCloud.roleName(p.role) + '</span>' +
+          (p.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(p.title) + '</div>' : '') + '</td>';
+        if (isSuper) {
+          html += '<td><select data-crole="' + e(p.id) + '">' +
+            ['pending', 'member', 'officer', 'staff', 'clerk', 'president', 'superadmin'].map(function (x) {
+              return '<option value="' + x + '"' + (p.role === x ? ' selected' : '') + '>' + SHSCloud.roleName(x) + '</option>';
+            }).join('') +
+            '</select> <button class="btn sm" data-cassign="' + e(p.id) + '">적용</button></td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      html += '<p style="font-size:0.82rem;color:var(--gray-5)">계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
+      area.innerHTML = html;
+
+      function updateRole(id, role, label) {
+        SHSCloud.init().then(function (c) {
+          return c.from('profiles').update({ role: role, updated_at: new Date().toISOString() }).eq('id', id);
+        }).then(function (res) {
+          if (res.error) { alert('처리하지 못했습니다: ' + res.error.message); return; }
+          SHSCloud.log('update', label, '대상 ' + id + ' → ' + SHSCloud.roleName(role));
+          alert('처리되었습니다.');
+          renderCloud();
+        });
+      }
+
+      area.querySelectorAll('button[data-capprove]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('이 회원을 정회원으로 설정하시겠습니까?')) return;
+          updateRole(b.dataset.capprove, 'member', '정회원 승인');
+        });
+      });
+      area.querySelectorAll('button[data-cassign]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var sel = area.querySelector('select[data-crole="' + b.dataset.cassign + '"]');
+          if (!confirm('등급을 ' + SHSCloud.roleName(sel.value) + '(으)로 변경하시겠습니까?')) return;
+          updateRole(b.dataset.cassign, sel.value, '등급 변경');
+        });
+      });
+    });
+  }
 
   function render() {
     var accounts = SHSAuth.listAccounts();
@@ -160,6 +244,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   render();
+ });
 });
 </script>
 </body>

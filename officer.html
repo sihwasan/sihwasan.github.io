@@ -27,7 +27,7 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var user = SHSAuth.currentUser();
+ SHS.getUser().then(function (user) {
   var area = document.getElementById('officer-area');
   var e = SHS.esc;
 
@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   area.innerHTML = html;
+ });
 });
 </script>
 </body>

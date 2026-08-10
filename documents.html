@@ -27,7 +27,7 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var user = SHSAuth.currentUser();
+ SHS.getUser().then(function (user) {
   var area = document.getElementById('doc-area');
   var e = SHS.esc;
   var LOG_KEY = 'shs_doclog_v1';
@@ -151,6 +151,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<p class="text-right no-print" style="max-width:720px;margin:0 auto 40px">' +
       '<button class="btn" onclick="window.print()">인쇄</button></p>';
   }
+ });
 });
 </script>
 </body>
