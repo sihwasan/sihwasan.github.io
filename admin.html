@@ -52,9 +52,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (pendings.length) {
       html += '<h2>승인대기 회원</h2>';
       html += '<p>가입 시 입력한 이름과 소속 교회가 회원명단과 일치하지 않은 회원입니다. 확인 후 정회원으로 설정해 주세요.</p>';
-      html += '<table class="tbl"><thead><tr><th>아이디</th><th>성명</th><th>직분</th><th>소속 교회</th><th style="width:120px">처리</th></tr></thead><tbody>';
+      html += '<table class="tbl"><thead><tr><th>이메일(아이디)</th><th>성명</th><th>직분</th><th>소속 교회</th><th style="width:120px">처리</th></tr></thead><tbody>';
       pendings.forEach(function (a) {
-        html += '<tr><td>' + e(a.id) + '</td><td>' + e(a.name) + '</td><td>' + e(a.position) + '</td><td>' + e(a.church) + '</td>' +
+        html += '<tr><td class="left">' + e(a.id) + '</td><td>' + e(a.name) + '</td><td>' + e(a.position) + '</td><td>' + e(a.church) + '</td>' +
           '<td>' + (canApprove ? '<button class="btn sm" data-approve="' + e(a.id) + '">정회원 설정</button>' : '승인 권한 없음') + '</td></tr>';
       });
       html += '</tbody></table>';
@@ -65,27 +65,29 @@ document.addEventListener('DOMContentLoaded', function () {
       return a.role !== 'superadmin' || isSuper;
     });
     html += '<h2>홈페이지 회원 목록</h2>';
-    html += '<table class="tbl"><thead><tr><th>아이디</th><th>성명</th><th>직분</th><th>소속</th><th>등급</th>' +
+    html += '<table class="tbl"><thead><tr><th>이메일(아이디)</th><th>성명</th><th>직분</th><th>소속</th><th>연락처</th><th>등급</th>' +
       (isSuper ? '<th style="width:210px">등급 변경</th>' : '') +
       '<th style="width:80px">관리</th></tr></thead><tbody>';
     visible.forEach(function (a) {
-      html += '<tr><td>' + e(a.id) + '</td><td>' + e(a.name) + '</td><td>' + e(a.position) + '</td><td>' + e(a.church) + '</td>' +
-        '<td><span class="role-badge">' + SHSAuth.roleName(a.role) + '</span></td>';
+      html += '<tr><td class="left">' + e(a.id) + '</td><td>' + e(a.name) + '</td><td>' + e(a.position) + '</td>' +
+        '<td>' + e(a.church) + '</td><td>' + e(a.phone || '-') + '</td>' +
+        '<td><span class="role-badge">' + SHSAuth.roleName(a.role) + '</span>' +
+        (a.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(a.title) + '</div>' : '') + '</td>';
       if (isSuper) {
         html += '<td><select data-role-for="' + e(a.id) + '">' +
-          ['member', 'staff', 'clerk', 'president', 'superadmin'].map(function (r) {
+          ['pending', 'member', 'officer', 'staff', 'clerk', 'president', 'superadmin'].map(function (r) {
             return '<option value="' + r + '"' + (a.role === r ? ' selected' : '') + '>' + SHSAuth.roleName(r) + '</option>';
           }).join('') +
           '</select> <button class="btn sm" data-assign="' + e(a.id) + '">적용</button></td>';
       }
-      html += '<td>' + (a.id !== 'admin' ? '<button class="btn danger sm" data-remove="' + e(a.id) + '">삭제</button>' : '') + '</td></tr>';
+      html += '<td><button class="btn danger sm" data-remove="' + e(a.id) + '">삭제</button></td></tr>';
     });
     html += '</tbody></table>';
 
     /* 회원 추가 */
     html += '<h2>회원 추가</h2>';
     html += '<div class="admin-card" style="max-width:760px"><div class="inline-form">' +
-      '<div class="field"><label>아이디</label><input type="text" id="na-id"></div>' +
+      '<div class="field"><label>이메일(아이디)</label><input type="email" id="na-id" placeholder="hong@naver.com"></div>' +
       '<div class="field"><label>초기 비밀번호</label><input type="text" id="na-pw"></div>' +
       '<div class="field"><label>성명</label><input type="text" id="na-name"></div>' +
       '<div class="field"><label>직분</label><select id="na-pos"><option>목사</option><option>장로</option><option>간사</option></select></div>' +
@@ -93,8 +95,9 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="btn" id="btn-add">추가</button>' +
       '</div><div class="form-msg" id="add-msg"></div>' +
       '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:10px">' +
-      '정회원은 시화산노회 소속 목사와 총대 장로로 구성됩니다. 신규 계정은 정회원 등급으로 생성되며, ' +
-      (isSuper ? '직책 지정은 위 목록의 등급 변경에서 할 수 있습니다.' : '직책 지정은 최고관리자에게 요청하시기 바랍니다.') +
+      '성명과 소속 교회가 노회 임원·회원 명단과 일치하면 해당 등급이 자동 부여되고, ' +
+      '일치하지 않으면 승인대기 상태로 생성됩니다. ' +
+      (isSuper ? '등급은 위 목록에서 직접 변경할 수 있습니다.' : '직책 지정은 최고관리자에게 요청하시기 바랍니다.') +
       '</p></div>';
 
     area.innerHTML = html;
@@ -133,15 +136,15 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btn-add').addEventListener('click', function () {
       var msg = document.getElementById('add-msg');
       var data = {
-        id: document.getElementById('na-id').value.trim(),
+        id: document.getElementById('na-id').value.trim().toLowerCase(),
         pw: document.getElementById('na-pw').value,
         name: document.getElementById('na-name').value.trim(),
         position: document.getElementById('na-pos').value,
         church: document.getElementById('na-church').value.trim()
       };
-      if (!data.id || !data.pw || !data.name) {
+      if (!data.id || !data.pw || !data.name || !data.church) {
         msg.className = 'form-msg err';
-        msg.textContent = '아이디, 비밀번호, 성명은 필수 항목입니다.';
+        msg.textContent = '이메일, 비밀번호, 성명, 소속 교회는 필수 항목입니다.';
         return;
       }
       var r = SHSAuth.addAccount(user, data);

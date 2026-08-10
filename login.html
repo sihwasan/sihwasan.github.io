@@ -20,8 +20,8 @@
   <div class="form-card">
     <h2>회원 로그인</h2>
     <div class="field">
-      <label for="login-id">아이디</label>
-      <input type="text" id="login-id" autocomplete="username">
+      <label for="login-id">이메일</label>
+      <input type="email" id="login-id" autocomplete="username" placeholder="hong@naver.com">
     </div>
     <div class="field">
       <label for="login-pw">비밀번호</label>
@@ -33,15 +33,15 @@
     <button class="btn" id="btn-login" style="width:100%">로그인</button>
     <div class="form-msg" id="login-msg"></div>
     <div class="find-links">
-      <a href="#" id="link-find-id">아이디 찾기</a>
+      <a href="#" id="link-find-id">이메일 찾기</a>
       <span class="sep">|</span>
       <a href="#" id="link-find-pw">비밀번호 재설정</a>
     </div>
   </div>
 
-  <!-- 아이디 찾기 -->
+  <!-- 이메일 찾기 -->
   <div class="form-card hidden" id="find-id-card" style="margin-top:20px">
-    <h2>아이디 찾기</h2>
+    <h2>이메일 찾기</h2>
     <p style="font-size:0.85rem;color:var(--gray-5);text-align:center;margin-bottom:20px">
       가입 시 등록한 성명과 소속 교회를 입력해 주세요.
     </p>
@@ -53,7 +53,7 @@
       <label for="fi-church">소속 교회</label>
       <input type="text" id="fi-church" placeholder="예: 운평장로교회">
     </div>
-    <button class="btn" id="btn-find-id" style="width:100%">아이디 찾기</button>
+    <button class="btn" id="btn-find-id" style="width:100%">이메일 찾기</button>
     <button class="btn ghost" id="btn-fi-cancel" style="width:100%;margin-top:8px">닫기</button>
     <div class="form-msg" id="fi-msg"></div>
     <div id="fi-result" class="hidden" style="margin-top:14px;border:1px solid var(--gray-2);background:var(--gray-1);padding:14px;font-size:0.9rem"></div>
@@ -63,11 +63,11 @@
   <div class="form-card hidden" id="find-pw-card" style="margin-top:20px">
     <h2>비밀번호 재설정</h2>
     <p style="font-size:0.85rem;color:var(--gray-5);text-align:center;margin-bottom:20px">
-      본인 확인을 위해 아이디와 가입 시 등록한 성명·소속 교회를 입력해 주세요.
+      본인 확인을 위해 이메일과 가입 시 등록한 성명·소속 교회를 입력해 주세요.
     </p>
     <div class="field">
-      <label for="fp-id">아이디</label>
-      <input type="text" id="fp-id" autocomplete="off">
+      <label for="fp-id">이메일</label>
+      <input type="email" id="fp-id" autocomplete="off" placeholder="hong@naver.com">
     </div>
     <div class="field">
       <label for="fp-name">성명</label>
@@ -92,12 +92,16 @@
 
   <div class="form-card" style="margin-top:36px">
     <h2>회원가입</h2>
+    <p style="font-size:0.85rem;color:var(--gray-5);text-align:center;margin-bottom:20px">
+      이메일이 곧 로그인 아이디가 됩니다.<br>
+      성명과 소속 교회가 노회 명단과 일치하면 자동으로 회원 등급이 부여됩니다.
+    </p>
     <div class="field">
-      <label for="reg-id">아이디 (영문·숫자 4~20자)</label>
-      <input type="text" id="reg-id" autocomplete="off">
+      <label for="reg-id">이메일 (로그인 아이디)</label>
+      <input type="email" id="reg-id" autocomplete="off" placeholder="hong@naver.com">
     </div>
     <div class="field">
-      <label for="reg-pw">비밀번호</label>
+      <label for="reg-pw">비밀번호 (4자 이상)</label>
       <input type="password" id="reg-pw" autocomplete="new-password">
     </div>
     <div class="field">
@@ -106,11 +110,15 @@
     </div>
     <div class="field">
       <label for="reg-pos">직분</label>
-      <select id="reg-pos"><option>목사</option><option>장로</option></select>
+      <select id="reg-pos"><option>목사</option><option>장로</option><option>간사</option></select>
     </div>
     <div class="field">
       <label for="reg-church">소속 교회</label>
       <input type="text" id="reg-church" placeholder="예: 운평장로교회">
+    </div>
+    <div class="field">
+      <label for="reg-phone">연락처 (선택)</label>
+      <input type="tel" id="reg-phone" placeholder="010-0000-0000">
     </div>
     <div class="field" style="font-size:0.85rem">
       <label style="font-weight:400">
@@ -128,7 +136,6 @@
 
 <script src="js/auth.js"></script>
 <script src="js/data.js"></script>
-<script src="private/admin-seed.js"></script>
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -139,7 +146,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var msg = document.getElementById('login-msg');
     if (!id || !pw) {
       msg.className = 'form-msg err';
-      msg.textContent = '아이디와 비밀번호를 입력해 주세요.';
+      msg.textContent = '이메일과 비밀번호를 입력해 주세요.';
       return;
     }
     var r = SHSAuth.login(id, pw, keep);
@@ -199,10 +206,10 @@ document.addEventListener('DOMContentLoaded', function () {
     msg.className = 'form-msg ok';
     msg.textContent = '일치하는 계정을 찾았습니다.';
     box.classList.remove('hidden');
-    box.innerHTML = '<strong>회원님의 아이디</strong><div style="margin-top:6px">' +
+    box.innerHTML = '<strong>회원님의 이메일</strong><div style="margin-top:6px">' +
       r.ids.map(function (i) { return '<div>' + i + '</div>'; }).join('') + '</div>' +
       '<div style="margin-top:10px;color:var(--gray-5);font-size:0.82rem">' +
-      '개인정보 보호를 위해 아이디 일부를 가려 표시합니다. 전체 아이디가 필요하시면 노회 사무실(031-486-9993)로 문의해 주세요.</div>';
+      '개인정보 보호를 위해 이메일 일부를 가려 표시합니다. 전체 주소가 필요하시면 노회 사무실(031-486-9993)로 문의해 주세요.</div>';
   });
 
   document.getElementById('btn-find-pw').addEventListener('click', function () {
@@ -240,11 +247,12 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     var r = SHSAuth.register({
-      id: document.getElementById('reg-id').value.trim(),
+      email: document.getElementById('reg-id').value.trim(),
       pw: document.getElementById('reg-pw').value,
       name: document.getElementById('reg-name').value.trim(),
       position: document.getElementById('reg-pos').value,
-      church: document.getElementById('reg-church').value.trim()
+      church: document.getElementById('reg-church').value.trim(),
+      phone: document.getElementById('reg-phone').value.trim()
     });
     if (!r.ok) {
       msg.className = 'form-msg err';
@@ -253,14 +261,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     msg.className = 'form-msg ok';
     if (r.autoApproved) {
-      msg.textContent = '가입이 완료되었습니다. 회원명단과 일치하여 정회원으로 가입되었습니다. 로그인해 주세요.';
+      msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하여 ' +
+        (r.title ? r.title + '(' + r.roleName + ')' : r.roleName) +
+        ' 등급으로 가입되었습니다. 로그인해 주세요.';
     } else {
-      msg.textContent = '가입이 완료되었습니다. 회원명단과 일치하지 않아 승인대기 상태입니다. 서기·간사·최고관리자 확인 후 정회원으로 전환됩니다.';
+      msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
+        '서기·간사·최고관리자 확인 후 정회원으로 전환됩니다.';
     }
-    document.getElementById('reg-id').value = '';
-    document.getElementById('reg-pw').value = '';
-    document.getElementById('reg-name').value = '';
-    document.getElementById('reg-church').value = '';
+    ['reg-id', 'reg-pw', 'reg-name', 'reg-church', 'reg-phone'].forEach(function (id) {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('reg-agree').checked = false;
   });
 });
 </script>

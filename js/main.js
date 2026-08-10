@@ -47,10 +47,11 @@
     var right;
     if (user) {
       right = '<span class="user-name">' + user.name + '</span>' +
-        '<span>(' + SHSAuth.roleName(user.role) + ')</span>' +
+        '<span>(' + SHSAuth.roleName(user.role) + (user.title ? ' · ' + user.title : '') + ')</span>' +
+        '<a href="mypage.html">내 정보</a>' +
         '<a href="#" id="btn-logout">로그아웃</a>';
     } else {
-      right = '<a href="login.html">로그인</a>';
+      right = '<a href="login.html">로그인</a><a href="login.html">회원가입</a>';
     }
     return '<div class="topbar"><div class="container">' +
       '<div>대한예수교장로회(합동) 시화산노회</div>' +

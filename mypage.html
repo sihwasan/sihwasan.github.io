@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>내 정보 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>내 정보</h1>
+    <div class="crumb">홈 &gt; 내 정보</div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <div id="my-area"></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var user = SHSAuth.currentUser();
+  var area = document.getElementById('my-area');
+  var e = SHS.esc;
+
+  if (!user) {
+    area.innerHTML =
+      '<div class="notice-banner">로그인 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+    return;
+  }
+
+  function render() {
+    var u = SHSAuth.currentUser();
+    var html = '';
+
+    /* 현재 등급 안내 */
+    html += '<div class="notice-banner"><strong>' + e(u.name) + '</strong> 님의 현재 등급은 ' +
+      '<strong>' + SHSAuth.roleName(u.role) + '</strong>' +
+      (u.title ? ' (' + e(u.title) + ')' : '') + '입니다. ';
+    if (u.role === 'pending') {
+      html += '성명과 소속 교회가 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
+        '아래에서 정보를 정확히 수정하시면 등급이 자동으로 부여됩니다.';
+    } else {
+      html += '성명 또는 소속 교회를 수정하면 노회 명단과 다시 대조하여 등급이 갱신됩니다.';
+    }
+    html += '</div>';
+
+    /* 회원 정보 수정 */
+    html += '<h2>회원 정보</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<div class="field"><label>이메일 (로그인 아이디)</label><input type="email" id="p-email" value="' + e(u.id) + '"></div>' +
+      '<div class="field"><label>성명</label><input type="text" id="p-name" value="' + e(u.name) + '"></div>' +
+      '<div class="field"><label>직분</label><select id="p-pos">' +
+      ['목사', '장로', '간사', '관리자'].map(function (x) {
+        return '<option' + (u.position === x ? ' selected' : '') + '>' + x + '</option>';
+      }).join('') +
+      '</select></div>' +
+      '<div class="field"><label>소속 교회</label><input type="text" id="p-church" value="' + e(u.church || '') + '"></div>' +
+      '<div class="field"><label>연락처 (선택)</label><input type="tel" id="p-phone" value="' + e(u.phone || '') + '" placeholder="010-0000-0000"></div>' +
+      '<button class="btn" id="btn-save" style="width:100%">저장</button>' +
+      '<div class="form-msg" id="p-msg"></div>' +
+      '</div>';
+
+    /* 비밀번호 변경 */
+    html += '<h2>비밀번호 변경</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<div class="field"><label>현재 비밀번호</label><input type="password" id="c-now" autocomplete="current-password"></div>' +
+      '<div class="field"><label>새 비밀번호 (4자 이상)</label><input type="password" id="c-new" autocomplete="new-password"></div>' +
+      '<div class="field"><label>새 비밀번호 확인</label><input type="password" id="c-new2" autocomplete="new-password"></div>' +
+      '<button class="btn" id="btn-pw" style="width:100%">비밀번호 변경</button>' +
+      '<div class="form-msg" id="c-msg"></div>' +
+      '</div>';
+
+    /* 회원 탈퇴 */
+    html += '<h2>회원 탈퇴</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<p style="font-size:0.88rem;color:var(--gray-7);margin-bottom:16px">' +
+      '탈퇴하시면 회원 정보가 삭제되며 되돌릴 수 없습니다. ' +
+      '작성하신 게시글은 남아 있으므로 필요하시면 탈퇴 전에 삭제해 주세요. ' +
+      '탈퇴 기록은 감사 기록으로 보존됩니다.</p>' +
+      '<div class="field"><label>확인을 위해 비밀번호를 입력하세요</label><input type="password" id="w-pw" autocomplete="current-password"></div>' +
+      '<button class="btn danger" id="btn-withdraw" style="width:100%">회원 탈퇴</button>' +
+      '<div class="form-msg" id="w-msg2"></div>' +
+      '</div>';
+
+    area.innerHTML = html;
+    bind();
+  }
+
+  function bind() {
+    document.getElementById('btn-save').addEventListener('click', function () {
+      var msg = document.getElementById('p-msg');
+      var u = SHSAuth.currentUser();
+      var r = SHSAuth.updateProfile(u.id, {
+        email: document.getElementById('p-email').value.trim(),
+        name: document.getElementById('p-name').value.trim(),
+        position: document.getElementById('p-pos').value,
+        church: document.getElementById('p-church').value.trim(),
+        phone: document.getElementById('p-phone').value.trim()
+      });
+      if (!r.ok) {
+        msg.className = 'form-msg err';
+        msg.textContent = r.msg;
+        return;
+      }
+      if (!r.changed.length) {
+        msg.className = 'form-msg';
+        msg.textContent = '변경된 내용이 없습니다.';
+        return;
+      }
+      /* 이메일(아이디)이 바뀌면 세션도 새 아이디로 다시 연결 */
+      if (r.newId !== u.id) {
+        SHSAuth.logout();
+        alert('이메일이 변경되었습니다. 새 이메일로 다시 로그인해 주세요.');
+        location.href = 'login.html';
+        return;
+      }
+      alert(r.changed.join(', ') + ' 정보가 저장되었습니다.' +
+        (r.reassigned ? '\n노회 명단과 일치하여 등급이 ' + r.reassigned + '(으)로 갱신되었습니다.' : ''));
+      location.reload();
+    });
+
+    document.getElementById('btn-pw').addEventListener('click', function () {
+      var msg = document.getElementById('c-msg');
+      var n1 = document.getElementById('c-new').value;
+      var n2 = document.getElementById('c-new2').value;
+      if (n1 !== n2) {
+        msg.className = 'form-msg err';
+        msg.textContent = '새 비밀번호가 서로 일치하지 않습니다.';
+        return;
+      }
+      var r = SHSAuth.changePassword(SHSAuth.currentUser().id, document.getElementById('c-now').value, n1);
+      if (!r.ok) {
+        msg.className = 'form-msg err';
+        msg.textContent = r.msg;
+        return;
+      }
+      msg.className = 'form-msg ok';
+      msg.textContent = '비밀번호가 변경되었습니다.';
+      ['c-now', 'c-new', 'c-new2'].forEach(function (id) { document.getElementById(id).value = ''; });
+    });
+
+    document.getElementById('btn-withdraw').addEventListener('click', function () {
+      var msg = document.getElementById('w-msg2');
+      if (!confirm('정말 탈퇴하시겠습니까? 회원 정보가 삭제되며 되돌릴 수 없습니다.')) return;
+      var r = SHSAuth.withdraw(SHSAuth.currentUser().id, document.getElementById('w-pw').value);
+      if (!r.ok) {
+        msg.className = 'form-msg err';
+        msg.textContent = r.msg;
+        return;
+      }
+      alert('탈퇴가 완료되었습니다. 그동안 이용해 주셔서 감사합니다.');
+      location.href = 'index.html';
+    });
+  }
+
+  render();
+});
+</script>
+</body>
+</html>
