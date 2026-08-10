@@ -10,7 +10,7 @@
 
 var SHS_SUPABASE = {
   url: 'https://ltbhgwozkffenahqdzfj.supabase.co',
-  anonKey: '',   /* ← 여기에 anon public 키를 붙여넣으세요 */
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Ymhnd296a2ZmZW5haHFkemZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDk0MDYsImV4cCI6MjEwMTkyNTQwNn0.nSptHsi7nTCWTiyTe_Kl9xpxyHJ3pkhRGoZLI1BdsnI',
 
   /* 로그인 후 돌아올 주소 */
   redirectTo: 'https://sihwasan.github.io/auth-callback.html'
