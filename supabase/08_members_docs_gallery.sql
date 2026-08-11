@@ -2,6 +2,8 @@
 -- 시화산노회 홈페이지 : 회원 정보 확장 · 서류 신청 · 갤러리 개편
 --
 -- 실행: Supabase 대시보드 → SQL Editor → New query → 전체 붙여넣고 Run
+--
+--   ※ 여러 번 실행해도 안전합니다. 이미 등록된 자료는 그대로 유지됩니다.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -110,6 +112,7 @@ drop policy if exists gallery_items_write  on public.gallery_items;
 drop policy if exists gallery_items_read   on public.gallery_items;
 drop policy if exists gallery_items_insert on public.gallery_items;
 drop policy if exists gallery_items_own    on public.gallery_items;
+drop policy if exists gallery_items_owndel on public.gallery_items;
 drop policy if exists gallery_items_admin  on public.gallery_items;
 create policy gallery_items_read   on public.gallery_items for select using (true);
 create policy gallery_items_insert on public.gallery_items for insert

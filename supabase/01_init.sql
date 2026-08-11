@@ -3,7 +3,9 @@
 --
 -- 실행 방법
 --   Supabase 대시보드 → 왼쪽 메뉴 SQL Editor → New query →
---   이 파일 전체를 붙여넣고 오른쪽 아래 Run 클릭 (한 번만 실행하면 됩니다)
+--   이 파일 전체를 붙여넣고 오른쪽 아래 Run 클릭
+--
+--   ※ 여러 번 실행해도 안전합니다. 이미 등록된 자료는 그대로 유지됩니다.
 -- =====================================================================
 
 
@@ -205,7 +207,7 @@ create policy audit_read   on public.audit_logs for select using (public.my_role
 -- ---------------------------------------------------------------------
 -- 8. 노회 명단 등록 (제19회 정기노회 기준, 71명)
 -- ---------------------------------------------------------------------
-delete from public.roster;
+-- 재실행해도 직접 추가하신 명단은 지워지지 않습니다 (같은 사람은 건너뜁니다)
 insert into public.roster (name, church, position, role, officer_title) values
   ('박흥열', '시흥생수교회', '목사', 'president', '노회장'),
   ('이재용', '안산상록교회', '목사', 'officer', '부노회장'),
@@ -277,7 +279,8 @@ insert into public.roster (name, church, position, role, officer_title) values
   ('백윤복', '성산교회', '장로', 'member', null),
   ('김종관', '연수교회', '장로', 'member', null),
   ('신용화', '운평장로교회', '장로', 'member', null),
-  ('허경하', '한숲우리교회', '장로', 'member', null);
+  ('허경하', '한숲우리교회', '장로', 'member', null)
+on conflict (name, church) do nothing;
 
 
 -- =====================================================================
