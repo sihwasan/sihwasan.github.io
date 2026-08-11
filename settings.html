@@ -104,15 +104,28 @@ document.addEventListener('DOMContentLoaded', function () {
         '등록·교체·열람 기록은 모두 감사 기록에 남습니다. ' +
         '배경이 없는 <strong>PNG 파일</strong>(투명 배경)로 올리시면 서류에 깔끔하게 찍힙니다.</div>';
 
+      /* 항목별 이름란 안내
+       * · 노회 직인은 기관 직인이므로 명의가 노회 자체입니다.
+       * · 노회장은 예시를 보여 주고, 나머지는 비워 둡니다. */
+      var HOLDER = {
+        '노회직인': { label: '직인 명의', value: '시화산노회', ph: '시화산노회' },
+        '노회장':   { label: '도장 주인 이름', ph: '예: 박흥열' },
+        '서기':     { label: '도장 주인 이름', ph: '' },
+        '회록서기': { label: '도장 주인 이름', ph: '' }
+      };
+
       html += '<div class="doc-list">';
       rows.forEach(function (s) {
+        var h = HOLDER[s.key] || { label: '도장 주인 이름', ph: '' };
+        var val = s.holder || h.value || '';
         html += '<div class="doc-item">' +
           '<div class="d-name">' + e(s.label) + '</div>' +
-          '<div class="d-desc">' + (s.holder ? '도장 주인: ' + e(s.holder) + '<br>' : '') +
+          '<div class="d-desc">' + (s.holder ? h.label + ': ' + e(s.holder) + '<br>' : '') +
           (s.file_path ? '등록됨 (' + e(String(s.updated_at || '').slice(0, 10)) + ')' : '아직 등록되지 않았습니다.') + '</div>' +
           '<div id="seal-prev-' + e(s.key) + '" style="min-height:70px;margin-bottom:10px"></div>' +
-          '<div class="field"><label>도장 주인 이름</label>' +
-          '<input type="text" data-sholder="' + e(s.key) + '" value="' + e(s.holder || '') + '" placeholder="예: 박흥열"></div>' +
+          '<div class="field"><label>' + e(h.label) + '</label>' +
+          '<input type="text" data-sholder="' + e(s.key) + '" value="' + e(val) + '"' +
+          (h.ph ? ' placeholder="' + e(h.ph) + '"' : '') + '></div>' +
           '<div class="field"><label>이미지 파일 (PNG 권장)</label>' +
           '<input type="file" accept="image/*" data-sfile="' + e(s.key) + '"></div>' +
           '<button class="btn sm" data-ssave="' + e(s.key) + '">저장</button> ' +
