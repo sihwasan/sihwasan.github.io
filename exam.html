@@ -47,16 +47,20 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  var reqs = [], attempts = [];
+  var reqs = [], attempts = [], isTester = false;
   function db() { return SHSCloud.init(); }
 
   function load() {
     db().then(function (c) {
       return Promise.all([
         c.from('exam_requests').select('*').order('created_at', { ascending: false }),
-        c.from('exam_attempts').select('*').order('started_at', { ascending: false })
+        c.from('exam_attempts').select('*').order('started_at', { ascending: false }),
+        c.from('exam_officers').select('user_id').eq('user_id', user.id)
       ]);
     }).then(function (rs) {
+      /* 고시부 부장·서기와 관리자는 문제를 점검할 수 있다 */
+      isTester = SHSAuth.canManageMembers(user) ||
+                 !!(rs[2] && rs[2].data && rs[2].data.length);
       if (rs[0].error) {
         area.innerHTML = '<div class="notice-banner">모의고사 정보를 불러오지 못했습니다: ' +
           e(rs[0].error.message) + ' (19 고시 모의고사 등록이 필요할 수 있습니다)</div>';
@@ -139,6 +143,25 @@ document.addEventListener('DOMContentLoaded', function () {
         '추가 응시가 필요하시면 고시부로 문의해 주세요.</div>';
     }
 
+    /* 고시부·관리자 점검용 */
+    if (isTester) {
+      h += '<h2>문제 점검 (고시부·관리자)</h2>' +
+        '<div class="admin-card" style="max-width:640px">' +
+        '<p style="font-size:0.88rem;color:var(--gray-7)">출제되는 문제를 직접 풀어 보며 확인하실 수 있습니다. ' +
+        '점검용 응시는 <strong>승인과 횟수 제한을 받지 않습니다.</strong></p>' +
+        '<div class="inline-form">' +
+        '<div class="field"><label>구분</label><select id="tx-track">' +
+        TRACKS.map(function (t) {
+          return '<option value="' + e(t.v) + '"' + (t.v === app ? ' selected' : '') + '>' +
+            e(t.v) + ' — ' + e(t.subs) + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 180px"><label>과목당 문항 수</label>' +
+        '<select id="tx-count"><option value="3">3문항</option>' +
+        '<option value="5" selected>5문항</option><option value="10">10문항</option></select></div>' +
+        '<button class="btn" id="tx-start">점검용으로 풀어 보기</button>' +
+        '</div><div class="form-msg" id="tx-msg"></div></div>';
+    }
+
     /* 지난 응시 */
     if (done.length) {
       h += '<h2>지난 응시 결과</h2><table class="tbl"><thead><tr>' +
@@ -171,6 +194,27 @@ document.addEventListener('DOMContentLoaded', function () {
           if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
           SHS.logAction('create', '모의고사 응시 요청', d.track);
           load();
+        });
+      });
+    }
+
+    if (document.getElementById('tx-start')) {
+      document.getElementById('tx-start').addEventListener('click', function () {
+        var msg = document.getElementById('tx-msg');
+        msg.className = 'form-msg'; msg.textContent = '문제를 준비하는 중입니다...';
+        db().then(function (c) {
+          return c.rpc('start_exam', {
+            p_track: document.getElementById('tx-track').value,
+            p_per_subject: parseInt(document.getElementById('tx-count').value, 10) || 5
+          });
+        }).then(function (r) {
+          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          if (!r.data || !r.data.length) {
+            msg.className = 'form-msg err';
+            msg.textContent = '출제할 문제가 없습니다. 19b 문제 은행 등록을 확인해 주세요.';
+            return;
+          }
+          runExam(r.data);
         });
       });
     }

@@ -181,17 +181,20 @@ begin
     return;
   end if;
 
-  select exists (
-    select 1 from public.exam_requests r
-     where r.user_id = v_uid and r.track = p_track and r.status = 'approved'
-  ) into v_ok;
-  if not v_ok then
-    raise exception '고시부의 응시 승인을 먼저 받으셔야 합니다.';
-  end if;
+  -- 고시부 부장·서기와 관리자는 문제를 점검해야 하므로 승인과 횟수 제한을 받지 않는다
+  if not public.is_exam_officer() then
+    select exists (
+      select 1 from public.exam_requests r
+       where r.user_id = v_uid and r.track = p_track and r.status = 'approved'
+    ) into v_ok;
+    if not v_ok then
+      raise exception '고시부의 응시 승인을 먼저 받으셔야 합니다.';
+    end if;
 
-  select count(*) into v_used from public.exam_attempts a where a.user_id = v_uid;
-  if v_used >= 2 then
-    raise exception '모의고사는 개인당 2회까지 응시하실 수 있습니다. (이미 %회 응시)', v_used;
+    select count(*) into v_used from public.exam_attempts a where a.user_id = v_uid;
+    if v_used >= 2 then
+      raise exception '모의고사는 개인당 2회까지 응시하실 수 있습니다. (이미 %회 응시)', v_used;
+    end if;
   end if;
 
   v_subs := public.exam_subjects(p_track);
@@ -278,13 +281,23 @@ grant execute on function public.submit_exam(bigint, smallint[]) to authenticate
 -- 8. 자료실에 고시집 자리를 만든다
 --    (파일은 자료실 관리에서 끌어다 놓아 올려 주세요)
 -- ---------------------------------------------------------------------
-insert into public.archive_items (section, title, description, doc_date, access, link_url, sort)
+insert into public.archive_items (section, title, description, doc_date, access, link_url, file_name, sort)
 select '고시', '시화산노회 고시부 목사장로 고시가이드',
-       '고시 과목·제출서류 안내와 과목별 예상 문제가 실린 고시집입니다. 이 책을 바탕으로 모의고사를 볼 수 있습니다.',
-       date '2025-09-01', 'member', 'exam.html', 200
+       '고시 과목·제출서류 안내와 과목별 예상 문제가 실린 고시집입니다. (2025. 9. 고시부 발행) 이 책을 바탕으로 모의고사를 볼 수 있습니다.',
+       date '2025-09-01', 'member',
+       'https://sihwasan-photos.sihwasan.workers.dev/o/docs/gosi-guide-2025.docx',
+       '시화산노회 고시부 목사장로 고시가이드.docx', 200
 where not exists (
   select 1 from public.archive_items where title = '시화산노회 고시부 목사장로 고시가이드'
 );
+
+-- 이미 등록되어 있으면 파일 주소만 채워 넣는다
+update public.archive_items
+   set link_url  = 'https://sihwasan-photos.sihwasan.workers.dev/o/docs/gosi-guide-2025.docx',
+       file_name = '시화산노회 고시부 목사장로 고시가이드.docx',
+       access    = 'member'
+ where title = '시화산노회 고시부 목사장로 고시가이드'
+   and coalesce(link_url, '') not like '%gosi-guide%';
 
 select (select count(*) from public.exam_questions) as "문제",
        (select count(*) from public.exam_officers)  as "고시부 임원";
