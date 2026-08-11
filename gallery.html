@@ -34,11 +34,28 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var grid = document.getElementById('gallery-grid');
-  SHSData.gallery.forEach(function (p) {
-    grid.insertAdjacentHTML('beforeend',
-      '<figure><a href="#" data-img="' + p.img + '"><img src="' + p.thumb + '" alt="' + SHS.esc(p.title) + '" loading="lazy"></a>' +
-      '<figcaption><div class="g-title">' + SHS.esc(p.title) + '</div><div class="g-date">' + SHS.esc(p.date) + '</div></figcaption></figure>');
-  });
+  function renderGrid(list) {
+    grid.innerHTML = '';
+    list.forEach(function (p) {
+      grid.insertAdjacentHTML('beforeend',
+        '<figure><a href="#" data-img="' + SHS.esc(p.img) + '"><img src="' + SHS.esc(p.thumb) + '" alt="' + SHS.esc(p.title) + '" loading="lazy"></a>' +
+        '<figcaption><div class="g-title">' + SHS.esc(p.title) + '</div><div class="g-date">' + SHS.esc(p.date) + '</div></figcaption></figure>');
+    });
+  }
+  renderGrid(SHSData.gallery);
+  /* 관리자가 올린 사진이 서버에 있으면 그것으로 교체 */
+  if (window.SHSCloud && SHSCloud.enabled()) {
+    SHSCloud.init().then(function (c) {
+      if (!c) return;
+      return c.from('gallery_items').select('*').order('sort').order('id', { ascending: false });
+    }).then(function (r) {
+      if (r && r.data && r.data.length) {
+        renderGrid(r.data.map(function (g) {
+          return { img: g.image_url, thumb: g.thumb_url, title: g.title, date: g.taken || '' };
+        }));
+      }
+    });
+  }
 
   var lb = document.getElementById('lightbox');
   var lbImg = document.getElementById('lb-img');

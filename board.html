@@ -89,12 +89,26 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---- 공지사항 ---- */
   var nb = document.getElementById('notice-body');
   var notices = SHSData.notices;
-  notices.forEach(function (n, i) {
-    nb.insertAdjacentHTML('beforeend',
-      '<tr><td>' + (notices.length - i) + '</td><td>' + n.cat + '</td>' +
-      '<td class="left"><a href="#" data-nid="' + n.id + '" style="color:var(--ink)">' + e(n.title) + '</a></td>' +
-      '<td>' + n.date + '</td></tr>');
-  });
+  function renderNoticeList(list) {
+    notices = list;
+    nb.innerHTML = '';
+    list.forEach(function (n, i) {
+      nb.insertAdjacentHTML('beforeend',
+        '<tr><td>' + (list.length - i) + '</td><td>' + e(n.cat) + '</td>' +
+        '<td class="left"><a href="#" data-nid="' + n.id + '" style="color:var(--ink)">' + e(n.title) + '</a></td>' +
+        '<td>' + e(n.date) + '</td></tr>');
+    });
+  }
+  renderNoticeList(notices);
+  /* 관리자가 사이트 관리에서 등록한 공지가 서버에 있으면 그것으로 교체 */
+  if (window.SHSCloud && SHSCloud.enabled()) {
+    SHSCloud.init().then(function (c) {
+      if (!c) return;
+      return c.from('site_notices').select('*').order('date', { ascending: false }).order('id', { ascending: false });
+    }).then(function (r) {
+      if (r && r.data && r.data.length) renderNoticeList(r.data);
+    });
+  }
   nb.addEventListener('click', function (ev) {
     var a = ev.target.closest('a[data-nid]');
     if (!a) return;

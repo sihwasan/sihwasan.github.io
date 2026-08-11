@@ -128,19 +128,38 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var ob = document.getElementById('officers-body');
-  SHSData.officers.forEach(function (o) {
-    ob.insertAdjacentHTML('beforeend',
-      '<tr><td><span class="role-badge">' + o.role + '</span></td><td>' + dn(o.name) + '</td><td>' + o.position + '</td><td>' + e(o.church) + '</td></tr>');
-  });
+  function renderOfficers(list) {
+    ob.innerHTML = '';
+    list.forEach(function (o) {
+      ob.insertAdjacentHTML('beforeend',
+        '<tr><td><span class="role-badge">' + e(o.role) + '</span></td><td>' + dn(o.name) + '</td><td>' + e(o.position) + '</td><td>' + e(o.church) + '</td></tr>');
+    });
+  }
+  renderOfficers(SHSData.officers);
 
-  var db = document.getElementById('delegates-body');
-  var d = SHSData.delegates;
-  function dlist(arr) { return arr.map(dt).join(', '); }
-  db.insertAdjacentHTML('beforeend',
-    '<tr><th style="width:140px">목사 정총대</th><td class="left">' + dlist(d.pastorMain) + '</td></tr>' +
-    '<tr><th>목사 부총대</th><td class="left">' + dlist(d.pastorSub) + '</td></tr>' +
-    '<tr><th>장로 정총대</th><td class="left">' + dlist(d.elderMain) + '</td></tr>' +
-    '<tr><th>장로 부총대</th><td class="left">' + dlist(d.elderSub) + '</td></tr>');
+  var dgb = document.getElementById('delegates-body');
+  function dlist(arr) { return (arr || []).map(dt).join(', '); }
+  function renderDelegates(d) {
+    dgb.innerHTML =
+      '<tr><th style="width:140px">목사 정총대</th><td class="left">' + dlist(d.pastorMain) + '</td></tr>' +
+      '<tr><th>목사 부총대</th><td class="left">' + dlist(d.pastorSub) + '</td></tr>' +
+      '<tr><th>장로 정총대</th><td class="left">' + dlist(d.elderMain) + '</td></tr>' +
+      '<tr><th>장로 부총대</th><td class="left">' + dlist(d.elderSub) + '</td></tr>';
+  }
+  renderDelegates(SHSData.delegates);
+
+  /* 관리자가 사이트 관리에서 수정한 임원 명부가 서버에 있으면 그것으로 교체 */
+  if (window.SHSCloud && SHSCloud.enabled()) {
+    SHSCloud.init().then(function (c) {
+      if (!c) return;
+      return c.from('site_settings').select('*').in('key', ['officers', 'delegates']);
+    }).then(function (r) {
+      ((r && r.data) || []).forEach(function (row) {
+        if (row.key === 'officers' && row.value && row.value.length) renderOfficers(row.value);
+        if (row.key === 'delegates' && row.value) renderDelegates(row.value);
+      });
+    });
+  }
 
   var sb = document.getElementById('senior-body');
   SHSData.seniorPastors.forEach(function (m, i) {
