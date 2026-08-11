@@ -64,6 +64,14 @@
     </a>
   </div>
 
+  <div class="home-committees hidden" id="home-com-wrap">
+    <div class="section-title">
+      <h2>상비부 활동</h2>
+      <a class="more" href="dashboard.html">대시보드</a>
+    </div>
+    <div id="home-committees"></div>
+  </div>
+
   <div class="home-gallery">
     <div class="section-title">
       <h2>갤러리</h2>
@@ -109,6 +117,38 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* ---------- 상비부 활동 (로그인 회원에게만) ---------- */
+  function renderCommittees(coms, evs, mine) {
+    var wrap = document.getElementById('home-com-wrap');
+    var box = document.getElementById('home-committees');
+    if (!wrap || !box || !coms.length) return;
+
+    var today = new Date().toISOString().slice(0, 10);
+    var byCom = {};
+    evs.forEach(function (v) { (byCom[v.committee] = byCom[v.committee] || []).push(v); });
+    var mineMap = {};
+    (mine || []).forEach(function (m) { mineMap[m.committee] = m.duty_name; });
+
+    var h = '<div class="db-grid">';
+    coms.forEach(function (c) {
+      var list = byCom[c.name] || [];
+      var next = list.filter(function (v) { return v.event_date && v.event_date >= today; })
+                     .sort(function (a, b) { return a.event_date < b.event_date ? -1 : 1; })[0];
+      var notice = list.filter(function (v) { return v.kind === '공지'; })[0];
+      h += '<a class="db-card' + (mineMap[c.name] ? ' mine' : '') + '" href="committee.html?c=' +
+        encodeURIComponent(c.name) + '">' +
+        (mineMap[c.name] ? '<div class="db-role">' + e(mineMap[c.name]) + '</div>' : '') +
+        '<div class="db-name">' + e(c.name) + '</div>' +
+        '<div class="db-lines">' +
+        (next ? '<div><strong>다음 일정</strong> ' + e(next.event_date) + ' ' + e(next.title) + '</div>' : '') +
+        (notice ? '<div><strong>공지</strong> ' + e(notice.title) + '</div>' : '') +
+        (!next && !notice ? '<div style="color:var(--gray-5)">등록된 활동이 없습니다</div>' : '') +
+        '</div></a>';
+    });
+    box.innerHTML = h + '</div>';
+    wrap.classList.remove('hidden');
+  }
+
   /* 우선 내장 자료로 표시 */
   renderNotices(SHSData.notices);
   renderSchedule(SHSData.schedule);
@@ -133,6 +173,18 @@ document.addEventListener('DOMContentLoaded', function () {
             renderGallery(r.data.map(function (g) { return { thumb: g.thumb_url, title: g.title }; }));
           }
         });
+      /* 상비부 활동 (로그인한 회원에게만 보인다) */
+      Promise.all([
+        c.from('committees').select('name').order('sort'),
+        c.from('committee_events').select('committee, kind, title, event_date')
+          .order('event_date', { ascending: false }),
+        c.rpc('my_committees')
+      ]).then(function (cs) {
+        var coms = (cs[0] && cs[0].data) || [];
+        if (!coms.length) return;
+        renderCommittees(coms, (cs[1] && cs[1].data) || [], (cs[2] && cs[2].data) || []);
+      }).catch(function () {});
+
       c.from('site_settings').select('*').in('key', ['hero', 'meeting_result']).then(function (r) {
         (r.data || []).forEach(function (row) {
           if (row.key === 'hero') {

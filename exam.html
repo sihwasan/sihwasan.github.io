@@ -39,119 +39,10 @@ document.addEventListener('DOMContentLoaded', function () {
   ];
   var MAX_TRY = 2;
 
-  var gate = SHS.memberGate(user, '고시 모의고사');
-  if (gate) { area.innerHTML = gate; return; }
-  if (!user.cloud) {
-    area.innerHTML = '<div class="notice-banner">모의고사는 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
-      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
-    return;
-  }
-
-  var reqs = [], attempts = [], isTester = false;
-  function db() { return SHSCloud.init(); }
-
-  function load() {
-    db().then(function (c) {
-      return Promise.all([
-        c.from('exam_requests').select('*').order('created_at', { ascending: false }),
-        c.from('exam_attempts').select('*').order('started_at', { ascending: false }),
-        c.from('exam_officers').select('user_id').eq('user_id', user.id)
-      ]);
-    }).then(function (rs) {
-      /* 고시부 부장·서기와 관리자는 문제를 점검할 수 있다 */
-      isTester = SHSAuth.canManageMembers(user) ||
-                 !!(rs[2] && rs[2].data && rs[2].data.length);
-      if (rs[0].error) {
-        area.innerHTML = '<div class="notice-banner">모의고사 정보를 불러오지 못했습니다: ' +
-          e(rs[0].error.message) + ' (19 고시 모의고사 등록이 필요할 수 있습니다)</div>';
-        return;
-      }
-      reqs = rs[0].data || [];
-      attempts = (rs[1] && rs[1].data) || [];
-      drawHome();
-    });
-  }
-
-  function approvedTrack() {
-    var a = reqs.filter(function (r) { return r.status === 'approved'; })[0];
-    return a ? a.track : null;
-  }
-
-  /* ---------- 첫 화면 ---------- */
-  function drawHome() {
-    var done = attempts.filter(function (a) { return a.submitted_at; });
-    var left = Math.max(0, MAX_TRY - attempts.length);
-    var app = approvedTrack();
-    var pending = reqs.filter(function (r) { return r.status === 'pending'; })[0];
-    var rejected = reqs.filter(function (r) { return r.status === 'rejected'; })[0];
-
-    var h = '<div class="notice-banner">' +
-      '「시화산노회 고시부 목사장로 고시가이드」의 과목별 예상 문제로 실제 고시처럼 풀어 보고 ' +
-      '바로 채점받으실 수 있습니다. ' +
-      (isTester
-        ? '<strong>' + e(user.name) + '</strong> 님은 ' +
-          (SHSAuth.canManageMembers(user) ? '관리자' : '고시부 임원') +
-          '이시므로 <strong>승인 없이 바로 응시</strong>하실 수 있고, 횟수 제한도 받지 않으십니다.'
-        : '응시는 <strong>고시부의 승인</strong>을 받으셔야 하고, ' +
-          '<strong>개인당 ' + MAX_TRY + '회</strong>까지 가능합니다.') +
-      '</div>';
-
-    /* 점검자는 승인 절차 없이 바로 시험을 볼 수 있다 */
-    if (isTester) {
-      h += '<h2>바로 응시하기</h2>' +
-        '<div class="admin-card" style="max-width:660px">' +
-        '<p style="font-size:0.88rem;color:var(--gray-7)">구분과 문항 수를 고르시고 바로 시작하시면 됩니다. ' +
-        '출제되는 문제를 그대로 확인하실 수 있으며, 응시 횟수는 차감되지 않습니다.</p>' +
-        '<div class="inline-form">' +
-        '<div class="field"><label>구분</label><select id="tx-track">' +
-        TRACKS.map(function (t) {
-          return '<option value="' + e(t.v) + '"' + (t.v === app ? ' selected' : '') + '>' +
-            e(t.v) + ' — ' + e(t.subs) + '</option>';
-        }).join('') + '</select></div>' +
-        '<div class="field" style="flex:0 0 180px"><label>과목당 문항 수</label>' +
-        '<select id="tx-count"><option value="3">3문항</option>' +
-        '<option value="5" selected>5문항</option><option value="10">10문항</option>' +
-        '<option value="20">20문항</option></select></div>' +
-        '<button class="btn" id="tx-start">시험 시작</button>' +
-        '</div><div class="form-msg" id="tx-msg"></div></div>';
-    }
-
-    /* 응시 자격 */
-    h += '<h2>응시 자격</h2>';
-    if (isTester && !app && !pending) {
-      h += '<div class="exam-state ok">승인 절차 없이 응시하실 수 있습니다. ' +
-        '일반 회원의 응시 요청은 <a href="exam-admin.html" style="color:var(--navy);text-decoration:underline">' +
-        '모의고사 응시 관리</a>에서 처리하실 수 있습니다.</div>';
-    } else if (app) {
-      h += '<div class="exam-state ok"><strong>' + e(app) + '</strong> 구분으로 응시가 승인되었습니다. ' +
-        '남은 응시 횟수 <strong>' + left + '회</strong></div>';
-    } else if (pending) {
-      h += '<div class="exam-state ' + (isTester ? 'ok' : 'wait') + '"><strong>' + e(pending.track) +
-        '</strong> 구분으로 응시를 요청하셨습니다. ' +
-        (isTester ? '점검용으로는 위에서 바로 응시하실 수 있습니다.'
-                  : '고시부 부장·서기의 승인을 기다리는 중입니다.') + '</div>';
-    } else if (isTester) {
-      /* 위에서 이미 안내했으므로 요청 화면은 띄우지 않는다 */
-    } else {
-      if (rejected) {
-        h += '<div class="exam-state no">지난 요청은 승인되지 않았습니다.' +
-          (rejected.note ? ' 사유: ' + e(rejected.note) : '') + ' 다시 요청하실 수 있습니다.</div>';
-      }
-      h += '<div class="admin-card" style="max-width:640px">' +
-        '<h3 style="margin-top:0">응시 요청</h3>' +
-        '<p style="font-size:0.88rem;color:var(--gray-7)">응시하실 구분을 고르시면 고시부에 요청이 전달됩니다.</p>' +
-        '<div class="field"><label>구분</label><select id="ex-track">' +
-        TRACKS.map(function (t) {
-          return '<option value="' + e(t.v) + '">' + e(t.v) + ' — ' + e(t.subs) + '</option>';
-        }).join('') + '</select></div>' +
-        '<div class="field"><label>남기실 말씀 (선택)</label><input type="text" id="ex-note" placeholder="예: 2026년 가을 고시 준비"></div>' +
-        '<button class="btn" id="ex-req">응시 요청하기</button>' +
-        '<div class="form-msg" id="ex-msg"></div></div>';
-    }
-
-    /* 과목 안내 */
-    h += '<h2>구분별 고시 과목</h2>' +
-      '<table class="tbl" style="max-width:720px"><thead><tr><th style="width:130px">구분</th><th>필기 과목</th></tr></thead><tbody>' +
+  function subjectTable() {
+    return '<h2>구분별 고시 과목</h2>' +
+      '<table class="tbl" style="max-width:720px"><thead><tr><th style="width:130px">구분</th>' +
+      '<th>필기 과목</th></tr></thead><tbody>' +
       TRACKS.map(function (t) {
         return '<tr><td>' + e(t.v) + '</td><td class="left">' + e(t.subs) + '</td></tr>';
       }).join('') + '</tbody></table>' +
@@ -159,23 +50,84 @@ document.addEventListener('DOMContentLoaded', function () {
       '· 면접은 모든 응시자 공통이며 필기가 아니므로 모의고사에서 제외됩니다.<br>' +
       '· 성경 과목은 성경통신 신구약 수료증으로 대체되므로 모의고사에 포함되지 않습니다.<br>' +
       '· 실제 고시 합격 기준은 전 과목 평균 60점 이상입니다.</p>';
+  }
 
-    /* 시험 시작 */
-    if (app && left > 0) {
+  /* 로그인만 하시면 누구나 응시하실 수 있습니다. */
+  if (!user || !user.cloud) {
+    area.innerHTML =
+      '<div class="notice-banner">모의고사는 <strong>로그인</strong>하시면 누구나 보실 수 있습니다. ' +
+      '구글 또는 이메일로 로그인해 주세요. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a> ' +
+      '<a class="btn ghost sm" href="signup.html">회원가입</a></div>' +
+      subjectTable();
+    return;
+  }
+
+  var attempts = [], isTester = false;
+  function db() { return SHSCloud.init(); }
+
+  function load() {
+    db().then(function (c) {
+      return Promise.all([
+        c.from('exam_attempts').select('*').order('started_at', { ascending: false }),
+        c.from('exam_officers').select('user_id').eq('user_id', user.id)
+      ]);
+    }).then(function (rs) {
+      isTester = SHSAuth.canManageMembers(user) ||
+                 !!(rs[1] && rs[1].data && rs[1].data.length);
+      if (rs[0].error) {
+        area.innerHTML = '<div class="notice-banner">모의고사 정보를 불러오지 못했습니다: ' +
+          e(rs[0].error.message) + ' (19 고시 모의고사 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      attempts = rs[0].data || [];
+      drawHome();
+    });
+  }
+
+  /* ---------- 첫 화면 ---------- */
+  function drawHome() {
+    var done = attempts.filter(function (a) { return a.submitted_at; });
+    var left = Math.max(0, MAX_TRY - attempts.length);
+    var canStart = isTester || left > 0;
+
+    var h = '<div class="notice-banner">' +
+      '「시화산노회 고시부 목사장로 고시가이드」의 과목별 예상 문제로 실제 고시처럼 풀어 보고 ' +
+      '바로 채점받으실 수 있습니다. ' +
+      (isTester
+        ? '<strong>' + e(user.name) + '</strong> 님은 ' +
+          (SHSAuth.canManageMembers(user) ? '관리자' : '고시부 임원') +
+          '이시므로 횟수 제한 없이 문제를 점검하실 수 있습니다.'
+        : '응시는 <strong>개인당 ' + MAX_TRY + '회</strong>까지 가능합니다. ' +
+          '남은 횟수 <strong>' + left + '회</strong>') +
+      '</div>';
+
+    if (canStart) {
       h += '<h2>시험 보기</h2>' +
-        '<div class="admin-card" style="max-width:640px">' +
-        '<p style="font-size:0.88rem;color:var(--gray-7)">과목마다 문제를 무작위로 뽑아 출제합니다. ' +
-        '한 번 시작하면 <strong>응시 횟수가 1회 사용</strong>됩니다. ' +
-        '도중에 나가셨다가 다시 들어오시면 보던 시험을 이어서 보실 수 있습니다.</p>' +
-        '<div class="field"><label>과목당 문항 수</label><select id="ex-count">' +
-        '<option value="5">5문항 (짧게)</option><option value="10" selected>10문항 (권장)</option>' +
+        '<div class="admin-card" style="max-width:660px">' +
+        '<p style="font-size:0.88rem;color:var(--gray-7)">응시하실 구분을 고르시면 ' +
+        '과목마다 문제를 무작위로 뽑아 출제합니다.' +
+        (isTester ? ' 점검용 응시는 횟수가 차감되지 않습니다.'
+                  : ' 한 번 시작하면 <strong>응시 횟수가 1회 사용</strong>됩니다. ' +
+                    '도중에 나가셨다가 다시 들어오시면 보던 시험을 이어서 보실 수 있습니다.') +
+        '</p>' +
+        '<div class="inline-form">' +
+        '<div class="field"><label>구분</label><select id="ex-track">' +
+        TRACKS.map(function (t) {
+          return '<option value="' + e(t.v) + '">' + e(t.v) + ' — ' + e(t.subs) + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 190px"><label>과목당 문항 수</label>' +
+        '<select id="ex-count"><option value="5">5문항 (짧게)</option>' +
+        '<option value="10" selected>10문항 (권장)</option>' +
         '<option value="20">20문항 (충분히)</option></select></div>' +
         '<button class="btn" id="ex-start">시험 시작</button>' +
-        '<div class="form-msg" id="ex-smsg"></div></div>';
-    } else if (app) {
+        '</div><div class="form-msg" id="ex-smsg"></div></div>';
+    } else {
       h += '<div class="notice-banner">응시 가능 횟수(' + MAX_TRY + '회)를 모두 사용하셨습니다. ' +
         '추가 응시가 필요하시면 고시부로 문의해 주세요.</div>';
     }
+
+    h += subjectTable();
 
     /* 지난 응시 */
     if (done.length) {
@@ -195,59 +147,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
     area.innerHTML = h;
 
-    if (document.getElementById('ex-req')) {
-      document.getElementById('ex-req').addEventListener('click', function () {
-        var msg = document.getElementById('ex-msg');
-        var d = {
-          user_id: user.id, user_name: user.name, user_church: user.church,
-          track: document.getElementById('ex-track').value,
-          note: document.getElementById('ex-note').value.trim() || null,
-          status: 'pending'
-        };
-        msg.className = 'form-msg'; msg.textContent = '요청을 보내는 중입니다...';
-        db().then(function (c) { return c.from('exam_requests').insert(d); }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-          SHS.logAction('create', '모의고사 응시 요청', d.track);
-          load();
-        });
-      });
-    }
-
-    if (document.getElementById('tx-start')) {
-      document.getElementById('tx-start').addEventListener('click', function () {
-        var msg = document.getElementById('tx-msg');
+    if (document.getElementById('ex-start')) {
+      document.getElementById('ex-start').addEventListener('click', function () {
+        var msg = document.getElementById('ex-smsg');
+        var track = document.getElementById('ex-track').value;
         msg.className = 'form-msg'; msg.textContent = '문제를 준비하는 중입니다...';
         db().then(function (c) {
           return c.rpc('start_exam', {
-            p_track: document.getElementById('tx-track').value,
-            p_per_subject: parseInt(document.getElementById('tx-count').value, 10) || 5
+            p_track: track,
+            p_per_subject: parseInt(document.getElementById('ex-count').value, 10) || 10
           });
         }).then(function (r) {
           if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
           if (!r.data || !r.data.length) {
             msg.className = 'form-msg err';
-            msg.textContent = '출제할 문제가 없습니다. 19b 문제 은행 등록을 확인해 주세요.';
+            msg.textContent = '출제할 문제가 없습니다. 고시부에 문의해 주세요.';
             return;
           }
-          runExam(r.data);
-        });
-      });
-    }
-
-    if (document.getElementById('ex-start')) {
-      document.getElementById('ex-start').addEventListener('click', function () {
-        var msg = document.getElementById('ex-smsg');
-        msg.className = 'form-msg'; msg.textContent = '문제를 준비하는 중입니다...';
-        var n = parseInt(document.getElementById('ex-count').value, 10) || 10;
-        db().then(function (c) {
-          return c.rpc('start_exam', { p_track: app, p_per_subject: n });
-        }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-          if (!r.data || !r.data.length) {
-            msg.className = 'form-msg err'; msg.textContent = '출제할 문제가 없습니다. 고시부에 문의해 주세요.';
-            return;
-          }
-          SHS.logAction('create', '모의고사 응시 시작', app);
+          SHS.logAction('create', '모의고사 응시 시작', track);
           runExam(r.data);
         });
       });
@@ -326,7 +243,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var score = rows[0].score, total = rows[0].total || rows.length;
     var pct = total ? Math.round(score * 100 / total) : 0;
 
-    /* 과목별 점수 */
     var bySub = {};
     rows.forEach(function (r) {
       var s = bySub[r.subject] || (bySub[r.subject] = { n: 0, ok: 0 });
@@ -370,8 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '</div></div>';
       });
     }
-    h += '<p style="margin-top:24px"><a class="btn" href="exam.html">모의고사 첫 화면으로</a> ' +
-      '<a class="btn ghost" href="archive.html#sec-고시">고시집 보기</a></p>';
+    h += '<p style="margin-top:24px"><a class="btn" href="exam.html">모의고사 첫 화면으로</a></p>';
 
     area.innerHTML = h;
     window.scrollTo(0, 0);

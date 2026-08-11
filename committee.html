@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var com = null, evs = [], isOfficer = false, myDuty = '';
-  var examReqs = [], accReqs = [];
+  var accReqs = [];
   var view = new Date(); view.setDate(1);
   var tab = 'cal';
 
@@ -62,10 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
         c.from('committee_events').select('*').eq('committee', NAME)
           .order('event_date', { ascending: false }).order('id', { ascending: false }),
         c.rpc('my_committees'),
-        c.from('access_requests').select('*').eq('committee', NAME).order('created_at', { ascending: false }),
-        NAME === '고시규칙부'
-          ? c.from('exam_requests').select('*').order('created_at', { ascending: false })
-          : Promise.resolve({ data: [] })
+        c.from('access_requests').select('*').eq('committee', NAME).order('created_at', { ascending: false })
       ]);
     }).then(function (rs) {
       if (rs[0].error && !rs[0].data) {
@@ -79,7 +76,6 @@ document.addEventListener('DOMContentLoaded', function () {
       mine.forEach(function (m) { if (m.committee === NAME) { isOfficer = true; myDuty = m.duty_name; } });
       if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '관리자'; }
       accReqs = (rs[3] && rs[3].data) || [];
-      examReqs = (rs[4] && rs[4].data) || [];
       draw();
       SHS.logAction('view', '상비부 열람', NAME);
     });
@@ -87,7 +83,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function draw() {
     var pendAcc = accReqs.filter(function (r) { return r.status === 'pending'; }).length;
-    var pendExam = examReqs.filter(function (r) { return r.status === 'pending'; }).length;
 
     var h = '<div class="notice-banner">' +
       (isOfficer
@@ -111,8 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="' + (tab === 'list' ? 'active' : '') + '" data-t="list">활동 내역</button>' +
       '<button class="' + (tab === 'mem' ? 'active' : '') + '" data-t="mem">부원 명단</button>' +
       (NAME === '고시규칙부'
-        ? '<button class="' + (tab === 'exam' ? 'active' : '') + '" data-t="exam">모의고사 응시 승인' +
-          (pendExam ? ' (' + pendExam + ')' : '') + '</button>'
+        ? '<button class="' + (tab === 'exam' ? 'active' : '') + '" data-t="exam">모의고사</button>'
         : '') +
       '<button class="' + (tab === 'acc' ? 'active' : '') + '" data-t="acc">자료 열람 요청' +
       (pendAcc ? ' (' + pendAcc + ')' : '') + '</button>' +
@@ -374,78 +368,14 @@ document.addEventListener('DOMContentLoaded', function () {
       '<a href="admin.html" style="color:var(--navy);text-decoration:underline">회원 관리 → 상비부 배정</a>에서 합니다.</p>';
   }
 
-  /* ---------- 모의고사 응시 승인 (고시규칙부) ---------- */
+  /* ---------- 모의고사 (고시규칙부) ---------- */
   function drawExam() {
     var box = document.getElementById('cm-body');
-    if (!isOfficer) {
-      box.innerHTML = '<div class="notice-banner">모의고사 응시 승인은 고시부 부장·서기가 처리합니다.</div>';
-      return;
-    }
-    if (!examReqs.length) {
-      box.innerHTML = '<div class="notice-banner">아직 응시 요청이 없습니다. ' +
-        '<a href="exam.html" style="color:var(--navy);text-decoration:underline">모의고사 화면 보기</a></div>';
-      return;
-    }
-    var h = '<div class="notice-banner">승인하시면 그분이 개인당 2회까지 모의고사를 보실 수 있습니다. ' +
-      '결정하시면 신청자에게 알림이 갑니다.</div>' +
-      '<table class="tbl"><thead><tr><th style="width:110px">성명</th><th style="width:150px">소속 교회</th>' +
-      '<th style="width:110px">구분</th><th>남긴 말</th><th style="width:150px">요청일</th>' +
-      '<th style="width:90px">상태</th><th style="width:180px">처리</th></tr></thead><tbody>';
-    examReqs.forEach(function (r) {
-      var label = { pending: '대기', approved: '승인', rejected: '반려' }[r.status] || r.status;
-      h += '<tr><td>' + e(r.user_name || '-') + '</td><td>' + e(r.user_church || '-') + '</td>' +
-        '<td>' + e(r.track) + '</td><td class="left">' + e(r.note || '') +
-        (r.decided_by ? '<div style="font-size:0.8rem;color:var(--gray-5)">처리: ' + e(r.decided_by) + '</div>' : '') +
-        '</td><td>' + e(String(r.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
-        '<td><span class="role-badge">' + label + '</span></td>' +
-        '<td>' + (r.status === 'pending'
-          ? '<button class="btn sm" data-xok="' + r.id + '">승인</button> ' +
-            '<button class="btn danger sm" data-xno="' + r.id + '">반려</button>'
-          : '<button class="btn ghost sm" data-x' + (r.status === 'approved' ? 'no' : 'ok') + '="' + r.id + '">' +
-            (r.status === 'approved' ? '승인 취소' : '다시 승인') + '</button>') +
-        '</td></tr>';
-    });
-    box.innerHTML = h + '</tbody></table><div class="form-msg" id="cm-msg"></div>';
-
-    function decide(id, status) {
-      var msg = document.getElementById('cm-msg');
-      var note = null;
-      if (status === 'rejected') {
-        note = prompt('반려 사유를 적어 주세요. (신청자에게 보입니다)', '');
-        if (note === null) return;
-      }
-      msg.className = 'form-msg'; msg.textContent = '처리 중입니다...';
-      var t = examReqs.filter(function (x) { return String(x.id) === String(id); })[0];
-      db().then(function (c) {
-        return c.from('exam_requests').update({
-          status: status, note: note || undefined,
-          decided_by: user.name, decided_at: new Date().toISOString()
-        }).eq('id', id);
-      }).then(function (r) {
-        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-        SHSCloud.log('update', '모의고사 응시 ' + (status === 'approved' ? '승인' : '반려'),
-                     t ? t.user_name + ' / ' + t.track : id);
-        if (t) {
-          db().then(function (c) {
-            return c.from('notifications').insert({
-              user_id: t.user_id, kind: '고시',
-              title: status === 'approved' ? '모의고사 응시가 승인되었습니다'
-                                           : '모의고사 응시 요청이 반려되었습니다',
-              body: status === 'approved'
-                ? t.track + ' 구분으로 응시가 승인되었습니다. 자료실 → 고시 모의고사에서 시험을 보실 수 있습니다. (개인당 2회)'
-                : '요청이 반려되었습니다.' + (note ? ' 사유: ' + note : '')
-            });
-          }).catch(function () {});
-        }
-        load();
-      });
-    }
-    box.querySelectorAll('button[data-xok]').forEach(function (b) {
-      b.addEventListener('click', function () { decide(b.dataset.xok, 'approved'); });
-    });
-    box.querySelectorAll('button[data-xno]').forEach(function (b) {
-      b.addEventListener('click', function () { decide(b.dataset.xno, 'rejected'); });
-    });
+    box.innerHTML = '<div class="notice-banner">모의고사는 <strong>로그인하신 분이면 누구나</strong> ' +
+      '응시하실 수 있습니다. 따로 승인하실 것은 없습니다. ' +
+      '응시 현황과 문제 은행은 아래에서 확인하실 수 있습니다.</div>' +
+      '<p><a class="btn" href="exam.html">모의고사 화면</a> ' +
+      '<a class="btn ghost" href="exam-admin.html">응시 현황·문제 은행</a></p>';
   }
 
   /* ---------- 자료 열람 요청 ---------- */
