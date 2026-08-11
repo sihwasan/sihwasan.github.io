@@ -182,7 +182,9 @@ var SHSAuth = (function () {
     return !!u && (u.role === 'president' || u.role === 'clerk' || u.role === 'staff' || u.role === 'superadmin');
   }
 
-  /* 서류 발급: 서기, 노회장, 간사 */
+  /* 서류 발급 권한은 서기에게 있다.
+   * 노회장은 허락 주체로서, 간사는 서기를 대행하여 발급 실무를 처리하므로
+   * 화면 접근은 허용하되 발급 기록에는 대행·승인으로 구분해 남긴다. */
   function canIssueDocuments(u) {
     return !!u && (u.role === 'clerk' || u.role === 'president' || u.role === 'staff');
   }

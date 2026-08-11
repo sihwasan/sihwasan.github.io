@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (!user || !SHSAuth.canIssueDocuments(user)) {
     area.innerHTML =
-      '<div class="notice-banner">서류 발급은 <strong>서기, 노회장, 간사</strong>만 할 수 있습니다.' +
+      '<div class="notice-banner">서류 발급 권한은 <strong>서기</strong>에게 있습니다.' +
       (user ? ' 현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 발급할 수 없습니다. 서류가 필요하신 회원께서는 노회 사무실(031-486-9993)로 신청해 주시기 바랍니다.'
             : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
       '</div>' +
@@ -53,8 +53,19 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function saveLog(l) { localStorage.setItem(LOG_KEY, JSON.stringify(l)); }
 
+  /* 서류 발급 권한은 서기에게 있다.
+   * 간사는 서기를 대행하여 실무를 처리하며, 발급 기록에 대행으로 남는다. */
+  var isProxy = user.role !== 'clerk';
+  var proxyNote = user.role === 'staff' ? ' (서기 대행)'
+                : (user.role === 'president' ? ' (노회장 승인)' : '');
+
   var html = '';
-  html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님(' + SHSAuth.roleName(user.role) + '), 서류 발급 권한이 확인되었습니다. 발급된 서류는 발급 대장에 자동 기록됩니다.</div>';
+  html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님, ' +
+    (isProxy
+      ? '서류 발급 권한은 <strong>서기</strong>에게 있습니다. 처리하신 발급 건은 발급 대장에 <strong>' +
+        (user.role === 'staff' ? '서기 대행' : '노회장 승인') + '</strong>으로 기록됩니다.'
+      : '서류 발급 권한이 확인되었습니다.') +
+    ' 발급된 서류는 발급 대장에 자동 기록됩니다.</div>';
   html += '<h2>증명서 발급</h2>';
   html += '<div class="admin-card" style="max-width:760px"><div class="inline-form">' +
     '<div class="field"><label>서류 종류</label><select id="d-type">' +
@@ -105,10 +116,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var today = new Date();
     var ds = today.getFullYear() + '. ' + (today.getMonth() + 1) + '. ' + today.getDate() + '.';
     var no = '시화산노 제19-' + String(seq).padStart(3, '0') + '호';
-    var rec = { no: no, date: ds, doc: doc, name: name, pos: pos, church: church, purpose: purpose, issuer: user.name };
+    var rec = { no: no, date: ds, doc: doc, name: name, pos: pos, church: church,
+                purpose: purpose, issuer: user.name + proxyNote };
     log.push(rec);
     saveLog(log);
-    SHSAudit.log('issue', '서류 발급', no + ' ' + doc + ' (대상 ' + name + ', ' + church + ', ' + purpose + ')');
+    SHS.logAction('issue', '서류 발급', no + ' ' + doc + ' (대상 ' + name + ', ' + church + ', ' + purpose + ')' + proxyNote);
     msg.className = 'form-msg ok';
     msg.textContent = no + ' ' + doc + '가 발급되었습니다. 아래 증명서를 인쇄하시기 바랍니다.';
     renderLog();
