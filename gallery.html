@@ -53,7 +53,6 @@
     <h2>사진 올리기</h2>
 
     <div class="drop" id="up-drop">
-      <div class="ico">&#128247;</div>
       <div>여기로 사진을 끌어다 놓거나</div>
       <div style="margin-top:12px">
         <button class="btn-round solid" id="up-pick">사진 선택</button>
@@ -157,8 +156,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>' +
       '<img class="feed-img" src="' + e(it.image_url) + '" alt="">' +
       '<div class="feed-bar">' +
-      '<button data-flike="' + it.id + '" class="' + (liked ? 'liked' : '') + '">' + (liked ? '&#10084;' : '&#9825;') + '</button>' +
-      '<button data-fcmt="' + it.id + '">&#128172;</button>' +
+      '<button data-flike="' + it.id + '" class="' + (liked ? 'liked' : '') + '">' + (liked ? '좋아요 취소' : '좋아요') + '</button>' +
+      '<button data-fcmt="' + it.id + '">댓글</button>' +
       '</div>' +
       '<div class="feed-meta"><span class="likes">좋아요 ' + (likeCount[it.id] || 0) + '개</span>' +
       (it.title ? '<div style="margin-top:4px">' + e(it.title) + '</div>' : '') +

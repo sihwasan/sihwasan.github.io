@@ -639,6 +639,118 @@
   }
 
   /* 전역 헬퍼 */
+  /* ---------- 파일 넣기 (끌어다 놓기) ----------
+   * 파일 선택 칸을 숨기고 그 자리에 넓은 상자를 놓는다.
+   * 파일을 상자 위로 끌어다 놓거나, 상자를 눌러 골라도 된다.
+   * 고른 파일은 원래의 파일 선택 칸에 그대로 담기므로,
+   * 각 화면의 기존 처리 방식은 손대지 않아도 된다. */
+  function dropZone(input, opts) {
+    if (!input || input.dataset.dz) return;
+    input.dataset.dz = '1';
+    opts = opts || {};
+
+    var multiple = input.multiple;
+    var wrap = document.createElement('div');
+    wrap.className = 'dropzone';
+    wrap.setAttribute('tabindex', '0');
+    wrap.setAttribute('role', 'button');
+    wrap.innerHTML =
+      '<div class="dz-guide">' +
+      '<strong>여기에 ' + (opts.what || '파일') + '을 끌어다 놓으세요</strong>' +
+      '<span>또는 이 상자를 눌러 컴퓨터에서 고르실 수 있습니다' +
+      (multiple ? ' (여러 개 가능)' : '') + '</span></div>' +
+      '<div class="dz-list"></div>';
+
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+    input.classList.add('dz-input');
+
+    var list = wrap.querySelector('.dz-list');
+
+    function human(n) {
+      if (n < 1024) return n + 'B';
+      if (n < 1024 * 1024) return Math.round(n / 1024) + 'KB';
+      return (n / 1024 / 1024).toFixed(1) + 'MB';
+    }
+
+    function paint() {
+      var fs = input.files;
+      if (!fs || !fs.length) { list.innerHTML = ''; wrap.classList.remove('has'); return; }
+      wrap.classList.add('has');
+      var h = '';
+      for (var i = 0; i < fs.length; i++) {
+        h += '<div class="dz-item"><span class="dz-name">' +
+          String(fs[i].name).replace(/[&<>"']/g, '') + '</span>' +
+          '<span class="dz-size">' + human(fs[i].size) + '</span></div>';
+      }
+      list.innerHTML = h;
+    }
+
+    /* 끌어다 놓은 파일을 원래의 파일 선택 칸에 담는다 */
+    function accept(files) {
+      if (!files || !files.length) return;
+      var dt = new DataTransfer();
+      var n = multiple ? files.length : 1;
+      for (var i = 0; i < n; i++) {
+        if (opts.accept === 'image' && files[i].type.indexOf('image/') !== 0) continue;
+        dt.items.add(files[i]);
+      }
+      if (!dt.files.length) {
+        alert('사진 파일만 넣으실 수 있습니다.');
+        return;
+      }
+      input.files = dt.files;
+      paint();
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    wrap.addEventListener('click', function (ev) {
+      if (ev.target === input) return;
+      input.click();
+    });
+    wrap.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', paint);
+
+    ['dragenter', 'dragover'].forEach(function (t) {
+      wrap.addEventListener(t, function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        wrap.classList.add('over');
+      });
+    });
+    ['dragleave', 'dragend'].forEach(function (t) {
+      wrap.addEventListener(t, function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        wrap.classList.remove('over');
+      });
+    });
+    wrap.addEventListener('drop', function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      wrap.classList.remove('over');
+      accept(ev.dataTransfer && ev.dataTransfer.files);
+    });
+
+    paint();
+    return wrap;
+  }
+
+  /* 화면 안의 파일 선택 칸을 한 번에 모두 바꾼다 */
+  function dropZoneAll(root, opts) {
+    (root || document).querySelectorAll('input[type="file"]:not(.dz-skip)').forEach(function (i) {
+      dropZone(i, opts || (i.accept && i.accept.indexOf('image') !== -1
+        ? { what: '사진', accept: 'image' } : {}));
+    });
+  }
+
+  /* 브라우저 창 아무 데나 파일을 떨어뜨렸을 때 그 파일이 열리지 않도록 막는다 */
+  ['dragover', 'drop'].forEach(function (t) {
+    window.addEventListener(t, function (ev) {
+      if (ev.target && ev.target.closest && ev.target.closest('.dropzone')) return;
+      ev.preventDefault();
+    });
+  });
+
   /* 한 화면에 여러 영역이 이어져 스크롤이 길어지면 보기가 어렵다.
    * 큰 제목(h2)을 기준으로 영역을 나누고, 위쪽 띠에서 하나씩 골라 보게 한다.
    * 주소 뒤에 #영역이름을 붙이면 그 영역이 바로 열린다. */
@@ -728,6 +840,8 @@
     user: user,
     getUser: getUser,
     sectionize: sectionize,
+    dropZone: dropZone,
+    dropZoneAll: dropZoneAll,
     logAction: logAction,
     displayRole: displayRole,
     isActiveMember: isActiveMember,

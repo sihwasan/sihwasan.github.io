@@ -150,6 +150,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       box.querySelectorAll('input[data-sfile]').forEach(function (inp) {
+        SHS.dropZone(inp, { what: '도장 이미지', accept: 'image' });
         inp.addEventListener('change', function () { sealFiles[inp.dataset.sfile] = this.files[0] || null; });
       });
 

@@ -395,6 +395,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       html += '</div>';
       box.innerHTML = html;
+      SHS.dropZone(document.getElementById('gl-file'), { what: '사진', accept: 'image' });
 
       document.getElementById('gl-up').addEventListener('click', function () {
         var msg = document.getElementById('gl-msg');

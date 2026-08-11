@@ -406,6 +406,29 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   padding: 36px;
 }
 .form-card h2 { border: none; padding: 0; text-align: center; margin-bottom: 24px; }
+/* 파일 끌어다 놓기 상자 */
+.dropzone {
+  border: 2px dashed var(--gray-3); background: var(--gray-1);
+  padding: 26px 18px; text-align: center; cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.dropzone:hover, .dropzone:focus { border-color: var(--navy); background: #fff; outline: none; }
+.dropzone.over { border-color: var(--navy); background: #eef2f8; border-style: solid; }
+.dropzone.has { background: #fff; border-style: solid; border-color: var(--gray-3); }
+.dropzone .dz-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.dropzone .dz-guide strong { display: block; font-size: 0.95rem; color: var(--navy); margin-bottom: 5px; }
+.dropzone .dz-guide span { display: block; font-size: 0.82rem; color: var(--gray-5); }
+.dropzone.over .dz-guide strong { color: var(--navy); }
+.dz-list { margin-top: 12px; }
+.dz-list:empty { margin-top: 0; }
+.dz-item {
+  display: flex; justify-content: space-between; gap: 10px;
+  border-top: 1px solid var(--gray-2); padding: 7px 4px;
+  font-size: 0.85rem; text-align: left;
+}
+.dz-name { color: var(--gray-7); word-break: break-all; }
+.dz-size { color: var(--gray-5); white-space: nowrap; }
+
 /* 한 화면 안의 영역 이동 띠 */
 .section-nav { display: flex; flex-wrap: wrap; border: 1px solid var(--gray-2); margin-bottom: 26px; }
 .section-nav a {

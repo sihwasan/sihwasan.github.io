@@ -163,6 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="btn ghost hidden" id="oa-cancel">새 자료로 전환</button>' +
       '<div class="form-msg" id="oa-msg"></div></div>';
 
+    SHS.dropZone(document.getElementById('oa-file'), { what: '첨부파일' });
     document.getElementById('oa-file').addEventListener('change', function () {
       oaFile = this.files[0] || null;
     });
