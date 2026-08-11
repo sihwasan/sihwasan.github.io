@@ -106,10 +106,19 @@ document.addEventListener('DOMContentLoaded', function () {
         '</div>';
     }
 
-    html += '<h2>로그아웃</h2>';
+    html += '<h2>비밀번호 변경</h2>';
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
       '<p style="font-size:0.88rem;color:var(--gray-7);margin-bottom:16px">' +
-      '구글 계정으로 로그인한 회원입니다. 비밀번호는 구글에서 관리하므로 이 홈페이지에 저장되지 않습니다.</p>' +
+      '이메일로 가입하신 경우 여기서 비밀번호를 바꾸실 수 있습니다.<br>' +
+      '구글 계정으로 로그인하신 경우에는 구글에서 관리하므로 바꾸실 필요가 없습니다.</p>' +
+      '<div class="field"><label>새 비밀번호 (6자 이상)</label><input type="password" id="q-pw1" autocomplete="new-password"></div>' +
+      '<div class="field"><label>새 비밀번호 확인</label><input type="password" id="q-pw2" autocomplete="new-password"></div>' +
+      '<button class="btn" id="q-pwsave" style="width:100%">비밀번호 변경</button>' +
+      '<div class="form-msg" id="q-pwmsg"></div>' +
+      '</div>';
+
+    html += '<h2>로그아웃</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
       '<button class="btn ghost" id="q-out" style="width:100%">로그아웃</button>' +
       '</div>';
 
@@ -160,6 +169,38 @@ document.addEventListener('DOMContentLoaded', function () {
           alert('저장되었습니다. 현재 등급: ' + r.roleName + (r.title ? ' (' + r.title + ')' : ''));
           location.reload();
         });
+      });
+    });
+
+    document.getElementById('q-pwsave').addEventListener('click', function () {
+      var msg = document.getElementById('q-pwmsg');
+      var a = document.getElementById('q-pw1').value;
+      var b = document.getElementById('q-pw2').value;
+      if (a.length < 6) {
+        msg.className = 'form-msg err';
+        msg.textContent = '비밀번호는 6자 이상으로 입력해 주세요.';
+        return;
+      }
+      if (a !== b) {
+        msg.className = 'form-msg err';
+        msg.textContent = '새 비밀번호가 서로 일치하지 않습니다.';
+        return;
+      }
+      msg.className = 'form-msg';
+      msg.textContent = '변경 중입니다...';
+      SHSCloud.init().then(function (c) {
+        return c.auth.updateUser({ password: a });
+      }).then(function (r) {
+        if (r.error) {
+          msg.className = 'form-msg err';
+          msg.textContent = r.error.message;
+          return;
+        }
+        SHSCloud.log('update', '비밀번호 변경', p.email);
+        msg.className = 'form-msg ok';
+        msg.textContent = '비밀번호가 변경되었습니다.';
+        document.getElementById('q-pw1').value = '';
+        document.getElementById('q-pw2').value = '';
       });
     });
 

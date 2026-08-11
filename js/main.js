@@ -179,6 +179,14 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    /* 비밀번호 재설정 메일의 링크로 들어온 경우 재설정 화면으로 보낸다.
+     * (메일 링크는 홈으로 돌아오므로 여기서 안내해야 한다.) */
+    var here0 = location.pathname.split('/').pop() || 'index.html';
+    if (location.hash.indexOf('type=recovery') !== -1 && here0 !== 'reset-password.html') {
+      location.replace('reset-password.html' + location.hash);
+      return;
+    }
+
     setupInstall();
 
     document.body.insertAdjacentHTML('afterbegin', buildTopbar() + buildHeader() + buildGnb());
