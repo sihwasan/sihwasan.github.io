@@ -233,7 +233,9 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
       html += '<h2>' + e(s.key) + '</h2>' +
-        '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>' + itemRows(list);
+        '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>';
+      /* 고시 분류는 올려 둔 자료가 없으면 목록을 비우고 모의고사 안내만 보인다 */
+      if (s.key !== '고시' || list.length) html += itemRows(list);
       if (s.key === '서식') html += formsHtml();
       if (s.key === '고시') html += examHtml();
     });
