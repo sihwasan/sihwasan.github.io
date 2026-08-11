@@ -27,6 +27,11 @@
       { t: '지난 회기 결의사항', h: 'archive.html#resolutions' },
       { t: '구비서류 안내', h: 'archive.html#forms' }
     ]},
+    { title: '서류발급', href: 'request.html', sub: [
+      { t: '서류 신청', h: 'request.html' },
+      { t: '발급 서류 안내', h: 'request.html#docs' },
+      { t: '구비서류 규정', h: 'archive.html#forms' }
+    ]},
     { title: '게시판', href: 'board.html', sub: [
       { t: '공지사항', h: 'board.html#notice' },
       { t: '자유게시판', h: 'board.html#free' }
@@ -44,11 +49,21 @@
     ]}
   ];
 
+  /* 화면 표기용 등급 이름
+   * 노회장·서기·간사와 시스템 관리 계정은 모두 '관리자'로 통일해 표기한다. */
+  function displayRole(role, title) {
+    if (role === 'superadmin' || role === 'president' || role === 'clerk' || role === 'staff') return '관리자';
+    if (role === 'officer') return title || '임원';
+    if (role === 'member') return '정회원';
+    if (role === 'pending') return '승인대기';
+    return role;
+  }
+
   function buildTopbar() {
     var right;
     if (user) {
       right = '<span class="user-name">' + user.name + '</span>' +
-        '<span>(' + SHSAuth.roleName(user.role) + (user.title ? ' · ' + user.title : '') + ')</span>' +
+        '<span>(' + displayRole(user.role, user.title) + ')</span>' +
         '<a href="mypage.html">내 정보</a>' +
         '<a href="#" id="btn-logout">로그아웃</a>';
     } else {
@@ -95,12 +110,64 @@
       '</div></footer>';
   }
 
+  /* ---------- 앱 설치(PWA) ---------- */
+  var installEvent = null;
+
+  function setupInstall() {
+    /* 아이콘·설정 파일 연결 */
+    [
+      { rel: 'icon', type: 'image/svg+xml', href: 'images/logo.svg' },
+      { rel: 'manifest', href: 'manifest.webmanifest' },
+      { rel: 'apple-touch-icon', href: 'images/icons/apple-touch-icon.png' }
+    ].forEach(function (a) {
+      var l = document.createElement('link');
+      Object.keys(a).forEach(function (k) { l[k] = a[k]; });
+      document.head.appendChild(l);
+    });
+    var meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#17335f';
+    document.head.appendChild(meta);
+
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    }
+
+    window.addEventListener('beforeinstallprompt', function (ev) {
+      ev.preventDefault();
+      installEvent = ev;
+      showInstallLink();
+    });
+  }
+
+  function showInstallLink() {
+    if (document.getElementById('btn-install')) return;
+    if (localStorage.getItem('shs_install_hidden')) return;
+    var util = document.querySelector('.topbar .util');
+    if (!util) return;
+    util.insertAdjacentHTML('afterbegin',
+      '<a href="#" id="btn-install" title="바탕화면에 앱으로 추가합니다">앱 설치</a>');
+    document.getElementById('btn-install').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      if (!installEvent) {
+        alert('크롬 주소창 오른쪽의 설치 아이콘을 눌러 설치하실 수 있습니다.\n' +
+              '(휴대폰은 브라우저 메뉴 → "홈 화면에 추가")');
+        return;
+      }
+      installEvent.prompt();
+      installEvent.userChoice.then(function (r) {
+        if (r.outcome === 'accepted') {
+          localStorage.setItem('shs_install_hidden', '1');
+          var b = document.getElementById('btn-install');
+          if (b) b.remove();
+        }
+        installEvent = null;
+      });
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
-    var fav = document.createElement('link');
-    fav.rel = 'icon';
-    fav.type = 'image/svg+xml';
-    fav.href = 'images/logo.svg';
-    document.head.appendChild(fav);
+    setupInstall();
 
     document.body.insertAdjacentHTML('afterbegin', buildTopbar() + buildHeader() + buildGnb());
     document.body.insertAdjacentHTML('beforeend', buildFooter());
@@ -128,10 +195,9 @@
     var lg = document.getElementById('btn-logout');
     if (lg) lg.addEventListener('click', doLogout);
 
-    /* 구글 로그인(서버) 세션 확인 후 상단바를 그 정보로 바꾼다.
-     * 로그인 직후에는 주소 끝에 인증 토큰이 붙어 돌아오므로,
-     * 토큰을 처리한 뒤 주소창을 깨끗하게 정리한다. */
-    if (window.SHSCloud && SHSCloud.enabled() && !user) {
+    /* 서버 세션이 있으면 상단바를 그 정보로 바꾼다 (서버 우선).
+     * 로그인 직후에는 주소 끝에 인증 토큰이 붙어 돌아오므로 정리한다. */
+    if (window.SHSCloud && SHSCloud.enabled()) {
       var hadToken = location.hash.indexOf('access_token') !== -1;
 
       SHSCloud.loadProfile().then(function (p) {
@@ -145,7 +211,7 @@
           util.innerHTML =
             '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
             '<span class="user-name">' + (p.name || p.email) + '</span>' +
-            '<span>(' + SHSCloud.roleName(p.role) + (p.title ? ' · ' + p.title : '') + ')</span>' +
+            '<span>(' + displayRole(p.role, p.title) + ')</span>' +
             '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
@@ -180,9 +246,60 @@
       if (target) target.click();
     }
 
-    /* 정기노회 이후 관리자에게 홈페이지 갱신 안내 */
-    getUser().then(meetingReminder);
+    /* 관리자에게 운영 알림·서류 신청 안내 */
+    getUser().then(function (u) {
+      meetingReminder(u);
+      docRequestWatch(u);
+    });
   });
+
+  /* ---------- 서류 신청 실시간 알림 (관리자 로그인 중) ---------- */
+  function docRequestWatch(u) {
+    if (!u || !u.cloud || !SHSAuth.canIssueDocuments(u)) return;
+    if (!(window.SHSCloud && SHSCloud.enabled())) return;
+
+    var seen = {};
+    try { seen = JSON.parse(localStorage.getItem('shs_docreq_seen') || '{}'); } catch (x) {}
+
+    function banner(rows) {
+      var fresh = rows.filter(function (r) { return !seen[r.id]; });
+      if (!fresh.length) return;
+      var old = document.getElementById('docreq-banner');
+      if (old) old.remove();
+      var bar = document.createElement('div');
+      bar.className = 'container';
+      bar.id = 'docreq-banner';
+      bar.style.marginTop = '16px';
+      bar.innerHTML =
+        '<div class="notice-banner" style="border-left:4px solid var(--red)">' +
+        '<strong>[서류 신청]</strong> 처리 대기 중인 서류 신청이 ' + fresh.length + '건 있습니다. ' +
+        fresh.slice(0, 3).map(function (r) {
+          return SHS.esc(r.name + ' ' + (r.church || '') + ' — ' + r.doc_type);
+        }).join(' / ') +
+        ' <a class="btn sm" style="margin-left:8px" href="documents.html#requests">신청 확인</a> ' +
+        '<button class="btn ghost sm" id="docreq-hide">나중에 보기</button>' +
+        '</div>';
+      var gnb = document.querySelector('.gnb');
+      if (gnb) gnb.insertAdjacentElement('afterend', bar);
+      var hide = document.getElementById('docreq-hide');
+      if (hide) hide.addEventListener('click', function () {
+        fresh.forEach(function (r) { seen[r.id] = 1; });
+        localStorage.setItem('shs_docreq_seen', JSON.stringify(seen));
+        bar.remove();
+      });
+    }
+
+    function poll() {
+      SHSCloud.init().then(function (c) {
+        if (!c) return null;
+        return c.from('doc_requests').select('*').eq('status', '신청').order('id', { ascending: false });
+      }).then(function (r) {
+        if (r && r.data && r.data.length) banner(r.data);
+      }).catch(function () {});
+    }
+    poll();
+    setInterval(poll, 60000);   /* 1분마다 새 신청 확인 */
+  }
 
   /* 이름 마스킹: 개인정보 보호를 위해 비회원에게는 가운데 글자를 *로 표시 */
   function maskName(name) {
@@ -196,23 +313,28 @@
   /* 통합 세션 확인: 구글 로그인(서버)과 이메일 로그인(브라우저)을 모두 확인한다.
    * 반환되는 사용자 객체는 role·title·name·church 등을 가지므로
    * SHSAuth의 권한 판정 함수(isOfficer 등)에 그대로 전달할 수 있다. */
+  function toCloudUser(p) {
+    return {
+      id: p.id, email: p.email, name: p.name || p.email,
+      church: p.church || '', position: p.position || '',
+      phone: p.phone || '', birth_date: p.birth_date || '', address: p.address || '',
+      role: p.role, title: p.title || null,
+      suspended: !!p.suspended, member_until: p.member_until || null,
+      cloud: true
+    };
+  }
+
+  /* 서버(구글·이메일) 세션을 우선 확인하고, 없을 때만 이 컴퓨터의 체험 계정을 쓴다. */
   function getUser() {
     return new Promise(function (resolve) {
-      var local = SHSAuth.currentUser();
-      if (local) { resolve(local); return; }
       if (window.SHSCloud && SHSCloud.enabled()) {
         SHSCloud.loadProfile().then(function (p) {
-          if (!p) { resolve(null); return; }
-          resolve({
-            id: p.id, email: p.email, name: p.name || p.email,
-            church: p.church || '', position: p.position || '',
-            phone: p.phone || '', role: p.role, title: p.title || null,
-            cloud: true
-          });
-        });
+          if (p) { resolve(toCloudUser(p)); return; }
+          resolve(SHSAuth.currentUser());
+        }, function () { resolve(SHSAuth.currentUser()); });
         return;
       }
-      resolve(null);
+      resolve(SHSAuth.currentUser());
     });
   }
 
@@ -360,11 +482,92 @@
     return { position: position };
   }
 
+  /* ---------- 회원 자격 판정 ----------
+   * 정회원 자격은 다음 세 가지로 상실된다.
+   *  1) 관리자가 자격을 정지한 경우
+   *  2) 총대 자격 기간(다음 봄 정기노회)이 지난 경우
+   *  3) 총회 정년(만 70세)에 이른 경우  */
+  var RETIRE_AGE = 70;
+
+  function ageOn(birth, when) {
+    if (!birth) return null;
+    var b = new Date(birth + 'T00:00:00');
+    if (isNaN(b)) return null;
+    var d = when || new Date();
+    var a = d.getFullYear() - b.getFullYear();
+    var m = d.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && d.getDate() < b.getDate())) a--;
+    return a;
+  }
+
+  /* 만 70세가 되는 날 (정년일) */
+  function retireDate(birth) {
+    if (!birth) return null;
+    var b = new Date(birth + 'T00:00:00');
+    if (isNaN(b)) return null;
+    return new Date(b.getFullYear() + RETIRE_AGE, b.getMonth(), b.getDate());
+  }
+
+  /* 남은 임기 안내 문구 */
+  function termLabel(u) {
+    var parts = [];
+    var rd = retireDate(u.birth_date);
+    if (rd) {
+      var days = Math.ceil((rd - new Date()) / 86400000);
+      if (days <= 0) parts.push('정년 경과');
+      else if (days < 400) parts.push('정년까지 ' + days + '일');
+      else parts.push('정년까지 ' + Math.floor(days / 365) + '년 ' + (Math.floor(days % 365 / 30)) + '개월');
+    }
+    if (u.member_until) {
+      var md = new Date(u.member_until + 'T00:00:00');
+      var mdays = Math.ceil((md - new Date()) / 86400000);
+      parts.push(mdays <= 0 ? '총대 자격 만료' : '총대 자격 ' + u.member_until + '까지');
+    }
+    return parts.join(' / ') || '-';
+  }
+
+  function membershipIssue(u) {
+    if (!u) return '로그인이 필요합니다.';
+    if (u.role === 'pending') return '승인대기 상태입니다.';
+    if (u.suspended) return '정회원 자격이 정지되었습니다.';
+    var rd = retireDate(u.birth_date);
+    if (rd && rd <= new Date()) return '총회 정년(만 ' + RETIRE_AGE + '세)에 이르러 정회원 자격이 만료되었습니다.';
+    if (u.member_until) {
+      var md = new Date(u.member_until + 'T00:00:00');
+      if (md <= new Date()) return '총대 자격 기간이 만료되어 정회원 자격이 상실되었습니다.';
+    }
+    return null;
+  }
+
+  /* 정회원 이상(자격 유효) 여부. 관리자·임원은 항상 유효로 본다. */
+  function isActiveMember(u) {
+    if (!u) return false;
+    if (['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(u.role) !== -1) return true;
+    return !membershipIssue(u);
+  }
+
+  /* 정회원 전용 영역 안내 (자격이 없으면 안내 HTML 반환, 있으면 null) */
+  function memberGate(u, what) {
+    if (isActiveMember(u)) return null;
+    var issue = membershipIssue(u);
+    return '<div class="notice-banner">' + (what || '이 자료') + '는 <strong>정회원</strong>만 열람할 수 있습니다. ' +
+      (u ? issue + ' 문의는 노회 사무실(031-486-9993)로 해주시기 바랍니다.'
+         : '로그인 후 이용해 주세요. <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
+      '</div>';
+  }
+
   /* 전역 헬퍼 */
   window.SHS = {
     user: user,
     getUser: getUser,
     logAction: logAction,
+    displayRole: displayRole,
+    isActiveMember: isActiveMember,
+    membershipIssue: membershipIssue,
+    memberGate: memberGate,
+    termLabel: termLabel,
+    ageOn: ageOn,
+    retireDate: retireDate,
     nthMonday: nthMonday,
     opsActive: opsActive,
     opsRuleLabel: opsRuleLabel,

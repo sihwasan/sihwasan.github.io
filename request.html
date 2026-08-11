@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>서류발급 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>서류발급</h1>
+    <div class="crumb">홈 &gt; 서류발급</div>
+  </div>
+</div>
+
+<div class="page-body container">
+
+  <div id="req-area"><p style="color:var(--gray-5)">확인 중...</p></div>
+
+  <h2 id="docs">발급 서류 안내</h2>
+  <div class="doc-list">
+    <div class="doc-item"><div class="d-name">소속증명서</div><div class="d-desc">노회 소속 교역자임을 증명합니다. 연말정산, 기관 제출 등에 사용합니다.</div></div>
+    <div class="doc-item"><div class="d-name">재직증명서</div><div class="d-desc">해당 교회에 재직 중임을 증명합니다.</div></div>
+    <div class="doc-item"><div class="d-name">대표자증명서</div><div class="d-desc">해당 교회의 대표자임을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
+    <div class="doc-item"><div class="d-name">직인증명서</div><div class="d-desc">교회 직인을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
+    <div class="doc-item"><div class="d-name">은퇴목사확인서</div><div class="d-desc">은퇴목사임을 확인합니다.</div></div>
+    <div class="doc-item"><div class="d-name">그 밖의 증명</div><div class="d-desc">필요한 내용을 신청 시 메모란에 적어 주시면 서기가 확인 후 처리합니다.</div></div>
+  </div>
+
+  <h2>발급 절차</h2>
+  <table class="tbl" style="max-width:760px">
+    <tbody>
+      <tr><th style="width:90px">1단계</th><td class="left">정회원이 아래 신청 양식을 작성하여 신청합니다.</td></tr>
+      <tr><th>2단계</th><td class="left">신청 즉시 관리자(노회장·서기·간사)에게 알림이 전달됩니다.</td></tr>
+      <tr><th>3단계</th><td class="left">노회장의 허락 아래 서기가 서류를 발급합니다. (간사가 대행할 수 있습니다)</td></tr>
+      <tr><th>4단계</th><td class="left">발급이 완료되면 노회 사무실(031-486-9993)에서 수령하거나 안내에 따라 전달받습니다.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:0.85rem;color:var(--gray-5)">
+    노회규칙 제29조에 따라 상회비 미납 교회는 서류 발급이 보류될 수 있습니다.
+  </p>
+
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('req-area');
+  var e = SHS.esc;
+
+  var gate = SHS.memberGate(user, '서류 신청');
+  if (gate) {
+    area.innerHTML = gate +
+      '<p style="color:var(--gray-7)">서류가 필요하신 경우 노회 사무실(031-486-9993)로 문의해 주시기 바랍니다.</p>';
+    return;
+  }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">서류 신청은 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var DOCS = ['소속증명서', '재직증명서', '대표자증명서', '직인증명서', '은퇴목사확인서', '기타'];
+  var PURPOSES = ['연말정산용', '은행제출용', '기관제출용', '총회제출용', '회사제출용', '교회제출용', '기타'];
+
+  function render(myList) {
+    var html = '';
+    html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님, 아래에서 필요한 서류를 신청하실 수 있습니다. ' +
+      '신청하시면 관리자에게 바로 알림이 전달됩니다.</div>';
+
+    html += '<h2>서류 신청</h2>';
+    html += '<div class="admin-card" style="max-width:820px"><div class="inline-form" style="margin-bottom:8px">' +
+      '<div class="field" style="flex:0 0 180px"><label>서류 종류</label><select id="rq-doc">' +
+      DOCS.map(function (d) { return '<option>' + d + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 170px"><label>용도</label><select id="rq-purpose">' +
+      PURPOSES.map(function (d) { return '<option>' + d + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 110px"><label>부수</label><input type="number" id="rq-copies" value="1" min="1" max="10"></div>' +
+      '</div>' +
+      '<div class="inline-form" style="margin-bottom:8px">' +
+      '<div class="field"><label>성명</label><input type="text" id="rq-name" value="' + e(user.name) + '"></div>' +
+      '<div class="field" style="flex:0 0 130px"><label>직분</label><input type="text" id="rq-pos" value="' + e(user.position || '') + '"></div>' +
+      '<div class="field"><label>소속 교회</label><input type="text" id="rq-church" value="' + e(user.church || '') + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>요청 사항 (선택)</label><textarea id="rq-memo" rows="3" placeholder="예: 영문 표기가 필요합니다 / 수령 방법 등"></textarea></div>' +
+      '<button class="btn" id="rq-send">신청하기</button>' +
+      '<div class="form-msg" id="rq-msg"></div></div>';
+
+    html += '<h2>내 신청 내역</h2>';
+    if (!myList.length) {
+      html += '<p style="color:var(--gray-5)">신청 내역이 없습니다.</p>';
+    } else {
+      html += '<table class="tbl" style="max-width:820px"><thead><tr><th>신청일</th><th>서류</th><th>용도</th><th>부수</th><th>상태</th></tr></thead><tbody>';
+      myList.forEach(function (r) {
+        html += '<tr><td>' + e(String(r.created_at).slice(0, 10)) + '</td><td>' + e(r.doc_type) + '</td>' +
+          '<td>' + e(r.purpose || '-') + '</td><td>' + e(r.copies) + '</td>' +
+          '<td><span class="role-badge">' + e(r.status) + '</span></td></tr>';
+      });
+      html += '</tbody></table>';
+    }
+    area.innerHTML = html;
+
+    document.getElementById('rq-send').addEventListener('click', function () {
+      var msg = document.getElementById('rq-msg');
+      var d = {
+        user_id: user.id,
+        email: user.email,
+        name: document.getElementById('rq-name').value.trim(),
+        position: document.getElementById('rq-pos').value.trim(),
+        church: document.getElementById('rq-church').value.trim(),
+        doc_type: document.getElementById('rq-doc').value,
+        purpose: document.getElementById('rq-purpose').value,
+        copies: parseInt(document.getElementById('rq-copies').value, 10) || 1,
+        memo: document.getElementById('rq-memo').value.trim()
+      };
+      if (!d.name || !d.church) {
+        msg.className = 'form-msg err';
+        msg.textContent = '성명과 소속 교회를 입력해 주세요.';
+        return;
+      }
+      msg.className = 'form-msg';
+      msg.textContent = '신청 중입니다...';
+      SHSCloud.init().then(function (c) {
+        return c.from('doc_requests').insert(d);
+      }).then(function (res) {
+        if (res.error) {
+          msg.className = 'form-msg err';
+          msg.textContent = res.error.message;
+          return;
+        }
+        SHSCloud.log('create', '서류 신청', d.doc_type + ' (' + d.name + ', ' + d.church + ', ' + d.purpose + ')');
+        alert('신청이 접수되었습니다. 관리자에게 알림이 전달되었습니다.');
+        load();
+      });
+    });
+  }
+
+  function load() {
+    SHSCloud.init().then(function (c) {
+      return c.from('doc_requests').select('*').eq('user_id', user.id).order('id', { ascending: false });
+    }).then(function (r) {
+      if (r.error) {
+        area.innerHTML = '<div class="notice-banner">신청 기능을 사용할 수 없습니다: ' + e(r.error.message) +
+          ' (08 서류신청 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      render(r.data || []);
+    });
+  }
+  load();
+ });
+});
+</script>
+</body>
+</html>

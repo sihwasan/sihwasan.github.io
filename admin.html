@@ -32,8 +32,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (!user || !SHSAuth.canManageMembers(user)) {
     area.innerHTML =
-      '<div class="notice-banner">회원 관리는 <strong>노회장, 서기, 간사</strong>가 이용할 수 있습니다.' +
-      (user ? ' 현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 이용할 수 없습니다.'
+      '<div class="notice-banner">회원 관리는 <strong>관리자 등급</strong>이 이용할 수 있습니다.' +
+      (user ? ' 현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 이용할 수 없습니다.'
             : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
       '</div>';
     return;
@@ -63,8 +63,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var html = '';
       html += '<div class="notice-banner">서버에 등록된 실제 회원 목록입니다. ' +
-        '승인대기 회원의 정회원 설정: <strong>서기, 간사</strong>' +
-        (isSuper ? ' / 등급 지정: <strong>최고관리자</strong>' : '') + '</div>';
+        '승인대기 회원의 정회원 설정과 회원명단 관리 권한: <strong>관리자 (노회장, 서기, 간사)</strong></div>';
 
       if (pendings.length) {
         html += '<h2>승인대기 회원</h2>';
@@ -79,14 +78,32 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       html += '<h2>회원 목록 (' + visible.length + '명)</h2>';
-      html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th><th>연락처</th><th>등급</th>' +
-        (isSuper ? '<th style="width:210px">등급 변경</th>' : '') + '</tr></thead><tbody>';
+      html += '<div class="notice-banner">개인정보(생년월일·연락처·주소)는 <strong>**</strong>로 가려서 표시됩니다. ' +
+        '<strong>열람</strong>을 누르면 내용이 표시되며, <strong>열람 기록은 감사 기록에 남습니다.</strong></div>';
+      html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th>' +
+        '<th style="width:150px">개인정보</th><th style="width:150px">남은 임기</th><th>등급</th>' +
+        '<th style="width:110px">자격</th>' +
+        (isSuper ? '<th style="width:200px">등급 변경</th>' : '') + '</tr></thead><tbody>';
       visible.forEach(function (p) {
         var cur = gradeValue(p);
+        var issue = SHS.membershipIssue(p);
+        var expired = p.role === 'member' && issue && !p.suspended && issue.indexOf('승인대기') === -1;
         html += '<tr><td class="left">' + e(p.email) + '</td><td>' + e(p.name || '-') + '</td>' +
-          '<td>' + e(p.position || '-') + '</td><td>' + e(p.church || '-') + '</td><td>' + e(p.phone || '-') + '</td>' +
-          '<td><span class="role-badge">' + SHSCloud.roleName(p.role) + '</span>' +
-          (p.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(p.title) + '</div>' : '') + '</td>';
+          '<td>' + e(p.position || '-') + '</td><td>' + e(p.church || '-') + '</td>' +
+          /* 개인정보: 가려서 표시하고 열람 버튼 제공 */
+          '<td><span id="pi-' + e(p.id) + '">**</span><br>' +
+          '<button class="btn ghost sm" data-piview="' + e(p.id) + '" style="margin-top:4px">열람</button></td>' +
+          '<td style="font-size:0.82rem">' + e(SHS.termLabel(p)) + '</td>' +
+          '<td><span class="role-badge">' + SHS.displayRole(p.role, p.title) + '</span>' +
+          (p.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(p.title) + '</div>' : '') + '</td>' +
+          '<td>' +
+          (p.suspended
+            ? '<div style="color:var(--red);font-size:0.8rem;margin-bottom:4px">정지됨</div>' +
+              '<button class="btn ghost sm" data-cresume="' + e(p.id) + '" data-cname="' + e(p.name || '') + '">해제</button>'
+            : (expired
+                ? '<div style="color:var(--red);font-size:0.78rem">' + e(issue) + '</div>'
+                : '<button class="btn danger sm" data-csuspend="' + e(p.id) + '" data-cname="' + e(p.name || '') + '">정지</button>')) +
+          '</td>';
         if (isSuper) {
           html += '<td><select data-crole="' + e(p.id) + '">' +
             GRADES.map(function (g) {
@@ -97,7 +114,23 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '</tr>';
       });
       html += '</tbody></table>';
-      html += '<p style="font-size:0.82rem;color:var(--gray-5)">계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
+      html += '<p style="font-size:0.82rem;color:var(--gray-5)">' +
+        '· 총회 정년은 만 70세이며, 정년이 지나면 정회원 자격이 자동으로 상실됩니다.<br>' +
+        '· 장로 총대는 다음 봄 정기노회까지 자격이 유지되며, 총대로 다시 등록되지 않으면 자격이 상실됩니다. ' +
+        '아래 <strong>총대 자격 기간 일괄 설정</strong>으로 만료일을 지정할 수 있습니다.<br>' +
+        '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
+
+      /* 총대 자격 기간 일괄 설정 */
+      var nextSpring = SHS.nthMonday(new Date().getFullYear() + (new Date().getMonth() >= 3 ? 1 : 0), 4, 2);
+      var nsStr = nextSpring.toISOString().slice(0, 10);
+      html += '<div class="admin-card" style="max-width:760px"><h3 style="margin-top:0">총대 자격 기간 일괄 설정</h3>' +
+        '<p style="font-size:0.86rem;color:var(--gray-7)">장로 총대의 자격 만료일을 한 번에 지정합니다. ' +
+        '기본값은 다음 봄 정기노회일입니다. 만료일이 지나면 정회원 자격이 자동으로 상실됩니다.</p>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 180px"><label>만료일</label><input type="date" id="mu-date" value="' + nsStr + '"></div>' +
+        '<div class="field" style="flex:0 0 160px"><label>대상 직분</label><select id="mu-pos"><option value="장로">장로</option><option value="">전체 정회원</option></select></div>' +
+        '<button class="btn" id="mu-apply">일괄 적용</button>' +
+        '</div><div class="form-msg" id="mu-msg"></div></div>';
 
       /* 노회 명단·상비부 관리 영역 */
       html += '<h2>노회 명단 관리</h2>';
@@ -133,6 +166,71 @@ document.addEventListener('DOMContentLoaded', function () {
           var sel = area.querySelector('select[data-crole="' + b.dataset.cassign + '"]');
           if (!confirm('등급을 ' + gradeLabel(sel.value) + '(으)로 변경하시겠습니까?')) return;
           updateRole(b.dataset.cassign, sel.value, '등급 변경');
+        });
+      });
+
+      /* 개인정보 열람 (열람 기록을 감사 기록에 남긴다) */
+      area.querySelectorAll('button[data-piview]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var id = b.dataset.piview;
+          var p = rows.filter(function (x) { return String(x.id) === id; })[0];
+          if (!p) return;
+          if (!confirm('개인정보를 열람하시겠습니까?\n열람 기록이 감사 기록에 남습니다.')) return;
+          var span = document.getElementById('pi-' + id);
+          span.innerHTML =
+            '<span style="font-size:0.82rem">' +
+            '생년월일 ' + e(p.birth_date || '-') + '<br>' +
+            '연락처 ' + e(p.phone || '-') + '<br>' +
+            '주소 ' + e(p.address || '-') + '</span>';
+          b.remove();
+          SHSCloud.log('view', '개인정보 열람',
+            (p.name || p.email) + ' — 생년월일·연락처·주소 열람');
+        });
+      });
+
+      /* 정회원 자격 정지 / 해제 */
+      function setSuspended(id, name, val) {
+        SHSCloud.init().then(function (c) {
+          return c.from('profiles').update({ suspended: val, updated_at: new Date().toISOString() }).eq('id', id);
+        }).then(function (res) {
+          if (res.error) { alert('처리하지 못했습니다: ' + res.error.message); return; }
+          SHSCloud.log('update', val ? '정회원 자격 정지' : '정회원 자격 해제', name || id);
+          renderCloud();
+        });
+      }
+      area.querySelectorAll('button[data-csuspend]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('"' + b.dataset.cname + '" 님의 정회원 자격을 정지하시겠습니까?\n' +
+                       '정지되면 정회원 전용 자료를 열람할 수 없습니다.')) return;
+          setSuspended(b.dataset.csuspend, b.dataset.cname, true);
+        });
+      });
+      area.querySelectorAll('button[data-cresume]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('"' + b.dataset.cname + '" 님의 정회원 자격 정지를 해제하시겠습니까?')) return;
+          setSuspended(b.dataset.cresume, b.dataset.cname, false);
+        });
+      });
+
+      /* 총대 자격 기간 일괄 설정 */
+      var muBtn = document.getElementById('mu-apply');
+      if (muBtn) muBtn.addEventListener('click', function () {
+        var msg = document.getElementById('mu-msg');
+        var until = document.getElementById('mu-date').value;
+        var pos = document.getElementById('mu-pos').value;
+        if (!until) { msg.className = 'form-msg err'; msg.textContent = '만료일을 선택해 주세요.'; return; }
+        if (!confirm((pos ? pos + ' 직분' : '전체 정회원') + '의 자격 만료일을 ' + until + '로 설정하시겠습니까?')) return;
+        SHSCloud.init().then(function (c) {
+          var q = c.from('profiles').update({ member_until: until, updated_at: new Date().toISOString() })
+            .eq('role', 'member');
+          if (pos) q = q.eq('position', pos);
+          return q;
+        }).then(function (res) {
+          if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+          SHSCloud.log('update', '총대 자격 기간 설정', (pos || '전체 정회원') + ' → ' + until);
+          msg.className = 'form-msg ok';
+          msg.textContent = '설정되었습니다.';
+          renderCloud();
         });
       });
     });
@@ -309,9 +407,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function render() {
     var accounts = SHSAuth.listAccounts();
     var html = '';
-    html += '<div class="notice-banner">회원명단 추가·삭제 권한: <strong>노회장, 서기, 간사</strong>' +
-      ' / 승인대기 회원의 정회원 설정: <strong>서기, 간사</strong>' +
-      (isSuper ? ' / 직책(노회장·서기·간사) 지정 권한: <strong>최고관리자</strong>' : '') + '</div>';
+    html += '<div class="notice-banner">회원명단 추가·삭제 권한: <strong>관리자 (노회장, 서기, 간사)</strong></div>';
 
     /* 승인대기 회원 */
     var pendings = accounts.filter(function (a) { return a.role === 'pending'; });

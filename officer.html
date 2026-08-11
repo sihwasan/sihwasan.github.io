@@ -42,13 +42,13 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   if (!hasAccess) {
     area.innerHTML =
-      '<div class="notice-banner">임원방은 <strong>노회장, 서기, 간사</strong>가 이용할 수 있는 공간입니다. ' +
-      '현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 열람할 수 없습니다.</div>';
+      '<div class="notice-banner">임원방은 <strong>노회 임원</strong>이 이용할 수 있는 공간입니다. ' +
+      '현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 열람할 수 없습니다.</div>';
     return;
   }
 
   var html = '';
-  html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님(' + SHSAuth.roleName(user.role) + '), 임원방에 오신 것을 환영합니다.</div>';
+  html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님(' + SHS.displayRole(user.role, user.title) + '), 임원방에 오신 것을 환영합니다.</div>';
 
   /* 바로가기 */
   html += '<h2>임원 업무</h2><div class="doc-list">';

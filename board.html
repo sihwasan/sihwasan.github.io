@@ -195,9 +195,9 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   document.getElementById('btn-write').addEventListener('click', function () {
-    if (!SHSAuth.isMember(user)) {
+    if (!SHS.isActiveMember(user)) {
       if (user) {
-        alert('현재 승인대기 상태입니다. 정회원 전환 후 글을 쓸 수 있습니다.');
+        alert('자유게시판 글쓰기는 정회원만 이용할 수 있습니다.\n' + (SHS.membershipIssue(user) || ''));
         return;
       }
       alert('글쓰기는 정회원 로그인 후 이용할 수 있습니다.');

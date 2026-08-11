@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
     /* 이미 등급을 받은 회원은 바로 홈으로 */
     if (p.role !== 'pending' && p.church) {
       area.innerHTML = '<div class="notice-banner"><strong>' + e(p.name || p.email) + '</strong> 님, 환영합니다. ' +
-        '현재 등급은 <strong>' + SHSCloud.roleName(p.role) + '</strong>' +
+        '현재 등급은 <strong>' + SHS.displayRole(p.role, p.title) + '</strong>' +
         (p.title ? ' (' + e(p.title) + ')' : '') + '입니다.</div>' +
         '<p style="text-align:center"><a class="btn" href="index.html">홈으로</a></p>';
       SHSCloud.log('auth', '구글 로그인', p.email);

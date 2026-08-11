@@ -65,6 +65,14 @@ document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
   var e = SHS.esc;
 
+  /* 자료실은 정회원 전용 */
+  var mgate = SHS.memberGate(user, '자료실');
+  if (mgate) {
+    document.querySelector('.page-body').innerHTML = mgate;
+    return;
+  }
+  SHS.logAction('view', '자료실 열람', '자료 목록 열람');
+
   var tb = document.getElementById('archive-body');
   SHSData.archives.forEach(function (a, i) {
     var canView = a.officerOnly ? SHSAuth.isOfficer(user) : (a.memberOnly ? SHSAuth.isMember(user) : true);

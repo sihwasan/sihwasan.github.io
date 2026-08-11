@@ -197,9 +197,9 @@ var SHSAuth = (function () {
   /* 정회원 이상 열람 자료 (승인대기 회원 제외) */
   function isMember(u) { return !!u && u.role !== 'pending'; }
 
-  /* 승인대기 회원을 정회원으로 설정: 서기, 간사, 최고관리자 */
+  /* 승인대기 회원을 정회원으로 설정: 관리자 등급 전원 (노회장·서기·간사) */
   function canApproveMembers(u) {
-    return !!u && (u.role === 'clerk' || u.role === 'staff' || u.role === 'superadmin');
+    return canManageMembers(u);
   }
 
   /* 임원 전용 자료(회의록 등): 노회 임원 전원(노회장·부노회장·서기·부서기·회록서기·

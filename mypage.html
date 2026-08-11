@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var html = '';
     html += '<div class="notice-banner"><strong>' + e(p.name || p.email) + '</strong> 님의 현재 등급은 ' +
-      '<strong>' + SHSCloud.roleName(p.role) + '</strong>' + (p.title ? ' (' + e(p.title) + ')' : '') + '입니다. ';
+      '<strong>' + SHS.displayRole(p.role, p.title) + '</strong>' + (p.title ? ' (' + e(p.title) + ')' : '') + '입니다. ';
     html += p.role === 'pending'
       ? '성명과 소속 교회가 노회 명단과 일치하지 않아 승인대기 상태입니다. 아래에서 정확히 수정하시면 등급이 자동으로 부여됩니다.'
       : '성명 또는 소속 교회를 수정하면 노회 명단과 다시 대조하여 등급이 갱신됩니다.';
@@ -79,7 +79,12 @@ document.addEventListener('DOMContentLoaded', function () {
       churches.map(function (c) {
         return '<option' + (p.church === c ? ' selected' : '') + '>' + e(c) + '</option>';
       }).join('') + '</select></div>' +
-      '<div class="field"><label>연락처 (선택)</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
+      '<div class="field"><label>연락처</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
+      '<div class="field"><label>생년월일</label><input type="date" id="q-birth" value="' + e(p.birth_date || '') + '">' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인에 사용됩니다.</span></div>' +
+      '<div class="field"><label>주소</label><input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5)">생년월일·연락처·주소는 노회 행정에만 사용하며, ' +
+      '홈페이지에서는 가려서 표시됩니다. 관리자가 열람하는 경우 열람 기록이 감사 기록에 남습니다.</p>' +
       '<button class="btn" id="q-save" style="width:100%">저장</button>' +
       '<div class="form-msg" id="q-msg"></div>' +
       '</div>';
@@ -127,8 +132,17 @@ document.addEventListener('DOMContentLoaded', function () {
           msg.textContent = r.msg;
           return;
         }
-        alert('저장되었습니다. 현재 등급: ' + r.roleName + (r.title ? ' (' + r.title + ')' : ''));
-        location.reload();
+        /* 생년월일·주소는 본인만 수정할 수 있는 항목이므로 별도 저장 */
+        return SHSCloud.init().then(function (c) {
+          return c.from('profiles').update({
+            birth_date: document.getElementById('q-birth').value || null,
+            address: document.getElementById('q-addr').value.trim(),
+            updated_at: new Date().toISOString()
+          }).eq('id', p.id);
+        }).then(function () {
+          alert('저장되었습니다. 현재 등급: ' + r.roleName + (r.title ? ' (' + r.title + ')' : ''));
+          location.reload();
+        });
       });
     });
 

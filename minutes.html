@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       gate.innerHTML =
         '<div class="notice-banner">노회 회의록은 <strong>노회 임원</strong>만 열람할 수 있는 자료입니다. ' +
-        '현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 열람할 수 없습니다. 회의록 열람이 필요한 회원께서는 노회 사무실(031-486-9993)로 문의해 주시기 바랍니다.</div>';
+        '현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 열람할 수 없습니다. 회의록 열람이 필요한 회원께서는 노회 사무실(031-486-9993)로 문의해 주시기 바랍니다.</div>';
     }
     return;
   }
