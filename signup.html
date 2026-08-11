@@ -20,9 +20,40 @@
   <div class="form-card">
     <h2>회원가입</h2>
     <p style="font-size:0.85rem;color:var(--gray-5);text-align:center;margin-bottom:20px">
-      이메일이 곧 로그인 아이디가 됩니다.<br>
       성명과 소속 교회가 노회 명단과 일치하면 자동으로 회원 등급이 부여됩니다.
     </p>
+
+    <div class="form-step">1. 가입 정보<span>구글로 가입하셔도 성명과 소속 교회는 입력하셔야 합니다.</span></div>
+
+    <div class="field">
+      <label for="reg-name">성명</label>
+      <input type="text" id="reg-name">
+    </div>
+    <div class="field">
+      <label for="reg-pos">직분</label>
+      <select id="reg-pos"><option>목사</option><option>위임목사</option><option>부목사</option><option>장로</option><option>간사</option></select>
+    </div>
+    <div class="field">
+      <label for="reg-church">소속 교회</label>
+      <select id="reg-church"><option value="">— 선택하세요 —</option></select>
+    </div>
+    <div class="field hidden" id="reg-etc-wrap">
+      <label for="reg-etc">교회명 직접 입력</label>
+      <input type="text" id="reg-etc">
+    </div>
+    <div class="field">
+      <label for="reg-phone">연락처 (선택)</label>
+      <input type="tel" id="reg-phone" placeholder="010-0000-0000">
+    </div>
+    <div class="field" style="font-size:0.85rem">
+      <label style="font-weight:400">
+        <input type="checkbox" id="reg-agree" style="width:auto;margin-right:6px">
+        <a href="terms.html" target="_blank" style="color:var(--navy);text-decoration:underline">이용약관</a>과
+        <a href="privacy.html" target="_blank" style="color:var(--navy);text-decoration:underline">개인정보처리방침</a>에 동의합니다. (필수)
+      </label>
+    </div>
+
+    <div class="form-step">2. 로그인 방법 선택<span>앞으로 홈페이지에 들어오실 때 사용할 방법입니다.</span></div>
 
     <div id="social-signup" class="hidden">
       <button class="btn-google" id="btn-google-up">
@@ -45,30 +76,7 @@
       <label for="reg-pw">비밀번호 (6자 이상)</label>
       <input type="password" id="reg-pw" autocomplete="new-password">
     </div>
-    <div class="field">
-      <label for="reg-name">성명</label>
-      <input type="text" id="reg-name">
-    </div>
-    <div class="field">
-      <label for="reg-pos">직분</label>
-      <select id="reg-pos"><option>목사</option><option>위임목사</option><option>부목사</option><option>장로</option><option>간사</option></select>
-    </div>
-    <div class="field">
-      <label for="reg-church">소속 교회</label>
-      <input type="text" id="reg-church" placeholder="예: 운평장로교회">
-    </div>
-    <div class="field">
-      <label for="reg-phone">연락처 (선택)</label>
-      <input type="tel" id="reg-phone" placeholder="010-0000-0000">
-    </div>
-    <div class="field" style="font-size:0.85rem">
-      <label style="font-weight:400">
-        <input type="checkbox" id="reg-agree" style="width:auto;margin-right:6px">
-        <a href="terms.html" target="_blank" style="color:var(--navy);text-decoration:underline">이용약관</a>과
-        <a href="privacy.html" target="_blank" style="color:var(--navy);text-decoration:underline">개인정보처리방침</a>에 동의합니다. (필수)
-      </label>
-    </div>
-    <button class="btn" id="btn-register" style="width:100%">가입하기</button>
+    <button class="btn" id="btn-register" style="width:100%">이메일로 가입하기</button>
     <div class="form-msg" id="reg-msg"></div>
 
     <div class="find-links">
@@ -86,31 +94,78 @@
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  var e = SHS.esc;
+  var msg = document.getElementById('reg-msg');
+
+  /* 소속 교회는 노회 명단과 대조해야 하므로 목록에서 고르게 한다.
+   * 오타로 명단과 어긋나 승인대기로 빠지는 일을 줄인다. */
+  var churches = [];
+  SHSData.sichals.forEach(function (s) { churches = churches.concat(s.churches); });
+  churches.sort();
+  var sel = document.getElementById('reg-church');
+  sel.innerHTML = '<option value="">— 선택하세요 —</option>' +
+    churches.map(function (c) { return '<option>' + e(c) + '</option>'; }).join('') +
+    '<option value="__etc">목록에 없음 (직접 입력)</option>';
+  sel.addEventListener('change', function () {
+    document.getElementById('reg-etc-wrap').classList.toggle('hidden', this.value !== '__etc');
+  });
+
+  function churchValue() {
+    var v = sel.value;
+    return v === '__etc' ? document.getElementById('reg-etc').value.trim() : v;
+  }
+
+  /* 구글·이메일 두 방법 모두 같은 가입 정보를 요구한다. */
+  function readInfo() {
+    if (!document.getElementById('reg-agree').checked) {
+      msg.className = 'form-msg err';
+      msg.textContent = '이용약관과 개인정보처리방침에 동의해야 가입할 수 있습니다.';
+      return null;
+    }
+    var name = document.getElementById('reg-name').value.trim();
+    var church = churchValue();
+    if (!name || !church) {
+      msg.className = 'form-msg err';
+      msg.textContent = '성명과 소속 교회를 먼저 입력해 주세요.';
+      document.getElementById(name ? 'reg-church' : 'reg-name').focus();
+      return null;
+    }
+    var adj = SHS.adjustPosition(name, church, document.getElementById('reg-pos').value);
+    if (adj.blocked) {
+      msg.className = 'form-msg err';
+      msg.textContent = adj.msg;
+      return null;
+    }
+    if (adj.note) alert(adj.note);
+    return {
+      name: name, church: church, position: adj.position,
+      phone: document.getElementById('reg-phone').value.trim()
+    };
+  }
+
   if (SHSCloud.enabled()) {
     document.getElementById('social-signup').classList.remove('hidden');
     document.getElementById('btn-google-up').addEventListener('click', function () {
+      var info = readInfo();
+      if (!info) return;
+      /* 구글 화면을 다녀오는 동안 입력한 가입 정보를 보관한다.
+       * 돌아오면 auth-callback.html이 이 정보로 명단과 대조한다. */
+      try { sessionStorage.setItem('shs_signup_v1', JSON.stringify(info)); } catch (err) {}
+      msg.className = 'form-msg';
+      msg.textContent = '구글 로그인 화면으로 이동합니다...';
       SHSCloud.signInWithGoogle();
     });
   }
 
   document.getElementById('btn-register').addEventListener('click', function () {
-    var msg = document.getElementById('reg-msg');
-    if (!document.getElementById('reg-agree').checked) {
-      msg.className = 'form-msg err';
-      msg.textContent = '이용약관과 개인정보처리방침에 동의해야 가입할 수 있습니다.';
-      return;
-    }
+    var info = readInfo();
+    if (!info) return;
 
     var email = document.getElementById('reg-id').value.trim().toLowerCase();
     var pw = document.getElementById('reg-pw').value;
-    var name = document.getElementById('reg-name').value.trim();
-    var church = document.getElementById('reg-church').value.trim();
-    var position = document.getElementById('reg-pos').value;
-    var phone = document.getElementById('reg-phone').value.trim();
-
-    if (!email || !pw || !name || !church) {
+    if (!email || !pw) {
       msg.className = 'form-msg err';
-      msg.textContent = '이메일, 비밀번호, 성명, 소속 교회는 필수 항목입니다.';
+      msg.textContent = '이메일과 비밀번호를 입력해 주세요.';
       return;
     }
     if (pw.length < 6) {
@@ -118,14 +173,6 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.textContent = '비밀번호는 6자 이상으로 입력해 주세요.';
       return;
     }
-    var adj = SHS.adjustPosition(name, church, position);
-    if (adj.blocked) {
-      msg.className = 'form-msg err';
-      msg.textContent = adj.msg;
-      return;
-    }
-    position = adj.position;
-
     if (!(window.SHSCloud && SHSCloud.enabled())) {
       msg.className = 'form-msg err';
       msg.textContent = '가입 서버에 연결할 수 없습니다. 노회 사무실(031-486-9993)로 문의해 주세요.';
@@ -137,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSCloud.init().then(function (c) {
       return c.auth.signUp({
         email: email, password: pw,
-        options: { data: { name: name, church: church, position: position, phone: phone } }
+        options: { data: { name: info.name, church: info.church, position: info.position, phone: info.phone } }
       });
     }).then(function (r) {
       if (r.error) {
@@ -157,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function () {
           ' 메일함에서 확인 링크를 누른 뒤 로그인해 주세요.';
         return;
       }
-      SHSCloud.claimMembership(name, church, position, phone).then(function (cr) {
+      SHSCloud.claimMembership(info.name, info.church, info.position, info.phone).then(function (cr) {
         msg.className = 'form-msg ok';
         if (cr.ok && cr.role && cr.role !== 'pending') {
           msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하여 ' +

@@ -406,6 +406,12 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   padding: 36px;
 }
 .form-card h2 { border: none; padding: 0; text-align: center; margin-bottom: 24px; }
+.form-step {
+  border-top: 1px solid var(--gray-2); margin: 26px 0 16px; padding-top: 18px;
+  font-weight: 700; color: var(--navy); font-size: 0.95rem;
+}
+.form-step:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.form-step span { display: block; font-weight: 400; font-size: 0.82rem; color: var(--gray-5); margin-top: 4px; }
 .field { margin-bottom: 16px; }
 .field label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; color: var(--gray-7); }
 .field input, .field select, .field textarea {
