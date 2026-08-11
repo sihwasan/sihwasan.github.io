@@ -918,7 +918,8 @@
       a.addEventListener('click', function (ev) {
         ev.preventDefault();
         var id = a.getAttribute('href').slice(1);
-        if (history.replaceState) history.replaceState(null, '', '#' + id);
+        /* 기록을 남겨 두어야 뒤로 가기가 이전 영역으로 돌아간다 */
+        if (history.pushState) history.pushState(null, '', '#' + id);
         else location.hash = id;
         show(id);
         container.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -931,10 +932,39 @@
     });
   }
 
+  /* ---------- 화면 안에서 단계 이동 ----------
+   * 한 페이지 안에서 화면이 바뀔 때(시험 시작·채점 결과 등) 기록을 남겨,
+   * 뒤로 가기를 누르면 홈이 아니라 이전 단계로 돌아가게 한다. */
+  function stepNav(steps) {
+    var current = null;
+
+    function render(name, first) {
+      var fn = steps[name];
+      if (!fn) return;
+      current = name;
+      fn(first);
+    }
+
+    window.addEventListener('popstate', function (ev) {
+      var name = (ev.state && ev.state.shsStep) || null;
+      if (!name) name = Object.keys(steps)[0];
+      if (name !== current) render(name);
+    });
+
+    return function go(name, run) {
+      if (run) steps[name] = run;
+      if (history.pushState) {
+        history.pushState({ shsStep: name }, '', location.pathname + location.search);
+      }
+      render(name);
+    };
+  }
+
   window.SHS = {
     user: user,
     getUser: getUser,
     sectionize: sectionize,
+    stepNav: stepNav,
     dropZone: dropZone,
     dropZoneAll: dropZoneAll,
     logAction: logAction,

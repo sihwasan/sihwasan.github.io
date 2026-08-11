@@ -37,7 +37,6 @@ document.addEventListener('DOMContentLoaded', function () {
     { v: '전도사',     subs: '상식 · 영어' },
     { v: '목사후보생', subs: '상식 · 영어' }
   ];
-  var MAX_TRY = 2;
 
   function subjectTable() {
     return '<h2>구분별 고시 과목</h2>' +
@@ -63,78 +62,80 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  var attempts = [], isTester = false;
+  var attempts = [], counts = {};
   function db() { return SHSCloud.init(); }
+
+  /* 시험 화면·채점 결과에서 뒤로 가기를 누르면 이전 단계로 돌아간다 */
+  var go = SHS.stepNav({
+    home: function () { load(); }
+  });
 
   function load() {
     db().then(function (c) {
       return Promise.all([
         c.from('exam_attempts').select('*').order('started_at', { ascending: false }),
-        c.from('exam_officers').select('user_id').eq('user_id', user.id)
+        c.rpc('exam_question_counts')
       ]);
     }).then(function (rs) {
-      isTester = SHSAuth.canManageMembers(user) ||
-                 !!(rs[1] && rs[1].data && rs[1].data.length);
       if (rs[0].error) {
         area.innerHTML = '<div class="notice-banner">모의고사 정보를 불러오지 못했습니다: ' +
           e(rs[0].error.message) + ' (19 고시 모의고사 등록이 필요할 수 있습니다)</div>';
         return;
       }
       attempts = rs[0].data || [];
+      counts = {};
+      ((rs[1] && rs[1].data) || []).forEach(function (x) { counts[x.subject] = x.n; });
       drawHome();
     });
+  }
+
+  /* 이 구분으로 실제 출제 가능한 문항 수를 미리 계산한다 */
+  function planFor(track, per) {
+    var t = TRACKS.filter(function (x) { return x.v === track; })[0];
+    if (!t) return { total: 0, rows: [] };
+    var subs = t.subs.split(' · ');
+    var rows = subs.map(function (name) {
+      var have = counts[name] || 0;
+      return { name: name, have: have, take: Math.min(have, per) };
+    });
+    return { total: rows.reduce(function (a, b) { return a + b.take; }, 0), rows: rows };
   }
 
   /* ---------- 첫 화면 ---------- */
   function drawHome() {
     var done = attempts.filter(function (a) { return a.submitted_at; });
-    var left = Math.max(0, MAX_TRY - attempts.length);
-    var canStart = isTester || left > 0;
 
     var h = '<div class="notice-banner">' +
       '「시화산노회 고시부 목사장로 고시가이드」의 과목별 예상 문제로 실제 고시처럼 풀어 보고 ' +
-      '바로 채점받으실 수 있습니다. ' +
-      (isTester
-        ? '<strong>' + e(user.name) + '</strong> 님은 ' +
-          (SHSAuth.canManageMembers(user) ? '관리자' : '고시부 임원') +
-          '이시므로 횟수 제한 없이 문제를 점검하실 수 있습니다.'
-        : '응시는 <strong>개인당 ' + MAX_TRY + '회</strong>까지 가능합니다. ' +
-          '남은 횟수 <strong>' + left + '회</strong>') +
-      '</div>';
+      '바로 채점받으실 수 있습니다. <strong>횟수 제한 없이</strong> 몇 번이든 보실 수 있습니다.</div>';
 
-    if (canStart) {
-      h += '<h2>시험 보기</h2>' +
-        '<div class="admin-card" style="max-width:660px">' +
-        '<p style="font-size:0.88rem;color:var(--gray-7)">응시하실 구분을 고르시면 ' +
-        '과목마다 문제를 무작위로 뽑아 출제합니다.' +
-        (isTester ? ' 점검용 응시는 횟수가 차감되지 않습니다.'
-                  : ' 한 번 시작하면 <strong>응시 횟수가 1회 사용</strong>됩니다. ' +
-                    '도중에 나가셨다가 다시 들어오시면 보던 시험을 이어서 보실 수 있습니다.') +
-        '</p>' +
-        '<div class="inline-form">' +
-        '<div class="field"><label>구분</label><select id="ex-track">' +
-        TRACKS.map(function (t) {
-          return '<option value="' + e(t.v) + '">' + e(t.v) + ' — ' + e(t.subs) + '</option>';
-        }).join('') + '</select></div>' +
-        '<div class="field" style="flex:0 0 190px"><label>과목당 문항 수</label>' +
-        '<select id="ex-count"><option value="5">5문항 (짧게)</option>' +
-        '<option value="10" selected>10문항 (권장)</option>' +
-        '<option value="20">20문항 (충분히)</option></select></div>' +
-        '<button class="btn" id="ex-start">시험 시작</button>' +
-        '</div><div class="form-msg" id="ex-smsg"></div></div>';
-    } else {
-      h += '<div class="notice-banner">응시 가능 횟수(' + MAX_TRY + '회)를 모두 사용하셨습니다. ' +
-        '추가 응시가 필요하시면 고시부로 문의해 주세요.</div>';
-    }
+    h += '<h2>시험 보기</h2>' +
+      '<div class="admin-card" style="max-width:680px">' +
+      '<p style="font-size:0.88rem;color:var(--gray-7)">응시하실 구분을 고르시면 ' +
+      '과목마다 문제를 무작위로 뽑아 출제합니다. ' +
+      '도중에 나가셨다가 다시 들어오시면 보던 시험을 이어서 보실 수 있습니다.</p>' +
+      '<div class="inline-form">' +
+      '<div class="field"><label>구분</label><select id="ex-track">' +
+      TRACKS.map(function (t) {
+        return '<option value="' + e(t.v) + '">' + e(t.v) + ' — ' + e(t.subs) + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 190px"><label>과목당 문항 수</label>' +
+      '<select id="ex-count">' +
+      [5, 10, 15, 20, 25, 30].map(function (n) {
+        return '<option value="' + n + '"' + (n === 10 ? ' selected' : '') + '>' + n + '문항</option>';
+      }).join('') + '</select></div>' +
+      '<button class="btn" id="ex-start">시험 시작</button>' +
+      '</div>' +
+      '<div id="ex-plan" style="margin-top:12px"></div>' +
+      '<div class="form-msg" id="ex-smsg"></div></div>';
 
     h += subjectTable();
 
-    /* 지난 응시 */
     if (done.length) {
-      h += '<h2>지난 응시 결과</h2><table class="tbl"><thead><tr>' +
+      h += '<h2>지난 응시 결과 (' + done.length + '회)</h2><table class="tbl"><thead><tr>' +
         '<th style="width:110px">구분</th><th style="width:170px">응시일</th>' +
         '<th style="width:120px">점수</th><th>백분율</th></tr></thead><tbody>';
-      done.forEach(function (a) {
+      done.slice(0, 20).forEach(function (a) {
         var pct = a.total ? Math.round(a.score * 100 / a.total) : 0;
         h += '<tr><td>' + e(a.track) + '</td>' +
           '<td>' + e(String(a.submitted_at).replace('T', ' ').slice(0, 16)) + '</td>' +
@@ -147,28 +148,60 @@ document.addEventListener('DOMContentLoaded', function () {
 
     area.innerHTML = h;
 
-    if (document.getElementById('ex-start')) {
-      document.getElementById('ex-start').addEventListener('click', function () {
-        var msg = document.getElementById('ex-smsg');
-        var track = document.getElementById('ex-track').value;
-        msg.className = 'form-msg'; msg.textContent = '문제를 준비하는 중입니다...';
-        db().then(function (c) {
-          return c.rpc('start_exam', {
-            p_track: track,
-            p_per_subject: parseInt(document.getElementById('ex-count').value, 10) || 10
-          });
-        }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-          if (!r.data || !r.data.length) {
-            msg.className = 'form-msg err';
-            msg.textContent = '출제할 문제가 없습니다. 고시부에 문의해 주세요.';
-            return;
-          }
-          SHS.logAction('create', '모의고사 응시 시작', track);
-          runExam(r.data);
-        });
-      });
+    /* 고른 구분·문항 수로 실제 몇 문항이 나오는지 미리 보여준다 */
+    function showPlan() {
+      var box = document.getElementById('ex-plan');
+      var track = document.getElementById('ex-track').value;
+      var per = parseInt(document.getElementById('ex-count').value, 10) || 10;
+      var plan = planFor(track, per);
+      var short = plan.rows.filter(function (r) { return r.take < per; });
+
+      var t = '<table class="tbl" style="margin:0"><thead><tr>' +
+        '<th style="width:130px">과목</th><th style="width:130px">등록된 문제</th>' +
+        '<th>이번에 출제</th></tr></thead><tbody>' +
+        plan.rows.map(function (r) {
+          return '<tr><td>' + e(r.name) + '</td>' +
+            '<td>' + r.have + '문항</td>' +
+            '<td class="left">' + (r.take ? r.take + '문항' :
+              '<span class="fail">문제가 없어 출제되지 않습니다</span>') + '</td></tr>';
+        }).join('') +
+        '<tr><th>합계</th><th></th><th class="left">' + plan.total + '문항</th></tr>' +
+        '</tbody></table>';
+
+      if (short.length) {
+        t += '<p style="font-size:0.84rem;color:var(--red)">' +
+          '문제가 부족한 과목이 있어 고르신 수보다 적게 출제됩니다. ' +
+          '고시부에서 <strong>supabase/exam-questions/</strong> 폴더의 과목 파일을 모두 등록하시면 ' +
+          '전 과목이 정상 출제됩니다.</p>';
+      }
+      box.innerHTML = t;
+      document.getElementById('ex-start').disabled = plan.total === 0;
     }
+
+    document.getElementById('ex-track').addEventListener('change', showPlan);
+    document.getElementById('ex-count').addEventListener('change', showPlan);
+    showPlan();
+
+    document.getElementById('ex-start').addEventListener('click', function () {
+      var msg = document.getElementById('ex-smsg');
+      var track = document.getElementById('ex-track').value;
+      msg.className = 'form-msg'; msg.textContent = '문제를 준비하는 중입니다...';
+      db().then(function (c) {
+        return c.rpc('start_exam', {
+          p_track: track,
+          p_per_subject: parseInt(document.getElementById('ex-count').value, 10) || 10
+        });
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        if (!r.data || !r.data.length) {
+          msg.className = 'form-msg err';
+          msg.textContent = '출제할 문제가 없습니다. 고시부에 문의해 주세요.';
+          return;
+        }
+        SHS.logAction('create', '모의고사 응시 시작', track);
+        go('exam', function () { runExam(r.data); });
+      });
+    });
   }
 
   /* ---------- 시험 진행 ---------- */
@@ -232,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }).then(function (r) {
         if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
         SHS.logAction('create', '모의고사 제출', '응시 ' + attemptId);
-        showResult(r.data || []);
+        go('result', function () { showResult(r.data || []); });
       });
     });
   }
@@ -286,11 +319,22 @@ document.addEventListener('DOMContentLoaded', function () {
           '</div></div>';
       });
     }
-    h += '<p style="margin-top:24px"><a class="btn" href="exam.html">모의고사 첫 화면으로</a></p>';
+    h += '<p style="margin-top:24px"><button class="btn" id="ex-again">모의고사 첫 화면으로</button></p>';
 
     area.innerHTML = h;
     window.scrollTo(0, 0);
+    document.getElementById('ex-again').addEventListener('click', function () {
+      go('home', function () { load(); });
+    });
   }
+
+  /* 시험 화면에서 나가려 할 때 실수로 잃지 않도록 확인한다 */
+  window.addEventListener('beforeunload', function (ev) {
+    if (document.getElementById('ex-send')) {
+      ev.preventDefault();
+      ev.returnValue = '';
+    }
+  });
 
   load();
  });
