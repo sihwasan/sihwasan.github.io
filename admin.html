@@ -16,7 +16,7 @@
 </div>
 
 <div class="page-body container">
-  <div id="admin-area"></div>
+  <div id="admin-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
 </div>
 
 <script src="js/auth.js"></script>
@@ -43,12 +43,6 @@ document.addEventListener('DOMContentLoaded', function () {
   var canApprove = SHSAuth.canApproveMembers(user);
   /* 등급 임명 권한: 노회장(서기·간사 등)과 운영자 계정(비상시 전체) */
   var canAppoint = isSuper || user.role === 'president';
-
-  /* ---------- 서버(구글 로그인) 회원 관리 ---------- */
-  if (user.cloud) {
-    renderCloud();
-    return;
-  }
 
   function renderCloud() {
     SHSCloud.init().then(function (c) {
@@ -722,7 +716,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  render();
+  /* ---------- 화면 그리기 ----------
+   * 등급 목록(GRADES) 등이 모두 정의된 뒤에 그려야 하므로 맨 마지막에 부른다. */
+  if (user.cloud) {
+    renderCloud();
+  } else {
+    render();
+  }
  });
 });
 </script>
