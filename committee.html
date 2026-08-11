@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var h = '<div class="notice-banner">' +
       (isOfficer
-        ? '<strong>' + e(user.name) + '</strong> 님은 이 부서의 <strong>' + e(myDuty) + '</strong>이시므로 ' +
+        ? '<strong>' + e(SHS.honorific(user)) + '</strong>은 이 부서의 <strong>' + e(myDuty) + '</strong>이시므로 ' +
           '일정과 공지를 등록하고 부서 업무를 처리하실 수 있습니다.'
         : '이 부서의 일정과 공지입니다. 등록·수정은 부장·서기가 합니다.') +
       '</div>';

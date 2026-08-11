@@ -123,6 +123,14 @@
   /* 화면 표기용 등급 이름
    * 노회장·서기·간사는 '관리자'로 통일 표기한다.
    * 최고관리자는 본인 화면에서만 그대로 표기되며, 회원 목록에는 나타나지 않는다. */
+  /* 이름에 직분과 존칭을 붙인다. 예: 김동석 위임목사님 / 박영수 장로님
+   * 직분이 없으면 '님'만 붙인다. */
+  function honorific(u) {
+    if (!u || !u.name) return '';
+    var pos = (u.position || '').trim();
+    return pos ? u.name + ' ' + pos + '님' : u.name + '님';
+  }
+
   function displayRole(role, title) {
     if (role === 'superadmin') return '최고관리자';
     if (role === 'president' || role === 'clerk' || role === 'staff') return '관리자';
@@ -135,8 +143,7 @@
   function buildTopbar() {
     var right;
     if (user) {
-      right = '<span class="user-name">' + user.name + '</span>' +
-        '<span>(' + displayRole(user.role, user.title) + ')</span>' +
+      right = '<span class="user-name">' + honorific(user) + '</span>' +
         '<a href="mypage.html">내 정보</a>' +
         '<a href="#" id="btn-logout">로그아웃</a>';
     } else {
@@ -291,8 +298,7 @@
         if (util) {
           util.innerHTML =
             '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
-            '<span class="user-name">' + (p.name || p.email) + '</span>' +
-            '<span>(' + displayRole(p.role, p.title) + ')</span>' +
+            '<span class="user-name">' + (honorific(p) || p.email) + '</span>' +
             '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
@@ -983,6 +989,7 @@
     dropZoneAll: dropZoneAll,
     logAction: logAction,
     displayRole: displayRole,
+    honorific: honorific,
     isActiveMember: isActiveMember,
     membershipIssue: membershipIssue,
     memberGate: memberGate,

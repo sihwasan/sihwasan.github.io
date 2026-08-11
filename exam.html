@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var attemptId = rows[0].attempt_id;
     var picked = new Array(rows.length);
 
-    var h = '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님, 모의고사를 시작합니다. ' +
+    var h = '<div class="notice-banner"><strong>' + e(SHS.honorific(user)) + '</strong>, 모의고사를 시작합니다. ' +
       '전체 <strong>' + rows.length + '문항</strong>입니다. 답을 고르신 뒤 맨 아래 <strong>제출하고 채점받기</strong>를 눌러 주세요.</div>' +
       '<div class="exam-progress"><span id="ex-prog">0 / ' + rows.length + ' 문항 선택</span></div>';
 

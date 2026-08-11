@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var html = '';
-  html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님(' + SHS.displayRole(user.role, user.title) + '), 임원방에 오신 것을 환영합니다.</div>';
+  html += '<div class="notice-banner"><strong>' + e(SHS.honorific(user)) + '</strong>, 임원방에 오신 것을 환영합니다.</div>';
 
   /* 자료 아카이브 자리 (임원방에 들어오면 가장 먼저 보이는 영역) */
   html += '<h2>임원 자료실</h2>';
