@@ -406,7 +406,7 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   padding: 36px;
 }
 .form-card h2 { border: none; padding: 0; text-align: center; margin-bottom: 24px; }
-.home-committees { margin: 40px 0; }
+.home-committees { padding: 10px 0 30px; }
 .home-committees .db-grid { margin-bottom: 0; }
 
 /* ---------- 상비부 대시보드 ---------- */
