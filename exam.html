@@ -87,17 +87,51 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var h = '<div class="notice-banner">' +
       '「시화산노회 고시부 목사장로 고시가이드」의 과목별 예상 문제로 실제 고시처럼 풀어 보고 ' +
-      '바로 채점받으실 수 있습니다. 응시는 <strong>고시부의 승인</strong>을 받으셔야 하고, ' +
-      '<strong>개인당 ' + MAX_TRY + '회</strong>까지 가능합니다.</div>';
+      '바로 채점받으실 수 있습니다. ' +
+      (isTester
+        ? '<strong>' + e(user.name) + '</strong> 님은 ' +
+          (SHSAuth.canManageMembers(user) ? '관리자' : '고시부 임원') +
+          '이시므로 <strong>승인 없이 바로 응시</strong>하실 수 있고, 횟수 제한도 받지 않으십니다.'
+        : '응시는 <strong>고시부의 승인</strong>을 받으셔야 하고, ' +
+          '<strong>개인당 ' + MAX_TRY + '회</strong>까지 가능합니다.') +
+      '</div>';
+
+    /* 점검자는 승인 절차 없이 바로 시험을 볼 수 있다 */
+    if (isTester) {
+      h += '<h2>바로 응시하기</h2>' +
+        '<div class="admin-card" style="max-width:660px">' +
+        '<p style="font-size:0.88rem;color:var(--gray-7)">구분과 문항 수를 고르시고 바로 시작하시면 됩니다. ' +
+        '출제되는 문제를 그대로 확인하실 수 있으며, 응시 횟수는 차감되지 않습니다.</p>' +
+        '<div class="inline-form">' +
+        '<div class="field"><label>구분</label><select id="tx-track">' +
+        TRACKS.map(function (t) {
+          return '<option value="' + e(t.v) + '"' + (t.v === app ? ' selected' : '') + '>' +
+            e(t.v) + ' — ' + e(t.subs) + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 180px"><label>과목당 문항 수</label>' +
+        '<select id="tx-count"><option value="3">3문항</option>' +
+        '<option value="5" selected>5문항</option><option value="10">10문항</option>' +
+        '<option value="20">20문항</option></select></div>' +
+        '<button class="btn" id="tx-start">시험 시작</button>' +
+        '</div><div class="form-msg" id="tx-msg"></div></div>';
+    }
 
     /* 응시 자격 */
     h += '<h2>응시 자격</h2>';
-    if (app) {
+    if (isTester && !app && !pending) {
+      h += '<div class="exam-state ok">승인 절차 없이 응시하실 수 있습니다. ' +
+        '일반 회원의 응시 요청은 <a href="exam-admin.html" style="color:var(--navy);text-decoration:underline">' +
+        '모의고사 응시 관리</a>에서 처리하실 수 있습니다.</div>';
+    } else if (app) {
       h += '<div class="exam-state ok"><strong>' + e(app) + '</strong> 구분으로 응시가 승인되었습니다. ' +
         '남은 응시 횟수 <strong>' + left + '회</strong></div>';
     } else if (pending) {
-      h += '<div class="exam-state wait"><strong>' + e(pending.track) + '</strong> 구분으로 응시를 요청하셨습니다. ' +
-        '고시부 부장·서기의 승인을 기다리는 중입니다.</div>';
+      h += '<div class="exam-state ' + (isTester ? 'ok' : 'wait') + '"><strong>' + e(pending.track) +
+        '</strong> 구분으로 응시를 요청하셨습니다. ' +
+        (isTester ? '점검용으로는 위에서 바로 응시하실 수 있습니다.'
+                  : '고시부 부장·서기의 승인을 기다리는 중입니다.') + '</div>';
+    } else if (isTester) {
+      /* 위에서 이미 안내했으므로 요청 화면은 띄우지 않는다 */
     } else {
       if (rejected) {
         h += '<div class="exam-state no">지난 요청은 승인되지 않았습니다.' +
@@ -141,25 +175,6 @@ document.addEventListener('DOMContentLoaded', function () {
     } else if (app) {
       h += '<div class="notice-banner">응시 가능 횟수(' + MAX_TRY + '회)를 모두 사용하셨습니다. ' +
         '추가 응시가 필요하시면 고시부로 문의해 주세요.</div>';
-    }
-
-    /* 고시부·관리자 점검용 */
-    if (isTester) {
-      h += '<h2>문제 점검 (고시부·관리자)</h2>' +
-        '<div class="admin-card" style="max-width:640px">' +
-        '<p style="font-size:0.88rem;color:var(--gray-7)">출제되는 문제를 직접 풀어 보며 확인하실 수 있습니다. ' +
-        '점검용 응시는 <strong>승인과 횟수 제한을 받지 않습니다.</strong></p>' +
-        '<div class="inline-form">' +
-        '<div class="field"><label>구분</label><select id="tx-track">' +
-        TRACKS.map(function (t) {
-          return '<option value="' + e(t.v) + '"' + (t.v === app ? ' selected' : '') + '>' +
-            e(t.v) + ' — ' + e(t.subs) + '</option>';
-        }).join('') + '</select></div>' +
-        '<div class="field" style="flex:0 0 180px"><label>과목당 문항 수</label>' +
-        '<select id="tx-count"><option value="3">3문항</option>' +
-        '<option value="5" selected>5문항</option><option value="10">10문항</option></select></div>' +
-        '<button class="btn" id="tx-start">점검용으로 풀어 보기</button>' +
-        '</div><div class="form-msg" id="tx-msg"></div></div>';
     }
 
     /* 지난 응시 */
