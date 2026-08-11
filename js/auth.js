@@ -72,10 +72,6 @@ var SHSAuth = (function () {
     pending: '승인대기'
   };
 
-  /* 최고관리자 부트스트랩 (아이디·비밀번호를 평문으로 두지 않는다)
-   * 이 값만으로는 계정을 알 수 없으며, 정확한 이메일과 비밀번호를 입력해야 로그인된다. */
-  var SUPER_BOOTSTRAP = { id: 'h129o4kz', pw: 'h1bnuoah', name: '시화산노회', church: '노회 사무실', position: '관리자' };
-
   function hash(str) {
     /* 데모용 해시 (운영 시 서버측 bcrypt 등으로 교체) */
     var h = 5381, i;
@@ -152,17 +148,6 @@ var SHSAuth = (function () {
         return { ok: true, user: users[i] };
       }
     }
-    /* 최고관리자 최초 로그인: 이 기기에 계정이 없으면 부트스트랩으로 생성 */
-    if (hash(id) === SUPER_BOOTSTRAP.id && hash(pw) === SUPER_BOOTSTRAP.pw) {
-      users.push({
-        id: id, pw: hash(pw), name: SUPER_BOOTSTRAP.name, role: 'superadmin',
-        position: SUPER_BOOTSTRAP.position, church: SUPER_BOOTSTRAP.church, email: id
-      });
-      saveUsers(users);
-      startSession(id, keep);
-      SHSAudit.log('auth', '로그인', '관리자 로그인');
-      return { ok: true, user: users[users.length - 1] };
-    }
     SHSAudit.log('auth', '로그인 실패', '아이디 ' + id);
     return { ok: false, msg: '아이디 또는 비밀번호가 올바르지 않습니다.' };
   }
@@ -201,6 +186,25 @@ var SHSAuth = (function () {
   /* 승인대기 회원을 정회원으로 설정: 관리자 등급 전원 (노회장·서기·간사) */
   function canApproveMembers(u) {
     return canManageMembers(u);
+  }
+
+  /* ---------- 임원 자료실 보안 등급 ----------
+   * 일반자료·대외비자료 : 노회 임원과 간사
+   * 기밀자료           : 노회장·부노회장·서기 (최고관리자 포함) */
+  function canViewSecret(u) {
+    if (!u) return false;
+    if (u.role === 'superadmin' || u.role === 'president' || u.role === 'clerk') return true;
+    return u.role === 'officer' && !!u.title && u.title.indexOf('부노회장') !== -1;
+  }
+
+  function canViewLevel(u, level) {
+    if (level === '기밀') return canViewSecret(u);
+    return isOfficer(u);
+  }
+
+  /* 자료 등록·수정·삭제: 관리자이면서 해당 등급을 볼 수 있는 사람 */
+  function canEditLevel(u, level) {
+    return canManageMembers(u) && canViewLevel(u, level);
   }
 
   /* 임원 전용 자료(회의록 등): 노회 임원 전원(노회장·부노회장·서기·부서기·회록서기·
@@ -531,6 +535,9 @@ var SHSAuth = (function () {
     isMember: isMember,
     isOfficer: isOfficer,
     canApproveMembers: canApproveMembers,
+    canViewSecret: canViewSecret,
+    canViewLevel: canViewLevel,
+    canEditLevel: canEditLevel,
     register: register,
     approveMember: approveMember,
     findIds: findIds,

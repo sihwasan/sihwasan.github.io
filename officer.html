@@ -64,6 +64,10 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   html += '</div>';
 
+  /* 자료 아카이브 자리 */
+  html += '<h2>자료 아카이브</h2>';
+  html += '<div id="oa-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+
   /* 임원회 결의사항 전체 (공개 저장소 미포함 자료) */
   html += '<h2>임원회 결의사항</h2>';
   if (SHSData.resolutions && SHSData.resolutions.length) {
@@ -94,6 +98,228 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   area.innerHTML = html;
+
+  /* ================= 자료 아카이브 ================= */
+  var LEVELS = [
+    { v: '일반', d: '임원이 함께 보는 일반 문서입니다.' },
+    { v: '대외비', d: '노회 밖으로 나가서는 안 되는 문서입니다. 임원만 열람합니다.' },
+    { v: '기밀', d: '노회장·부노회장·서기만 열람합니다.' }
+  ];
+  var PREFIX = { '일반': 'general', '대외비': 'confidential', '기밀': 'secret' };
+  var curLevel = '일반';
+  var oaFile = null;
+
+  function oaBox() { return document.getElementById('oa-area'); }
+
+  function renderArchiveShell() {
+    var visible = LEVELS.filter(function (L) { return SHSAuth.canViewLevel(user, L.v); });
+    var html2 = '<div class="notice-banner">보안 등급에 따라 열람 범위가 다릅니다. ' +
+      '모든 열람·등록·수정·삭제는 감사 기록에 남습니다.</div>';
+    html2 += '<div class="tabs" id="oa-tabs">' +
+      visible.map(function (L, i) {
+        return '<button class="' + (i === 0 ? 'active' : '') + '" data-lv="' + e(L.v) + '">' + e(L.v) + '자료</button>';
+      }).join('') + '</div>';
+    html2 += '<p id="oa-desc" style="color:var(--gray-5);font-size:0.88rem"></p>';
+    html2 += '<div id="oa-form"></div>';
+    html2 += '<div id="oa-list"></div>';
+    oaBox().innerHTML = html2;
+
+    if (!visible.length) {
+      oaBox().innerHTML = '<div class="notice-banner">열람 가능한 자료 등급이 없습니다.</div>';
+      return;
+    }
+    curLevel = visible[0].v;
+    oaBox().querySelectorAll('#oa-tabs button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        oaBox().querySelectorAll('#oa-tabs button').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        curLevel = b.dataset.lv;
+        loadArchive();
+      });
+    });
+    loadArchive();
+  }
+
+  function renderForm() {
+    var box = document.getElementById('oa-form');
+    if (!SHSAuth.canEditLevel(user, curLevel)) { box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<div class="admin-card" style="margin-bottom:16px">' +
+      '<h3 style="margin-top:0" id="oa-ftitle">' + e(curLevel) + '자료 등록</h3>' +
+      '<input type="hidden" id="oa-id">' +
+      '<div class="inline-form" style="margin-bottom:8px">' +
+      '<div class="field"><label>제목</label><input type="text" id="oa-title"></div>' +
+      '<div class="field" style="flex:0 0 150px"><label>분류</label><input type="text" id="oa-cat" placeholder="예: 공문"></div>' +
+      '<div class="field" style="flex:0 0 165px"><label>문서 날짜</label><input type="date" id="oa-date"></div>' +
+      '</div>' +
+      '<div class="field"><label>내용</label><textarea id="oa-body" rows="5"></textarea></div>' +
+      '<div class="field"><label>첨부파일 (선택)</label><input type="file" id="oa-file">' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">첨부파일은 비공개 저장소에 보관되며, 열람 권한이 있는 분만 내려받을 수 있습니다.</span></div>' +
+      '<button class="btn" id="oa-save">저장</button> ' +
+      '<button class="btn ghost hidden" id="oa-cancel">새 자료로 전환</button>' +
+      '<div class="form-msg" id="oa-msg"></div></div>';
+
+    document.getElementById('oa-file').addEventListener('change', function () {
+      oaFile = this.files[0] || null;
+    });
+    document.getElementById('oa-cancel').addEventListener('click', function () {
+      ['oa-id', 'oa-title', 'oa-cat', 'oa-body'].forEach(function (id) { document.getElementById(id).value = ''; });
+      document.getElementById('oa-ftitle').textContent = curLevel + '자료 등록';
+      this.classList.add('hidden');
+    });
+    document.getElementById('oa-save').addEventListener('click', saveDoc);
+  }
+
+  function saveDoc() {
+    var msg = document.getElementById('oa-msg');
+    var id = document.getElementById('oa-id').value;
+    var d = {
+      level: curLevel,
+      title: document.getElementById('oa-title').value.trim(),
+      category: document.getElementById('oa-cat').value.trim(),
+      doc_date: document.getElementById('oa-date').value || null,
+      body: document.getElementById('oa-body').value.trim(),
+      updated_at: new Date().toISOString()
+    };
+    if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
+    if (!user.cloud) { msg.className = 'form-msg err'; msg.textContent = '서버 로그인 후 이용할 수 있습니다.'; return; }
+    msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+
+    SHSCloud.init().then(function (c) {
+      var pre = Promise.resolve(null);
+      if (oaFile) {
+        var path = PREFIX[curLevel] + '/' + Date.now() + '-' + oaFile.name.replace(/[^\w.\-가-힣]/g, '_');
+        pre = c.storage.from('officer-docs').upload(path, oaFile).then(function (r) {
+          if (r.error) throw r.error;
+          return { file_path: path, file_name: oaFile.name };
+        });
+      }
+      return pre.then(function (f) {
+        if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
+        if (!id) { d.author_id = user.id; d.author_name = user.name; }
+        return id ? c.from('officer_docs').update(d).eq('id', id)
+                  : c.from('officer_docs').insert(d);
+      });
+    }).then(function (res) {
+      if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+      SHSCloud.log(id ? 'update' : 'create', '임원 자료 ' + (id ? '수정' : '등록'),
+        '[' + curLevel + '] ' + d.title);
+      oaFile = null;
+      loadArchive();
+    }).catch(function (err) {
+      msg.className = 'form-msg err';
+      msg.textContent = '저장 실패: ' + (err.message || err);
+    });
+  }
+
+  function loadArchive() {
+    var descEl = document.getElementById('oa-desc');
+    var lv = LEVELS.filter(function (L) { return L.v === curLevel; })[0];
+    if (descEl && lv) descEl.textContent = lv.d;
+    renderForm();
+
+    var list = document.getElementById('oa-list');
+    if (!user.cloud) {
+      list.innerHTML = '<div class="notice-banner">자료 아카이브는 서버에 보관되어 있습니다. ' +
+        '서버 계정(구글 또는 이메일)으로 로그인해 주세요.</div>';
+      return;
+    }
+    list.innerHTML = '<p style="color:var(--gray-5)">불러오는 중...</p>';
+    SHSCloud.init().then(function (c) {
+      return c.from('officer_docs').select('*').eq('level', curLevel)
+        .order('doc_date', { ascending: false }).order('id', { ascending: false });
+    }).then(function (r) {
+      if (r.error) {
+        list.innerHTML = '<div class="notice-banner">불러오지 못했습니다: ' + e(r.error.message) +
+          ' (09 임원 자료실 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      var rows = r.data || [];
+      SHS.logAction('view', '임원 자료실 열람', '[' + curLevel + '] 목록 ' + rows.length + '건');
+      if (!rows.length) { list.innerHTML = '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>'; return; }
+      var canEd = SHSAuth.canEditLevel(user, curLevel);
+      var h = '<table class="tbl"><thead><tr><th style="width:70px">번호</th><th style="width:100px">분류</th>' +
+        '<th>제목</th><th style="width:110px">문서 날짜</th><th style="width:90px">첨부</th>' +
+        (canEd ? '<th style="width:130px">관리</th>' : '') + '</tr></thead><tbody>';
+      rows.forEach(function (d, i) {
+        h += '<tr><td>' + (rows.length - i) + '</td><td>' + e(d.category || '-') + '</td>' +
+          '<td class="left"><a href="#" data-oaview="' + i + '" style="color:var(--navy);text-decoration:underline">' + e(d.title) + '</a>' +
+          (d.author_name ? '<div style="font-size:0.75rem;color:var(--gray-5)">' + e(d.author_name) + '</div>' : '') + '</td>' +
+          '<td>' + e(d.doc_date || '-') + '</td>' +
+          '<td>' + (d.file_path ? '<button class="btn ghost sm" data-oafile="' + i + '">내려받기</button>' : '-') + '</td>' +
+          (canEd ? '<td><button class="btn ghost sm" data-oaedit="' + i + '">수정</button> ' +
+                   '<button class="btn danger sm" data-oadel="' + i + '">삭제</button></td>' : '') +
+          '</tr>';
+      });
+      h += '</tbody></table><div id="oa-view"></div>';
+      list.innerHTML = h;
+
+      list.querySelectorAll('a[data-oaview]').forEach(function (a) {
+        a.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          var d = rows[+a.dataset.oaview];
+          document.getElementById('oa-view').innerHTML =
+            '<div class="side-box" style="margin-top:16px"><div class="box-head">' +
+            '[' + e(d.level) + '] ' + e(d.title) + '</div><div class="box-body">' +
+            '<p style="font-size:0.82rem;color:var(--gray-5)">' +
+            e(d.category || '') + (d.doc_date ? ' · ' + e(d.doc_date) : '') +
+            (d.author_name ? ' · ' + e(d.author_name) : '') + '</p>' +
+            String(d.body || '').split('\n').map(function (l) {
+              return l.trim() ? '<p style="margin-bottom:6px">' + e(l) + '</p>' : '';
+            }).join('') +
+            '</div></div>';
+          SHS.logAction('view', '임원 자료 열람', '[' + d.level + '] ' + d.title);
+          document.getElementById('oa-view').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
+
+      list.querySelectorAll('button[data-oafile]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var d = rows[+b.dataset.oafile];
+          SHSCloud.init().then(function (c) {
+            return c.storage.from('officer-docs').createSignedUrl(d.file_path, 60);
+          }).then(function (r) {
+            if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
+            SHSCloud.log('view', '임원 자료 첨부 내려받기', '[' + d.level + '] ' + d.title);
+            window.open(r.data.signedUrl, '_blank');
+          });
+        });
+      });
+
+      if (!canEd) return;
+      list.querySelectorAll('button[data-oaedit]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var d = rows[+b.dataset.oaedit];
+          document.getElementById('oa-id').value = d.id;
+          document.getElementById('oa-title').value = d.title;
+          document.getElementById('oa-cat').value = d.category || '';
+          document.getElementById('oa-date').value = d.doc_date || '';
+          document.getElementById('oa-body').value = d.body || '';
+          document.getElementById('oa-ftitle').textContent = curLevel + '자료 수정';
+          document.getElementById('oa-cancel').classList.remove('hidden');
+          document.getElementById('oa-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
+      list.querySelectorAll('button[data-oadel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var d = rows[+b.dataset.oadel];
+          if (!confirm('"' + d.title + '" 자료를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+          SHSCloud.init().then(function (c) {
+            var pre = d.file_path
+              ? c.storage.from('officer-docs').remove([d.file_path]).catch(function () {})
+              : Promise.resolve();
+            return pre.then(function () { return c.from('officer_docs').delete().eq('id', d.id); });
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('delete', '임원 자료 삭제', '[' + d.level + '] ' + d.title);
+            loadArchive();
+          });
+        });
+      });
+    });
+  }
+
+  renderArchiveShell();
  });
 });
 </script>

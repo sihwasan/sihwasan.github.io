@@ -1,6 +1,15 @@
 /* 시화산노회 홈페이지 - 공통 레이아웃 및 유틸 */
 
 (function () {
+  /* 서버 인증을 사용하는 환경에서는 예전 '이 컴퓨터 전용' 로그인 기록을 정리한다.
+   * 이것이 남아 있으면 서버 자료를 읽지 못하는 상태로 로그인된 것처럼 보인다. */
+  if (window.SHS_SUPABASE && SHS_SUPABASE.ready && SHS_SUPABASE.ready()) {
+    try {
+      sessionStorage.removeItem('shs_session_v1');
+      localStorage.removeItem('shs_session_v1');
+    } catch (e) {}
+  }
+
   var user = SHSAuth.currentUser();
 
   /* ---------- 상단바 + 헤더 + GNB ---------- */
