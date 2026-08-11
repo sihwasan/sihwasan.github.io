@@ -77,7 +77,8 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div class="notice-banner">개인정보(생년월일·연락처·주소)는 <strong>**</strong>로 가려서 표시됩니다. ' +
         '<strong>열람</strong>을 누르면 내용이 표시되며, <strong>열람 기록은 감사 기록에 남습니다.</strong></div>';
       html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th>' +
-        '<th style="width:150px">개인정보</th><th style="width:150px">남은 임기</th><th>등급</th>' +
+        '<th style="width:150px">개인정보</th><th style="width:185px">정년 (만 70세)</th>' +
+        '<th style="width:150px">남은 임기</th><th>등급</th>' +
         '<th style="width:110px">자격</th>' +
         (canAppoint ? '<th style="width:200px">등급 임명</th>' : '') + '</tr></thead><tbody>';
       visible.forEach(function (p) {
@@ -89,6 +90,10 @@ document.addEventListener('DOMContentLoaded', function () {
           /* 개인정보: 가려서 표시하고 열람 버튼 제공 */
           '<td><span id="pi-' + e(p.id) + '">**</span><br>' +
           '<button class="btn ghost sm" data-piview="' + e(p.id) + '" style="margin-top:4px">열람</button></td>' +
+          '<td style="font-size:0.82rem">' +
+          (SHS.retireDate(p.birth_date) && SHS.retireDate(p.birth_date) <= new Date()
+            ? '<span class="fail">' + e(SHS.retireLabel(p)) + '</span>'
+            : e(SHS.retireLabel(p))) + '</td>' +
           '<td style="font-size:0.82rem">' + e(SHS.termLabel(p)) + '</td>' +
           '<td><span class="role-badge">' + SHS.displayRole(p.role, p.title) + '</span>' +
           (p.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(p.title) + '</div>' : '') + '</td>' +
@@ -111,7 +116,9 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       html += '</tbody></table>';
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">' +
-        '· 총회 정년은 만 70세이며, 정년이 지나면 정회원 자격이 자동으로 상실됩니다.<br>' +
+        '· 총회 정년은 만 70세이며, <strong>정년이 지나면 등급과 상관없이 정회원 자격이 상실</strong>됩니다. ' +
+        '정회원 전용 자료도 열람할 수 없습니다.<br>' +
+        '· 생년월일이 등록되지 않은 회원은 정년을 계산할 수 없습니다. 회원 본인이 <strong>내 정보</strong>에서 입력하거나 여기에서 확인해 주세요.<br>' +
         '· 장로 총대는 다음 봄 정기노회까지 자격이 유지되며, 총대로 다시 등록되지 않으면 자격이 상실됩니다. ' +
         '아래 <strong>총대 자격 기간 일괄 설정</strong>으로 만료일을 지정할 수 있습니다.<br>' +
         '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
@@ -132,6 +139,8 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<h2>노회 명단 관리</h2>';
       html += '<p>가입 시 등급 자동 부여의 기준이 되는 명단입니다. 성명과 소속 교회가 이 명단과 일치하면 해당 등급이 자동으로 부여됩니다.</p>';
       html += '<div id="roster-area"><p style="color:var(--gray-5)">명단을 불러오는 중...</p></div>';
+      html += '<h2>총회 총대</h2>';
+      html += '<div id="delegate-area"><p style="color:var(--gray-5)">총대 명단을 불러오는 중...</p></div>';
       html += '<h2>시찰회 관리</h2>';
       html += '<div id="sichal-area"><p style="color:var(--gray-5)">시찰 정보를 불러오는 중...</p></div>';
       html += '<h2>상비부 배정 관리</h2>';
@@ -140,6 +149,7 @@ document.addEventListener('DOMContentLoaded', function () {
       area.innerHTML = html;
       SHS.sectionize(area);
       renderRoster();
+      renderDelegates();
       renderSichals();
       renderCommittees();
 
@@ -439,6 +449,190 @@ document.addEventListener('DOMContentLoaded', function () {
             renderRoster();
           });
         });
+      });
+    });
+  }
+
+  /* ---------- 총회 총대 관리 ----------
+   * 근거: 노회규칙 제16조 (총대)
+   * 노회장과 장로부노회장은 자동총대, 그 외는 선거관리위원회 내규에 따라 선정 */
+  var DKINDS = ['목사 정총대', '목사 부총대', '장로 정총대', '장로 부총대'];
+
+  function renderDelegates() {
+    var box = document.getElementById('delegate-area');
+    if (!box) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('delegates').select('*').order('kind').order('sort');
+    }).then(function (r) {
+      if (r.error) {
+        box.innerHTML = '<div class="notice-banner">총대 명단을 불러오지 못했습니다: ' + e(r.error.message) +
+          ' (26 총회 총대 관리 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      var rows = r.data || [];
+      var live = rows.filter(function (x) { return x.active; });
+      var past = rows.filter(function (x) { return !x.active; });
+
+      function kindOpts(v) {
+        return DKINDS.map(function (k) {
+          return '<option' + (k === v ? ' selected' : '') + '>' + e(k) + '</option>';
+        }).join('');
+      }
+      function termCell(d) {
+        if (!d.term_until) return '<span style="color:var(--gray-5)">기간 미정</span>';
+        var left = Math.ceil((new Date(d.term_until + 'T00:00:00') - new Date()) / 86400000);
+        var txt = e(d.term_from || '?') + ' ~ ' + e(d.term_until);
+        if (left <= 0) return txt + '<div class="fail" style="font-size:0.8rem">자격 만료</div>';
+        return txt + '<div style="font-size:0.8rem;color:var(--gray-5)">' + left + '일 남음</div>';
+      }
+
+      var h = '<div class="notice-banner">노회규칙 제16조에 따라 4월 정기노회에서 선정합니다. ' +
+        '노회장과 장로 부노회장은 자동총대입니다. ' +
+        '총대가 바뀌면 <strong>교체</strong>를 눌러 새 총대를 넣어 주세요. ' +
+        '이전 총대는 지워지지 않고 기록으로 남습니다.</div>';
+
+      DKINDS.forEach(function (k) {
+        var list = live.filter(function (x) { return x.kind === k; });
+        h += '<h3 style="margin-top:22px">' + e(k) + ' (' + list.length + '명)</h3>';
+        if (!list.length) { h += '<p style="color:var(--gray-5)">등록된 총대가 없습니다.</p>'; return; }
+        h += '<table class="tbl"><thead><tr><th style="width:110px">성명</th>' +
+          '<th style="width:160px">소속 교회</th><th style="width:110px">직책</th>' +
+          '<th style="width:200px">자격 기간</th><th style="width:170px">비고</th>' +
+          '<th style="width:170px">관리</th></tr></thead><tbody>';
+        list.forEach(function (d) {
+          h += '<tr data-dg="' + d.id + '">' +
+            '<td><input type="text" data-df="name" value="' + e(d.name) + '"></td>' +
+            '<td><input type="text" data-df="church" value="' + e(d.church || '') + '" placeholder="소속 교회"></td>' +
+            '<td><input type="text" data-df="title" value="' + e(d.title || '') + '" placeholder="자동총대"></td>' +
+            '<td><input type="date" data-df="term_from" value="' + e(d.term_from || '') + '">' +
+            '<input type="date" data-df="term_until" value="' + e(d.term_until || '') + '" style="margin-top:4px">' +
+            '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:2px">' + termCell(d) + '</div></td>' +
+            '<td><input type="text" data-df="note" value="' + e(d.note || '') + '"></td>' +
+            '<td><button class="btn sm" data-dsave="' + d.id + '">저장</button> ' +
+            '<button class="btn ghost sm" data-dswap="' + d.id + '" data-dn="' + e(d.name) + '">교체</button> ' +
+            '<button class="btn danger sm" data-ddel="' + d.id + '" data-dn2="' + e(d.name) + '">삭제</button></td>' +
+            '</tr>';
+        });
+        h += '</tbody></table>';
+      });
+
+      /* 총대 추가 */
+      var nextSpring = SHS.nthMonday(new Date().getFullYear() + (new Date().getMonth() >= 3 ? 1 : 0), 4, 2);
+      h += '<div class="admin-card" style="margin-top:22px"><h3 style="margin-top:0">총대 추가</h3>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 150px"><label>구분</label><select id="dg-kind">' + kindOpts('장로 정총대') + '</select></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="dg-name"></div>' +
+        '<div class="field"><label>소속 교회</label><input type="text" id="dg-church"></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>직책 (선택)</label><input type="text" id="dg-title" placeholder="자동총대"></div>' +
+        '<div class="field" style="flex:0 0 165px"><label>자격 시작</label><input type="date" id="dg-from" value="' +
+        new Date().toISOString().slice(0, 10) + '"></div>' +
+        '<div class="field" style="flex:0 0 165px"><label>자격 만료</label><input type="date" id="dg-until" value="' +
+        nextSpring.toISOString().slice(0, 10) + '"></div>' +
+        '<button class="btn" id="dg-add">추가</button>' +
+        '</div><div class="form-msg" id="dg-msg"></div></div>';
+
+      /* 교체 기록 */
+      if (past.length) {
+        h += '<h3 style="margin-top:26px">교체된 총대 (' + past.length + '명)</h3>' +
+          '<table class="tbl"><thead><tr><th style="width:150px">구분</th><th style="width:110px">성명</th>' +
+          '<th style="width:160px">소속 교회</th><th style="width:130px">교체일</th>' +
+          '<th>후임</th></tr></thead><tbody>';
+        past.forEach(function (d) {
+          h += '<tr><td>' + e(d.kind) + '</td><td>' + e(d.name) + '</td>' +
+            '<td>' + e(d.church || '-') + '</td><td>' + e(d.replaced_at || '-') + '</td>' +
+            '<td class="left">' + e(d.replaced_by || '-') + '</td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+
+      h += '<div class="form-msg" id="dg-rowmsg"></div>';
+      box.innerHTML = h;
+
+      /* 줄 저장 */
+      box.querySelectorAll('button[data-dsave]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var tr = b.closest('tr');
+          var msg = document.getElementById('dg-rowmsg');
+          function v(fl) { return tr.querySelector('[data-df="' + fl + '"]').value.trim(); }
+          var d = {
+            name: v('name'), church: v('church') || null, title: v('title') || null,
+            term_from: v('term_from') || null, term_until: v('term_until') || null,
+            note: v('note') || null, updated_at: new Date().toISOString(), updated_by: user.name
+          };
+          if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명은 비울 수 없습니다.'; return; }
+          msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+          SHSCloud.init().then(function (c) {
+            return c.from('delegates').update(d).eq('id', b.dataset.dsave);
+          }).then(function (res) {
+            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+            SHSCloud.log('update', '총대 수정', d.name + ' (' + (d.church || '') + ')');
+            msg.className = 'form-msg ok';
+            msg.textContent = d.name + ' 총대 정보를 저장했습니다.';
+            renderDelegates();
+          });
+        });
+      });
+
+      /* 교체 */
+      box.querySelectorAll('button[data-dswap]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var nm = prompt('"' + b.dataset.dn + '" 총대를 대신할 새 총대의 성명을 적어 주세요.', '');
+          if (nm === null || !nm.trim()) return;
+          var ch = prompt('새 총대의 소속 교회를 적어 주세요.', '');
+          if (ch === null) return;
+          var msg = document.getElementById('dg-rowmsg');
+          msg.className = 'form-msg'; msg.textContent = '교체 중입니다...';
+          SHSCloud.init().then(function (c) {
+            return c.rpc('replace_delegate', {
+              p_id: Number(b.dataset.dswap), p_name: nm.trim(),
+              p_church: ch.trim(), p_note: b.dataset.dn + ' 총대 후임'
+            });
+          }).then(function (res) {
+            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+            SHSCloud.log('update', '총대 교체', b.dataset.dn + ' → ' + nm.trim());
+            msg.className = 'form-msg ok';
+            msg.textContent = b.dataset.dn + ' 총대를 ' + nm.trim() + ' 총대로 교체했습니다. ' +
+              '이전 총대는 아래 교체 기록에 남습니다.';
+            renderDelegates();
+          });
+        });
+      });
+
+      /* 삭제 */
+      box.querySelectorAll('button[data-ddel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('"' + b.dataset.dn2 + '" 총대를 명단에서 삭제하시겠습니까?\n교체가 아니라 기록까지 지웁니다.')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('delegates').delete().eq('id', b.dataset.ddel);
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('delete', '총대 삭제', b.dataset.dn2);
+            renderDelegates();
+          });
+        });
+      });
+
+      /* 추가 */
+      document.getElementById('dg-add').addEventListener('click', function () {
+        var msg = document.getElementById('dg-msg');
+        var d = {
+          kind: document.getElementById('dg-kind').value,
+          name: document.getElementById('dg-name').value.trim(),
+          church: document.getElementById('dg-church').value.trim() || null,
+          title: document.getElementById('dg-title').value.trim() || null,
+          term_from: document.getElementById('dg-from').value || null,
+          term_until: document.getElementById('dg-until').value || null,
+          sort: (live.length + 1) * 10,
+          updated_at: new Date().toISOString(), updated_by: user.name
+        };
+        if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명을 입력해 주세요.'; return; }
+        msg.className = 'form-msg'; msg.textContent = '추가 중입니다...';
+        SHSCloud.init().then(function (c) { return c.from('delegates').insert(d); })
+          .then(function (res) {
+            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+            SHSCloud.log('create', '총대 추가', d.kind + ' ' + d.name);
+            renderDelegates();
+          });
       });
     });
   }

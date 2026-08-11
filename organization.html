@@ -151,19 +151,53 @@ document.addEventListener('DOMContentLoaded', function () {
       '<tr><th>장로 정총대</th><td class="left">' + dlist(d.elderMain) + '</td></tr>' +
       '<tr><th>장로 부총대</th><td class="left">' + dlist(d.elderSub) + '</td></tr>';
   }
+
+  /* 서버 총대 명단이 있으면 소속 교회와 자격 기간까지 함께 보여준다 */
+  function renderDelegateRows(rows) {
+    var table = dgb.closest('table');
+    if (!table || !rows.length) return;
+    var today = new Date();
+    var head = table.querySelector('thead');
+    if (head) head.remove();
+    table.insertAdjacentHTML('afterbegin',
+      '<thead><tr><th style="width:130px">구분</th><th style="width:110px">성명</th>' +
+      '<th style="width:170px">소속 교회</th><th>자격 기간</th></tr></thead>');
+
+    dgb.innerHTML = rows.map(function (d) {
+      var term = '-';
+      if (d.term_until) {
+        var until = new Date(d.term_until + 'T00:00:00');
+        var left = Math.ceil((until - today) / 86400000);
+        term = e(d.term_from || '?') + ' ~ ' + e(d.term_until) +
+          (left <= 0 ? ' <span class="fail">(자격 만료)</span>'
+                     : ' <span style="color:var(--gray-5)">(' + left + '일 남음)</span>');
+      }
+      return '<tr><td>' + e(d.kind) + '</td>' +
+        '<td>' + dn(d.name) + (d.title ? ' <span style="font-size:0.78rem;color:var(--gray-5)">(' + e(d.title) + ')</span>' : '') + '</td>' +
+        '<td>' + e(d.church || '-') + '</td>' +
+        '<td class="left">' + term + '</td></tr>';
+    }).join('');
+  }
+
   renderDelegates(SHSData.delegates);
 
   /* 관리자가 사이트 관리에서 수정한 임원 명부가 서버에 있으면 그것으로 교체 */
   if (window.SHSCloud && SHSCloud.enabled()) {
     SHSCloud.init().then(function (c) {
       if (!c) return;
-      return c.from('site_settings').select('*').in('key', ['officers', 'delegates']);
-    }).then(function (r) {
-      ((r && r.data) || []).forEach(function (row) {
+      return Promise.all([
+        c.from('site_settings').select('*').in('key', ['officers', 'delegates']),
+        c.from('delegates').select('*').eq('active', true).order('kind').order('sort')
+      ]);
+    }).then(function (rs) {
+      ((rs[0] && rs[0].data) || []).forEach(function (row) {
         if (row.key === 'officers' && row.value && row.value.length) renderOfficers(row.value);
         if (row.key === 'delegates' && row.value) renderDelegates(row.value);
       });
-    });
+      /* 총대 표는 서버 명단이 있으면 그것으로 바꾼다 (소속 교회·자격 기간 포함) */
+      var dg = (rs[1] && rs[1].data) || [];
+      if (dg.length) renderDelegateRows(dg);
+    }).catch(function () {});
   }
 
   /* 아래 회원명단·시찰회·상비부는 정회원만 볼 수 있다. */

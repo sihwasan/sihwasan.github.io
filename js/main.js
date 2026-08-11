@@ -685,6 +685,17 @@
     return new Date(b.getFullYear() + RETIRE_AGE, b.getMonth(), b.getDate());
   }
 
+  /* 정년일 표기 (생년월일이 없으면 알 수 없다고 알린다) */
+  function retireLabel(u) {
+    var rd = retireDate(u && u.birth_date);
+    if (!rd) return '생년월일 미등록';
+    var y = rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.';
+    var days = Math.ceil((rd - new Date()) / 86400000);
+    if (days <= 0) return y + ' (정년 경과)';
+    if (days < 400) return y + ' (' + days + '일 남음)';
+    return y + ' (' + Math.floor(days / 365) + '년 ' + Math.floor(days % 365 / 30) + '개월 남음)';
+  }
+
   /* 남은 임기 안내 문구 */
   function termLabel(u) {
     var parts = [];
@@ -694,6 +705,8 @@
       if (days <= 0) parts.push('정년 경과');
       else if (days < 400) parts.push('정년까지 ' + days + '일');
       else parts.push('정년까지 ' + Math.floor(days / 365) + '년 ' + (Math.floor(days % 365 / 30)) + '개월');
+    } else {
+      parts.push('생년월일 미등록');
     }
     if (u.member_until) {
       var md = new Date(u.member_until + 'T00:00:00');
@@ -716,9 +729,13 @@
     return null;
   }
 
-  /* 정회원 이상(자격 유효) 여부. 관리자·임원은 항상 유효로 본다. */
+  /* 정회원 이상(자격 유효) 여부.
+   * 정년(만 70세)은 등급과 상관없이 모든 회원에게 적용된다. (총회 정년 규정)
+   * 그 밖의 사유(승인대기·총대 기간 만료 등)는 관리자·임원에게 적용하지 않는다. */
   function isActiveMember(u) {
     if (!u) return false;
+    var rd = retireDate(u.birth_date);
+    if (rd && rd <= new Date()) return false;
     if (['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(u.role) !== -1) return true;
     return !membershipIssue(u);
   }
@@ -973,6 +990,7 @@
     membershipIssue: membershipIssue,
     memberGate: memberGate,
     termLabel: termLabel,
+    retireLabel: retireLabel,
     ageOn: ageOn,
     retireDate: retireDate,
     nthMonday: nthMonday,
