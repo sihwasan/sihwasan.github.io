@@ -31,8 +31,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('officer-area');
   var e = SHS.esc;
 
-  /* 임원방 접근: 노회장, 서기, 간사 */
-  var hasAccess = user && (user.role === 'president' || user.role === 'clerk' || user.role === 'staff' || user.role === 'superadmin');
+  /* 임원방 접근: 노회 임원 전원
+   * (노회장·부노회장·서기·부서기·회록서기·부회록서기·회계·부회계)과 간사 */
+  var hasAccess = SHSAuth.isOfficer(user);
 
   if (!user) {
     area.innerHTML =
@@ -43,7 +44,8 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!hasAccess) {
     area.innerHTML =
       '<div class="notice-banner">임원방은 <strong>노회 임원</strong>이 이용할 수 있는 공간입니다. ' +
-      '현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 열람할 수 없습니다.</div>';
+      '현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 열람할 수 없습니다. ' +
+      '임원이신데 들어오지 못하시면 노회 사무실로 알려 주시기 바랍니다.</div>';
     return;
   }
 

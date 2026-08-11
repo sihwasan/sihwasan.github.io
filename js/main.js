@@ -144,6 +144,7 @@
     var right;
     if (user) {
       right = '<span class="user-name">' + honorific(user) + '</span>' +
+        '<span>(' + displayRole(user.role, user.title) + ')</span>' +
         '<a href="mypage.html">내 정보</a>' +
         '<a href="#" id="btn-logout">로그아웃</a>';
     } else {
@@ -299,6 +300,7 @@
           util.innerHTML =
             '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
             '<span class="user-name">' + (honorific(p) || p.email) + '</span>' +
+            '<span>(' + displayRole(p.role, p.title) + ')</span>' +
             '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
