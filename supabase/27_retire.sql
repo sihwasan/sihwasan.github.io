@@ -44,23 +44,28 @@ $fn$;
 
 -- ---------------------------------------------------------------------
 -- 3. 정년이 지난 분에게는 정회원 등급을 주지 않는다
+--    (01_init.sql 의 원래 기능을 그대로 두고 정년 검사만 더합니다)
 -- ---------------------------------------------------------------------
 create or replace function public.claim_membership(
-  p_name text, p_church text, p_position text, p_phone text default null)
-returns table (role text, title text)
+  p_name text, p_church text, p_position text, p_phone text)
+returns table (out_role text, out_title text)
 language plpgsql security definer set search_path = public as $fn$
 declare
-  v_role  text := 'pending';
+  v_role  text;
   v_title text;
+  v_norm  text := regexp_replace(regexp_replace(p_church, '\s', '', 'g'), '교회$', '');
+  v_name  text := regexp_replace(p_name, '\s', '', 'g');
+  v_cur   text;
   v_birth date;
 begin
-  select p.birth_date into v_birth from public.profiles p where p.id = auth.uid();
+  if auth.uid() is null then
+    raise exception '로그인이 필요합니다.';
+  end if;
 
-  -- 노회 명단과 이름·교회가 일치하면 그 등급을 준다
   select r.role, r.officer_title into v_role, v_title
     from public.roster r
-   where replace(r.name, ' ', '') = replace(p_name, ' ', '')
-     and replace(r.church, ' ', '') = replace(p_church, ' ', '')
+   where regexp_replace(r.name, '\s', '', 'g') = v_name
+     and regexp_replace(regexp_replace(r.church, '\s', '', 'g'), '교회$', '') = v_norm
    limit 1;
 
   if v_role is null then
@@ -68,15 +73,22 @@ begin
     v_title := null;
   end if;
 
-  -- 정년이 지났으면 정회원 등급을 주지 않는다
+  -- 정년(만 70세)이 지났으면 정회원·임원 등급을 주지 않는다
+  select p.birth_date into v_birth from public.profiles p where p.id = auth.uid();
   if public.is_retired(v_birth) and v_role in ('member', 'officer') then
     v_role := 'pending';
     v_title := null;
   end if;
 
+  select p.role into v_cur from public.profiles p where p.id = auth.uid();
+
   update public.profiles p
-     set name = p_name, church = p_church, position = p_position,
-         phone = coalesce(p_phone, p.phone),
+     set name = p_name,
+         church = p_church,
+         position = p_position,
+         phone = p_phone,
+         updated_at = now(),
+         -- 최고관리자와 관리자가 직접 지정한 등급은 낮추지 않는다
          role  = case when p.role = 'superadmin' then p.role else v_role end,
          title = case when p.role = 'superadmin' then p.title else v_title end
    where p.id = auth.uid();

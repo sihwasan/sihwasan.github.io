@@ -123,6 +123,10 @@ document.addEventListener('DOMContentLoaded', function () {
       '<option value="__etc">목록에 없음 (직접 입력)</option></select></div>' +
       '<div class="field hidden" id="cb-etc-wrap"><label>교회명 직접 입력</label>' +
       '<input type="text" id="cb-etc" placeholder="소속 교회명"></div>' +
+      '<div class="field"><label>생년월일</label><input type="date" id="cb-birth">' +
+      '<span style="display:block;font-size:0.82rem;color:var(--gray-5);margin-top:5px">' +
+      '총회 정년이 <strong>만 70세</strong>이므로, 정회원 자격 확인을 위해 생년월일이 필요합니다. ' +
+      '적지 않으시면 승인대기 상태가 됩니다.</span></div>' +
       '<div class="field"><label>연락처 (선택)</label><input type="tel" id="cb-phone" placeholder="010-0000-0000"></div>' +
       '<button class="btn" id="cb-submit" style="width:100%">등록</button>' +
       '<div class="form-msg" id="cb-msg"></div>' +
@@ -149,6 +153,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('cb-etc').value = pend.church;
       }
       document.getElementById('cb-phone').value = pend.phone || '';
+      if (pend.birth) document.getElementById('cb-birth').value = pend.birth;
     }
 
     document.getElementById('cb-submit').addEventListener('click', function () {
@@ -156,9 +161,16 @@ document.addEventListener('DOMContentLoaded', function () {
       var name = document.getElementById('cb-name').value.trim();
       var sel = document.getElementById('cb-church').value;
       var church = sel === '__etc' ? document.getElementById('cb-etc').value.trim() : sel;
+      var birth = document.getElementById('cb-birth').value;
       if (!name || !church) {
         msg.className = 'form-msg err';
         msg.textContent = '성명과 소속 교회를 입력해 주세요.';
+        return;
+      }
+      if (!birth) {
+        msg.className = 'form-msg err';
+        msg.textContent = '생년월일을 입력해 주세요. 총회 정년(만 70세) 확인에 필요합니다.';
+        document.getElementById('cb-birth').focus();
         return;
       }
       var adj = SHS.adjustPosition(name, church, document.getElementById('cb-pos').value);
@@ -172,7 +184,8 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.textContent = '확인 중입니다...';
       SHSCloud.claimMembership(name, church,
         adj.position,
-        document.getElementById('cb-phone').value.trim()
+        document.getElementById('cb-phone').value.trim(),
+        birth
       ).then(function (r) {
         if (!r.ok) {
           msg.className = 'form-msg err';

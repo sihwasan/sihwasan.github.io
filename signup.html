@@ -42,6 +42,14 @@
       <input type="text" id="reg-etc">
     </div>
     <div class="field">
+      <label for="reg-birth">생년월일</label>
+      <input type="date" id="reg-birth">
+      <span style="display:block;font-size:0.82rem;color:var(--gray-5);margin-top:5px">
+        총회 정년이 <strong>만 70세</strong>이므로, 정회원 자격 확인을 위해 생년월일이 필요합니다.
+        적지 않으시면 정회원 등급이 부여되지 않고 승인대기 상태가 됩니다.
+      </span>
+    </div>
+    <div class="field">
       <label for="reg-phone">연락처 (선택)</label>
       <input type="tel" id="reg-phone" placeholder="010-0000-0000">
     </div>
@@ -145,10 +153,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var name = document.getElementById('reg-name').value.trim();
     var church = churchValue();
+    var birth = document.getElementById('reg-birth').value;
     if (!name || !church) {
       msg.className = 'form-msg err';
       msg.textContent = '성명과 소속 교회를 먼저 입력해 주세요.';
       document.getElementById(name ? 'reg-church' : 'reg-name').focus();
+      return null;
+    }
+    if (!birth) {
+      msg.className = 'form-msg err';
+      msg.textContent = '생년월일을 입력해 주세요. 총회 정년(만 70세) 확인에 필요합니다.';
+      document.getElementById('reg-birth').focus();
       return null;
     }
     var adj = SHS.adjustPosition(name, church, document.getElementById('reg-pos').value);
@@ -159,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (adj.note) alert(adj.note);
     return {
-      name: name, church: church, position: adj.position,
+      name: name, church: church, position: adj.position, birth: birth,
       phone: document.getElementById('reg-phone').value.trim()
     };
   }
@@ -205,7 +220,8 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSCloud.init().then(function (c) {
       return c.auth.signUp({
         email: email, password: pw,
-        options: { data: { name: info.name, church: info.church, position: info.position, phone: info.phone } }
+        options: { data: { name: info.name, church: info.church, position: info.position,
+                           phone: info.phone, birth_date: info.birth } }
       });
     }).then(function (r) {
       if (r.error) {
@@ -225,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
           ' 메일함에서 확인 링크를 누른 뒤 로그인해 주세요.';
         return;
       }
-      SHSCloud.claimMembership(info.name, info.church, info.position, info.phone).then(function (cr) {
+      SHSCloud.claimMembership(info.name, info.church, info.position, info.phone, info.birth).then(function (cr) {
         msg.className = 'form-msg ok';
         if (cr.ok && cr.role && cr.role !== 'pending') {
           msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하여 ' +

@@ -91,15 +91,26 @@ var SHSCloud = (function () {
   }
 
   /* 성명·소속 교회를 등록하고 노회 명단과 대조하여 등급을 부여받는다. */
-  function claimMembership(name, church, position, phone) {
+  /* 생년월일은 정년(만 70세) 판정에 쓰이므로 등급을 정하기 전에 먼저 저장한다 */
+  function claimMembership(name, church, position, phone, birth) {
     return init().then(function (c) {
       if (!c) return { ok: false, msg: '서버에 연결할 수 없습니다.' };
+      var pre = Promise.resolve();
+      if (birth) {
+        pre = c.auth.getUser().then(function (u) {
+          var id = u && u.data && u.data.user && u.data.user.id;
+          if (!id) return;
+          return c.from('profiles').update({ birth_date: birth }).eq('id', id);
+        }).catch(function () {});
+      }
+      return pre.then(function () {
       return c.rpc('claim_membership', {
         p_name: name, p_church: church, p_position: position, p_phone: phone || ''
       }).then(function (r) {
         if (r.error) return { ok: false, msg: r.error.message };
         var row = (r.data && r.data[0]) || {};
         return { ok: true, role: row.out_role, title: row.out_title, roleName: roleName(row.out_role) };
+      });
       });
     });
   }

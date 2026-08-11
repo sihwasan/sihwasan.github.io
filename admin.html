@@ -91,9 +91,12 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><span id="pi-' + e(p.id) + '">**</span><br>' +
           '<button class="btn ghost sm" data-piview="' + e(p.id) + '" style="margin-top:4px">열람</button></td>' +
           '<td style="font-size:0.82rem">' +
+          '<input type="date" data-birth="' + e(p.id) + '" value="' + e(p.birth_date || '') + '" ' +
+          'style="font-size:0.82rem;padding:4px 6px">' +
+          '<div style="margin-top:3px">' +
           (SHS.retireDate(p.birth_date) && SHS.retireDate(p.birth_date) <= new Date()
             ? '<span class="fail">' + e(SHS.retireLabel(p)) + '</span>'
-            : e(SHS.retireLabel(p))) + '</td>' +
+            : e(SHS.retireLabel(p))) + '</div></td>' +
           '<td style="font-size:0.82rem">' + e(SHS.termLabel(p)) + '</td>' +
           '<td><span class="role-badge">' + SHS.displayRole(p.role, p.title) + '</span>' +
           (p.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(p.title) + '</div>' : '') + '</td>' +
@@ -118,7 +121,9 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">' +
         '· 총회 정년은 만 70세이며, <strong>정년이 지나면 등급과 상관없이 정회원 자격이 상실</strong>됩니다. ' +
         '정회원 전용 자료도 열람할 수 없습니다.<br>' +
-        '· 생년월일이 등록되지 않은 회원은 정년을 계산할 수 없습니다. 회원 본인이 <strong>내 정보</strong>에서 입력하거나 여기에서 확인해 주세요.<br>' +
+        '· 생년월일이 없으면 정년을 계산할 수 없습니다. ' +
+        '<strong>정년 칸의 날짜를 고치시면 관리자가 대신 입력</strong>할 수 있고, 곧바로 저장됩니다. ' +
+        '입력 기록은 감사 기록에 남습니다.<br>' +
         '· 장로 총대는 다음 봄 정기노회까지 자격이 유지되며, 총대로 다시 등록되지 않으면 자격이 상실됩니다. ' +
         '아래 <strong>총대 자격 기간 일괄 설정</strong>으로 만료일을 지정할 수 있습니다.<br>' +
         '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
@@ -186,6 +191,22 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       /* 개인정보 열람 (열람 기록을 감사 기록에 남긴다) */
+      /* 관리자가 생년월일을 대신 입력할 수 있다. 고치면 바로 저장된다. */
+      area.querySelectorAll('input[data-birth]').forEach(function (inp) {
+        inp.addEventListener('change', function () {
+          var id = inp.dataset.birth;
+          var p = rows.filter(function (x) { return String(x.id) === id; })[0];
+          var v = inp.value || null;
+          SHSCloud.init().then(function (c) {
+            return c.from('profiles').update({ birth_date: v }).eq('id', id);
+          }).then(function (res) {
+            if (res.error) { alert('저장하지 못했습니다: ' + res.error.message); return; }
+            SHSCloud.log('update', '생년월일 입력', (p ? p.name : id) + ' → ' + (v || '(지움)'));
+            renderCloud();
+          });
+        });
+      });
+
       area.querySelectorAll('button[data-piview]').forEach(function (b) {
         b.addEventListener('click', function () {
           var id = b.dataset.piview;
