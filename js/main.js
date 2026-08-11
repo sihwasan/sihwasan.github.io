@@ -293,7 +293,6 @@
             '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
             '<span class="user-name">' + (p.name || p.email) + '</span>' +
             '<span>(' + displayRole(p.role, p.title) + ')</span>' +
-            '<a class="noti-link" href="notifications.html" id="noti-link">알림</a>' +
             '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
@@ -383,8 +382,6 @@
     }).then(function (r) {
       if (!r || r.error || !r.data || !r.data.length) return;
       var rows = r.data;
-      var link = document.getElementById('noti-link');
-      if (link) link.insertAdjacentHTML('beforeend', '<span class="noti-badge">' + rows.length + '</span>');
 
       /* 임명·취임 알림은 놓치지 않도록 배너로도 안내한다 */
       var big = rows.filter(function (n) { return n.kind === '임명'; })[0];

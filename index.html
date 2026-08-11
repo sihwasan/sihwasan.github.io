@@ -47,9 +47,10 @@
 
   <div class="home-committees hidden" id="home-com-wrap">
     <div class="section-title">
-      <h2>상비부 활동</h2>
-      <a class="more" href="dashboard.html">대시보드</a>
+      <h2>대시보드</h2>
+      <a class="more" href="dashboard.html">상비부 전체 보기</a>
     </div>
+    <div id="home-noti"></div>
     <div id="home-committees"></div>
   </div>
 
@@ -117,6 +118,39 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* ---------- 나의 알림 ---------- */
+  function renderNoti(rows) {
+    var box = document.getElementById('home-noti');
+    var wrap = document.getElementById('home-com-wrap');
+    if (!box) return;
+    var unread = rows.filter(function (n) { return !n.read_at; });
+
+    var h = '<div class="noti-card' + (unread.length ? ' has' : '') + '">' +
+      '<div class="noti-card-head">' +
+      '<span class="n-label">나의 알림</span>' +
+      (unread.length
+        ? '<span class="n-count">' + unread.length + '</span>' +
+          '<span class="n-sub">확인하지 않은 알림이 ' + unread.length + '건 있습니다</span>'
+        : '<span class="n-sub">확인하지 않은 알림이 없습니다</span>') +
+      '<a class="more" href="notifications.html">알림함</a>' +
+      '</div>';
+
+    if (unread.length) {
+      h += '<ul class="noti-card-list">' +
+        unread.slice(0, 5).map(function (n) {
+          return '<li><a href="notifications.html">' +
+            (n.kind ? '<span class="n-kind">' + e(n.kind) + '</span>' : '') +
+            '<span class="n-t">' + e(n.title) + '</span>' +
+            '<span class="n-d">' + e(String(n.created_at).slice(0, 10)) + '</span></a></li>';
+        }).join('') + '</ul>' +
+        (unread.length > 5
+          ? '<div class="noti-card-more"><a href="notifications.html">' +
+            (unread.length - 5) + '건 더 보기</a></div>' : '');
+    }
+    box.innerHTML = h + '</div>';
+    if (wrap) wrap.classList.remove('hidden');
+  }
+
   /* ---------- 상비부 활동 (로그인 회원에게만) ---------- */
   function renderCommittees(coms, evs, mine) {
     var wrap = document.getElementById('home-com-wrap');
@@ -173,6 +207,12 @@ document.addEventListener('DOMContentLoaded', function () {
             renderGallery(r.data.map(function (g) { return { thumb: g.thumb_url, title: g.title }; }));
           }
         });
+      /* 나의 알림 */
+      c.from('notifications').select('*').order('created_at', { ascending: false }).limit(30)
+        .then(function (r) {
+          if (r && r.data) renderNoti(r.data);
+        }, function () {});
+
       /* 상비부 활동 (로그인한 회원에게만 보인다) */
       Promise.all([
         c.from('committees').select('name').order('sort'),

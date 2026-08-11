@@ -407,6 +407,39 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 }
 .form-card h2 { border: none; padding: 0; text-align: center; margin-bottom: 24px; }
 .home-committees { padding: 10px 0 30px; }
+
+/* 나의 알림 */
+.noti-card { border: 1px solid var(--gray-2); background: #fff; margin-bottom: 16px; }
+.noti-card.has { border-color: var(--navy); border-left: 4px solid var(--accent); }
+.noti-card-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 18px; border-bottom: 1px solid var(--gray-2);
+}
+.noti-card:not(.has) .noti-card-head { border-bottom: none; }
+.noti-card-head .n-label { font-weight: 700; color: var(--navy); font-size: 1.02rem; }
+.noti-card-head .n-count {
+  min-width: 24px; height: 24px; line-height: 24px; padding: 0 8px;
+  background: #d63b3b; color: #fff; font-size: 0.82rem; font-weight: 700;
+  text-align: center; border-radius: 12px;
+}
+.noti-card-head .n-sub { font-size: 0.86rem; color: var(--gray-5); }
+.noti-card-head .more { margin-left: auto; font-size: 0.82rem; color: var(--gray-5); }
+.noti-card-head .more:hover { color: var(--navy); }
+.noti-card-list li { border-bottom: 1px solid var(--gray-1); }
+.noti-card-list li:last-child { border-bottom: none; }
+.noti-card-list a {
+  display: flex; align-items: center; gap: 10px; padding: 11px 18px; font-size: 0.92rem;
+}
+.noti-card-list a:hover { background: var(--gray-1); }
+.noti-card-list .n-kind {
+  flex-shrink: 0; font-size: 0.72rem; border: 1px solid var(--accent); color: var(--accent);
+  padding: 1px 7px;
+}
+.noti-card-list .n-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.noti-card-list .n-d { flex-shrink: 0; font-size: 0.8rem; color: var(--gray-5); }
+.noti-card-more { padding: 10px 18px; text-align: center; border-top: 1px solid var(--gray-1); }
+.noti-card-more a { font-size: 0.85rem; color: var(--navy); }
+.noti-card-more a:hover { text-decoration: underline; }
 .home-committees .db-grid { margin-bottom: 0; }
 
 /* ---------- 상비부 대시보드 ---------- */
