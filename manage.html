@@ -23,6 +23,8 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
+<script src="js/photos-config.js"></script>
+<script src="js/photos.js"></script>
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -409,22 +411,14 @@ document.addEventListener('DOMContentLoaded', function () {
         var chain = Promise.resolve();
         Array.prototype.forEach.call(files, function (f, idx) {
           chain = chain.then(function () {
-            var base = Date.now() + '-' + idx;
             return Promise.all([resizeImage(f, 1400, 0.8), resizeImage(f, 520, 0.72)])
-              .then(function (blobs) {
-                return db.storage.from('gallery').upload('full/' + base + '.jpg', blobs[0], { contentType: 'image/jpeg' })
-                  .then(function (r1) {
-                    if (r1.error) throw r1.error;
-                    return db.storage.from('gallery').upload('thumb/' + base + '.jpg', blobs[1], { contentType: 'image/jpeg' });
-                  })
-                  .then(function (r2) {
-                    if (r2.error) throw r2.error;
-                    var full = db.storage.from('gallery').getPublicUrl('full/' + base + '.jpg').data.publicUrl;
-                    var th = db.storage.from('gallery').getPublicUrl('thumb/' + base + '.jpg').data.publicUrl;
-                    return db.from('gallery_items').insert({ title: title, taken: taken, image_url: full, thumb_url: th, sort: 0 });
-                  })
-                  .then(function (r3) { if (r3.error) throw r3.error; });
-              });
+              .then(function (blobs) { return SHSPhotos.putPair(blobs[0], blobs[1]); })
+              .then(function (u) {
+                return db.from('gallery_items').insert({
+                  title: title, taken: taken, image_url: u.full, thumb_url: u.thumb, sort: 0
+                });
+              })
+              .then(function (r3) { if (r3.error) throw r3.error; });
           });
         });
         chain.then(function () {

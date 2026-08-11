@@ -98,6 +98,8 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
+<script src="js/photos-config.js"></script>
+<script src="js/photos.js"></script>
 <script src="js/main.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -337,27 +339,18 @@ document.addEventListener('DOMContentLoaded', function () {
     if (picked.length) {
       picked.forEach(function (f, i) {
         chain = chain.then(function () {
-          var base = Date.now() + '-' + i;
           return Promise.all([resize(f, 1400, 0.8), resize(f, 640, 0.72)]).then(function (bs) {
+            return SHSPhotos.putPair(bs[0], bs[1]);
+          }).then(function (u) {
             return SHSCloud.init().then(function (c) {
-              return c.storage.from('gallery').upload('full/' + base + '.jpg', bs[0], { contentType: 'image/jpeg' })
-                .then(function (r1) {
-                  if (r1.error) throw r1.error;
-                  return c.storage.from('gallery').upload('thumb/' + base + '.jpg', bs[1], { contentType: 'image/jpeg' });
-                })
-                .then(function (r2) {
-                  if (r2.error) throw r2.error;
-                  return c.from('gallery_items').insert({
-                    title: title || '노회 소식', taken: taken, category: cat, caption: caption,
-                    link_url: link || null,
-                    image_url: c.storage.from('gallery').getPublicUrl('full/' + base + '.jpg').data.publicUrl,
-                    thumb_url: c.storage.from('gallery').getPublicUrl('thumb/' + base + '.jpg').data.publicUrl,
-                    author_id: user.id, author_name: user.name, sort: 0
-                  });
-                })
-                .then(function (r3) { if (r3.error) throw r3.error; });
+              return c.from('gallery_items').insert({
+                title: title || '노회 소식', taken: taken, category: cat, caption: caption,
+                link_url: link || null,
+                image_url: u.full, thumb_url: u.thumb,
+                author_id: user.id, author_name: user.name, sort: 0
+              });
             });
-          });
+          }).then(function (r3) { if (r3.error) throw r3.error; });
         });
       });
     } else {
