@@ -6,8 +6,11 @@
 -- 열람 권한
 --   일반자료 · 대외비자료 : 노회 임원 (노회장·부노회장·서기·부서기·회록서기·
 --                          부회록서기·회계·부회계) 및 간사
---   기밀자료             : 노회장 · 부노회장 · 서기
+--   기밀자료             : 노회장 · 부노회장 · 서기 · 간사
 --   최고관리자는 모든 자료에 접근합니다.
+--
+-- ※ 이미 실행하셨더라도 이 파일을 다시 실행하면 권한만 갱신됩니다.
+--    (자료는 그대로 유지됩니다)
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -21,11 +24,12 @@ returns boolean language sql stable security definer set search_path = public as
     ('superadmin','president','clerk','staff','officer'), false)
 $fn$;
 
--- 기밀 열람 : 노회장 · 부노회장 · 서기 · 최고관리자
+-- 기밀 열람 : 노회장 · 부노회장 · 서기 · 간사 · 최고관리자
+--             (간사는 기밀자료의 등록·수정 실무를 담당한다)
 create or replace function public.can_view_secret()
 returns boolean language sql stable security definer set search_path = public as $fn$
   select coalesce(
-    public.my_role() in ('superadmin','president','clerk')
+    public.my_role() in ('superadmin','president','clerk','staff')
     or exists (
       select 1 from public.profiles p
        where p.id = auth.uid()

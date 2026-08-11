@@ -190,10 +190,12 @@ var SHSAuth = (function () {
 
   /* ---------- 임원 자료실 보안 등급 ----------
    * 일반자료·대외비자료 : 노회 임원과 간사
-   * 기밀자료           : 노회장·부노회장·서기 (최고관리자 포함) */
+   * 기밀자료           : 노회장·부노회장·서기·간사 (최고관리자 포함)
+   *                     간사는 기밀자료의 등록·수정 실무를 담당한다. */
   function canViewSecret(u) {
     if (!u) return false;
-    if (u.role === 'superadmin' || u.role === 'president' || u.role === 'clerk') return true;
+    if (u.role === 'superadmin' || u.role === 'president' ||
+        u.role === 'clerk' || u.role === 'staff') return true;
     return u.role === 'officer' && !!u.title && u.title.indexOf('부노회장') !== -1;
   }
 
