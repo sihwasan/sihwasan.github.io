@@ -36,7 +36,6 @@
       { t: '자료 목록', h: 'archive.html' },
       { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
       { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
-      { t: '목사·장로 고시', h: 'archive.html#sec-%EA%B3%A0%EC%8B%9C' },
       { t: '고시 모의고사', h: 'exam.html' }
     ]},
     { title: '서류발급', href: 'request.html', sub: [
@@ -102,7 +101,6 @@
       '<a href="committee.html?c=%EA%B3%A0%EC%8B%9C%EA%B7%9C%EC%B9%99%EB%B6%80">고시규칙부</a>' +
       '<a href="exam-admin.html">모의고사 응시 관리</a>' +
       '<a href="exam.html">모의고사 보기</a>' +
-      '<a href="archive.html#sec-%EA%B3%A0%EC%8B%9C">고시집</a>' +
       '</div>';
     var admin = document.getElementById('gnb-admin');
     if (admin) list.insertBefore(li, admin); else list.appendChild(li);
