@@ -51,14 +51,36 @@
     { title: '임원방', href: 'officer.html', sub: [
       { t: '임원 자료실', h: 'officer.html' },
       { t: '노회 회의록', h: 'minutes.html' },
-      { t: '회칙 개정 반영', h: 'rules-edit.html' },
-      { t: '서류 발급', h: 'documents.html' },
-      { t: '홈페이지 설정', h: 'settings.html' },
-      { t: '회원 관리', h: 'admin.html' },
-      { t: '사이트 관리', h: 'manage.html' },
-      { t: '시스템 운영', h: 'ops.html' }
+      { t: '서류 발급', h: 'documents.html' }
     ]}
   ];
+
+  /* 관리자(노회장·서기·간사)에게만 보이는 메뉴.
+   * 홈페이지를 고치는 일은 모두 여기에 모아 둔다. */
+  var ADMIN_NAV = { title: '관리자', href: 'settings.html', sub: [
+    { t: '홈페이지 설정', h: 'settings.html' },
+    { t: '사이트 관리', h: 'manage.html' },
+    { t: '회원 관리', h: 'admin.html' },
+    { t: '회칙 개정 반영', h: 'rules-edit.html' },
+    { t: '자료실 관리', h: 'archive-edit.html' },
+    { t: '서류 발급', h: 'documents.html' },
+    { t: '시스템 운영', h: 'ops.html' },
+    { t: '감독 (감사 기록)', h: 'audit.html' }
+  ]};
+
+  function addAdminMenu() {
+    var list = document.querySelector('.gnb-list');
+    if (!list || document.getElementById('gnb-admin')) return;
+    var here = location.pathname.split('/').pop() || 'index.html';
+    var active = ADMIN_NAV.sub.filter(function (s) { return s.h === here; }).length ? ' active' : '';
+    var li = document.createElement('li');
+    li.className = 'gnb-item gnb-admin' + active;
+    li.id = 'gnb-admin';
+    li.innerHTML = '<a href="' + ADMIN_NAV.href + '">' + ADMIN_NAV.title + '</a><div class="gnb-sub">' +
+      ADMIN_NAV.sub.map(function (s) { return '<a href="' + s.h + '">' + s.t + '</a>'; }).join('') +
+      '</div>';
+    list.appendChild(li);
+  }
 
   /* 화면 표기용 등급 이름
    * 노회장·서기·간사는 '관리자'로 통일 표기한다.
@@ -239,6 +261,24 @@
           if (lo) lo.addEventListener('click', window.SHSLogout);
           loadUnread();
         }
+
+        /* 정기노회가 다가오면 알림을 내보낸다.
+         * 홈페이지에 아무나 들어와도 하루 한 번만 조용히 확인하며,
+         * 이미 보낸 알림은 서버에서 다시 보내지 않는다. */
+        try {
+          var remKey = 'shs_rem_' + new Date().toISOString().slice(0, 10);
+          if (!localStorage.getItem(remKey)) {
+            localStorage.setItem(remKey, '1');
+            SHSCloud.init().then(function (c) {
+              return c.rpc('run_reminders');
+            }).then(function () {
+              loadUnread();
+            }, function () {});
+          }
+        } catch (x) {}
+
+        /* 관리자에게 관리자 메뉴를 붙인다 */
+        if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) addAdminMenu();
 
         /* 아직 성명·소속 교회를 등록하지 않은 회원은 등록 화면으로 안내한다. */
         var here = location.pathname.split('/').pop() || 'index.html';

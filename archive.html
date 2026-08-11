@@ -16,46 +16,12 @@
 </div>
 
 <div class="page-body container">
-
-  <div class="notice-banner">
-    자료실의 일부 자료는 <strong>정회원(노회 소속 목사·총대 장로)</strong> 로그인 후 열람할 수 있습니다.
-    임원회 내부 자료는 <a href="officer.html"><strong>임원방</strong></a>에서 열람하시기 바랍니다.
-  </div>
-
-  <h2>자료 목록</h2>
-  <table class="tbl">
-    <thead><tr><th style="width:70px">번호</th><th style="width:100px">분류</th><th>제목</th><th style="width:110px">등록일</th><th style="width:90px">열람</th></tr></thead>
-    <tbody id="archive-body"></tbody>
-  </table>
-
-  <h2 id="resolutions">지난 회기 결의사항</h2>
-  <div id="resolution-area"></div>
-
-  <h2 id="forms">구비서류 안내</h2>
-  <p>노회에 청원할 때에는 노회규칙 제36조에 따라 규정된 서식대로 당회장이 시찰회에 제출하여 진단받은 후 노회 서기에게 접수하여야 합니다. 주요 청원별 구비서류는 다음과 같습니다.</p>
-  <table class="tbl">
-    <thead><tr><th style="width:220px">청원 구분</th><th>구비서류</th></tr></thead>
-    <tbody>
-      <tr><td>청빙 청원 (위임·시무목사)</td><td class="left">당회장 청원서 2통, 교인 청빙서(서명날인) 2통, 공동의회록 사본 2통</td></tr>
-      <tr><td>청빙 청원 (부목사·부목사 계속)</td><td class="left">당회장 청원서 1통, 당회록 사본 1통</td></tr>
-      <tr><td>목사고시 청원</td><td class="left">본인 청원서·당회장 추천서 1통, 강도사 인허증 사본 1통, 사진 첨부 이력서 1통, 가족관계증명서 1통</td></tr>
-      <tr><td>장로고시 청원</td><td class="left">본인 청원서·당회장 추천서 1통, 공동의회록 1통, 사진 첨부 이력서 1통, 가족관계증명서 1통, 성경통신과 수료증 사본 1통</td></tr>
-      <tr><td>전도사고시 청원</td><td class="left">본인 청원서·당회장 청원서 1통, 사진 첨부 이력서 1통, 졸업(예정)증명서 1통</td></tr>
-      <tr><td>신학입학 추천 청원</td><td class="left">본인 청원서·당회장 청원서 1통, 졸업증명서 1통, 사진 첨부 이력서 1통, 목사후보생고시 합격증 사본 1통</td></tr>
-      <tr><td>당회조직·장로증원 청원</td><td class="left">당회장 청원서 1통</td></tr>
-      <tr><td>교회가입 청원</td><td class="left">임시당회장 가입청원서 1통, 설립자 및 교인 서명 1통, 공동의회록 사본 1통</td></tr>
-      <tr><td>교회주소·명칭 변경 청원</td><td class="left">당회장 청원서 1통(사유 첨부), 공동의회록 사본 1통</td></tr>
-      <tr><td>이명이래 청원</td><td class="left">본인 청원서 1통, (강도사·목사후보생) 당회장 청원서 1통, 사진 첨부 이력서 1통, 가족관계증명서 1통</td></tr>
-      <tr><td>이명이거 청원</td><td class="left">본인 청원서 1통, (강도사·목사후보생) 당회장 청원서 1통</td></tr>
-      <tr><td>각종 연기 청원</td><td class="left">당회장 청원서 1통 (목사위임·장로고시·장로장립, 한 노회기에 한하여 연기 가능)</td></tr>
-      <tr><td>목사 시무 사면 청원</td><td class="left">본인 청원서 1통</td></tr>
-    </tbody>
-  </table>
-
+  <div id="ar-area"><p style="color:var(--gray-5)">자료를 불러오는 중...</p></div>
 </div>
 
 <script src="js/auth.js"></script>
 <script src="js/data.js"></script>
+<script src="js/forms-guide.js"></script>
 <script src="private/resolutions.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
@@ -63,96 +29,256 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
+  var area = document.getElementById('ar-area');
   var e = SHS.esc;
 
-  /* 자료실은 정회원 전용 */
-  var mgate = SHS.memberGate(user, '자료실');
-  if (mgate) {
-    document.querySelector('.page-body').innerHTML = mgate;
-    return;
-  }
-  SHS.logAction('view', '자료실 열람', '자료 목록 열람');
+  var isMember = SHS.isActiveMember(user);
+  var isOfficer = SHSAuth.isOfficer(user);
+  var canManage = user && SHSAuth.canManageMembers(user);
 
-  var tb = document.getElementById('archive-body');
-  SHSData.archives.forEach(function (a, i) {
-    var canView = a.officerOnly ? SHSAuth.isOfficer(user) : (a.memberOnly ? SHSAuth.isMember(user) : true);
-    var badge = a.officerOnly ? ' <span class="badge-locked">임원</span>' :
-                (a.memberOnly ? ' <span class="badge-locked">정회원</span>' : '');
-    var lockMsg = a.officerOnly ? '노회 임원만 열람할 수 있습니다.' :
-                  '정회원 로그인 후 열람할 수 있습니다.';
-    var title = (canView && a.href)
-      ? '<a href="' + a.href + '" style="color:var(--navy);text-decoration:underline">' + e(a.title) + '</a>'
-      : e(a.title);
-    var status;
-    if (canView) {
-      status = a.href ? '<a href="' + a.href + '" style="color:var(--navy);text-decoration:underline">바로가기</a>'
-                      : ((a.memberOnly || a.officerOnly) ? '열람 가능' : '공개');
-    } else {
-      status = user ? '권한 없음' : '<a href="login.html" style="color:var(--navy);text-decoration:underline">로그인</a>';
-    }
-    tb.insertAdjacentHTML('beforeend',
-      '<tr><td>' + (SHSData.archives.length - i) + '</td>' +
-      '<td>' + a.type + '</td>' +
-      '<td class="left">' + title + badge +
-      '<div style="font-size:0.82rem;color:var(--gray-5);margin-top:2px">' + (canView ? e(a.desc) : lockMsg) + '</div></td>' +
-      '<td>' + a.date + '</td>' +
-      '<td>' + status + '</td></tr>');
-  });
+  /* 분류. 순서대로 위쪽 띠에 나타난다. */
+  var SECTIONS = [
+    { key: '회의록',   desc: '역대 정기노회 회의록입니다.' },
+    { key: '회의자료', desc: '정기노회 회의순서, 각 부 보고서 등 회의에 쓰인 자료입니다.' },
+    { key: '결의사항', desc: '정기노회와 임원회에서 결의한 내용입니다.' },
+    { key: '규칙',     desc: '노회규칙 전문입니다.' },
+    { key: '내규',     desc: '각 위원회와 부서의 내규입니다.' },
+    { key: '서식',     desc: '노회에 올리는 각종 청원 서식입니다.' }
+  ];
 
-  var area = document.getElementById('resolution-area');
-  if (!SHSAuth.isMember(user)) {
-    area.innerHTML =
-      '<div class="notice-banner">지난 회기 결의사항은 <strong>정회원 전용</strong> 자료입니다. ' +
-      (user ? '현재 승인대기 상태입니다. 서기·간사의 확인 후 열람할 수 있습니다.'
-            : '노회 소속 목사와 총대 장로께서는 로그인 후 열람하시기 바랍니다. ' +
-              '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
-      '</div>';
-    return;
+  function accessLabel(a) {
+    return a === 'officer' ? '임원' : (a === 'member' ? '정회원' : '');
   }
-  function renderResolutions(resolutions, agenda) {
-    var html = '';
-    resolutions.forEach(function (r) {
-      var items = '';
-      r.items.forEach(function (it, i) { items += '<li>' + (i + 1) + '. ' + e(it) + '</li>'; });
-      html += '<div class="side-box" style="margin-bottom:18px"><div class="box-head">' + e(r.session) + '</div>' +
-        '<div class="box-body"><ol style="list-style:none">' + items + '</ol></div></div>';
-    });
-    if (agenda && agenda.length) {
-      html += '<h3>제19회 정기노회 주요 헌의안건</h3><div class="side-box"><div class="box-body"><ol style="list-style:none">';
-      agenda.forEach(function (a, i) { html += '<li>' + (i + 1) + '. ' + e(a) + '</li>'; });
-      html += '</ol></div></div>';
-    }
-    area.innerHTML = html;
-    SHS.logAction('view', '결의사항 열람', '자료실에서 지난 회기 결의사항 열람');
+  function canOpen(a) {
+    if (a === 'officer') return isOfficer;
+    if (a === 'member') return isMember;
+    return true;
   }
 
-  /* 로컬 파일(내부 컴퓨터)이 있으면 그것을, 없으면 서버(정회원 인증)에서 불러온다. */
-  if (SHSData.resolutions && SHSData.resolutions.length) {
-    renderResolutions(SHSData.resolutions, SHSData.agenda || []);
-    return;
-  }
-  if (window.SHSCloud && SHSCloud.enabled() && user && user.cloud) {
-    SHSCloud.init().then(function (c) {
-      return c.from('archive_docs').select('*').in('key', ['resolutions', 'agenda']);
-    }).then(function (r) {
-      var rows = (r && r.data) || [];
-      var res = null, ag = null;
-      rows.forEach(function (row) {
-        if (row.key === 'resolutions') res = row.content;
-        if (row.key === 'agenda') ag = row.content;
-      });
-      if (res && res.length) {
-        renderResolutions(res, ag || []);
+  function itemRows(list) {
+    if (!list.length) return '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>';
+    var h = '<table class="tbl"><thead><tr><th style="width:70px">번호</th><th>제목</th>' +
+      '<th style="width:110px">등록일</th><th style="width:110px">열람</th></tr></thead><tbody>';
+    list.forEach(function (a, i) {
+      var ok = canOpen(a.access);
+      var badge = accessLabel(a.access)
+        ? ' <span class="badge-locked">' + accessLabel(a.access) + '</span>' : '';
+      var title = (ok && a.link_url)
+        ? '<a href="' + e(a.link_url) + '" style="color:var(--navy);text-decoration:underline">' + e(a.title) + '</a>'
+        : e(a.title);
+      var status;
+      if (ok) {
+        if (a.file_path) status = '<button class="btn ghost sm" data-arfile="' + a.id + '">내려받기</button>';
+        else if (a.link_url) status = '<a href="' + e(a.link_url) + '" style="color:var(--navy);text-decoration:underline">바로가기</a>';
+        else status = accessLabel(a.access) ? '열람 가능' : '공개';
       } else {
-        area.innerHTML = '<div class="notice-banner">결의사항 자료가 아직 서버에 등록되지 않았습니다. ' +
-          '노회 사무실(031-486-9993)로 문의해 주세요.</div>';
+        status = user ? '권한 없음'
+                      : '<a href="login.html" style="color:var(--navy);text-decoration:underline">로그인</a>';
       }
+      var note = ok ? e(a.description || '')
+                    : (a.access === 'officer' ? '노회 임원만 열람할 수 있습니다.'
+                                              : '정회원 로그인 후 열람할 수 있습니다.');
+      h += '<tr><td>' + (list.length - i) + '</td>' +
+        '<td class="left">' + title + badge +
+        '<div style="font-size:0.82rem;color:var(--gray-5);margin-top:2px">' + note + '</div></td>' +
+        '<td>' + e(a.doc_date || '') + '</td><td>' + status + '</td></tr>';
     });
+    return h + '</tbody></table>';
+  }
+
+  /* ---------- 구비서류 안내 (말풍선 설명) ---------- */
+  function formsHtml() {
+    var h = '<h2 id="sec-구비서류-안내">구비서류 안내</h2>' +
+      '<p>노회에 청원할 때에는 노회규칙 제36조에 따라 규정된 서식대로 <strong>당회장이 시찰회에 제출하여 진단받은 후</strong> ' +
+      '노회 서기에게 접수하여야 합니다.</p>' +
+      '<p style="font-size:0.86rem;color:var(--gray-5)">청원 이름에 마우스를 올리시면 ' +
+      '그 청원이 무엇이고 언제 하는 것인지 설명이 나타납니다. (휴대폰에서는 눌러 주세요)</p>' +
+      '<table class="tbl"><thead><tr><th style="width:230px">청원 구분</th><th>구비서류</th></tr></thead><tbody>';
+    SHSForms.list.forEach(function (f, i) {
+      h += '<tr><td class="left">' +
+        '<span class="hint-word" data-form="' + i + '" tabindex="0">' + e(f.name) + '</span>' +
+        '</td><td class="left">' + e(f.papers) + '</td></tr>';
+    });
+    return h + '</tbody></table><div id="ar-tip" class="hint-bubble" hidden></div>';
+  }
+
+  function bindForms() {
+    var tip = document.getElementById('ar-tip');
+    if (!tip) return;
+
+    function show(el) {
+      var f = SHSForms.list[+el.dataset.form];
+      if (!f) return;
+      tip.innerHTML = '<strong>' + e(f.name) + '</strong>' +
+        '<p><span class="hint-tag">무엇인가</span>' + f.what + '</p>' +
+        '<p><span class="hint-tag">언제 하나</span>' + f.when + '</p>';
+      tip.hidden = false;
+      var r = el.getBoundingClientRect();
+      var top = r.bottom + window.scrollY + 6;
+      var left = r.left + window.scrollX;
+      tip.style.top = top + 'px';
+      /* 화면 밖으로 넘어가지 않도록 왼쪽으로 당긴다 */
+      tip.style.left = Math.max(8, Math.min(left, window.innerWidth - tip.offsetWidth - 16)) + 'px';
+    }
+    function hide() { tip.hidden = true; }
+
+    area.querySelectorAll('.hint-word').forEach(function (el) {
+      el.addEventListener('mouseenter', function () { show(el); });
+      el.addEventListener('mouseleave', hide);
+      el.addEventListener('focus', function () { show(el); });
+      el.addEventListener('blur', hide);
+      el.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (!tip.hidden && tip.dataset.for === el.dataset.form) { hide(); return; }
+        tip.dataset.for = el.dataset.form;
+        show(el);
+      });
+    });
+    document.addEventListener('click', hide);
+    window.addEventListener('scroll', hide, { passive: true });
+  }
+
+  /* ---------- 노회 회의결의 ---------- */
+  function resolutionsHtml(rows) {
+    if (!isMember) {
+      return '<h2>결의사항</h2>' +
+        '<div class="notice-banner">노회 회의결의는 <strong>정회원 전용</strong> 자료입니다. ' +
+        (user ? '현재 승인대기 상태입니다. 서기·간사의 확인 후 열람할 수 있습니다.'
+              : '노회 소속 목사와 총대 장로께서는 로그인 후 열람하시기 바랍니다. ' +
+                '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
+        '</div>';
+    }
+    var h = '<h2>결의사항</h2>' +
+      '<p style="color:var(--gray-5);font-size:0.88rem">회기를 누르시면 그 회기의 결의 내용이 펼쳐집니다.</p>' +
+      '<div class="board-controls" style="margin-bottom:14px">' +
+      '<span style="color:var(--gray-7);font-size:0.88rem">전체 ' + rows.length + '건</span>' +
+      '<input type="text" id="rs-q" placeholder="회기·내용 검색"></div>' +
+      '<div id="rs-list"></div>';
+    return h;
+  }
+
+  function drawResolutions(rows) {
+    var box = document.getElementById('rs-list');
+    if (!box) return;
+    var q = (document.getElementById('rs-q').value || '').trim();
+    var list = rows.filter(function (r) {
+      if (!q) return true;
+      return ((r.session || '') + (r.president || '') + (r.place || '') + (r.items || '')).indexOf(q) !== -1;
+    });
+    if (!list.length) {
+      box.innerHTML = '<p style="color:var(--gray-5)">해당하는 결의가 없습니다.</p>';
+      return;
+    }
+    box.innerHTML = list.map(function (r, i) {
+      var items = String(r.items || '').split('\n')
+        .map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+      return '<div class="res-row">' +
+        '<button class="res-head" data-res="' + i + '">' +
+        '<span class="res-title">' + e(r.session) + '</span>' +
+        '<span class="res-meta">' +
+        (r.year ? '<span><strong>연도</strong> ' + e(r.year) + '</span>' : '') +
+        (r.president ? '<span><strong>노회장</strong> ' + e(r.president) + '</span>' : '') +
+        (r.place ? '<span><strong>장소</strong> ' + e(r.place) + '</span>' : '') +
+        '</span></button>' +
+        '<div class="res-body" hidden><ol style="list-style:none">' +
+        items.map(function (it, k) { return '<li>' + (k + 1) + '. ' + e(it) + '</li>'; }).join('') +
+        '</ol></div></div>';
+    }).join('');
+
+    box.querySelectorAll('.res-head').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var body = b.nextElementSibling;
+        body.hidden = !body.hidden;
+        b.classList.toggle('open', !body.hidden);
+      });
+    });
+  }
+
+  /* ---------- 화면 그리기 ---------- */
+  function draw(items, resolutions) {
+    var html = '<div class="notice-banner">자료실의 일부 자료는 <strong>정회원(노회 소속 목사·총대 장로)</strong> ' +
+      '로그인 후 열람할 수 있습니다. 임원회 내부 자료는 <a href="officer.html"><strong>임원방</strong></a>에서 ' +
+      '열람하시기 바랍니다.' +
+      (canManage ? ' <a class="btn sm" style="margin-left:10px" href="archive-edit.html">자료 관리</a>' : '') +
+      '</div>';
+
+    SECTIONS.forEach(function (s) {
+      var list = items.filter(function (a) { return a.section === s.key; });
+      if (s.key === '결의사항') {
+        html += resolutionsHtml(resolutions);
+        if (list.length) {
+          html += '<h3 style="margin-top:22px">관련 자료</h3>' + itemRows(list);
+        }
+        return;
+      }
+      html += '<h2>' + e(s.key) + '</h2>' +
+        '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>' + itemRows(list);
+      if (s.key === '서식') html += formsHtml();
+    });
+
+    area.innerHTML = html;
+    SHS.sectionize(area);
+    bindForms();
+
+    if (isMember) {
+      drawResolutions(resolutions);
+      var q = document.getElementById('rs-q');
+      if (q) q.addEventListener('input', function () { drawResolutions(resolutions); });
+    }
+
+    /* 첨부파일 내려받기 */
+    area.querySelectorAll('button[data-arfile]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var a = items.filter(function (x) { return String(x.id) === b.dataset.arfile; })[0];
+        if (!a) return;
+        SHSCloud.init().then(function (c) {
+          return c.storage.from('archive-files').createSignedUrl(a.file_path, 60);
+        }).then(function (r) {
+          if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
+          SHS.logAction('view', '자료 내려받기', '[' + a.section + '] ' + a.title);
+          window.open(r.data.signedUrl, '_blank');
+        });
+      });
+    });
+
+    SHS.logAction('view', '자료실 열람', '자료 목록 열람');
+  }
+
+  /* ---------- 자료 불러오기 ---------- */
+  function fallbackItems() {
+    return (SHSData.archives || []).map(function (a, i) {
+      return {
+        id: 'local' + i, section: a.type || '회의자료', title: a.title,
+        description: a.desc, doc_date: a.date, link_url: a.href || null,
+        access: a.officerOnly ? 'officer' : (a.memberOnly ? 'member' : 'public'),
+        sort: i
+      };
+    });
+  }
+  function fallbackResolutions() {
+    return (SHSData.resolutions || []).map(function (r, i) {
+      return { id: 'l' + i, session: r.session, items: (r.items || []).join('\n') };
+    });
+  }
+
+  if (!(window.SHSCloud && SHSCloud.enabled())) {
+    draw(fallbackItems(), fallbackResolutions());
     return;
   }
-  area.innerHTML =
-    '<div class="notice-banner">결의사항 자료는 보안을 위해 인터넷 홈페이지에 직접 게시하지 않습니다. ' +
-    '현재는 노회 사무실(031-486-9993)에서 열람하실 수 있습니다.</div>';
+
+  SHSCloud.init().then(function (c) {
+    return Promise.all([
+      c.from('archive_items').select('*').order('sort', { ascending: false }).order('id', { ascending: false }),
+      isMember ? c.from('resolutions').select('*').order('sort', { ascending: false }).order('id', { ascending: false })
+               : Promise.resolve({ data: [] })
+    ]);
+  }).then(function (rs) {
+    var items = (rs[0] && rs[0].data && rs[0].data.length) ? rs[0].data : fallbackItems();
+    var res = (rs[1] && rs[1].data && rs[1].data.length) ? rs[1].data : fallbackResolutions();
+    draw(items, res);
+  }).catch(function () {
+    draw(fallbackItems(), fallbackResolutions());
+  });
  });
 });
 </script>

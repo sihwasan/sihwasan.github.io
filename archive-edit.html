@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자료실 관리 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>자료실 관리</h1>
+    <div class="crumb">홈 &gt; 관리자 &gt; 자료실 관리</div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <div id="ae-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('ae-area');
+  var e = SHS.esc;
+
+  var SECTIONS = ['회의록', '회의자료', '결의사항', '규칙', '내규', '서식'];
+  var ACCESS = [
+    { v: 'public',  t: '공개 (누구나)' },
+    { v: 'member',  t: '정회원' },
+    { v: 'officer', t: '임원' }
+  ];
+
+  if (!user || !SHSAuth.canManageMembers(user)) {
+    area.innerHTML =
+      '<div class="notice-banner">자료실 관리는 <strong>관리자 등급(노회장·서기·간사)</strong>이 이용할 수 있습니다.' +
+      (user ? ' 현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 이용할 수 없습니다.'
+            : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') + '</div>';
+    return;
+  }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">자료실 관리는 서버 로그인 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var tab = 'items';
+  var items = [], reso = [];
+  var newFile = null;
+  function db() { return SHSCloud.init(); }
+
+  function load() {
+    db().then(function (c) {
+      return Promise.all([
+        c.from('archive_items').select('*').order('section').order('sort', { ascending: false }),
+        c.from('resolutions').select('*').order('sort', { ascending: false }).order('id', { ascending: false })
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) {
+        area.innerHTML = '<div class="notice-banner">자료를 불러오지 못했습니다: ' + e(rs[0].error.message) +
+          ' (17 자료실 정비 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      items = rs[0].data || [];
+      reso = (rs[1] && rs[1].data) || [];
+      draw();
+    });
+  }
+
+  function draw() {
+    var h = '<div class="notice-banner">여기서 고친 내용은 <strong>자료실</strong>에 바로 반영됩니다. ' +
+      '모든 변경은 감사 기록에 남습니다. ' +
+      '<a href="archive.html" target="_blank" style="color:var(--navy);text-decoration:underline">자료실 보기</a></div>' +
+      '<div class="tabs" id="ae-tabs">' +
+      '<button class="' + (tab === 'items' ? 'active' : '') + '" data-t="items">자료 목록</button>' +
+      '<button class="' + (tab === 'reso' ? 'active' : '') + '" data-t="reso">노회 회의결의</button>' +
+      '</div><div id="ae-body"></div>';
+    area.innerHTML = h;
+    area.querySelectorAll('#ae-tabs button').forEach(function (b) {
+      b.addEventListener('click', function () { tab = b.dataset.t; draw(); });
+    });
+    if (tab === 'items') drawItems(); else drawReso();
+  }
+
+  function opts(list, v, keyv, keyt) {
+    return list.map(function (x) {
+      var val = keyv ? x[keyv] : x, txt = keyt ? x[keyt] : x;
+      return '<option value="' + e(val) + '"' + (val === v ? ' selected' : '') + '>' + e(txt) + '</option>';
+    }).join('');
+  }
+
+  /* ---------- 자료 목록 ---------- */
+  function drawItems() {
+    var box = document.getElementById('ae-body');
+    var h = '<div class="admin-card" style="margin-bottom:18px"><h3 style="margin-top:0">자료 추가</h3>' +
+      '<div class="inline-form" style="margin-bottom:6px">' +
+      '<div class="field" style="flex:0 0 130px"><label>분류</label><select id="n-sec">' + opts(SECTIONS, '회의자료') + '</select></div>' +
+      '<div class="field"><label>제목</label><input type="text" id="n-title"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>등록일</label><input type="date" id="n-date" value="' +
+      new Date().toISOString().slice(0, 10) + '"></div>' +
+      '<div class="field" style="flex:0 0 150px"><label>열람 범위</label><select id="n-acc">' +
+      opts(ACCESS, 'member', 'v', 't') + '</select></div>' +
+      '</div>' +
+      '<div class="field"><label>설명</label><input type="text" id="n-desc"></div>' +
+      '<div class="field"><label>바로가기 주소 (선택)</label><input type="text" id="n-link" placeholder="rules-presbytery.html 처럼 홈페이지 안의 주소도 됩니다"></div>' +
+      '<div class="field"><label>첨부파일 (선택)</label><input type="file" id="n-file"></div>' +
+      '<button class="btn" id="n-add">추가</button><div class="form-msg" id="n-msg"></div></div>';
+
+    SECTIONS.forEach(function (sec) {
+      var list = items.filter(function (a) { return a.section === sec; });
+      h += '<h3 style="margin-top:26px">' + e(sec) + ' (' + list.length + ')</h3>';
+      if (!list.length) { h += '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>'; return; }
+      h += '<table class="tbl"><thead><tr><th>제목·설명</th><th style="width:120px">분류</th>' +
+        '<th style="width:140px">열람 범위</th><th style="width:140px">등록일</th>' +
+        '<th style="width:150px">관리</th></tr></thead><tbody>';
+      list.forEach(function (a) {
+        h += '<tr data-ai="' + a.id + '">' +
+          '<td class="left"><input type="text" data-af="title" value="' + e(a.title) + '">' +
+          '<input type="text" data-af="description" value="' + e(a.description || '') + '" style="margin-top:4px;font-size:0.85rem">' +
+          '<input type="text" data-af="link_url" value="' + e(a.link_url || '') + '" placeholder="바로가기 주소" style="margin-top:4px;font-size:0.85rem">' +
+          (a.file_path ? '<div style="font-size:0.8rem;color:var(--gray-5);margin-top:4px">첨부: ' + e(a.file_name || a.file_path) + '</div>' : '') +
+          '</td>' +
+          '<td><select data-af="section">' + opts(SECTIONS, a.section) + '</select></td>' +
+          '<td><select data-af="access">' + opts(ACCESS, a.access, 'v', 't') + '</select></td>' +
+          '<td><input type="date" data-af="doc_date" value="' + e(a.doc_date || '') + '"></td>' +
+          '<td><button class="btn sm" data-asave="' + a.id + '">저장</button> ' +
+          '<button class="btn danger sm" data-adel="' + a.id + '" data-at="' + e(a.title) + '">삭제</button></td>' +
+          '</tr>';
+      });
+      h += '</tbody></table>';
+    });
+    h += '<div class="form-msg" id="ae-msg"></div>';
+    box.innerHTML = h;
+
+    SHS.dropZone(document.getElementById('n-file'), { what: '첨부파일' });
+    document.getElementById('n-file').addEventListener('change', function () { newFile = this.files[0] || null; });
+
+    document.getElementById('n-add').addEventListener('click', function () {
+      var msg = document.getElementById('n-msg');
+      var d = {
+        section: document.getElementById('n-sec').value,
+        title: document.getElementById('n-title').value.trim(),
+        description: document.getElementById('n-desc').value.trim() || null,
+        doc_date: document.getElementById('n-date').value || null,
+        access: document.getElementById('n-acc').value,
+        link_url: document.getElementById('n-link').value.trim() || null,
+        sort: (items.length ? Math.max.apply(null, items.map(function (x) { return Number(x.sort || 0); })) : 0) + 10,
+        updated_at: new Date().toISOString(), updated_by: user.name
+      };
+      if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+
+      db().then(function (c) {
+        var pre = Promise.resolve(null);
+        if (newFile) {
+          var path = 'archive/' + Date.now() + '-' + newFile.name.replace(/[^\w.\-가-힣]/g, '_');
+          pre = c.storage.from('archive-files').upload(path, newFile).then(function (r) {
+            if (r.error) throw r.error;
+            return { file_path: path, file_name: newFile.name };
+          });
+        }
+        return pre.then(function (f) {
+          if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
+          return c.from('archive_items').insert(d);
+        });
+      }).then(function (res) {
+        if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+        SHSCloud.log('create', '자료실 자료 등록', '[' + d.section + '] ' + d.title);
+        newFile = null;
+        load();
+      }).catch(function (err) {
+        msg.className = 'form-msg err';
+        msg.textContent = '저장 실패: ' + (err.message || err);
+      });
+    });
+
+    box.querySelectorAll('button[data-asave]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var tr = b.closest('tr');
+        var msg = document.getElementById('ae-msg');
+        function v(f) { return tr.querySelector('[data-af="' + f + '"]').value.trim(); }
+        var d = {
+          title: v('title'), description: v('description') || null,
+          link_url: v('link_url') || null, section: v('section'),
+          access: v('access'), doc_date: v('doc_date') || null,
+          updated_at: new Date().toISOString(), updated_by: user.name
+        };
+        if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목은 비울 수 없습니다.'; return; }
+        msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+        db().then(function (c) {
+          return c.from('archive_items').update(d).eq('id', b.dataset.asave);
+        }).then(function (res) {
+          if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+          SHSCloud.log('update', '자료실 자료 수정', '[' + d.section + '] ' + d.title);
+          msg.className = 'form-msg ok';
+          msg.textContent = '저장되었습니다. 자료실에 반영되었습니다.';
+          load();
+        });
+      });
+    });
+
+    box.querySelectorAll('button[data-adel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('"' + b.dataset.at + '" 자료를 삭제하시겠습니까?')) return;
+        var a = items.filter(function (x) { return String(x.id) === b.dataset.adel; })[0];
+        db().then(function (c) {
+          var pre = (a && a.file_path)
+            ? c.storage.from('archive-files').remove([a.file_path]).catch(function () {})
+            : Promise.resolve();
+          return pre.then(function () { return c.from('archive_items').delete().eq('id', b.dataset.adel); });
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('delete', '자료실 자료 삭제', b.dataset.at);
+          load();
+        });
+      });
+    });
+  }
+
+  /* ---------- 노회 회의결의 ---------- */
+  function drawReso() {
+    var box = document.getElementById('ae-body');
+    var KINDS = ['정기노회', '임시노회', '임원회'];
+    var h = '<div class="notice-banner">여기에 담긴 결의는 <strong>정회원만</strong> 열람할 수 있습니다. ' +
+      '결의 내용은 <strong>한 줄에 한 항목</strong>씩 적어 주세요.</div>';
+
+    h += '<div class="admin-card" style="margin-bottom:18px"><h3 style="margin-top:0">회기 추가</h3>' +
+      '<div class="inline-form" style="margin-bottom:6px">' +
+      '<div class="field" style="flex:0 0 90px"><label>회기</label><input type="number" id="r-seq" placeholder="19"></div>' +
+      '<div class="field" style="flex:0 0 120px"><label>구분</label><select id="r-kind">' + opts(KINDS, '정기노회') + '</select></div>' +
+      '<div class="field"><label>회기 이름</label><input type="text" id="r-session" placeholder="제19회 정기노회(봄)"></div>' +
+      '<div class="field" style="flex:0 0 100px"><label>연도</label><input type="number" id="r-year" value="' +
+      new Date().getFullYear() + '"></div>' +
+      '</div>' +
+      '<div class="inline-form" style="margin-bottom:6px">' +
+      '<div class="field"><label>노회장</label><input type="text" id="r-pres"></div>' +
+      '<div class="field"><label>장소</label><input type="text" id="r-place"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>회집일</label><input type="date" id="r-held"></div>' +
+      '</div>' +
+      '<div class="field"><label>결의 내용 (한 줄에 한 항목)</label><textarea id="r-items" rows="5"></textarea></div>' +
+      '<button class="btn" id="r-add">추가</button><div class="form-msg" id="r-msg"></div></div>';
+
+    if (!reso.length) {
+      h += '<p style="color:var(--gray-5)">등록된 회기가 없습니다.</p>';
+    } else {
+      reso.forEach(function (r) {
+        h += '<div class="admin-card" style="margin-bottom:14px" data-ri="' + r.id + '">' +
+          '<div class="inline-form" style="margin-bottom:6px">' +
+          '<div class="field" style="flex:0 0 90px"><label>회기</label><input type="number" data-rf="seq" value="' + e(r.seq == null ? '' : r.seq) + '"></div>' +
+          '<div class="field" style="flex:0 0 120px"><label>구분</label><select data-rf="kind">' + opts(KINDS, r.kind) + '</select></div>' +
+          '<div class="field"><label>회기 이름</label><input type="text" data-rf="session" value="' + e(r.session) + '"></div>' +
+          '<div class="field" style="flex:0 0 100px"><label>연도</label><input type="number" data-rf="year" value="' + e(r.year == null ? '' : r.year) + '"></div>' +
+          '</div>' +
+          '<div class="inline-form" style="margin-bottom:6px">' +
+          '<div class="field"><label>노회장</label><input type="text" data-rf="president" value="' + e(r.president || '') + '"></div>' +
+          '<div class="field"><label>장소</label><input type="text" data-rf="place" value="' + e(r.place || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 160px"><label>회집일</label><input type="date" data-rf="held_on" value="' + e(r.held_on || '') + '"></div>' +
+          '</div>' +
+          '<div class="field"><label>결의 내용 (한 줄에 한 항목)</label>' +
+          '<textarea data-rf="items" rows="' + Math.min(16, Math.max(3, String(r.items || '').split('\n').length + 1)) + '">' +
+          e(r.items || '') + '</textarea></div>' +
+          '<button class="btn sm" data-rsave="' + r.id + '">저장</button> ' +
+          '<button class="btn danger sm" data-rdel="' + r.id + '" data-rt="' + e(r.session) + '">삭제</button>' +
+          '<div class="form-msg" data-rmsg="' + r.id + '"></div></div>';
+      });
+    }
+    box.innerHTML = h;
+
+    document.getElementById('r-add').addEventListener('click', function () {
+      var msg = document.getElementById('r-msg');
+      var d = {
+        seq: Number(document.getElementById('r-seq').value) || null,
+        kind: document.getElementById('r-kind').value,
+        session: document.getElementById('r-session').value.trim(),
+        year: Number(document.getElementById('r-year').value) || null,
+        president: document.getElementById('r-pres').value.trim() || null,
+        place: document.getElementById('r-place').value.trim() || null,
+        held_on: document.getElementById('r-held').value || null,
+        items: document.getElementById('r-items').value.trim(),
+        sort: (reso.length ? Math.max.apply(null, reso.map(function (x) { return Number(x.sort || 0); })) : 0) + 10,
+        updated_at: new Date().toISOString(), updated_by: user.name
+      };
+      if (!d.session) { msg.className = 'form-msg err'; msg.textContent = '회기 이름을 입력해 주세요.'; return; }
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      db().then(function (c) { return c.from('resolutions').insert(d); }).then(function (res) {
+        if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+        SHSCloud.log('create', '노회 회의결의 등록', d.session);
+        load();
+      });
+    });
+
+    box.querySelectorAll('button[data-rsave]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var card = b.closest('[data-ri]');
+        var msg = box.querySelector('[data-rmsg="' + b.dataset.rsave + '"]');
+        function v(f) { return card.querySelector('[data-rf="' + f + '"]').value.trim(); }
+        var d = {
+          seq: Number(v('seq')) || null, kind: v('kind'), session: v('session'),
+          year: Number(v('year')) || null, president: v('president') || null,
+          place: v('place') || null, held_on: v('held_on') || null,
+          items: card.querySelector('[data-rf="items"]').value.trim(),
+          updated_at: new Date().toISOString(), updated_by: user.name
+        };
+        if (!d.session) { msg.className = 'form-msg err'; msg.textContent = '회기 이름은 비울 수 없습니다.'; return; }
+        msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+        db().then(function (c) {
+          return c.from('resolutions').update(d).eq('id', b.dataset.rsave);
+        }).then(function (res) {
+          if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+          SHSCloud.log('update', '노회 회의결의 수정', d.session);
+          msg.className = 'form-msg ok';
+          msg.textContent = '저장되었습니다. 자료실에 반영되었습니다.';
+        });
+      });
+    });
+
+    box.querySelectorAll('button[data-rdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('"' + b.dataset.rt + '" 결의를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+        db().then(function (c) {
+          return c.from('resolutions').delete().eq('id', b.dataset.rdel);
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('delete', '노회 회의결의 삭제', b.dataset.rt);
+          load();
+        });
+      });
+    });
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>

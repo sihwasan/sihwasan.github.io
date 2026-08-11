@@ -52,10 +52,12 @@ document.addEventListener('DOMContentLoaded', function () {
     '<button class="active" data-tab="ops-alert">시스템 알림</button>' +
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
     '<button data-tab="ops-sched">운영 일정</button>' +
+    '<button data-tab="ops-meet">정기노회 일정</button>' +
     '</div>' +
     '<div class="tab-panel active" id="ops-alert"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     '<div class="tab-panel" id="ops-manual"></div>' +
-    '<div class="tab-panel" id="ops-sched"></div>';
+    '<div class="tab-panel" id="ops-sched"></div>' +
+    '<div class="tab-panel" id="ops-meet"></div>';
 
   area.querySelectorAll('.tabs button').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -69,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   SHSCloud.init().then(function (c) {
     db = c;
-    loadAlerts(); loadManual(); loadSchedule();
+    loadAlerts(); loadManual(); loadSchedule(); loadMeetings();
   });
 
   /* ---------- 시스템 알림 (현재 표시 중 + 전체 규칙) ---------- */
@@ -248,6 +250,142 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       });
     });
+  }
+
+  /* ---------- 정기노회 일정 (날짜·장소 확정 → 40일 전 알림) ---------- */
+  function loadMeetings() {
+    var box = document.getElementById('ops-meet');
+    db.from('meetings').select('*').order('meet_date', { ascending: true, nullsFirst: false })
+      .then(function (r) {
+        if (r.error) {
+          box.innerHTML = '<div class="notice-banner">정기노회 일정을 불러오지 못했습니다: ' + e(r.error.message) +
+            ' (18 정기노회 서류 알림 등록이 필요할 수 있습니다)</div>';
+          return;
+        }
+        var rows = r.data || [];
+        var KINDS = ['봄 정기노회', '가을 정기노회', '임시노회'];
+        function kindOpts(v) {
+          return KINDS.map(function (k) {
+            return '<option' + (k === v ? ' selected' : '') + '>' + e(k) + '</option>';
+          }).join('');
+        }
+
+        var html = '<h2>정기노회 일정</h2>' +
+          '<div class="notice-banner">날짜와 장소를 적고 <strong>확정</strong>에 표시하면, ' +
+          '그 날로부터 <strong>40일 전부터</strong> 알림이 자동으로 나갑니다.<br>' +
+          '· <strong>시찰장과 서기</strong>에게 — 이번 회기에 접수할 서류 안내<br>' +
+          '· <strong>부목사가 있는 교회의 담임목사</strong>에게 — 부목사 계속 청빙 청원 안내<br>' +
+          '같은 알림이 두 번 가지는 않습니다. (근거: 노회규칙 제36조 서류 제출)</div>';
+
+        rows.forEach(function (m) {
+          var left = '';
+          if (m.meet_date) {
+            var d = Math.round((new Date(m.meet_date + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
+            left = d > 0 ? (d + '일 남음') : (d === 0 ? '오늘' : (-d) + '일 지남');
+          }
+          html += '<div class="admin-card" style="margin-bottom:14px" data-mt="' + m.id + '">' +
+            '<div class="inline-form" style="margin-bottom:6px">' +
+            '<div class="field" style="flex:0 0 150px"><label>구분</label><select data-mf="kind">' + kindOpts(m.kind) + '</select></div>' +
+            '<div class="field" style="flex:0 0 110px"><label>회기 연도</label><input type="number" data-mf="year" value="' + e(m.year == null ? '' : m.year) + '"></div>' +
+            '<div class="field" style="flex:0 0 170px"><label>날짜</label><input type="date" data-mf="meet_date" value="' + e(m.meet_date || '') + '"></div>' +
+            '<div class="field"><label>장소</label><input type="text" data-mf="place" value="' + e(m.place || '') + '" placeholder="예: 반월교회"></div>' +
+            '<div class="field" style="flex:0 0 130px"><label>알림 시작</label><input type="number" data-mf="lead_days" value="' + e(m.lead_days == null ? 40 : m.lead_days) + '"></div>' +
+            '</div>' +
+            '<label style="font-size:0.88rem;font-weight:400;display:block;margin-bottom:10px">' +
+            '<input type="checkbox" data-mf="confirmed" style="width:auto;margin-right:6px"' + (m.confirmed ? ' checked' : '') + '>' +
+            '날짜와 장소가 <strong>확정</strong>되었습니다 (표시하면 알림이 나갑니다)' +
+            (left ? ' <span style="color:var(--gray-5)">— ' + e(left) + '</span>' : '') +
+            '</label>' +
+            '<button class="btn sm" data-msave="' + m.id + '">저장</button> ' +
+            '<button class="btn danger sm" data-mdel="' + m.id + '" data-mk="' + e(m.kind) + '">삭제</button>' +
+            '<div class="form-msg" data-mmsg="' + m.id + '"></div></div>';
+        });
+
+        html += '<div class="admin-card"><h3 style="margin-top:0">일정 추가</h3>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 150px"><label>구분</label><select id="mn-kind">' + kindOpts('봄 정기노회') + '</select></div>' +
+          '<div class="field" style="flex:0 0 110px"><label>회기 연도</label><input type="number" id="mn-year" value="' + new Date().getFullYear() + '"></div>' +
+          '<div class="field" style="flex:0 0 170px"><label>날짜</label><input type="date" id="mn-date"></div>' +
+          '<div class="field"><label>장소</label><input type="text" id="mn-place"></div>' +
+          '<button class="btn" id="mn-add">추가</button>' +
+          '</div><div class="form-msg" id="mn-msg"></div></div>';
+
+        box.innerHTML = html;
+
+        box.querySelectorAll('button[data-msave]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var card = b.closest('[data-mt]');
+            var msg = box.querySelector('[data-mmsg="' + b.dataset.msave + '"]');
+            function v(f) { return card.querySelector('[data-mf="' + f + '"]').value.trim(); }
+            var d = {
+              kind: v('kind'),
+              year: Number(v('year')) || null,
+              meet_date: v('meet_date') || null,
+              place: v('place') || null,
+              lead_days: Number(v('lead_days')) || 40,
+              confirmed: card.querySelector('[data-mf="confirmed"]').checked,
+              updated_at: new Date().toISOString(), updated_by: user.name
+            };
+            if (d.confirmed && (!d.meet_date || !d.place)) {
+              msg.className = 'form-msg err';
+              msg.textContent = '확정하시려면 날짜와 장소를 모두 적어 주세요.';
+              return;
+            }
+            msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+            db.from('meetings').update(d).eq('id', b.dataset.msave).then(function (res) {
+              if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+              SHSCloud.log('update', '정기노회 일정 수정',
+                d.kind + ' ' + (d.meet_date || '') + ' ' + (d.place || '') + (d.confirmed ? ' (확정)' : ''));
+              if (d.confirmed) {
+                db.rpc('run_reminders').then(function (rr) {
+                  var n = (rr && rr.data) || 0;
+                  msg.className = 'form-msg ok';
+                  msg.textContent = n > 0
+                    ? '저장되었습니다. 알림 ' + n + '건을 보냈습니다.'
+                    : '저장되었습니다. (아직 알림 시작일이 되지 않았거나 이미 보낸 알림입니다)';
+                  loadMeetings();
+                }, function () {
+                  msg.className = 'form-msg ok';
+                  msg.textContent = '저장되었습니다.';
+                  loadMeetings();
+                });
+              } else {
+                msg.className = 'form-msg ok';
+                msg.textContent = '저장되었습니다.';
+                loadMeetings();
+              }
+            });
+          });
+        });
+
+        box.querySelectorAll('button[data-mdel]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            if (!confirm('"' + b.dataset.mk + '" 일정을 삭제하시겠습니까?')) return;
+            db.from('meetings').delete().eq('id', b.dataset.mdel).then(function (res) {
+              if (res.error) { alert(res.error.message); return; }
+              SHSCloud.log('delete', '정기노회 일정 삭제', b.dataset.mk);
+              loadMeetings();
+            });
+          });
+        });
+
+        document.getElementById('mn-add').addEventListener('click', function () {
+          var msg = document.getElementById('mn-msg');
+          var d = {
+            kind: document.getElementById('mn-kind').value,
+            year: Number(document.getElementById('mn-year').value) || null,
+            meet_date: document.getElementById('mn-date').value || null,
+            place: document.getElementById('mn-place').value.trim() || null,
+            confirmed: false,
+            updated_at: new Date().toISOString(), updated_by: user.name
+          };
+          db.from('meetings').insert(d).then(function (res) {
+            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+            SHSCloud.log('create', '정기노회 일정 등록', d.kind + ' ' + (d.meet_date || ''));
+            loadMeetings();
+          });
+        });
+      });
   }
 
   /* ---------- 운영 일정 (정기노회 기준일) ---------- */

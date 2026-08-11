@@ -406,6 +406,56 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   padding: 36px;
 }
 .form-card h2 { border: none; padding: 0; text-align: center; margin-bottom: 24px; }
+/* 관리자 전용 메뉴 — 다른 메뉴와 구분되도록 왼쪽에 선을 둔다 */
+.gnb-item.gnb-admin > a { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.22); }
+.gnb-item.gnb-admin > a::after {
+  content: ''; display: block; height: 2px; margin-top: 6px;
+  background: var(--accent, #c8a24a);
+}
+
+/* 서류 설명 말풍선 */
+.hint-word {
+  border-bottom: 1px dotted var(--navy); cursor: help; color: var(--navy);
+  font-weight: 500;
+}
+.hint-word:hover, .hint-word:focus { background: var(--gray-1); outline: none; }
+.hint-bubble {
+  position: absolute; z-index: 60; max-width: 460px;
+  background: #fff; border: 1px solid var(--navy); border-top: 3px solid var(--navy);
+  padding: 14px 16px; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16);
+  font-size: 0.88rem; line-height: 1.62; color: var(--gray-7);
+}
+.hint-bubble strong { display: block; color: var(--navy); margin-bottom: 8px; font-size: 0.95rem; }
+.hint-bubble p { margin: 0 0 8px; }
+.hint-bubble p:last-child { margin-bottom: 0; }
+.hint-tag {
+  display: inline-block; min-width: 62px; margin-right: 6px;
+  font-size: 0.76rem; color: #fff; background: var(--navy);
+  padding: 1px 7px; vertical-align: 1px;
+}
+
+/* 회기별 결의 목록 */
+.res-row { border-bottom: 1px solid var(--gray-2); }
+.res-row:first-child { border-top: 2px solid var(--navy); }
+.res-head {
+  width: 100%; text-align: left; background: #fff; border: none;
+  padding: 18px 34px 18px 4px; cursor: pointer; position: relative;
+}
+.res-head:hover { background: var(--gray-1); }
+.res-head::after {
+  content: ''; position: absolute; right: 12px; top: 50%;
+  width: 8px; height: 8px; margin-top: -6px;
+  border-right: 2px solid var(--gray-5); border-bottom: 2px solid var(--gray-5);
+  transform: rotate(45deg);
+}
+.res-head.open::after { transform: rotate(-135deg); margin-top: -2px; }
+.res-title { display: block; font-size: 1.05rem; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+.res-meta { display: block; font-size: 0.86rem; color: var(--gray-5); }
+.res-meta span { margin-right: 18px; }
+.res-meta strong { color: var(--gray-7); margin-right: 5px; }
+.res-body { padding: 4px 4px 20px; }
+.res-body li { padding: 4px 0; }
+
 /* 파일 끌어다 놓기 상자 */
 .dropzone {
   border: 2px dashed var(--gray-3); background: var(--gray-1);
