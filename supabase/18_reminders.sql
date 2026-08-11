@@ -61,6 +61,7 @@ returns integer language plpgsql security definer set search_path = public as $f
 declare
   m           record;
   v_sent      integer := 0;
+  v_n         integer := 0;
   v_docs      text;
   v_assoc     text;
   v_when      text;
@@ -120,7 +121,8 @@ begin
              select 1 from public.notifications n
               where n.user_id = p.id and n.dedupe_key = 'meet-docs-' || m.id
            );
-    get diagnostics v_sent = row_count;
+    get diagnostics v_n = row_count;
+    v_sent := v_sent + v_n;
 
     -- ---------------------------------------------------------------
     -- (2) 부목사가 있는 교회의 담임목사에게 : 부목사 계속 청빙 청원 안내
@@ -157,7 +159,8 @@ begin
              select 1 from public.notifications n
               where n.user_id = p.id and n.dedupe_key = 'assoc-call-' || m.id
            );
-    get diagnostics v_sent = v_sent + row_count;
+    get diagnostics v_n = row_count;
+    v_sent := v_sent + v_n;
   end loop;
 
   return v_sent;
