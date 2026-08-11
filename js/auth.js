@@ -5,7 +5,7 @@
 
 /* ---------- 감사 로그 (감독 기능) ----------
  * 개인정보 열람, 자료 추가·수정·삭제, 로그인 등 주요 행위를 기록한다.
- * 로그 열람은 최고관리자만 가능하며, 로그는 삭제 기능을 두지 않는다.
+ * 로그 열람은 관리자(노회장·서기·간사)만 가능하며, 로그는 삭제 기능을 두지 않는다.
  */
 var SHSAudit = (function () {
   var KEY = 'shs_audit_v1';
@@ -391,7 +391,7 @@ var SHSAuth = (function () {
 
   /* 승인대기 회원을 정회원으로 설정 */
   function approveMember(actor, id) {
-    if (!canApproveMembers(actor)) return { ok: false, msg: '정회원 승인은 서기, 간사, 최고관리자만 할 수 있습니다.' };
+    if (!canApproveMembers(actor)) return { ok: false, msg: '정회원 승인은 노회장, 서기, 간사만 할 수 있습니다.' };
     var users = loadUsers();
     for (var i = 0; i < users.length; i++) {
       if (users[i].id === id) {
@@ -506,7 +506,7 @@ var SHSAuth = (function () {
   }
 
   function assignRole(actor, id, role) {
-    if (!canAssignRoles(actor)) return { ok: false, msg: '직책 지정은 최고관리자만 할 수 있습니다.' };
+    if (!canAssignRoles(actor)) return { ok: false, msg: '직책을 지정할 권한이 없습니다.' };
     if (!ROLE_NAMES[role]) return { ok: false, msg: '알 수 없는 등급입니다.' };
     var users = loadUsers();
     for (var i = 0; i < users.length; i++) {
@@ -515,7 +515,7 @@ var SHSAuth = (function () {
           /* 최고관리자가 1명뿐이면 강등 금지 */
           var admins = 0;
           for (var j = 0; j < users.length; j++) if (users[j].role === 'superadmin') admins++;
-          if (admins <= 1) return { ok: false, msg: '최고관리자가 1명뿐이므로 등급을 변경할 수 없습니다.' };
+          if (admins <= 1) return { ok: false, msg: '이 계정의 등급은 변경할 수 없습니다.' };
         }
         var before = users[i].role;
         users[i].role = role;

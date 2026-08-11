@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var isSuper = SHSAuth.canAssignRoles(user);
   var canApprove = SHSAuth.canApproveMembers(user);
-  /* 등급 임명 권한: 노회장(서기·간사 등)과 최고관리자(비상시 전체) */
+  /* 등급 임명 권한: 노회장(서기·간사 등)과 운영자 계정(비상시 전체) */
   var canAppoint = isSuper || user.role === 'president';
 
   /* ---------- 서버(구글 로그인) 회원 관리 ---------- */
@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
       var rows = r.data || [];
-      /* 최고관리자 계정은 회원 목록에 표시하지 않는다 */
+      /* 운영자 계정은 회원 목록에 표시하지 않는다 */
       var visible = rows.filter(function (p) { return p.role !== 'superadmin'; });
       var pendings = visible.filter(function (p) { return p.role === 'pending'; });
 
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 임명할 수 있는 등급 목록
    * · 노회장    : 서기·간사 등 관리자와 임원 직책 (노회장 등급은 권한 이양으로만)
-   * · 최고관리자 : 비상시 노회장을 포함해 전부 */
+   * · 운영자 계정 : 비상시 노회장을 포함해 전부 */
   function assignable() {
     if (isSuper) return GRADES;
     return GRADES.filter(function (g) { return g.role !== 'president' && g.role !== 'superadmin'; });
@@ -439,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '</tbody></table>';
     }
 
-    /* 계정 목록 (최고관리자 계정은 회원 목록에 표시하지 않는다) */
+    /* 계정 목록 (운영자 계정은 회원 목록에 표시하지 않는다) */
     var visible = accounts.filter(function (a) {
       return a.role !== 'superadmin';
     });
@@ -454,7 +454,7 @@ document.addEventListener('DOMContentLoaded', function () {
         (a.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(a.title) + '</div>' : '') + '</td>';
       if (isSuper) {
         html += '<td><select data-role-for="' + e(a.id) + '">' +
-          ['pending', 'member', 'officer', 'staff', 'clerk', 'president', 'superadmin'].map(function (r) {
+          ['pending', 'member', 'officer', 'staff', 'clerk', 'president'].map(function (r) {
             return '<option value="' + r + '"' + (a.role === r ? ' selected' : '') + '>' + SHSAuth.roleName(r) + '</option>';
           }).join('') +
           '</select> <button class="btn sm" data-assign="' + e(a.id) + '">적용</button></td>';
