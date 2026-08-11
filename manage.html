@@ -180,8 +180,11 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   }
 
-  /* ---------- 노회 일정 ---------- */
-  /* 날짜는 달력에서 고르고, 화면에 보이는 '10.12' 표시는 자동으로 만든다 */
+  /* ---------- 노회 일정 ----------
+   * 날짜는 달력에서 고른다. 화면에 보이는 '10.12' 표시와 정렬 순서는 자동으로 만든다.
+   * 서버에 event_date 칸이 없어도 동작하며, 있으면 실제 날짜까지 함께 담는다. */
+  var schedHasDate = null;   /* null = 아직 모름 */
+
   function labelOf(ymd) {
     var p = String(ymd || '').split('-');
     return p.length === 3 ? (parseInt(p[1], 10) + '.' + parseInt(p[2], 10)) : '';
@@ -189,50 +192,72 @@ document.addEventListener('DOMContentLoaded', function () {
   function sortOf(ymd) {
     return parseInt(String(ymd || '').replace(/-/g, ''), 10) || 0;
   }
+  /* '3.25' 처럼 적혀 있던 예전 표시를 달력이 알아듣는 형태로 바꾼다 */
+  function guessDate(row) {
+    if (row.event_date) return row.event_date;
+    var m = String(row.date_label || '').match(/^(\d{1,2})\.(\d{1,2})$/);
+    if (!m) return '';
+    var y = new Date().getFullYear();
+    return y + '-' + String(m[1]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
+  }
+
+  /* event_date 칸이 없는 서버에서도 저장되도록 한 번 더 시도한다 */
+  function saveSched(id, ymd, title) {
+    var withDate = { date_label: labelOf(ymd), sort: sortOf(ymd), event_date: ymd || null };
+    var plain = { date_label: labelOf(ymd), sort: sortOf(ymd) };
+    if (title !== undefined) { withDate.title = title; plain.title = title; }
+
+    function run(d) {
+      return id ? db.from('site_schedule').update(d).eq('id', id)
+                : db.from('site_schedule').insert(d);
+    }
+    if (schedHasDate === false) return run(plain);
+    return run(withDate).then(function (res) {
+      if (res.error && /event_date/.test(res.error.message || '')) {
+        schedHasDate = false;
+        return run(plain);
+      }
+      if (!res.error) schedHasDate = true;
+      return res;
+    });
+  }
 
   function loadSchedule() {
     db.from('site_schedule').select('*').order('sort').then(function (r) {
       var box = document.getElementById('mg-sched');
       if (r.error) { box.innerHTML = '<div class="notice-banner">불러오기 실패: ' + e(r.error.message) + '</div>'; return; }
       var rows = r.data || [];
-      var hasDate = rows.filter(function (x) { return x.event_date; }).length > 0 ||
-                    Object.prototype.hasOwnProperty.call(rows[0] || {}, 'event_date');
-
-      var html = '<h2>노회 일정 관리</h2><p>메인 화면 오른쪽 "노회 일정"에 표시됩니다. ' +
-        '달력에서 날짜를 고르시면 <strong>10.12</strong> 같은 표시는 자동으로 만들어집니다.</p>';
-      if (!hasDate) {
-        html += '<div class="notice-banner">달력으로 날짜를 고르시려면 ' +
-          '<strong>supabase/24_schedule_date.sql</strong> 을 먼저 실행해 주세요. ' +
-          '지금은 예전 방식(직접 입력)으로 표시됩니다.</div>';
+      if (rows.length) {
+        schedHasDate = Object.prototype.hasOwnProperty.call(rows[0], 'event_date');
       }
+
+      var html = '<h2>노회 일정 관리</h2>' +
+        '<p>메인 화면 오른쪽 "노회 일정"에 표시됩니다. ' +
+        '달력에서 날짜를 고르시면 <strong>10.12</strong> 같은 표시는 자동으로 만들어집니다.</p>';
       html += '<div class="admin-card" style="margin-bottom:16px"><div class="inline-form">' +
-        '<div class="field" style="flex:0 0 180px"><label>날짜</label>' +
-        (hasDate ? '<input type="date" id="sc-date">'
-                 : '<input type="text" id="sc-date" placeholder="예: 10.12">') + '</div>' +
+        '<div class="field" style="flex:0 0 180px"><label>날짜</label><input type="date" id="sc-date"></div>' +
         '<div class="field"><label>내용</label><input type="text" id="sc-title" placeholder="예: 제19회기 가을 정기노회 (○○교회)"></div>' +
         '<button class="btn" id="sc-add">추가</button>' +
         '</div><div class="form-msg" id="sc-msg"></div></div>';
-      html += '<table class="tbl" style="max-width:820px"><thead><tr><th style="width:90px">표시</th>' +
-        (hasDate ? '<th style="width:170px">날짜</th>' : '') +
+      html += '<table class="tbl" style="max-width:820px"><thead><tr>' +
+        '<th style="width:80px">표시</th><th style="width:175px">날짜</th>' +
         '<th>내용</th><th style="width:80px">관리</th></tr></thead><tbody>';
-      rows.forEach(function (s) {
-        html += '<tr><td>' + e(s.date_label) + '</td>' +
-          (hasDate ? '<td><input type="date" data-scd="' + s.id + '" value="' + e(s.event_date || '') + '"></td>' : '') +
-          '<td class="left">' + e(s.title) + '</td>' +
-          '<td><button class="btn danger sm" data-scdel="' + s.id + '" data-sct="' + e(s.title) + '">삭제</button></td></tr>';
+      rows.forEach(function (s2) {
+        html += '<tr><td>' + e(s2.date_label) + '</td>' +
+          '<td><input type="date" data-scd="' + s2.id + '" value="' + e(guessDate(s2)) + '"></td>' +
+          '<td class="left">' + e(s2.title) + '</td>' +
+          '<td><button class="btn danger sm" data-scdel="' + s2.id + '" data-sct="' + e(s2.title) + '">삭제</button></td></tr>';
       });
-      html += '</tbody></table>';
-      if (hasDate) html += '<p style="font-size:0.84rem;color:var(--gray-5)">날짜를 고치시면 곧바로 저장되고 순서도 날짜순으로 정리됩니다.</p>';
+      html += '</tbody></table>' +
+        '<p style="font-size:0.84rem;color:var(--gray-5)">날짜를 고치시면 곧바로 저장되고 날짜순으로 정리됩니다.</p>';
       box.innerHTML = html;
 
-      /* 표 안에서 날짜를 고치면 바로 저장한다 */
+      /* 표 안에서 날짜를 고치면 바로 저장 */
       box.querySelectorAll('input[data-scd]').forEach(function (inp) {
         inp.addEventListener('change', function () {
           if (!inp.value) return;
-          db.from('site_schedule').update({
-            event_date: inp.value, date_label: labelOf(inp.value), sort: sortOf(inp.value)
-          }).eq('id', inp.dataset.scd).then(function (res) {
-            if (res.error) { alert(res.error.message); return; }
+          saveSched(inp.dataset.scd, inp.value).then(function (res) {
+            if (res && res.error) { alert(res.error.message); return; }
             SHSCloud.log('update', '일정 날짜 수정', labelOf(inp.value));
             loadSchedule();
           });
@@ -241,23 +266,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
       document.getElementById('sc-add').addEventListener('click', function () {
         var msg = document.getElementById('sc-msg');
-        var v = document.getElementById('sc-date').value.trim();
-        var d = { title: document.getElementById('sc-title').value.trim() };
-        if (hasDate) {
-          d.event_date = v || null;
-          d.date_label = labelOf(v);
-          d.sort = sortOf(v);
-        } else {
-          d.date_label = v;
-          d.sort = rows.length + 1;
-        }
-        if (!d.date_label || !d.title) { toast(msg, false, '날짜와 내용을 입력해 주세요.'); return; }
-        db.from('site_schedule').insert(d).then(function (res) {
-          if (res.error) { toast(msg, false, res.error.message); return; }
-          SHSCloud.log('create', '일정 추가', d.date_label + ' ' + d.title);
+        var ymd = document.getElementById('sc-date').value;
+        var title = document.getElementById('sc-title').value.trim();
+        if (!ymd || !title) { toast(msg, false, '날짜와 내용을 입력해 주세요.'); return; }
+        saveSched(null, ymd, title).then(function (res) {
+          if (res && res.error) { toast(msg, false, res.error.message); return; }
+          SHSCloud.log('create', '일정 추가', labelOf(ymd) + ' ' + title);
           loadSchedule();
         });
       });
+
       box.querySelectorAll('button[data-scdel]').forEach(function (b) {
         b.addEventListener('click', function () {
           if (!confirm('일정 "' + b.dataset.sct + '" 을(를) 삭제하시겠습니까?')) return;
