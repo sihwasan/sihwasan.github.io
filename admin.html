@@ -138,12 +138,15 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<h2>노회 명단 관리</h2>';
       html += '<p>가입 시 등급 자동 부여의 기준이 되는 명단입니다. 성명과 소속 교회가 이 명단과 일치하면 해당 등급이 자동으로 부여됩니다.</p>';
       html += '<div id="roster-area"><p style="color:var(--gray-5)">명단을 불러오는 중...</p></div>';
+      html += '<h2>시찰회 관리</h2>';
+      html += '<div id="sichal-area"><p style="color:var(--gray-5)">시찰 정보를 불러오는 중...</p></div>';
       html += '<h2>상비부 배정 관리</h2>';
       html += '<div id="committee-area"><p style="color:var(--gray-5)">상비부 정보를 불러오는 중...</p></div>';
 
       area.innerHTML = html;
       SHS.sectionize(area);
       renderRoster();
+      renderSichals();
       renderCommittees();
 
       function updateRole(id, grade, label) {
@@ -287,51 +290,96 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 노회 명단 관리 (추가·수정·삭제) ---------- */
   var ROSTER_ROLES = { member: '정회원', officer: '임원', president: '노회장', clerk: '서기', staff: '간사' };
 
+  var CATEGORIES = ['목사', '부목사', '원로목사', '은퇴목사', '무임목사', '장로'];
+
   function renderRoster() {
     var box = document.getElementById('roster-area');
-    SHSCloud.init().then(function (c) {
-      return c.from('roster').select('*').order('id');
-    }).then(function (r) {
+    Promise.all([
+      SHSCloud.init().then(function (c) { return c.from('roster').select('*').order('sort').order('id'); }),
+      SHSCloud.init().then(function (c) { return c.from('sichals').select('name').order('sort'); })
+    ]).then(function (rs) {
+      var r = rs[0];
       if (r.error) {
         box.innerHTML = '<div class="notice-banner">명단을 불러오지 못했습니다: ' + e(r.error.message) + '</div>';
         return;
       }
       var rows = r.data || [];
+      var sichalNames = ((rs[1] && rs[1].data) || []).map(function (x) { return x.name; });
+      var hasOrg = rows.filter(function (m) { return m.category; }).length > 0;
+
+      function catOptions(v) {
+        return '<option value="">— 없음 —</option>' + CATEGORIES.map(function (x) {
+          return '<option' + (x === v ? ' selected' : '') + '>' + e(x) + '</option>';
+        }).join('');
+      }
+      function sichalOptions(v) {
+        return '<option value="">— 없음 —</option>' + sichalNames.map(function (x) {
+          return '<option' + (x === v ? ' selected' : '') + '>' + e(x) + '</option>';
+        }).join('');
+      }
+
       var html = '';
-      html += '<div class="admin-card" style="margin-bottom:16px"><div class="inline-form">' +
-        '<div class="field"><label>성명</label><input type="text" id="ro-name"></div>' +
+      html += '<div class="notice-banner">여기서 고친 내용은 <strong>조직 페이지의 회원명단</strong>에 바로 반영됩니다. ' +
+        '<strong>조직 분류</strong>를 정해 주셔야 조직 페이지에 나타납니다. ' +
+        '<a href="organization.html" target="_blank" style="color:var(--navy);text-decoration:underline">조직 페이지 보기</a></div>';
+      if (!hasOrg) {
+        html += '<div class="notice-banner">아직 조직 분류가 채워지지 않았습니다. ' +
+          'supabase/16_organization.sql 을 실행하시면 지금 조직 페이지에 실려 있는 명단이 그대로 채워집니다.</div>';
+      }
+
+      /* 새 회원 추가 */
+      html += '<div class="admin-card" style="margin-bottom:16px"><h3 style="margin-top:0">명단에 추가</h3>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 120px"><label>성명</label><input type="text" id="ro-name"></div>' +
         '<div class="field"><label>소속 교회</label><input type="text" id="ro-church"></div>' +
-        '<div class="field"><label>직분</label><select id="ro-pos">' +
+        '<div class="field" style="flex:0 0 120px"><label>직분</label><select id="ro-pos">' +
         ['목사', '위임목사', '부목사', '원로목사', '은퇴목사', '장로', '간사'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
         '</select></div>' +
-        '<div class="field"><label>구분 (가입 시 자동 부여될 등급)</label><select id="ro-grade">' +
+        '<div class="field" style="flex:0 0 130px"><label>조직 분류</label><select id="ro-cat">' + catOptions('목사') + '</select></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>시찰</label><select id="ro-sichal">' + sichalOptions('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 160px"><label>부여 등급</label><select id="ro-grade">' +
         GRADES.filter(function (g) { return g.v !== 'pending'; }).map(function (g) {
           return '<option value="' + g.v + '">' + g.t + '</option>';
-        }).join('') +
-        '</select></div>' +
+        }).join('') + '</select></div>' +
         '<button class="btn" id="ro-add">추가</button>' +
         '</div><div class="form-msg" id="ro-msg"></div></div>';
 
-      html += '<table class="tbl"><thead><tr><th>번호</th><th>성명</th><th>소속 교회</th><th>직분</th><th>부여 등급</th><th>임원 직책</th><th style="width:80px">관리</th></tr></thead><tbody>';
+      /* 명단 표 (그 자리에서 고칠 수 있다) */
+      html += '<table class="tbl"><thead><tr><th style="width:50px">번호</th><th style="width:110px">성명</th>' +
+        '<th>소속 교회</th><th style="width:110px">직분</th><th style="width:120px">조직 분류</th>' +
+        '<th style="width:120px">시찰</th><th style="width:130px">비고</th>' +
+        '<th style="width:110px">부여 등급</th><th style="width:120px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
-        html += '<tr><td>' + (i + 1) + '</td><td>' + e(m.name) + '</td><td>' + e(m.church) + '</td>' +
-          '<td>' + e(m.position || '-') + '</td>' +
+        html += '<tr data-ro="' + m.id + '">' +
+          '<td>' + (i + 1) + '</td>' +
+          '<td><input type="text" data-rf="name" value="' + e(m.name) + '"></td>' +
+          '<td><input type="text" data-rf="church" value="' + e(m.church) + '"></td>' +
+          '<td><input type="text" data-rf="position" value="' + e(m.position || '') + '"></td>' +
+          '<td><select data-rf="category">' + catOptions(m.category || '') + '</select></td>' +
+          '<td><select data-rf="sichal">' + sichalOptions(m.sichal || '') + '</select></td>' +
+          '<td><input type="text" data-rf="note" value="' + e(m.note || '') + '" placeholder="추대일 등"></td>' +
           '<td><span class="role-badge">' + e(m.officer_title || ROSTER_ROLES[m.role] || m.role) + '</span></td>' +
-          '<td>' + e(m.officer_title || '-') + '</td>' +
-          '<td><button class="btn danger sm" data-rodel="' + m.id + '" data-roname="' + e(m.name) + '">삭제</button></td></tr>';
+          '<td><button class="btn sm" data-rosave="' + m.id + '">저장</button> ' +
+          '<button class="btn danger sm" data-rodel="' + m.id + '" data-roname="' + e(m.name) + '">삭제</button></td>' +
+          '</tr>';
       });
       html += '</tbody></table>';
-      html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '명. 수정이 필요하면 해당 행을 삭제한 후 다시 추가해 주세요. 모든 변경은 감사 기록으로 남습니다.</p>';
+      html += '<div class="form-msg" id="ro-rowmsg"></div>';
+      html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '명. ' +
+        '칸을 고친 뒤 그 줄의 <strong>저장</strong>을 누르시면 됩니다. 모든 변경은 감사 기록에 남습니다.</p>';
       box.innerHTML = html;
 
       document.getElementById('ro-add').addEventListener('click', function () {
         var msg = document.getElementById('ro-msg');
+        var g = parseGrade(document.getElementById('ro-grade').value);
         var d = {
           name: document.getElementById('ro-name').value.trim(),
           church: document.getElementById('ro-church').value.trim(),
           position: document.getElementById('ro-pos').value,
-          role: parseGrade(document.getElementById('ro-grade').value).role,
-          officer_title: parseGrade(document.getElementById('ro-grade').value).title
+          category: document.getElementById('ro-cat').value || null,
+          sichal: document.getElementById('ro-sichal').value || null,
+          role: g.role, officer_title: g.title,
+          sort: (rows.length ? Number(rows[rows.length - 1].sort || 0) : 0) + 10
         };
         if (!d.name || !d.church) {
           msg.className = 'form-msg err';
@@ -351,6 +399,41 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       });
 
+      box.querySelectorAll('button[data-rosave]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var tr = b.closest('tr');
+          var msg = document.getElementById('ro-rowmsg');
+          function v(f) { return tr.querySelector('[data-rf="' + f + '"]').value.trim(); }
+          var d = {
+            name: v('name'), church: v('church'),
+            position: v('position') || null,
+            category: v('category') || null,
+            sichal: v('sichal') || null,
+            note: v('note') || null
+          };
+          if (!d.name || !d.church) {
+            msg.className = 'form-msg err';
+            msg.textContent = '성명과 소속 교회는 비울 수 없습니다.';
+            return;
+          }
+          msg.className = 'form-msg';
+          msg.textContent = '저장 중입니다...';
+          SHSCloud.init().then(function (c) {
+            return c.from('roster').update(d).eq('id', b.dataset.rosave);
+          }).then(function (res) {
+            if (res.error) {
+              msg.className = 'form-msg err';
+              msg.textContent = res.error.code === '23505'
+                ? '같은 성명과 교회가 이미 명단에 있습니다.' : res.error.message;
+              return;
+            }
+            SHSCloud.log('update', '명단 수정', d.name + ' (' + d.church + ')');
+            msg.className = 'form-msg ok';
+            msg.textContent = d.name + ' 님 정보를 저장했습니다. 조직 페이지에 반영되었습니다.';
+          });
+        });
+      });
+
       box.querySelectorAll('button[data-rodel]').forEach(function (b) {
         b.addEventListener('click', function () {
           if (!confirm('"' + b.dataset.roname + '" 님을 명단에서 삭제하시겠습니까?')) return;
@@ -361,6 +444,108 @@ document.addEventListener('DOMContentLoaded', function () {
             SHSCloud.log('delete', '명단 삭제', b.dataset.roname);
             renderRoster();
           });
+        });
+      });
+    });
+  }
+
+  /* ---------- 시찰회 관리 ---------- */
+  function renderSichals() {
+    var box = document.getElementById('sichal-area');
+    if (!box) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('sichals').select('*').order('sort');
+    }).then(function (r) {
+      if (r.error) {
+        box.innerHTML = '<div class="notice-banner">시찰 정보를 불러오지 못했습니다: ' + e(r.error.message) +
+          ' (16 조직 명단·시찰 관리 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      var rows = r.data || [];
+      var html = '<div class="notice-banner">시찰 구성은 조직 페이지와 <strong>회원가입 화면의 교회 목록</strong>에 함께 쓰입니다. ' +
+        '교회가 새로 들어오거나 나가면 여기에서 고쳐 주세요.</div>';
+
+      rows.forEach(function (s) {
+        html += '<div class="admin-card" style="margin-bottom:14px" data-si="' + s.id + '">' +
+          '<div class="inline-form" style="margin-bottom:6px">' +
+          '<div class="field" style="flex:0 0 140px"><label>시찰 이름</label><input type="text" data-sf="name" value="' + e(s.name) + '"></div>' +
+          '<div class="field"><label>관할 지역</label><input type="text" data-sf="area" value="' + e(s.area || '') + '"></div>' +
+          '</div>' +
+          '<div class="inline-form" style="margin-bottom:6px">' +
+          '<div class="field"><label>시찰장</label><input type="text" data-sf="head" value="' + e(s.head || '') + '"></div>' +
+          '<div class="field"><label>서기</label><input type="text" data-sf="clerk" value="' + e(s.clerk || '') + '"></div>' +
+          '<div class="field"><label>회계</label><input type="text" data-sf="treasurer" value="' + e(s.treasurer || '') + '"></div>' +
+          '</div>' +
+          '<div class="field"><label>소속 교회 (한 줄에 한 교회씩 적어 주세요)</label>' +
+          '<textarea data-sf="churches" rows="8">' + e(s.churches || '') + '</textarea></div>' +
+          '<button class="btn sm" data-sisave="' + s.id + '">저장</button> ' +
+          '<button class="btn danger sm" data-sidel="' + s.id + '" data-siname="' + e(s.name) + '">시찰 삭제</button>' +
+          '<div class="form-msg" data-simsg="' + s.id + '"></div></div>';
+      });
+
+      html += '<div class="admin-card"><h3 style="margin-top:0">시찰 추가</h3>' +
+        '<div class="inline-form"><div class="field"><label>시찰 이름</label><input type="text" id="si-new"></div>' +
+        '<button class="btn" id="si-add">추가</button></div>' +
+        '<div class="form-msg" id="si-newmsg"></div></div>';
+      box.innerHTML = html;
+
+      box.querySelectorAll('button[data-sisave]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var card = b.closest('[data-si]');
+          var msg = box.querySelector('[data-simsg="' + b.dataset.sisave + '"]');
+          function v(f) { return card.querySelector('[data-sf="' + f + '"]').value.trim(); }
+          var lines = card.querySelector('[data-sf="churches"]').value.split('\n');
+          var d = {
+            name: v('name'), area: v('area'), head: v('head'),
+            clerk: v('clerk'), treasurer: v('treasurer'),
+            churches: lines.map(function (x) { return x.trim(); })
+              .filter(function (x) { return x; }).join('\n'),
+            updated_at: new Date().toISOString(), updated_by: user.name
+          };
+          if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '시찰 이름을 입력해 주세요.'; return; }
+          msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+          SHSCloud.init().then(function (c) {
+            return c.from('sichals').update(d).eq('id', b.dataset.sisave);
+          }).then(function (res) {
+            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+            SHSCloud.log('update', '시찰 정보 수정', d.name);
+            msg.className = 'form-msg ok';
+            msg.textContent = '저장되었습니다. 조직 페이지와 회원가입 화면에 반영되었습니다.';
+          });
+        });
+      });
+
+      box.querySelectorAll('button[data-sidel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('"' + b.dataset.siname + '" 시찰을 삭제하시겠습니까? 소속 교회 목록도 함께 사라집니다.')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('sichals').delete().eq('id', b.dataset.sidel);
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('delete', '시찰 삭제', b.dataset.siname);
+            renderSichals();
+          });
+        });
+      });
+
+      document.getElementById('si-add').addEventListener('click', function () {
+        var msg = document.getElementById('si-newmsg');
+        var nm = document.getElementById('si-new').value.trim();
+        if (!nm) { msg.className = 'form-msg err'; msg.textContent = '시찰 이름을 입력해 주세요.'; return; }
+        SHSCloud.init().then(function (c) {
+          return c.from('sichals').insert({
+            name: nm, churches: '',
+            sort: (rows.length ? Number(rows[rows.length - 1].sort || 0) : 0) + 10,
+            updated_at: new Date().toISOString(), updated_by: user.name
+          });
+        }).then(function (res) {
+          if (res.error) {
+            msg.className = 'form-msg err';
+            msg.textContent = res.error.code === '23505' ? '같은 이름의 시찰이 이미 있습니다.' : res.error.message;
+            return;
+          }
+          SHSCloud.log('create', '시찰 추가', nm);
+          renderSichals();
         });
       });
     });

@@ -169,59 +169,93 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 아래 회원명단·시찰회·상비부는 정회원만 볼 수 있다. */
   if (!canSee) return;
 
-  var sb = document.getElementById('senior-body');
-  SHSData.seniorPastors.forEach(function (m, i) {
-    sb.insertAdjacentHTML('beforeend',
-      '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td><td>' + m.retired + '</td></tr>');
-  });
-
-  var rb = document.getElementById('retired-body');
-  SHSData.retiredPastors.forEach(function (m, i) {
-    rb.insertAdjacentHTML('beforeend',
-      '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>');
-  });
-
-  var pb = document.getElementById('pastors-body');
-  var ps = SHSData.pastors;
-  var half = Math.ceil(ps.length / 2);
-  for (var i = 0; i < half; i++) {
-    var a = ps[i], b = ps[i + half];
-    pb.insertAdjacentHTML('beforeend',
-      '<tr><td>' + (i + 1) + '</td><td>' + dn(a.name) + '</td><td>' + e(a.church) + '</td>' +
-      (b ? '<td>' + (i + half + 1) + '</td><td>' + dn(b.name) + '</td><td>' + e(b.church) + '</td>' : '<td></td><td></td><td></td>') + '</tr>');
+  /* ---------- 회원명단 ----------
+   * 서버 명단이 있으면 그것으로, 없으면 홈페이지에 실려 있는 명단으로 그린다. */
+  function fill(id, html) {
+    var el = document.getElementById(id);
+    if (el) el.innerHTML = html;
   }
 
-  var ab = document.getElementById('assoc-body');
-  SHSData.assocPastors.forEach(function (m, i) {
-    ab.insertAdjacentHTML('beforeend',
-      '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>');
-  });
+  function renderRoster(D) {
+    fill('senior-body', (D.seniorPastors || []).map(function (m, i) {
+      return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) +
+        '</td><td>' + e(m.retired || '') + '</td></tr>';
+    }).join(''));
 
-  document.getElementById('nocharge-body').textContent =
-    SHSData.pastorsWithoutCharge.map(function (n) { return canSee ? n : SHS.maskName(n); }).join(', ');
+    fill('retired-body', (D.retiredPastors || []).map(function (m, i) {
+      return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>';
+    }).join(''));
 
-  var eb = document.getElementById('elders-body');
-  Object.keys(SHSData.elders).forEach(function (k) {
+    /* 담임목사는 두 줄로 나누어 보여준다 */
+    var ps = D.pastors || [];
+    var half = Math.ceil(ps.length / 2);
     var rows = '';
-    SHSData.elders[k].forEach(function (m, i) {
-      rows += '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>';
-    });
-    eb.insertAdjacentHTML('beforeend',
-      '<h4 style="color:var(--navy);margin:18px 0 8px">' + k + ' (' + SHSData.elders[k].length + '명)</h4>' +
-      '<table class="tbl" style="max-width:640px"><thead><tr><th>번호</th><th>성명</th><th>교회</th></tr></thead><tbody>' + rows + '</tbody></table>');
-  });
+    for (var i = 0; i < half; i++) {
+      var a = ps[i], b = ps[i + half];
+      rows += '<tr><td>' + (i + 1) + '</td><td>' + dn(a.name) + '</td><td>' + e(a.church) + '</td>' +
+        (b ? '<td>' + (i + half + 1) + '</td><td>' + dn(b.name) + '</td><td>' + e(b.church) + '</td>'
+           : '<td></td><td></td><td></td>') + '</tr>';
+    }
+    fill('pastors-body', rows);
 
-  var scb = document.getElementById('sichal-body');
-  SHSData.sichals.forEach(function (s) {
-    var churches = s.churches.join(', ');
-    scb.insertAdjacentHTML('beforeend',
-      '<div class="side-box" style="margin-bottom:20px"><div class="box-head">' + s.name + '</div>' +
-      '<div class="box-body">' +
-      '<p><strong>관할</strong> ' + e(s.area) + '</p>' +
-      '<p><strong>시찰장</strong> ' + dt(s.head) + ' / <strong>서기</strong> ' + dt(s.clerk) + ' / <strong>회계</strong> ' + dt(s.treasurer) + '</p>' +
-      '<p><strong>소속 교회 (' + s.churches.length + ')</strong> ' + e(churches) + '</p>' +
-      '</div></div>');
-  });
+    fill('assoc-body', (D.assocPastors || []).map(function (m, i) {
+      return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>';
+    }).join(''));
+
+    var nc = document.getElementById('nocharge-body');
+    if (nc) nc.textContent = (D.pastorsWithoutCharge || []).map(function (n) {
+      return canSee ? n : SHS.maskName(n);
+    }).join(', ');
+
+    var eldersHtml = '';
+    Object.keys(D.elders || {}).forEach(function (k) {
+      var list = D.elders[k] || [];
+      eldersHtml +=
+        '<h4 style="color:var(--navy);margin:18px 0 8px">' + e(k) + ' (' + list.length + '명)</h4>' +
+        '<table class="tbl" style="max-width:640px"><thead><tr><th>번호</th><th>성명</th><th>교회</th></tr></thead><tbody>' +
+        list.map(function (m, i) {
+          return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>';
+        }).join('') + '</tbody></table>';
+    });
+    fill('elders-body', eldersHtml);
+  }
+
+  function renderSichals(list) {
+    fill('sichal-body', (list || []).map(function (s) {
+      var chs = s.churches || [];
+      return '<div class="side-box" style="margin-bottom:20px"><div class="box-head">' + e(s.name) + '</div>' +
+        '<div class="box-body">' +
+        '<p><strong>관할</strong> ' + e(s.area || '') + '</p>' +
+        '<p><strong>시찰장</strong> ' + dt(s.head || '') + ' / <strong>서기</strong> ' + dt(s.clerk || '') +
+        ' / <strong>회계</strong> ' + dt(s.treasurer || '') + '</p>' +
+        '<p><strong>소속 교회 (' + chs.length + ')</strong> ' + e(chs.join(', ')) + '</p>' +
+        '</div></div>';
+    }).join(''));
+  }
+
+  renderRoster(SHSData);
+  renderSichals(SHSData.sichals);
+
+  /* 서버 명단을 분류별로 묶어 화면이 쓰는 모양으로 바꾼다 */
+  function groupRoster(rows) {
+    var D = { seniorPastors: [], retiredPastors: [], pastors: [], assocPastors: [],
+              pastorsWithoutCharge: [], elders: {} };
+    rows.forEach(function (r) {
+      var m = { name: r.name, church: r.church, retired: r.note || '' };
+      switch (r.category) {
+        case '원로목사': D.seniorPastors.push(m); break;
+        case '은퇴목사': D.retiredPastors.push(m); break;
+        case '부목사':   D.assocPastors.push(m); break;
+        case '무임목사': D.pastorsWithoutCharge.push(r.name); break;
+        case '장로':
+          var k = r.sichal || '기타';
+          (D.elders[k] = D.elders[k] || []).push(m);
+          break;
+        case '목사':     D.pastors.push(m); break;
+      }
+    });
+    return D;
+  }
 
   var cb = document.getElementById('committees-body');
   function renderCommittees(list) {
@@ -243,13 +277,36 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   renderCommittees(SHSData.committees);
 
-  /* 서버에 관리자가 수정한 상비부 배정이 있으면 그것으로 갱신한다 (정회원 이상) */
+  /* 관리자가 회원 관리에서 고친 명단·시찰·상비부가 서버에 있으면 그것으로 갱신한다.
+   * 서버 연결이 안 되면 위에서 그린 내용이 그대로 남는다. */
   if (user && user.cloud && window.SHSCloud && SHSCloud.enabled()) {
     SHSCloud.init().then(function (c) {
-      return c.from('committees').select('*').order('sort');
-    }).then(function (r) {
-      if (r && r.data && r.data.length) renderCommittees(r.data);
-    });
+      return Promise.all([
+        c.from('committees').select('*').order('sort'),
+        c.from('roster').select('*').order('sort'),
+        c.from('sichals').select('*').order('sort')
+      ]);
+    }).then(function (rs) {
+      if (rs[0] && rs[0].data && rs[0].data.length) renderCommittees(rs[0].data);
+
+      var roster = (rs[1] && rs[1].data) || [];
+      /* 분류가 하나도 채워지지 않았으면 아직 옮기기 전이므로 건드리지 않는다 */
+      if (roster.filter(function (r) { return r.category; }).length) {
+        renderRoster(groupRoster(roster.filter(function (r) { return r.category; })));
+      }
+
+      var sichals = (rs[2] && rs[2].data) || [];
+      if (sichals.length) {
+        renderSichals(sichals.map(function (s) {
+          return {
+            name: s.name, area: s.area, head: s.head, clerk: s.clerk, treasurer: s.treasurer,
+            churches: String(s.churches || '').split('\n')
+              .map(function (x) { return x.trim(); })
+              .filter(function (x) { return x; })
+          };
+        }));
+      }
+    }).catch(function () {});
   }
  });
 });

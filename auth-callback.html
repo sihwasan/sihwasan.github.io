@@ -83,6 +83,27 @@ document.addEventListener('DOMContentLoaded', function () {
     var churches = [];
     SHSData.sichals.forEach(function (s) { churches = churches.concat(s.churches); });
     churches.sort();
+    /* 서버 시찰 자료가 있으면 그 교회 목록으로 바꿔 준다 */
+    SHSCloud.init().then(function (c) {
+      return c.from('sichals').select('churches').order('sort');
+    }).then(function (r) {
+      var list = [];
+      ((r && r.data) || []).forEach(function (s) {
+        String(s.churches || '').split(String.fromCharCode(10)).forEach(function (x) {
+          x = x.trim();
+          if (x) list.push(x);
+        });
+      });
+      if (!list.length) return;
+      list.sort();
+      var sel = document.getElementById('cb-church');
+      if (!sel) return;
+      var keep = sel.value;
+      sel.innerHTML = '<option value="">— 선택하세요 —</option>' +
+        list.map(function (x) { return '<option>' + e(x) + '</option>'; }).join('') +
+        '<option value="__etc">목록에 없음 (직접 입력)</option>';
+      sel.value = keep;
+    }).catch(function () {});
 
     area.innerHTML =
       '<div class="notice-banner">구글 로그인이 완료되었습니다. ' +

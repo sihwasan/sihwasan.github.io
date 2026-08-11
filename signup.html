@@ -99,13 +99,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 소속 교회는 노회 명단과 대조해야 하므로 목록에서 고르게 한다.
    * 오타로 명단과 어긋나 승인대기로 빠지는 일을 줄인다. */
-  var churches = [];
-  SHSData.sichals.forEach(function (s) { churches = churches.concat(s.churches); });
-  churches.sort();
   var sel = document.getElementById('reg-church');
-  sel.innerHTML = '<option value="">— 선택하세요 —</option>' +
-    churches.map(function (c) { return '<option>' + e(c) + '</option>'; }).join('') +
-    '<option value="__etc">목록에 없음 (직접 입력)</option>';
+
+  /* 노회 소속 교회 목록. 서버 시찰 자료가 있으면 그것을, 없으면 기본 자료를 쓴다. */
+  function churchList() {
+    var fallback = [];
+    SHSData.sichals.forEach(function (s) { fallback = fallback.concat(s.churches); });
+    fallback.sort();
+    if (!(window.SHSCloud && SHSCloud.enabled())) return Promise.resolve(fallback);
+    return SHSCloud.init().then(function (c) {
+      return c.from('sichals').select('churches').order('sort');
+    }).then(function (r) {
+      var list = [];
+      ((r && r.data) || []).forEach(function (s) {
+        String(s.churches || '').split('\n').forEach(function (x) {
+          x = x.trim();
+          if (x) list.push(x);
+        });
+      });
+      list.sort();
+      return list.length ? list : fallback;
+    }).catch(function () { return fallback; });
+  }
+
+  churchList().then(function (churches) {
+    sel.innerHTML = '<option value="">— 선택하세요 —</option>' +
+      churches.map(function (c) { return '<option>' + e(c) + '</option>'; }).join('') +
+      '<option value="__etc">목록에 없음 (직접 입력)</option>';
+  });
   sel.addEventListener('change', function () {
     document.getElementById('reg-etc-wrap').classList.toggle('hidden', this.value !== '__etc');
   });
