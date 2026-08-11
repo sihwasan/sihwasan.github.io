@@ -392,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function () {
       (r.data || []).forEach(function (g) {
         html += '<figure><a><img src="' + e(g.thumb_url) + '" loading="lazy"></a>' +
           '<figcaption><div class="g-title">' + e(g.title) + '</div><div class="g-date">' + e(g.taken || '') + '</div>' +
-          '<button class="btn danger sm" style="margin-top:8px" data-gldel="' + g.id + '" data-glt="' + e(g.title) + '">삭제</button>' +
+          '<button class="btn danger sm" style="margin-top:8px" data-gldel="' + g.id + '" data-glt="' + e(g.title) + '" data-glf="' + e(g.image_url || '') + '" data-glth="' + e(g.thumb_url || '') + '">삭제</button>' +
           '</figcaption></figure>';
       });
       html += '</div>';
@@ -434,8 +434,13 @@ document.addEventListener('DOMContentLoaded', function () {
           if (!confirm('이 사진을 삭제하시겠습니까?')) return;
           db.from('gallery_items').delete().eq('id', b.dataset.gldel).then(function (res) {
             if (res.error) { alert(res.error.message); return; }
-            SHSCloud.log('delete', '갤러리 사진 삭제', b.dataset.glt);
-            loadGallery();
+            return Promise.all([
+              SHSPhotos.remove(b.dataset.glf),
+              SHSPhotos.remove(b.dataset.glth)
+            ]).then(function () {
+              SHSCloud.log('delete', '갤러리 사진 삭제', b.dataset.glt);
+              loadGallery();
+            });
           });
         });
       });

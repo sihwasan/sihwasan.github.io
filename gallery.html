@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="feed-who">' + e(it.author_name || '노회') +
       '<div class="d">' + e(it.taken || String(it.created_at || '').slice(0, 10)) +
       (it.category ? ' · ' + e(it.category) : '') + '</div></div>' +
-      ((mine || canManage) ? '<button class="feed-del" data-fdel="' + it.id + '">삭제</button>' : '') +
+      ((mine || canManage) ? '<button class="feed-del" data-fdel="' + it.id + '" data-ffull="' + e(it.image_url || '') + '" data-fthumb="' + e(it.thumb_url || '') + '">삭제</button>' : '') +
       '</div>' +
       '<img class="feed-img" src="' + e(it.image_url) + '" alt="">' +
       '<div class="feed-bar">' +
@@ -239,8 +239,14 @@ document.addEventListener('DOMContentLoaded', function () {
           return c.from('gallery_items').delete().eq('id', b.dataset.fdel);
         }).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
-          SHSCloud.log('delete', '갤러리 사진 삭제', b.dataset.fdel);
-          load(true);
+          /* 목록에서 지운 뒤 보관소의 사진 파일도 함께 지운다 */
+          return Promise.all([
+            SHSPhotos.remove(b.dataset.ffull),
+            SHSPhotos.remove(b.dataset.fthumb)
+          ]).then(function () {
+            SHSCloud.log('delete', '갤러리 사진 삭제', b.dataset.fdel);
+            load(true);
+          });
         });
       });
     });

@@ -6,5 +6,5 @@
  * 로 나뉘어 보관됩니다. 이미 올라간 사진은 그대로 보입니다.
  */
 var SHS_PHOTOS = {
-  base: ''
+  base: 'https://sihwasan-photos.sihwasan.workers.dev'
 };
