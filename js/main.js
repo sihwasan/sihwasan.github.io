@@ -24,7 +24,8 @@
       { t: '노회 임원', h: 'organization.html#officers' },
       { t: '회원명단', h: 'organization.html#members' },
       { t: '시찰회', h: 'organization.html#sichal' },
-      { t: '상비부', h: 'organization.html#committees' }
+      { t: '상비부', h: 'organization.html#committees' },
+      { t: '상비부 대시보드', h: 'dashboard.html' }
     ]},
     { title: '회칙', href: 'rules-presbytery.html', sub: [
       { t: '노회 회칙', h: 'rules-presbytery.html' },
@@ -65,10 +66,29 @@
     { t: '회원 관리', h: 'admin.html' },
     { t: '회칙 개정 반영', h: 'rules-edit.html' },
     { t: '자료실 관리', h: 'archive-edit.html' },
+    { t: '상비부 대시보드', h: 'dashboard.html' },
     { t: '서류 발급', h: 'documents.html' },
     { t: '시스템 운영', h: 'ops.html' },
     { t: '감독 (감사 기록)', h: 'audit.html' }
   ]};
+
+  /* 상비부 임원에게 내가 맡은 부서 메뉴를 보여준다 */
+  function addCommitteeMenu(list) {
+    var ul = document.querySelector('.gnb-list');
+    if (!ul || document.getElementById('gnb-com')) return;
+    var li = document.createElement('li');
+    li.className = 'gnb-item gnb-admin';
+    li.id = 'gnb-com';
+    li.innerHTML = '<a href="dashboard.html">내 상비부</a><div class="gnb-sub">' +
+      list.map(function (m) {
+        return '<a href="committee.html?c=' + encodeURIComponent(m.committee) + '">' +
+          m.committee + ' (' + m.duty_name + ')</a>';
+      }).join('') +
+      '<a href="dashboard.html">상비부 대시보드</a></div>';
+    var exam = document.getElementById('gnb-exam');
+    var admin = document.getElementById('gnb-admin');
+    ul.insertBefore(li, exam || admin || null);
+  }
 
   /* 고시부 부장·서기에게만 보이는 메뉴 */
   function addExamMenu() {
@@ -79,6 +99,7 @@
     li.className = 'gnb-item gnb-admin' + (here === 'exam-admin.html' ? ' active' : '');
     li.id = 'gnb-exam';
     li.innerHTML = '<a href="exam-admin.html">고시부</a><div class="gnb-sub">' +
+      '<a href="committee.html?c=%EA%B3%A0%EC%8B%9C%EA%B7%9C%EC%B9%99%EB%B6%80">고시규칙부</a>' +
       '<a href="exam-admin.html">모의고사 응시 관리</a>' +
       '<a href="exam.html">모의고사 보기</a>' +
       '<a href="archive.html#sec-%EA%B3%A0%EC%8B%9C">고시집</a>' +
@@ -299,7 +320,16 @@
         /* 관리자에게 관리자 메뉴를 붙인다 */
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) addAdminMenu();
 
-        /* 고시부 부장·서기이면 고시부 메뉴를 붙인다 */
+        /* 상비부 임원이면 내 부서 메뉴를 붙인다 */
+        SHSCloud.init().then(function (c) {
+          return c.rpc('my_committees');
+        }).then(function (r) {
+          var list = (r && r.data) || [];
+          if (list.length) addCommitteeMenu(list);
+          if (list.filter(function (x) { return x.committee === '고시규칙부'; }).length) addExamMenu();
+        }, function () {});
+
+        /* 고시부로 따로 지정된 분도 고시부 메뉴를 본다 */
         SHSCloud.init().then(function (c) {
           return c.from('exam_officers').select('user_id').eq('user_id', p.id);
         }).then(function (r) {

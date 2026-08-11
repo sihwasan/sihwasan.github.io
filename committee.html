@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>상비부 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1 id="cm-title">상비부</h1>
+    <div class="crumb">홈 &gt; 조직 &gt; <a href="dashboard.html">상비부 대시보드</a> &gt; <span id="cm-crumb">부서</span></div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <div id="cm-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('cm-area');
+  var e = SHS.esc;
+
+  var NAME = decodeURIComponent((location.search.match(/[?&]c=([^&]*)/) || [])[1] || '');
+  if (!NAME) { location.href = 'dashboard.html'; return; }
+  document.getElementById('cm-title').textContent = NAME;
+  document.getElementById('cm-crumb').textContent = NAME;
+  document.title = NAME + ' - 시화산노회';
+
+  var gate = SHS.memberGate(user, '상비부');
+  if (gate) { area.innerHTML = gate; return; }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">상비부 화면은 서버 로그인 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var com = null, evs = [], isOfficer = false, myDuty = '';
+  var examReqs = [], accReqs = [];
+  var view = new Date(); view.setDate(1);
+  var tab = 'cal';
+
+  function db() { return SHSCloud.init(); }
+  function ymd(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+           '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function load() {
+    db().then(function (c) {
+      return Promise.all([
+        c.from('committees').select('*').eq('name', NAME).single(),
+        c.from('committee_events').select('*').eq('committee', NAME)
+          .order('event_date', { ascending: false }).order('id', { ascending: false }),
+        c.rpc('my_committees'),
+        c.from('access_requests').select('*').eq('committee', NAME).order('created_at', { ascending: false }),
+        NAME === '고시규칙부'
+          ? c.from('exam_requests').select('*').order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] })
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error && !rs[0].data) {
+        area.innerHTML = '<div class="notice-banner">부서 정보를 불러오지 못했습니다: ' +
+          e(rs[0].error.message) + ' (20 상비부 대시보드 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      com = rs[0].data || { name: NAME };
+      evs = (rs[1] && rs[1].data) || [];
+      var mine = (rs[2] && rs[2].data) || [];
+      mine.forEach(function (m) { if (m.committee === NAME) { isOfficer = true; myDuty = m.duty_name; } });
+      if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '관리자'; }
+      accReqs = (rs[3] && rs[3].data) || [];
+      examReqs = (rs[4] && rs[4].data) || [];
+      draw();
+      SHS.logAction('view', '상비부 열람', NAME);
+    });
+  }
+
+  function draw() {
+    var pendAcc = accReqs.filter(function (r) { return r.status === 'pending'; }).length;
+    var pendExam = examReqs.filter(function (r) { return r.status === 'pending'; }).length;
+
+    var h = '<div class="notice-banner">' +
+      (isOfficer
+        ? '<strong>' + e(user.name) + '</strong> 님은 이 부서의 <strong>' + e(myDuty) + '</strong>이시므로 ' +
+          '일정과 공지를 등록하고 부서 업무를 처리하실 수 있습니다.'
+        : '이 부서의 일정과 공지입니다. 등록·수정은 부장·서기가 합니다.') +
+      '</div>';
+
+    /* 부서 개요 */
+    h += '<div class="cm-head">' +
+      '<div class="cm-officers">' +
+      '<span><strong>부장</strong> ' + e(com.head || '-') + '</span>' +
+      '<span><strong>서기</strong> ' + e(com.clerk || '-') + '</span>' +
+      '<span><strong>회계</strong> ' + e(com.treasurer || '-') + '</span>' +
+      '</div>' +
+      (com.duty ? '<p class="cm-duty">' + e(com.duty) + '</p>' : '') +
+      '</div>';
+
+    h += '<div class="tabs" id="cm-tabs">' +
+      '<button class="' + (tab === 'cal' ? 'active' : '') + '" data-t="cal">일정 달력</button>' +
+      '<button class="' + (tab === 'list' ? 'active' : '') + '" data-t="list">활동 내역</button>' +
+      '<button class="' + (tab === 'mem' ? 'active' : '') + '" data-t="mem">부원 명단</button>' +
+      (NAME === '고시규칙부'
+        ? '<button class="' + (tab === 'exam' ? 'active' : '') + '" data-t="exam">모의고사 응시 승인' +
+          (pendExam ? ' (' + pendExam + ')' : '') + '</button>'
+        : '') +
+      '<button class="' + (tab === 'acc' ? 'active' : '') + '" data-t="acc">자료 열람 요청' +
+      (pendAcc ? ' (' + pendAcc + ')' : '') + '</button>' +
+      '</div><div id="cm-body"></div>';
+
+    area.innerHTML = h;
+    area.querySelectorAll('#cm-tabs button').forEach(function (b) {
+      b.addEventListener('click', function () { tab = b.dataset.t; draw(); });
+    });
+
+    if (tab === 'cal') drawCal();
+    else if (tab === 'list') drawList();
+    else if (tab === 'mem') drawMem();
+    else if (tab === 'exam') drawExam();
+    else drawAcc();
+  }
+
+  /* ---------- 달력 ---------- */
+  function drawCal() {
+    var box = document.getElementById('cm-body');
+    var y = view.getFullYear(), m = view.getMonth();
+    var first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+    var start = first.getDay();
+    var today = ymd(new Date());
+
+    var byDay = {};
+    evs.forEach(function (v) { if (v.event_date) (byDay[v.event_date] = byDay[v.event_date] || []).push(v); });
+
+    var h = '<div class="cal-bar">' +
+      '<button class="btn ghost sm" id="cal-prev">← 이전 달</button>' +
+      '<span class="cal-title">' + y + '년 ' + (m + 1) + '월</span>' +
+      '<button class="btn ghost sm" id="cal-next">다음 달 →</button>' +
+      '<button class="btn ghost sm" id="cal-today">이번 달</button></div>';
+
+    if (isOfficer) {
+      h += '<p style="color:var(--gray-5);font-size:0.88rem">날짜를 누르시면 그 날로 일정을 잡으실 수 있습니다.</p>';
+    }
+
+    h += '<table class="cal"><thead><tr>' +
+      ['일', '월', '화', '수', '목', '금', '토'].map(function (d, i) {
+        return '<th class="' + (i === 0 ? 'sun' : (i === 6 ? 'sat' : '')) + '">' + d + '</th>';
+      }).join('') + '</tr></thead><tbody><tr>';
+
+    for (var i = 0; i < start; i++) h += '<td class="empty"></td>';
+    for (var d = 1; d <= last.getDate(); d++) {
+      var key = ymd(new Date(y, m, d));
+      var dow = (start + d - 1) % 7;
+      var list = byDay[key] || [];
+      if (dow === 0 && d > 1) h += '</tr><tr>';
+      h += '<td class="' + (key === today ? 'today ' : '') + (dow === 0 ? 'sun' : (dow === 6 ? 'sat' : '')) + '"' +
+        (isOfficer ? ' data-day="' + key + '"' : '') + '>' +
+        '<div class="cal-d">' + d + '</div>' +
+        list.map(function (v) {
+          return '<div class="cal-ev ' + (v.kind === '공지' ? 'notice' : (v.kind === '할일' ? 'todo' : '')) +
+            (v.done ? ' done' : '') + '" data-ev="' + v.id + '" title="' + e(v.title) + '">' +
+            e(v.title) + '</div>';
+        }).join('') + '</td>';
+    }
+    var tail = (start + last.getDate()) % 7;
+    if (tail) for (var k = tail; k < 7; k++) h += '<td class="empty"></td>';
+    h += '</tr></tbody></table>';
+
+    if (isOfficer) h += formHtml('');
+    box.innerHTML = h;
+
+    document.getElementById('cal-prev').addEventListener('click', function () {
+      view.setMonth(view.getMonth() - 1); drawCal();
+    });
+    document.getElementById('cal-next').addEventListener('click', function () {
+      view.setMonth(view.getMonth() + 1); drawCal();
+    });
+    document.getElementById('cal-today').addEventListener('click', function () {
+      view = new Date(); view.setDate(1); drawCal();
+    });
+
+    box.querySelectorAll('td[data-day]').forEach(function (td) {
+      td.addEventListener('click', function (ev) {
+        if (ev.target.closest('.cal-ev')) return;
+        var f = document.getElementById('ev-date');
+        if (!f) return;
+        f.value = td.dataset.day;
+        document.getElementById('ev-id').value = '';
+        document.getElementById('ev-title').value = '';
+        document.getElementById('ev-body').value = '';
+        document.getElementById('ev-form-title').textContent = td.dataset.day + ' 일정 등록';
+        document.getElementById('ev-title').focus();
+        document.getElementById('cm-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+
+    box.querySelectorAll('.cal-ev').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var v = evs.filter(function (x) { return String(x.id) === el.dataset.ev; })[0];
+        if (!v) return;
+        if (!isOfficer) { alert(v.title + (v.body ? '\n\n' + v.body : '')); return; }
+        fillForm(v);
+      });
+    });
+
+    if (isOfficer) bindForm();
+  }
+
+  /* ---------- 등록 양식 ---------- */
+  function formHtml() {
+    return '<div class="admin-card" id="cm-form" style="margin-top:22px">' +
+      '<h3 style="margin-top:0" id="ev-form-title">일정·공지 등록</h3>' +
+      '<input type="hidden" id="ev-id">' +
+      '<div class="inline-form" style="margin-bottom:8px">' +
+      '<div class="field" style="flex:0 0 120px"><label>구분</label><select id="ev-kind">' +
+      '<option>일정</option><option>공지</option><option>할일</option></select></div>' +
+      '<div class="field" style="flex:0 0 170px"><label>날짜</label><input type="date" id="ev-date"></div>' +
+      '<div class="field"><label>제목</label><input type="text" id="ev-title"></div>' +
+      '<div class="field" style="flex:0 0 170px"><label>장소</label><input type="text" id="ev-place"></div>' +
+      '</div>' +
+      '<div class="field"><label>내용</label><textarea id="ev-body" rows="3"></textarea></div>' +
+      '<button class="btn" id="ev-save">저장</button> ' +
+      '<button class="btn ghost" id="ev-notify">부원에게 알리기</button> ' +
+      '<button class="btn ghost hidden" id="ev-new">새로 쓰기</button> ' +
+      '<button class="btn danger hidden" id="ev-del">삭제</button>' +
+      '<div class="form-msg" id="ev-msg"></div></div>';
+  }
+
+  function fillForm(v) {
+    document.getElementById('ev-id').value = v.id;
+    document.getElementById('ev-kind').value = v.kind || '일정';
+    document.getElementById('ev-date').value = v.event_date || '';
+    document.getElementById('ev-title').value = v.title || '';
+    document.getElementById('ev-place').value = v.place || '';
+    document.getElementById('ev-body').value = v.body || '';
+    document.getElementById('ev-form-title').textContent = '수정 : ' + v.title;
+    document.getElementById('ev-new').classList.remove('hidden');
+    document.getElementById('ev-del').classList.remove('hidden');
+    document.getElementById('cm-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function bindForm() {
+    var msg = document.getElementById('ev-msg');
+
+    document.getElementById('ev-save').addEventListener('click', function () {
+      var id = document.getElementById('ev-id').value;
+      var d = {
+        committee: NAME,
+        kind: document.getElementById('ev-kind').value,
+        title: document.getElementById('ev-title').value.trim(),
+        body: document.getElementById('ev-body').value.trim() || null,
+        event_date: document.getElementById('ev-date').value || null,
+        place: document.getElementById('ev-place').value.trim() || null,
+        updated_at: new Date().toISOString()
+      };
+      if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
+      if (!id) d.created_by = user.name;
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      db().then(function (c) {
+        return id ? c.from('committee_events').update(d).eq('id', id)
+                  : c.from('committee_events').insert(d);
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        SHSCloud.log(id ? 'update' : 'create', '상비부 ' + d.kind + (id ? ' 수정' : ' 등록'),
+                     NAME + ' / ' + d.title);
+        load();
+      });
+    });
+
+    document.getElementById('ev-new').addEventListener('click', function () {
+      ['ev-id', 'ev-title', 'ev-body', 'ev-place'].forEach(function (i) {
+        document.getElementById(i).value = '';
+      });
+      document.getElementById('ev-form-title').textContent = '일정·공지 등록';
+      this.classList.add('hidden');
+      document.getElementById('ev-del').classList.add('hidden');
+    });
+
+    document.getElementById('ev-del').addEventListener('click', function () {
+      var id = document.getElementById('ev-id').value;
+      if (!id) return;
+      var t = document.getElementById('ev-title').value;
+      if (!confirm('"' + t + '" 을 삭제하시겠습니까?')) return;
+      db().then(function (c) { return c.from('committee_events').delete().eq('id', id); })
+        .then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('delete', '상비부 일정 삭제', NAME + ' / ' + t);
+          load();
+        });
+    });
+
+    document.getElementById('ev-notify').addEventListener('click', function () {
+      var id = document.getElementById('ev-id').value;
+      if (!id) {
+        msg.className = 'form-msg err';
+        msg.textContent = '먼저 저장하신 뒤 알림을 보내실 수 있습니다. (달력에서 항목을 눌러 고르셔도 됩니다)';
+        return;
+      }
+      if (!confirm('이 부서 부원들에게 알림을 보내시겠습니까?')) return;
+      msg.className = 'form-msg'; msg.textContent = '보내는 중입니다...';
+      db().then(function (c) { return c.rpc('notify_committee', { p_event: Number(id) }); })
+        .then(function (r) {
+          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          msg.className = 'form-msg ok';
+          msg.textContent = (r.data || 0) > 0
+            ? r.data + '명에게 알림을 보냈습니다.'
+            : '새로 보낼 대상이 없습니다. (이미 보냈거나, 부원 중 홈페이지 가입자가 없습니다)';
+          SHSCloud.log('create', '상비부 알림 발송', NAME);
+          load();
+        });
+    });
+  }
+
+  /* ---------- 활동 내역 ---------- */
+  function drawList() {
+    var box = document.getElementById('cm-body');
+    if (!evs.length) {
+      box.innerHTML = '<p style="color:var(--gray-5)">등록된 활동이 없습니다.</p>' +
+        (isOfficer ? formHtml() : '');
+      if (isOfficer) bindForm();
+      return;
+    }
+    var h = '<table class="tbl"><thead><tr><th style="width:90px">구분</th><th style="width:120px">날짜</th>' +
+      '<th>내용</th><th style="width:130px">장소</th><th style="width:90px">알림</th>' +
+      (isOfficer ? '<th style="width:80px">관리</th>' : '') + '</tr></thead><tbody>';
+    evs.forEach(function (v) {
+      h += '<tr><td><span class="role-badge">' + e(v.kind) + '</span></td>' +
+        '<td>' + e(v.event_date || '-') + '</td>' +
+        '<td class="left"><strong>' + e(v.title) + '</strong>' +
+        (v.body ? '<div style="font-size:0.84rem;color:var(--gray-5)">' + e(v.body) + '</div>' : '') +
+        (v.created_by ? '<div style="font-size:0.78rem;color:var(--gray-5)">' + e(v.created_by) + '</div>' : '') +
+        '</td><td>' + e(v.place || '-') + '</td>' +
+        '<td>' + (v.notify ? '보냄' : '-') + '</td>' +
+        (isOfficer ? '<td><button class="btn ghost sm" data-edit="' + v.id + '">수정</button></td>' : '') +
+        '</tr>';
+    });
+    h += '</tbody></table>' + (isOfficer ? formHtml() : '');
+    box.innerHTML = h;
+    if (isOfficer) {
+      bindForm();
+      box.querySelectorAll('button[data-edit]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var v = evs.filter(function (x) { return String(x.id) === b.dataset.edit; })[0];
+          if (v) fillForm(v);
+        });
+      });
+    }
+  }
+
+  /* ---------- 부원 명단 ---------- */
+  function drawMem() {
+    var box = document.getElementById('cm-body');
+    function row(label, s) {
+      return '<tr><th style="width:110px">' + label + '</th><td class="left">' +
+        (s ? e(s) : '<span style="color:var(--gray-5)">-</span>') + '</td></tr>';
+    }
+    box.innerHTML = '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      '상비부원은 매년 4월 봄 정기노회에서 공천위원회 보고로 인준되며, 임기는 3년으로 매년 3분의 1씩 개선합니다. ' +
+      '(노회규칙 제11조)</p>' +
+      '<table class="tbl" style="max-width:760px"><tbody>' +
+      row('부장', com.head) + row('서기', com.clerk) + row('회계', com.treasurer) +
+      row('1년조', com.y1) + row('2년조', com.y2) + row('3년조', com.y3) +
+      '</tbody></table>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5)">명단 수정은 ' +
+      '<a href="admin.html" style="color:var(--navy);text-decoration:underline">회원 관리 → 상비부 배정</a>에서 합니다.</p>';
+  }
+
+  /* ---------- 모의고사 응시 승인 (고시규칙부) ---------- */
+  function drawExam() {
+    var box = document.getElementById('cm-body');
+    if (!isOfficer) {
+      box.innerHTML = '<div class="notice-banner">모의고사 응시 승인은 고시부 부장·서기가 처리합니다.</div>';
+      return;
+    }
+    if (!examReqs.length) {
+      box.innerHTML = '<div class="notice-banner">아직 응시 요청이 없습니다. ' +
+        '<a href="exam.html" style="color:var(--navy);text-decoration:underline">모의고사 화면 보기</a></div>';
+      return;
+    }
+    var h = '<div class="notice-banner">승인하시면 그분이 개인당 2회까지 모의고사를 보실 수 있습니다. ' +
+      '결정하시면 신청자에게 알림이 갑니다.</div>' +
+      '<table class="tbl"><thead><tr><th style="width:110px">성명</th><th style="width:150px">소속 교회</th>' +
+      '<th style="width:110px">구분</th><th>남긴 말</th><th style="width:150px">요청일</th>' +
+      '<th style="width:90px">상태</th><th style="width:180px">처리</th></tr></thead><tbody>';
+    examReqs.forEach(function (r) {
+      var label = { pending: '대기', approved: '승인', rejected: '반려' }[r.status] || r.status;
+      h += '<tr><td>' + e(r.user_name || '-') + '</td><td>' + e(r.user_church || '-') + '</td>' +
+        '<td>' + e(r.track) + '</td><td class="left">' + e(r.note || '') +
+        (r.decided_by ? '<div style="font-size:0.8rem;color:var(--gray-5)">처리: ' + e(r.decided_by) + '</div>' : '') +
+        '</td><td>' + e(String(r.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
+        '<td><span class="role-badge">' + label + '</span></td>' +
+        '<td>' + (r.status === 'pending'
+          ? '<button class="btn sm" data-xok="' + r.id + '">승인</button> ' +
+            '<button class="btn danger sm" data-xno="' + r.id + '">반려</button>'
+          : '<button class="btn ghost sm" data-x' + (r.status === 'approved' ? 'no' : 'ok') + '="' + r.id + '">' +
+            (r.status === 'approved' ? '승인 취소' : '다시 승인') + '</button>') +
+        '</td></tr>';
+    });
+    box.innerHTML = h + '</tbody></table><div class="form-msg" id="cm-msg"></div>';
+
+    function decide(id, status) {
+      var msg = document.getElementById('cm-msg');
+      var note = null;
+      if (status === 'rejected') {
+        note = prompt('반려 사유를 적어 주세요. (신청자에게 보입니다)', '');
+        if (note === null) return;
+      }
+      msg.className = 'form-msg'; msg.textContent = '처리 중입니다...';
+      var t = examReqs.filter(function (x) { return String(x.id) === String(id); })[0];
+      db().then(function (c) {
+        return c.from('exam_requests').update({
+          status: status, note: note || undefined,
+          decided_by: user.name, decided_at: new Date().toISOString()
+        }).eq('id', id);
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        SHSCloud.log('update', '모의고사 응시 ' + (status === 'approved' ? '승인' : '반려'),
+                     t ? t.user_name + ' / ' + t.track : id);
+        if (t) {
+          db().then(function (c) {
+            return c.from('notifications').insert({
+              user_id: t.user_id, kind: '고시',
+              title: status === 'approved' ? '모의고사 응시가 승인되었습니다'
+                                           : '모의고사 응시 요청이 반려되었습니다',
+              body: status === 'approved'
+                ? t.track + ' 구분으로 응시가 승인되었습니다. 자료실 → 고시 모의고사에서 시험을 보실 수 있습니다. (개인당 2회)'
+                : '요청이 반려되었습니다.' + (note ? ' 사유: ' + note : '')
+            });
+          }).catch(function () {});
+        }
+        load();
+      });
+    }
+    box.querySelectorAll('button[data-xok]').forEach(function (b) {
+      b.addEventListener('click', function () { decide(b.dataset.xok, 'approved'); });
+    });
+    box.querySelectorAll('button[data-xno]').forEach(function (b) {
+      b.addEventListener('click', function () { decide(b.dataset.xno, 'rejected'); });
+    });
+  }
+
+  /* ---------- 자료 열람 요청 ---------- */
+  function drawAcc() {
+    var box = document.getElementById('cm-body');
+    var h = '';
+
+    if (!isOfficer) {
+      var mineReq = accReqs.filter(function (r) { return r.user_id === user.id; });
+      h += '<div class="notice-banner">이 부서가 보관하는 자료를 보시려면 열람을 요청해 주세요. ' +
+        '부장·서기가 확인한 뒤 알려 드립니다.</div>';
+      if (mineReq.length) {
+        h += '<table class="tbl" style="max-width:760px"><thead><tr><th>요청 자료</th>' +
+          '<th style="width:150px">요청일</th><th style="width:110px">상태</th></tr></thead><tbody>';
+        mineReq.forEach(function (r) {
+          var label = { pending: '대기', approved: '승인', rejected: '반려' }[r.status] || r.status;
+          h += '<tr><td class="left">' + e(r.subject) +
+            (r.reason ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(r.reason) + '</div>' : '') +
+            '</td><td>' + e(String(r.created_at).slice(0, 10)) + '</td>' +
+            '<td><span class="role-badge">' + label + '</span></td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+      h += '<div class="admin-card" style="max-width:640px;margin-top:16px">' +
+        '<h3 style="margin-top:0">열람 요청</h3>' +
+        '<div class="field"><label>보고 싶은 자료</label><input type="text" id="ac-subject" placeholder="예: 지난 회기 고시 문제 유형"></div>' +
+        '<div class="field"><label>사유 (선택)</label><input type="text" id="ac-reason"></div>' +
+        '<button class="btn" id="ac-send">요청하기</button><div class="form-msg" id="ac-msg"></div></div>';
+      box.innerHTML = h;
+
+      document.getElementById('ac-send').addEventListener('click', function () {
+        var msg = document.getElementById('ac-msg');
+        var d = {
+          committee: NAME, user_id: user.id, user_name: user.name, user_church: user.church,
+          subject: document.getElementById('ac-subject').value.trim(),
+          reason: document.getElementById('ac-reason').value.trim() || null
+        };
+        if (!d.subject) { msg.className = 'form-msg err'; msg.textContent = '보고 싶은 자료를 적어 주세요.'; return; }
+        msg.className = 'form-msg'; msg.textContent = '보내는 중입니다...';
+        db().then(function (c) { return c.from('access_requests').insert(d); }).then(function (r) {
+          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          SHS.logAction('create', '자료 열람 요청', NAME + ' / ' + d.subject);
+          load();
+        });
+      });
+      return;
+    }
+
+    /* 임원 화면 */
+    if (!accReqs.length) {
+      box.innerHTML = '<div class="notice-banner">아직 열람 요청이 없습니다.</div>';
+      return;
+    }
+    h += '<table class="tbl"><thead><tr><th style="width:110px">성명</th><th style="width:140px">소속 교회</th>' +
+      '<th>요청 자료</th><th style="width:140px">요청일</th><th style="width:90px">상태</th>' +
+      '<th style="width:180px">처리</th></tr></thead><tbody>';
+    accReqs.forEach(function (r) {
+      var label = { pending: '대기', approved: '승인', rejected: '반려' }[r.status] || r.status;
+      h += '<tr><td>' + e(r.user_name || '-') + '</td><td>' + e(r.user_church || '-') + '</td>' +
+        '<td class="left"><strong>' + e(r.subject) + '</strong>' +
+        (r.reason ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(r.reason) + '</div>' : '') +
+        (r.decided_by ? '<div style="font-size:0.8rem;color:var(--gray-5)">처리: ' + e(r.decided_by) + '</div>' : '') +
+        '</td><td>' + e(String(r.created_at).slice(0, 10)) + '</td>' +
+        '<td><span class="role-badge">' + label + '</span></td>' +
+        '<td>' + (r.status === 'pending'
+          ? '<button class="btn sm" data-aok="' + r.id + '">승인</button> ' +
+            '<button class="btn danger sm" data-ano="' + r.id + '">반려</button>'
+          : '-') + '</td></tr>';
+    });
+    box.innerHTML = h + '</tbody></table><div class="form-msg" id="cm-msg"></div>';
+
+    function decideAcc(id, status) {
+      var msg = document.getElementById('cm-msg');
+      var note = status === 'approved'
+        ? prompt('신청자에게 전할 말을 적어 주세요. (열람 방법 등)', '노회 사무실에서 열람하실 수 있습니다.')
+        : prompt('반려 사유를 적어 주세요.', '');
+      if (note === null) return;
+      var t = accReqs.filter(function (x) { return String(x.id) === String(id); })[0];
+      msg.className = 'form-msg'; msg.textContent = '처리 중입니다...';
+      db().then(function (c) {
+        return c.from('access_requests').update({
+          status: status, decided_by: user.name, decided_at: new Date().toISOString()
+        }).eq('id', id);
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        SHSCloud.log('update', '자료 열람 요청 ' + (status === 'approved' ? '승인' : '반려'),
+                     NAME + ' / ' + (t ? t.subject : id));
+        if (t) {
+          db().then(function (c) {
+            return c.from('notifications').insert({
+              user_id: t.user_id, kind: '상비부',
+              title: '[' + NAME + '] 자료 열람 요청이 ' + (status === 'approved' ? '승인' : '반려') + '되었습니다',
+              body: t.subject + (note ? '\n' + note : '')
+            });
+          }).catch(function () {});
+        }
+        load();
+      });
+    }
+    box.querySelectorAll('button[data-aok]').forEach(function (b) {
+      b.addEventListener('click', function () { decideAcc(b.dataset.aok, 'approved'); });
+    });
+    box.querySelectorAll('button[data-ano]').forEach(function (b) {
+      b.addEventListener('click', function () { decideAcc(b.dataset.ano, 'rejected'); });
+    });
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>

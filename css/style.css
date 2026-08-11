@@ -406,6 +406,71 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   padding: 36px;
 }
 .form-card h2 { border: none; padding: 0; text-align: center; margin-bottom: 24px; }
+/* ---------- 상비부 대시보드 ---------- */
+.db-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 14px; margin-bottom: 30px;
+}
+.db-card {
+  display: block; border: 1px solid var(--gray-2); border-top: 3px solid var(--gray-3);
+  padding: 18px 20px; background: #fff; color: inherit;
+}
+.db-card:hover { border-color: var(--gray-5); border-top-color: var(--navy); }
+.db-card.mine { border-top-color: var(--navy); background: var(--gray-1); }
+.db-role {
+  display: inline-block; font-size: 0.74rem; color: #fff; background: var(--navy);
+  padding: 1px 8px; margin-bottom: 7px;
+}
+.db-name { font-size: 1.06rem; font-weight: 700; color: var(--navy); margin-bottom: 5px; }
+.db-officer { font-size: 0.82rem; color: var(--gray-5); margin-bottom: 9px; }
+.db-lines { font-size: 0.86rem; color: var(--gray-7); line-height: 1.75; }
+.db-lines strong { color: var(--navy); margin-right: 5px; }
+.db-count { font-size: 0.78rem; color: var(--gray-5); margin-top: 6px; }
+.db-alert { color: var(--red, #b8352e); font-weight: 600; }
+
+.cm-head { border: 1px solid var(--gray-2); padding: 18px 22px; margin-bottom: 20px; }
+.cm-officers span { margin-right: 24px; font-size: 0.92rem; color: var(--gray-7); }
+.cm-officers strong { color: var(--navy); margin-right: 6px; }
+.cm-duty { margin: 12px 0 0; font-size: 0.88rem; color: var(--gray-5); line-height: 1.7; }
+
+/* 달력 */
+.cal-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cal-title { font-size: 1.1rem; font-weight: 700; color: var(--navy); margin: 0 6px; }
+table.cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.cal th {
+  background: var(--navy); color: #fff; padding: 9px 0; font-size: 0.86rem; font-weight: 500;
+  border: 1px solid var(--navy);
+}
+table.cal th.sun { color: #ffc9c4; }
+table.cal th.sat { color: #c4d8ff; }
+table.cal td {
+  border: 1px solid var(--gray-2); height: 104px; vertical-align: top; padding: 5px 6px;
+  background: #fff;
+}
+table.cal td[data-day] { cursor: pointer; }
+table.cal td[data-day]:hover { background: var(--gray-1); }
+table.cal td.empty { background: var(--gray-1); }
+table.cal td.today { background: #eef2f8; }
+table.cal td.today .cal-d { background: var(--navy); color: #fff; }
+.cal-d {
+  display: inline-block; min-width: 22px; height: 22px; line-height: 22px; text-align: center;
+  font-size: 0.82rem; color: var(--gray-7); margin-bottom: 4px;
+}
+td.sun .cal-d { color: var(--red, #b8352e); }
+td.sat .cal-d { color: #2a4d8f; }
+.cal-ev {
+  font-size: 0.76rem; line-height: 1.4; padding: 3px 5px; margin-bottom: 3px; cursor: pointer;
+  background: var(--navy); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cal-ev.notice { background: var(--accent, #c8a24a); }
+.cal-ev.todo { background: #fff; color: var(--navy); border: 1px solid var(--navy); }
+.cal-ev.done { opacity: 0.5; text-decoration: line-through; }
+.cal-ev:hover { opacity: 0.85; }
+@media (max-width: 700px) {
+  table.cal td { height: 72px; }
+  .cal-ev { font-size: 0.68rem; }
+}
+
 /* ---------- 고시 모의고사 ---------- */
 .exam-state { border-left: 4px solid var(--gray-3); background: var(--gray-1); padding: 14px 18px; margin-bottom: 18px; }
 .exam-state.ok { border-left-color: #2f7d4f; }
