@@ -39,7 +39,8 @@
       { t: '노회 회의록', h: 'minutes.html' },
       { t: '서류 발급', h: 'documents.html' },
       { t: '회원 관리', h: 'admin.html' },
-      { t: '사이트 관리', h: 'manage.html' }
+      { t: '사이트 관리', h: 'manage.html' },
+      { t: '시스템 운영', h: 'ops.html' }
     ]}
   ];
 
@@ -215,76 +216,100 @@
     });
   }
 
-  /* ---------- 정기노회 일정 알림 ----------
-   * 노회규칙 제24조: 정기회는 연 2회.
-   *  봄  : 부활절 다음 주 월요일 (2026년 부활절 4/5 → 4/13 개회와 일치)
-   *  가을: 10월 둘째 주 주일 후 월요일
-   * 정기회가 폐회되면 간사·서기·노회장·최고관리자에게
-   * 임원 등록과 명단·상비부 갱신을 요청하는 안내를 띄운다. */
+  /* ---------- 시스템 운영 알림 ----------
+   * 봄 정기노회: 4월 둘째 주 월요일(통상 부활절 다음 주) / 가을 정기노회: 10월 둘째 주 월요일 (기준일은 운영 일정에서 변경 가능)
+   * 알림 규칙은 서버(ops_notices)에서 관리하며, 간사·서기·노회장이 받는다. */
 
-  function easterDate(y) {
-    var a = y % 19, b = Math.floor(y / 100), c = y % 100;
-    var d = Math.floor(b / 4), ee = b % 4, f = Math.floor((b + 8) / 25);
-    var g = Math.floor((b - f + 1) / 3);
-    var h = (19 * a + b - d - g + 15) % 30;
-    var i = Math.floor(c / 4), k = c % 4;
-    var l = (32 + 2 * ee + 2 * i - h - k) % 7;
-    var m = Math.floor((a + 11 * h + 22 * l) / 451);
-    var month = Math.floor((h + l - 7 * m + 114) / 31);
-    var day = ((h + l - 7 * m + 114) % 31) + 1;
-    return new Date(y, month - 1, day);
+  function nthMonday(y, month, week) {
+    var first = new Date(y, month - 1, 1).getDay();      /* 0=일 */
+    var firstMonday = 1 + ((8 - first) % 7);
+    return new Date(y, month - 1, firstMonday + 7 * (week - 1));
   }
 
-  function springMeeting(y) {
-    var d = easterDate(y);
-    d.setDate(d.getDate() + 8);  /* 부활절(주일) 다음 주 월요일 */
-    return d;
+  var DEFAULT_OPS_DATES = { springMonth: 4, springWeek: 2, fallMonth: 10, fallWeek: 2 };
+
+  var DEFAULT_OPS_NOTICES = [
+    { id: 'd1', title: '임원 교체 안내', audience: '간사', rule: 'spring', offset_days: 0, window_days: 21, active: true,
+      message: '봄 정기노회 주간입니다. 사이트 관리 → 임원 명부와 회원 관리 → 노회 명단을 신임 임원으로 갱신해 주세요.' },
+    { id: 'd2', title: '상비부 명부 수정 안내', audience: '간사', rule: 'spring', offset_days: 0, window_days: 21, active: true,
+      message: '상비부 배정이 확정되는 기간입니다. 회원 관리 → 상비부 배정 관리에서 새 배정을 입력해 주세요.' },
+    { id: 'd3', title: '고시부 공문 발송 안내 (봄)', audience: '간사', rule: 'before_spring', offset_days: 45, window_days: 45, active: true,
+      message: '봄 정기노회 한 달 반 전입니다. 고시규칙부에 공문 발송을 안내해 주세요.' },
+    { id: 'd4', title: '고시부 공문 발송 안내 (가을)', audience: '간사', rule: 'before_fall', offset_days: 45, window_days: 45, active: true,
+      message: '가을 정기노회 한 달 반 전입니다. 고시규칙부에 공문 발송을 안내해 주세요.' }
+  ];
+
+  function opsRuleLabel(n) {
+    var base = { spring: '봄 정기노회', fall: '가을 정기노회', before_spring: '봄 정기노회', before_fall: '가을 정기노회', fixed: (n.fixed_date || '') }[n.rule] || n.rule;
+    if (n.rule === 'fixed') return base + '부터 ' + n.window_days + '일간';
+    var when = n.offset_days > 0 ? base + ' ' + n.offset_days + '일 전부터' : base + ' 주간부터';
+    return when + ' ' + n.window_days + '일간';
   }
 
-  function fallMeeting(y) {
-    var d = new Date(y, 9, 1);   /* 10월 1일 */
-    var firstSunday = 1 + ((7 - d.getDay()) % 7);
-    return new Date(y, 9, firstSunday + 7 + 1);  /* 둘째 주 주일 + 1일(월) */
+  function opsActive(rows, dates) {
+    dates = dates || DEFAULT_OPS_DATES;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    var out = [];
+    [today.getFullYear()].forEach(function (y) {
+      var spring = nthMonday(y, dates.springMonth, dates.springWeek);
+      var fall = nthMonday(y, dates.fallMonth, dates.fallWeek);
+      rows.forEach(function (n) {
+        if (!n.active) return;
+        var base;
+        if (n.rule === 'spring' || n.rule === 'before_spring') base = spring;
+        else if (n.rule === 'fall' || n.rule === 'before_fall') base = fall;
+        else if (n.rule === 'fixed' && n.fixed_date) base = new Date(n.fixed_date + 'T00:00:00');
+        else return;
+        var start = new Date(base.getTime() - n.offset_days * 86400000);
+        var end = new Date(start.getTime() + n.window_days * 86400000);
+        if (today < start || today > end) return;
+        var doneKey = 'shs_ops_done_' + n.id + '_' + y;
+        if (localStorage.getItem(doneKey)) return;
+        out.push({
+          id: n.id, title: n.title, message: n.message, audience: n.audience,
+          doneKey: doneKey,
+          period: (start.getMonth() + 1) + '.' + start.getDate() + ' ~ ' + (end.getMonth() + 1) + '.' + end.getDate()
+        });
+      });
+    });
+    return out;
   }
 
+  /* 관리자 화면 상단 배너: 확인이 필요한 시스템 알림 안내 */
   function meetingReminder(u) {
     if (!u || !SHSAuth.canManageMembers(u)) return;
-    var today = new Date();
-    var y = today.getFullYear();
-    /* 봄 회기: 2026년 봄 = 제19회 */
-    var events = [
-      { key: 'spring' + y, date: springMeeting(y), label: '제' + (19 + (y - 2026)) + '회 봄 정기노회',
-        tasks: '신임 임원 등록(조직 페이지·명단·계정 등급), 상비부 배정 갱신, 회의록 등록' },
-      { key: 'fall' + y, date: fallMeeting(y), label: '제' + (19 + (y - 2026)) + '회기 가을 정기노회',
-        tasks: '결의사항·회의록 등록, 명단 변동 반영' }
-    ];
-    events.forEach(function (ev) {
-      var from = ev.date.getTime();
-      var until = from + 45 * 24 * 3600 * 1000;   /* 폐회 후 45일간 안내 */
-      var now = today.getTime();
-      if (now < from || now > until) return;
-      if (localStorage.getItem('shs_reminder_done_' + ev.key)) return;
 
-      var dateStr = (ev.date.getMonth() + 1) + '월 ' + ev.date.getDate() + '일';
+    function show(active) {
+      if (!active.length) return;
       var bar = document.createElement('div');
       bar.className = 'container';
       bar.style.marginTop = '16px';
       bar.innerHTML =
         '<div class="notice-banner" style="border-left:4px solid var(--accent)">' +
-        '<strong>[홈페이지 갱신 요청]</strong> ' + ev.label + '(' + dateStr + ')가 폐회되었습니다. ' +
-        '다음 사항을 갱신해 주세요: ' + ev.tasks + '. ' +
-        '<a class="btn sm" style="margin-left:8px" href="admin.html">회원 관리로 이동</a> ' +
-        '<button class="btn ghost sm" id="rem-' + ev.key + '">갱신 완료 (알림 끄기)</button>' +
+        '<strong>[시스템 알림]</strong> 확인이 필요한 운영 알림이 ' + active.length + '건 있습니다: ' +
+        active.map(function (n) { return n.title; }).join(', ') + ' ' +
+        '<a class="btn sm" style="margin-left:8px" href="ops.html">알림 확인하기</a>' +
         '</div>';
       var gnb = document.querySelector('.gnb');
       if (gnb) gnb.insertAdjacentElement('afterend', bar);
-      var btn = document.getElementById('rem-' + ev.key);
-      if (btn) btn.addEventListener('click', function () {
-        localStorage.setItem('shs_reminder_done_' + ev.key, '1');
-        SHS.logAction('update', '정기노회 갱신 완료 확인', ev.label);
-        bar.remove();
+    }
+
+    if (u.cloud && window.SHSCloud && SHSCloud.enabled()) {
+      SHSCloud.init().then(function (c) {
+        if (!c) return;
+        return Promise.all([
+          c.from('ops_notices').select('*'),
+          c.from('site_settings').select('*').eq('key', 'ops_dates').single()
+        ]);
+      }).then(function (rs) {
+        if (!rs || rs[0].error) { show(opsActive(DEFAULT_OPS_NOTICES, DEFAULT_OPS_DATES)); return; }
+        var dates = (rs[1] && rs[1].data && rs[1].data.value) || DEFAULT_OPS_DATES;
+        show(opsActive(rs[0].data || [], dates));
       });
-    });
+      return;
+    }
+    show(opsActive(DEFAULT_OPS_NOTICES, DEFAULT_OPS_DATES));
   }
 
   /* 통합 감사 로그: 서버가 연결되어 있으면 서버에, 아니면 브라우저에 기록 */
@@ -296,11 +321,55 @@
     }
   }
 
+  /* ---------- 직분 판정 (위임목사) ----------
+   * 조직교회(장로가 있는 교회)의 담임목사는 위임목사로 등록한다. */
+  function normChurchName(s) {
+    return String(s || '').replace(/\s+/g, '').replace(/교회$/, '');
+  }
+  function isOrganizedChurch(church) {
+    var c = normChurchName(church);
+    if (!c) return false;
+    var found = false;
+    Object.keys(SHSData.elders || {}).forEach(function (k) {
+      (SHSData.elders[k] || []).forEach(function (el) {
+        if (normChurchName(el.church) === c) found = true;
+      });
+    });
+    return found;
+  }
+  function isSeniorPastorOf(name, church) {
+    var n = String(name || '').replace(/\s+/g, '');
+    var c = normChurchName(church);
+    return (SHSData.pastors || []).some(function (p) {
+      return normChurchName(p.church) === c && p.name.replace(/\s+/g, '') === n;
+    });
+  }
+  /* 저장 직전에 직분을 확정한다.
+   * 반환: { blocked, msg, position, note } */
+  function adjustPosition(name, church, position) {
+    if (position === '위임목사' && !isOrganizedChurch(church)) {
+      return {
+        blocked: true,
+        msg: '위임목사 직분은 조직교회(장로가 있는 교회)의 담임목사에게 부여됩니다. ' +
+             '입력하신 교회는 조직교회로 확인되지 않습니다. 해당 사항이 있으시면 노회 서기에게 문의해 주세요.'
+      };
+    }
+    if (position === '목사' && isOrganizedChurch(church) && isSeniorPastorOf(name, church)) {
+      return { position: '위임목사', note: '조직교회 담임목사로 확인되어 직분이 위임목사로 등록됩니다.' };
+    }
+    return { position: position };
+  }
+
   /* 전역 헬퍼 */
   window.SHS = {
     user: user,
     getUser: getUser,
     logAction: logAction,
+    nthMonday: nthMonday,
+    opsActive: opsActive,
+    opsRuleLabel: opsRuleLabel,
+    isOrganizedChurch: isOrganizedChurch,
+    adjustPosition: adjustPosition,
     maskName: maskName,
     esc: function (s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {

@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="field"><label>성명</label><input type="text" id="ro-name"></div>' +
         '<div class="field"><label>소속 교회</label><input type="text" id="ro-church"></div>' +
         '<div class="field"><label>직분</label><select id="ro-pos">' +
-        ['목사', '부목사', '원로목사', '은퇴목사', '장로', '간사'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
+        ['목사', '위임목사', '부목사', '원로목사', '은퇴목사', '장로', '간사'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
         '</select></div>' +
         '<div class="field"><label>구분 (가입 시 자동 부여될 등급)</label><select id="ro-grade">' +
         GRADES.filter(function (g) { return g.v !== 'pending'; }).map(function (g) {

@@ -124,7 +124,7 @@
     </div>
     <div class="field">
       <label for="reg-pos">직분</label>
-      <select id="reg-pos"><option>목사</option><option>장로</option><option>간사</option></select>
+      <select id="reg-pos"><option>목사</option><option>위임목사</option><option>부목사</option><option>장로</option><option>간사</option></select>
     </div>
     <div class="field">
       <label for="reg-church">소속 교회</label>
@@ -310,6 +310,13 @@ document.addEventListener('DOMContentLoaded', function () {
         msg.textContent = '비밀번호는 6자 이상으로 입력해 주세요.';
         return;
       }
+      var adj = SHS.adjustPosition(name, church, position);
+      if (adj.blocked) {
+        msg.className = 'form-msg err';
+        msg.textContent = adj.msg;
+        return;
+      }
+      position = adj.position;
       msg.className = 'form-msg';
       msg.textContent = '가입 처리 중입니다...';
       SHSCloud.init().then(function (c) {

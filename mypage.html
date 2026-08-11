@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>이메일 (구글 계정)</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
       '<div class="field"><label>성명</label><input type="text" id="q-name" value="' + e(p.name || '') + '"></div>' +
       '<div class="field"><label>직분</label><select id="q-pos">' +
-      ['목사', '부목사', '장로', '간사'].map(function (x) {
+      ['목사', '위임목사', '부목사', '장로', '간사'].map(function (x) {
         return '<option' + (p.position === x ? ' selected' : '') + '>' + x + '</option>';
       }).join('') + '</select></div>' +
       '<div class="field"><label>소속 교회</label><select id="q-church">' +
@@ -110,9 +110,17 @@ document.addEventListener('DOMContentLoaded', function () {
         msg.textContent = '성명과 소속 교회를 입력해 주세요.';
         return;
       }
+      /* 위임목사 직분 확인: 조직교회 담임만 가능 */
+      var adj = SHS.adjustPosition(name, church, document.getElementById('q-pos').value);
+      if (adj.blocked) {
+        msg.className = 'form-msg err';
+        msg.textContent = adj.msg;
+        return;
+      }
+      if (adj.note) alert(adj.note);
       msg.className = 'form-msg';
       msg.textContent = '저장 중입니다...';
-      SHSCloud.claimMembership(name, church, document.getElementById('q-pos').value,
+      SHSCloud.claimMembership(name, church, adj.position,
         document.getElementById('q-phone').value.trim()).then(function (r) {
         if (!r.ok) {
           msg.className = 'form-msg err';
