@@ -31,18 +31,18 @@ document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('officer-area');
   var e = SHS.esc;
 
-  /* 임원방 접근: 노회장, 서기, 간사, 최고관리자 */
+  /* 임원방 접근: 노회장, 서기, 간사 */
   var hasAccess = user && (user.role === 'president' || user.role === 'clerk' || user.role === 'staff' || user.role === 'superadmin');
 
   if (!user) {
     area.innerHTML =
-      '<div class="notice-banner">임원방은 노회 임원(노회장·서기·간사)과 최고관리자만 이용할 수 있습니다. ' +
+      '<div class="notice-banner">임원방은 노회 임원만 이용할 수 있습니다. ' +
       '로그인 후 이용해 주시기 바랍니다. <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
     return;
   }
   if (!hasAccess) {
     area.innerHTML =
-      '<div class="notice-banner">임원방은 <strong>노회장, 서기, 간사, 최고관리자</strong>만 이용할 수 있는 공간입니다. ' +
+      '<div class="notice-banner">임원방은 <strong>노회장, 서기, 간사</strong>가 이용할 수 있는 공간입니다. ' +
       '현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 열람할 수 없습니다.</div>';
     return;
   }
@@ -56,7 +56,9 @@ document.addEventListener('DOMContentLoaded', function () {
   html += '<div class="doc-item"><div class="d-name">노회 회의록</div><div class="d-desc">제19회 정기노회 회의록 전문을 열람합니다. (임원 전용)</div><a class="btn sm" href="minutes.html">바로가기</a></div>';
   html += '<div class="doc-item"><div class="d-name">서류 발급</div><div class="d-desc">소속·재직·대표자·직인 증명서 등 각종 서류를 발급합니다. (노회장·서기·간사)</div><a class="btn sm" href="documents.html">바로가기</a></div>';
   html += '<div class="doc-item"><div class="d-name">회원 관리</div><div class="d-desc">회원명단과 홈페이지 계정을 추가·삭제하고, 승인대기 회원을 정회원으로 설정합니다.</div><a class="btn sm" href="admin.html">바로가기</a></div>';
-  html += '<div class="doc-item"><div class="d-name">감독 (감사 로그)</div><div class="d-desc">개인정보 열람, 자료 추가·수정·삭제, 서류 발급 기록을 확인합니다. (최고관리자 전용)</div><a class="btn sm" href="audit.html">바로가기</a></div>';
+  if (user.role === 'superadmin') {
+    html += '<div class="doc-item"><div class="d-name">감독 (감사 로그)</div><div class="d-desc">개인정보 열람, 자료 추가·수정·삭제, 서류 발급 기록을 확인합니다.</div><a class="btn sm" href="audit.html">바로가기</a></div>';
+  }
   html += '</div>';
 
   /* 임원회 결의사항 전체 (공개 저장소 미포함 자료) */

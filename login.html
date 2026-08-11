@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
               (cr.title ? cr.title + '(' + cr.roleName + ')' : cr.roleName) + ' 등급으로 가입되었습니다.';
           } else {
             msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
-              '서기·간사·최고관리자 확인 후 정회원으로 전환됩니다.';
+              '서기·간사 확인 후 정회원으로 전환됩니다.';
           }
           setTimeout(function () { location.href = 'index.html'; }, 1800);
         });
@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function () {
         ' 등급으로 가입되었습니다. 로그인해 주세요.';
     } else {
       msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
-        '서기·간사·최고관리자 확인 후 정회원으로 전환됩니다.';
+        '서기·간사 확인 후 정회원으로 전환됩니다.';
     }
     ['reg-id', 'reg-pw', 'reg-name', 'reg-church', 'reg-phone'].forEach(function (id) {
       document.getElementById(id).value = '';

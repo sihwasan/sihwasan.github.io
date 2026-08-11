@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (!user || !SHSAuth.canManageMembers(user)) {
     area.innerHTML =
-      '<div class="notice-banner">회원 관리는 <strong>노회장, 서기, 간사, 최고관리자</strong>만 이용할 수 있습니다.' +
+      '<div class="notice-banner">회원 관리는 <strong>노회장, 서기, 간사</strong>가 이용할 수 있습니다.' +
       (user ? ' 현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 이용할 수 없습니다.'
             : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
       '</div>';
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var html = '';
       html += '<div class="notice-banner">서버에 등록된 실제 회원 목록입니다. ' +
-        '승인대기 회원의 정회원 설정: <strong>서기, 간사, 최고관리자</strong>' +
+        '승인대기 회원의 정회원 설정: <strong>서기, 간사</strong>' +
         (isSuper ? ' / 등급 지정: <strong>최고관리자</strong>' : '') + '</div>';
 
       if (pendings.length) {
@@ -82,14 +82,15 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th><th>연락처</th><th>등급</th>' +
         (isSuper ? '<th style="width:210px">등급 변경</th>' : '') + '</tr></thead><tbody>';
       visible.forEach(function (p) {
+        var cur = gradeValue(p);
         html += '<tr><td class="left">' + e(p.email) + '</td><td>' + e(p.name || '-') + '</td>' +
           '<td>' + e(p.position || '-') + '</td><td>' + e(p.church || '-') + '</td><td>' + e(p.phone || '-') + '</td>' +
           '<td><span class="role-badge">' + SHSCloud.roleName(p.role) + '</span>' +
           (p.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(p.title) + '</div>' : '') + '</td>';
         if (isSuper) {
           html += '<td><select data-crole="' + e(p.id) + '">' +
-            ['pending', 'member', 'officer', 'staff', 'clerk', 'president', 'superadmin'].map(function (x) {
-              return '<option value="' + x + '"' + (p.role === x ? ' selected' : '') + '>' + SHSCloud.roleName(x) + '</option>';
+            GRADES.map(function (g) {
+              return '<option value="' + g.v + '"' + (cur === g.v ? ' selected' : '') + '>' + g.t + '</option>';
             }).join('') +
             '</select> <button class="btn sm" data-cassign="' + e(p.id) + '">적용</button></td>';
         }
@@ -109,12 +110,13 @@ document.addEventListener('DOMContentLoaded', function () {
       renderRoster();
       renderCommittees();
 
-      function updateRole(id, role, label) {
+      function updateRole(id, grade, label) {
+        var g = parseGrade(grade);
         SHSCloud.init().then(function (c) {
-          return c.from('profiles').update({ role: role, updated_at: new Date().toISOString() }).eq('id', id);
+          return c.from('profiles').update({ role: g.role, title: g.title, updated_at: new Date().toISOString() }).eq('id', id);
         }).then(function (res) {
           if (res.error) { alert('처리하지 못했습니다: ' + res.error.message); return; }
-          SHSCloud.log('update', label, '대상 ' + id + ' → ' + SHSCloud.roleName(role));
+          SHSCloud.log('update', label, '대상 ' + id + ' → ' + gradeLabel(grade));
           alert('처리되었습니다.');
           renderCloud();
         });
@@ -129,11 +131,42 @@ document.addEventListener('DOMContentLoaded', function () {
       area.querySelectorAll('button[data-cassign]').forEach(function (b) {
         b.addEventListener('click', function () {
           var sel = area.querySelector('select[data-crole="' + b.dataset.cassign + '"]');
-          if (!confirm('등급을 ' + SHSCloud.roleName(sel.value) + '(으)로 변경하시겠습니까?')) return;
+          if (!confirm('등급을 ' + gradeLabel(sel.value) + '(으)로 변경하시겠습니까?')) return;
           updateRole(b.dataset.cassign, sel.value, '등급 변경');
         });
       });
     });
+  }
+
+  /* ---------- 등급·직책 체계 ----------
+   * 노회 임원 직책: 회록부서기, 회록서기, 부서기, 서기, 부회계, 회계,
+   *                부노회장, (장로)부노회장, 노회장  (그 외: 간사, 정회원, 승인대기)
+   * 서기·노회장·간사는 홈페이지 관리 권한을 함께 갖는다. */
+  var GRADES = [
+    { v: 'pending', t: '승인대기', role: 'pending', title: null },
+    { v: 'member', t: '정회원', role: 'member', title: null },
+    { v: 'staff', t: '간사', role: 'staff', title: '간사' },
+    { v: 'officer:회록부서기', t: '회록부서기', role: 'officer', title: '회록부서기' },
+    { v: 'officer:회록서기', t: '회록서기', role: 'officer', title: '회록서기' },
+    { v: 'officer:부서기', t: '부서기', role: 'officer', title: '부서기' },
+    { v: 'clerk', t: '서기', role: 'clerk', title: '서기' },
+    { v: 'officer:부회계', t: '부회계', role: 'officer', title: '부회계' },
+    { v: 'officer:회계', t: '회계', role: 'officer', title: '회계' },
+    { v: 'officer:부노회장', t: '부노회장', role: 'officer', title: '부노회장' },
+    { v: 'officer:(장로)부노회장', t: '(장로)부노회장', role: 'officer', title: '(장로)부노회장' },
+    { v: 'president', t: '노회장', role: 'president', title: '노회장' }
+  ];
+  function parseGrade(v) {
+    for (var i = 0; i < GRADES.length; i++) if (GRADES[i].v === v) return GRADES[i];
+    return { role: v, title: null };
+  }
+  function gradeLabel(v) {
+    var g = parseGrade(v);
+    return g.t || v;
+  }
+  function gradeValue(p) {
+    if (p.role === 'officer' && p.title) return 'officer:' + p.title;
+    return p.role;
   }
 
   /* ---------- 노회 명단 관리 (추가·수정·삭제) ---------- */
@@ -156,10 +189,11 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="field"><label>직분</label><select id="ro-pos">' +
         ['목사', '부목사', '원로목사', '은퇴목사', '장로', '간사'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
         '</select></div>' +
-        '<div class="field"><label>부여 등급</label><select id="ro-role">' +
-        Object.keys(ROSTER_ROLES).map(function (k) { return '<option value="' + k + '">' + ROSTER_ROLES[k] + '</option>'; }).join('') +
+        '<div class="field"><label>구분 (가입 시 자동 부여될 등급)</label><select id="ro-grade">' +
+        GRADES.filter(function (g) { return g.v !== 'pending'; }).map(function (g) {
+          return '<option value="' + g.v + '">' + g.t + '</option>';
+        }).join('') +
         '</select></div>' +
-        '<div class="field"><label>임원 직책 (해당 시)</label><input type="text" id="ro-title" placeholder="예: 부서기"></div>' +
         '<button class="btn" id="ro-add">추가</button>' +
         '</div><div class="form-msg" id="ro-msg"></div></div>';
 
@@ -167,7 +201,7 @@ document.addEventListener('DOMContentLoaded', function () {
       rows.forEach(function (m, i) {
         html += '<tr><td>' + (i + 1) + '</td><td>' + e(m.name) + '</td><td>' + e(m.church) + '</td>' +
           '<td>' + e(m.position || '-') + '</td>' +
-          '<td><span class="role-badge">' + (ROSTER_ROLES[m.role] || m.role) + '</span></td>' +
+          '<td><span class="role-badge">' + e(m.officer_title || ROSTER_ROLES[m.role] || m.role) + '</span></td>' +
           '<td>' + e(m.officer_title || '-') + '</td>' +
           '<td><button class="btn danger sm" data-rodel="' + m.id + '" data-roname="' + e(m.name) + '">삭제</button></td></tr>';
       });
@@ -181,8 +215,8 @@ document.addEventListener('DOMContentLoaded', function () {
           name: document.getElementById('ro-name').value.trim(),
           church: document.getElementById('ro-church').value.trim(),
           position: document.getElementById('ro-pos').value,
-          role: document.getElementById('ro-role').value,
-          officer_title: document.getElementById('ro-title').value.trim() || null
+          role: parseGrade(document.getElementById('ro-grade').value).role,
+          officer_title: parseGrade(document.getElementById('ro-grade').value).title
         };
         if (!d.name || !d.church) {
           msg.className = 'form-msg err';
@@ -197,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function () {
             msg.textContent = res.error.code === '23505' ? '이미 명단에 있는 회원입니다.' : res.error.message;
             return;
           }
-          SHSCloud.log('create', '명단 추가', d.name + ' (' + d.church + ', ' + (ROSTER_ROLES[d.role] || d.role) + ')');
+          SHSCloud.log('create', '명단 추가', d.name + ' (' + d.church + ', ' + (d.officer_title || ROSTER_ROLES[d.role] || d.role) + ')');
           renderRoster();
         });
       });
@@ -275,8 +309,8 @@ document.addEventListener('DOMContentLoaded', function () {
   function render() {
     var accounts = SHSAuth.listAccounts();
     var html = '';
-    html += '<div class="notice-banner">회원명단 추가·삭제 권한: <strong>노회장, 서기, 간사, 최고관리자</strong>' +
-      ' / 승인대기 회원의 정회원 설정: <strong>서기, 간사, 최고관리자</strong>' +
+    html += '<div class="notice-banner">회원명단 추가·삭제 권한: <strong>노회장, 서기, 간사</strong>' +
+      ' / 승인대기 회원의 정회원 설정: <strong>서기, 간사</strong>' +
       (isSuper ? ' / 직책(노회장·서기·간사) 지정 권한: <strong>최고관리자</strong>' : '') + '</div>';
 
     /* 승인대기 회원 */
@@ -329,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:10px">' +
       '성명과 소속 교회가 노회 임원·회원 명단과 일치하면 해당 등급이 자동 부여되고, ' +
       '일치하지 않으면 승인대기 상태로 생성됩니다. ' +
-      (isSuper ? '등급은 위 목록에서 직접 변경할 수 있습니다.' : '직책 지정은 최고관리자에게 요청하시기 바랍니다.') +
+      (isSuper ? '등급은 위 목록에서 직접 변경할 수 있습니다.' : '직책 지정은 노회 사무실을 통해 처리됩니다.') +
       '</p></div>';
 
     area.innerHTML = html;

@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var canView = a.officerOnly ? SHSAuth.isOfficer(user) : (a.memberOnly ? SHSAuth.isMember(user) : true);
     var badge = a.officerOnly ? ' <span class="badge-locked">임원</span>' :
                 (a.memberOnly ? ' <span class="badge-locked">정회원</span>' : '');
-    var lockMsg = a.officerOnly ? '노회 임원(노회장·서기·간사)과 최고관리자만 열람할 수 있습니다.' :
+    var lockMsg = a.officerOnly ? '노회 임원만 열람할 수 있습니다.' :
                   '정회원 로그인 후 열람할 수 있습니다.';
     var title = (canView && a.href)
       ? '<a href="' + a.href + '" style="color:var(--navy);text-decoration:underline">' + e(a.title) + '</a>'
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!SHSAuth.isMember(user)) {
     area.innerHTML =
       '<div class="notice-banner">지난 회기 결의사항은 <strong>정회원 전용</strong> 자료입니다. ' +
-      (user ? '현재 승인대기 상태입니다. 서기·간사·최고관리자의 확인 후 열람할 수 있습니다.'
+      (user ? '현재 승인대기 상태입니다. 서기·간사의 확인 후 열람할 수 있습니다.'
             : '노회 소속 목사와 총대 장로께서는 로그인 후 열람하시기 바랍니다. ' +
               '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
       '</div>';

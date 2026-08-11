@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function () {
         msg.className = 'form-msg ok';
         if (r.role === 'pending') {
           msg.textContent = '등록되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
-            '서기·간사·최고관리자 확인 후 정회원으로 전환됩니다.';
+            '서기·간사 확인 후 정회원으로 전환됩니다.';
         } else {
           msg.textContent = '등록되었습니다. 노회 명단과 일치하여 ' +
             (r.title ? r.title + '(' + r.roleName + ')' : r.roleName) + ' 등급이 부여되었습니다.';

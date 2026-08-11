@@ -32,9 +32,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (!user || !SHSAuth.canAssignRoles(user)) {
     area.innerHTML =
-      '<div class="notice-banner">감사 로그는 <strong>최고관리자</strong>만 열람할 수 있습니다.' +
-      (user ? ' 현재 등급(' + SHSAuth.roleName(user.role) + ')으로는 열람할 수 없습니다.'
-            : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
+      '<div class="notice-banner">감사 기록을 열람할 권한이 없습니다.' +
+      (user ? '' : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
       '</div>';
     return;
   }

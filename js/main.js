@@ -39,8 +39,7 @@
       { t: '노회 회의록', h: 'minutes.html' },
       { t: '서류 발급', h: 'documents.html' },
       { t: '회원 관리', h: 'admin.html' },
-      { t: '사이트 관리', h: 'manage.html' },
-      { t: '감독(감사 로그)', h: 'audit.html' }
+      { t: '사이트 관리', h: 'manage.html' }
     ]}
   ];
 
