@@ -1,0 +1,98 @@
+-- =====================================================================
+--  고시 문제 은행 6/8 : 상식 (88문항)
+--  출처 : 「시화산노회 고시부 목사장로 고시가이드」 예상 문제 은행
+--  * 이 과목만 다시 넣습니다. 여러 번 실행해도 문제가 늘어나지 않습니다.
+-- =====================================================================
+
+delete from public.exam_questions where subject = '상식';
+
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '국민이 직접 또는 간접적으로 대표를 선출하여 의사를 결정하는 민주주의의 핵심 원칙은 무엇입니까?', '["군주정", "과두정", "독재정", "대의 민주주의"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '민주주의 정부에서 입법, 행정, 사법부로 권력을 나누어 서로 견제하고 균형을 이루게 하는 개념은 무엇입니까?', '["견제와 균형 (Checks and Balances)", "중앙집권화", "일방주의", "권위주의"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '민주 사회에서 시민이 자신의 의견과 신념을 자유롭게 표현할 수 있도록 보장하는 기본적인 권리는 무엇입니까?', '["언론의 자유", "사생활 보호권", "재산권", "무기 소지권"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '국민의 주권을 강조하고 자유롭고 공정한 선거를 통해 이루어지는 정치 체제는 무엇입니까?', '["귀족정", "독재정", "신정정치", "민주주의"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '민주주의에서 시민들이 특정 법안이나 정책에 대해 직접 투표로 의사를 결정하는 제도는 무엇입니까?', '["탄핵", "게리맨더링", "국민투표 (Referendum)", "의사진행 방해"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '민주 사회에서 모든 사람이 지위나 신분과 관계없이 동일한 법의 지배를 받는다는 원칙을 무엇이라고 합니까?', '["법치주의 (Rule of Law)", "인치 (人治)", "전체주의", "무정부주의"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '민주주의 국가에서 헌법의 주된 목적은 무엇입니까?', '["정부의 근본적인 법과 원칙을 수립하기 위해", "모든 권력을 중앙집권화하기 위해", "일상생활을 통제하기 위해", "자의적인 통치를 허용하기 위해"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '다수결 원칙에 따라 의사결정이 이루어지지만, 동시에 소수 집단의 권리도 보호한다는 민주주의 원칙을 무엇이라고 합니까?', '["절대 권력", "만장일치", "다수결 원칙과 소수자 권리 보호", "다수의 횡포"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '민주주의 사회에서 여론과 정치 과정에 상당한 영향력을 행사하여 흔히 ''제 4 부'' 라고 불리는 것은 무엇입니까?', '["언론", "교육 시스템", "군대", "기업"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '생산 수단의 사적 소유와 이윤 추구를 특징으로 하는 경제 체제는 무엇입니까?', '["봉건주의", "사회주의", "자본주의", "공산주의"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '일정 기간 동안 한 국가의 국경 내에서 생산된 모든 재화와 서비스의 총 가치를 나타내며, 경제 건강도를 측정하는 데 자주 사용되는 지표는 무엇입니까?', '["실업률", "인플레이션율", "소비자 물가 지수 (CPI)", "국내총생산 (GDP)"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '재화나 서비스의 가격이 오르면 수요량이 감소하고, 가격이 내리면 수요량이 증가한다는 경제 원칙은 무엇입니까?', '["기회비용", "공급의 법칙", "수요의 법칙", "비교우위"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '시간이 지남에 따라 재화와 서비스의 전반적인 물가 수준이 상승하여 구매력이 하락하는 현상을 무엇이라고 합니까?', '["경기침체 (Recession)", "디플레이션", "인플레이션", "공황 (Depression)"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '경제학에서 어떤 것을 선택함으로써 포기해야 하는 다른 것의 가치를 의미하는 용어는 무엇입니까?', '["기회비용", "외부 효과", "한계 효용", "매몰 비용"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '국가가 세금 징수나 재정 지출을 통해 경제를 안정시키고 성장시키려는 정책은 무엇입니까?', '["통화정책", "재정정책", "금융정책", "무역정책"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '수출액이 수입액을 초과하여 한 국가가 외국으로부터 더 많은 외화를 벌어들이는 상태를 무엇이라고 합니까?', '["환율 변동", "무역 적자", "경상수지 적자", "무역 흑자"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '특정 시장에서 하나의 기업이나 공급자가 모든 상품과 서비스를 지배하여 경쟁이 없는 상태를 무엇이라고 합니까?', '["카르텔", "완전 경쟁", "과점", "독점"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '중앙은행이 이자율을 조절하거나 통화량을 통제하여 물가 안정과 경제 성장을 목표로 하는 정책은 무엇입니까?', '["통화정책", "재정정책", "노동정책", "산업정책"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '경제 주체들이 합리적인 기대를 바탕으로 행동하며, 정부의 정책 변화를 예측하여 미리 대응한다는 이론은 무엇입니까?', '["행동 경제학", "고전 경제학", "케인즈 경제학", "합리적 기대 이론"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '다양한 문화와 가치를 존중하고 함께 공존하려는 사회적 태도를 무엇이라고 합니까?', '["동화주의", "국수주의", "고립주의", "다문화주의"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '사회가 빠르게 변화하고 개인의 삶이 불안정해지면서, 사람들의 피로도와 무기력감이 증대되는 현상을 표현하는 용어는 무엇입니까?', '["워라밸", "번아웃 증후군", "욜로 (YOLO)", "에코 세대"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '고령화 사회에서 노인 인구의 증가로 인해 발생하는 사회적, 경제적 문제들을 포괄하는 용어는 무엇입니까?', '["인구 과잉", "인구 절벽", "저출산 문제", "고령화 문제"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '정보 기술의 발달로 모든 사물이 인터넷으로 연결되어 정보를 주고받는 환경을 의미하는 용어는 무엇입니까?', '["사물 인터넷 (IoT)", "인공지능 (AI)", "빅데이터", "클라우드 컴퓨팅"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '사이버 공간에서 발생하는 명예훼손, 성희롱, 따돌림 등 언어적 폭력을 의미하는 용어는 무엇입니까?', '["사이버 폭력", "스토킹", "해킹", "피싱"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인구 구조에서 출생률은 낮아지고 기대 수명은 늘어나 사회 전체의 활력이 떨어지는 현상을 의미하는 용어는 무엇입니까?', '["인구 증가", "고령화", "베이비붐", "저출산·고령화"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '현대 사회에서 일과 삶의 균형을 중요하게 여기며, 직장 생활 외 개인적인 여가와 행복을 추구하는 가치관은 무엇입니까?', '["워라밸 (Work-Life Balance)", "워커홀릭", "자기계발", "주 52 시간 근무제"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', 'SNS(사회관계망서비스)를 통해 개인들이 정보를 공유하고 소통하며 관계를 맺는 활동은 현대 사회에서 어떤 변화를 가져왔습니까?', '["새로운 소통 방식의 확산", "정보 습득의 어려움", "대인 관계 단절", "미디어의 영향력 약화"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '환경 보호와 자원 절약을 위해 재활용, 에너지 절약, 친환경 소비 등을 실천하는 시민 운동은 무엇입니까?', '["산업 발전 운동", "물질주의", "환경 운동", "과소비 운동"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '소통 과정에서 상대방의 감정을 이해하고 공감하며, 상대방의 입장에서 생각하는 능력을 무엇이라고 합니까?', '["비판적 사고", "자기주장", "논리력", "공감 능력"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', 'K-팝, K-드라마 등 한국 대중문화가 세계적으로 인기를 얻는 현상을 무엇이라고 부릅니까?', '["문화다양성", "한류 (Korean Wave)", "문화 충격", "문화 식민주의"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '클래식, 오페라, 발레 등과 같이 전통적으로 높은 예술적 가치를 지닌다고 여겨지는 문화 분야를 무엇이라고 합니까?', '["하위문화", "고급문화", "대중문화", "하이브리드 문화"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '한 사회의 구성원들이 공유하고 있는 생활 방식, 가치관, 신념, 행동 양식 등을 총체적으로 일컫는 용어는 무엇입니까?', '["문화", "문명", "사회", "역사"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '특정 시대나 사회의 지배적인 사고방식이나 가치관을 형성하고, 예술, 철학, 과학 등에 영향을 미치는 큰 틀을 무엇이라고 합니까?', '["패션", "라이프스타일", "유행", "세계관"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인터넷을 통해 영화, 드라마, 음악 등 다양한 콘텐츠를 스트리밍 방식으로 제공하는 서비스를 무엇이라고 합니까?', '["유선 방송", "OTT (Over-The-Top) 서비스", "다운로드 서비스", "개인 방송"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '과거의 전통적인 예술 형태와 현대의 새로운 기술이나 표현 방식이 결합되어 만들어지는 새로운 문화 현상을 무엇이라고 합니까?', '["대중문화", "복고주의", "퓨전 문화", "아방가르드"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '사람들이 스마트폰, 태블릿 등 휴대용 기기를 통해 웹툰, 웹소설 등 디지털 콘텐츠를 소비하는 현상을 무엇이라고 합니까?', '["모바일 콘텐츠 소비", "종이책 독서", "방송 시청", "영화 관람"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '음악, 미술, 영화 등 예술 분야에서 특정 사조나 스타일이 대중에게 널리 퍼져 유행하는 현상을 무엇이라고 합니까?', '["장르화", "비주류화", "문화적 유행", "고전화"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인간의 삶과 사회를 비판적으로 바라보고, 독자가 현실에 대해 깊이 성찰하도록 유도하는 문학 장르는 무엇입니까?', '["판타지 소설", "공상 과학 소설", "리얼리즘 문학", "로맨스 소설"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '문학 작품 속에서 작가가 말하고자 하는 주된 생각이나 교훈을 무엇이라고 합니까?', '["플롯", "등장인물", "배경", "주제"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '시, 소설, 희곡 등 모든 문학 작품에서 사건이 전개되고 인물들이 활동하는 시간적, 공간적 배경을 무엇이라고 합니까?', '["배경", "구성", "갈등", "복선"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '문학 작품에서 미래의 사건이나 결과를 미리 암시하여 독자의 궁금증을 유발하는 표현 기법은 무엇입니까?', '["상징", "반전", "대조", "복선"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '소설, 시, 희곡 등 여러 문학 장르를 총칭하는 용어는 무엇입니까?', '["비문학", "예술", "문학", "학문"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인간을 환경과 유전에 지배되는 존재로 보고, 과학자가 관찰하듯 그리려 한 문학 사조는 무엇입니까?', '["자연주의", "낭만주의", "포스트모더니즘", "모더니즘"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '작품 속에서 어떤 구체적인 사물이나 인물이 추상적인 의미나 개념을 대표하도록 하는 표현 기법은 무엇입니까?', '["상징", "풍자", "직유", "은유"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '독자가 문학 작품을 읽으면서 얻게 되는 정서적인 감동이나 깨달음을 무엇이라고 합니까?', '["정보", "미적 체험", "교훈", "지식"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인간의학문은 삶의 의미, 존재의 본질, 지식의 기원 등 근본적인 질문들을 탐구하는무엇입니까?', '["역사", "종교", "과학", "철학"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '모든 존재의 근원이 하나의 실체라고 주장하는 철학적 입장은 무엇입니까?', '["회의론", "다원론", "일원론", "이원론"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인간의 지식은 경험을 통해서만 얻을 수 있다고 주장하는 철학 사조는 무엇입니까?', '["이상주의", "경험론", "실존주의", "합리론"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인간의 존재는 미리 정해진 본질이 없으며, 자유로운 선택과 책임을 통해 스스로의 본질을 만들어간다고 보는 철학은 무엇입니까?', '["허무주의", "실존주의", "유물론", "결정론"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인간의 감각 경험이나 이성적 추론을 넘어서는 초월적인 진리나 실재의 존재를 믿는 철학적 관점은 무엇입니까?', '["무신론", "유신론", "회의론", "불가지론"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '세상의 모든 현상이 원인과 결과의 법칙에 따라 필연적으로 발생하며, 자유 의지는 환상이라고 주장하는 철학적 입장은 무엇입니까?', '["허무주의", "결정론", "자유 의지론", "우연론"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '지식이 오직 이성적 사유와 추론을 통해서만 얻어질 수 있다고 주장하며, 경험을 경시하는 철학 사조는 무엇입니까?', '["합리론", "실용주의", "상대주의", "경험론"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인간의 삶에는 어떤 궁극적인 목적이나 의미도 없으며, 모든 가치는 허구라고 주장하는 철학적 관점은 무엇입니까?', '["유토피아주의", "허무주의", "이상주의", "낙천주의"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '도덕적인 옳고 그름이 개인의 문화나 관점에 따라 상대적이며, 보편적인 도덕 원리는 존재하지 않는다고 보는 윤리적 관점은 무엇입니까?', '["공리주의", "상대주의", "의무론", "절대주의"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '고대 그리스 철학에서 소크라테스, 플라톤, 아리스토텔레스를 잇는 학파를 무엇이라고 합니까?', '["에피쿠로스 학파", "스토아 학파", "고전 철학", "소피스트"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '고대 로마 제국이 공화정에서 제정으로 전환된 후, ''팍스 로마나'' 시대를 열며 지중해 세계를 지배했던 시기는 언제입니까?', '["콘스탄티누스 대제 시대", "아우구스투스 시대", "알렉산더 대왕 시대", "카이사르 시대"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '중세 유럽에서 교황의 권력이 강해지고, 기독교가 사회 전반을 지배했던 시기를 무엇이라고 부릅니까?', '["계몽주의 시대", "르네상스 시대", "중세 암흑시대", "십자군 시대"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '15 세기 말, 콜럼버스의 아메리카 대륙 발견을 시작으로 유럽인들이 신대륙을 탐험하고 교역로를 개척했던 시기를 무엇이라고 합니까?', '["냉전 시대", "산업 혁명", "대항해 시대", "제국주의 시대"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '제 1 차 세계대전 이후, 국제 평화와 협력을 위해 창설되었으나 한계를 보이다가 제 2 차 세계대전 이후 유엔으로 계승된 국제기구는 무엇입니까?', '["국제연맹 (League of Nations)", "국제연합 (UN)", "국제사법재판소 (ICJ)", "NATO"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '제 2 차 세계대전 이후 미국과 소련을 중심으로 이념과 군사적 대립이 격화되었던 시기를 무엇이라고 합니까?', '["탈냉전 시대", "정보화 시대", "냉전 시대", "세계화 시대"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '1960 년대 미국에서 마르틴 루터 킹 주니어 목사를 중심으로 인종 차별에 반대하고 평등을 주장했던 운동은 무엇입니까?', '["여성 인권 운동", "시민권 운동", "노동 운동", "환경 운동"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '1980 년대 후반부터 시작된 인터넷과 컴퓨터 기술의 발전으로 정보의 생산, 유통, 소비 방식이 혁신적으로 변화한 시대를 무엇이라고 합니까?', '["농업 사회", "정보화 사회", "산업 사회", "지식 기반 사회"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '다양한 정보를 비판적으로 분석하고 평가하며, 논리적으로 사고하여 합리적인 결론을 도출하는 능력을 무엇이라고 합니까?', '["암기력", "공감 능력", "창의력", "비판적 사고력"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '독서, 예술 감상, 여행 등을 통해 견문을 넓히고 인격을 함양하며, 삶의 질을 높이는 활동을 총칭하는 용어는 무엇입니까?', '["교양 활동", "여가 활동", "생계 활동", "사회 활동"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '개인의 삶에서 육체적, 정신적, 사회적 안녕이 조화롭게 이루어진 상태를 무엇이라고 합니까?', '["성공", "부유함", "건강", "행복"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인터넷상에서 개인의 신분을 숨기고 악의적인 댓글이나 허위 정보를 유포하여 타인에게 피해를 주는 행위를 무엇이라고 합니까?', '["정보 공유", "사이버 불링", "선의의 비판", "정당한 주장"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '인공지능(AI), 빅데이터, 사물 인터넷(IoT) 등으로 대표되는 기술 발전이 사회 전반에 걸쳐 큰 변화를 가져오는 시대를 무엇이라고 합니까?', '["전기 시대", "증기기관 시대", "4 차 산업혁명 시대", "정보 통신 시대"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '지속 가능한 발전을 위해 환경 보호와 경제 성장을 동시에 추구하며, 미래 세대의 필요를 충족시키는 범위 내에서 현재의 발전을 이루려는 개념은 무엇입니까?', '["친환경 발전", "무제한 성장", "제로 성장", "환경 파괴"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '복잡한 현대 사회에서 다양한 의견과 가치를 가진 사람들이 서로를 이해하고 존중하며 대화하는 태도를 무엇이라고 합니까?', '["무관심", "고립주의", "소통과 공감", "극단주의"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '개인이 사회 구성원으로서 가지는 권리와 의무를 인식하고, 공동체의 발전에 적극적으로 참여하려는 태도를 무엇이라고 합니까?', '["시민 의식", "이기주의", "방관자적 태도", "무책임"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '기독교를 박해하던 로마 제국이 기독교를 공인하게 된 계기가 된 칙령은 무엇입니까?', '["테오도시우스 칙령", "니케아 칙령", "카노사 칙령", "밀라노 칙령"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '로마 제국 말기, 기독교를 국교로 선포한 로마 황제는 누구입니까?', '["아우구스투스", "네로", "테오도시우스 1 세", "콘스탄티누스 대제"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '초대 교회 시대, 기독교의 핵심 교리(예: 삼위일체, 그리스도의 신성)를 확립하기 위해 모였던 주교들의 회의를 무엇이라고 합니까?', '["종교개혁 회의", "십자군 회의", "종교재판", "에큐메니컬 공의회"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '기독교 박해 시기, 신앙을 지키기 위해 기꺼이 죽음을 택했던 이들을 무엇이라고 부릅니까?', '["사도", "순교자", "선지자", "교부"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '동방 교회(정교회)와 서방 교회(로마 가톨릭)가 분열된 사건을 무엇이라고 부릅니까?', '["아비뇽 유수", "종교개혁", "십자군 전쟁", "동서 교회의 대분열 (대분열)"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '교황의 권력이 절정에 달했던 시기에, 성지 탈환을 목적으로 교황의 주도하에 이루어진 대규모 원정은 무엇입니까?', '["십자군 전쟁", "대항해 시대", "백년 전쟁", "이슬람 정복 전쟁"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '중세 시대, 수도원에서 주로 이루어졌던 활동으로 교회의 영적 중심지 역할을 했던 것은 무엇입니까?', '["농업 생산", "학문 연구와 기도 생활", "정치적 권력 획득", "상업 활동"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '중세 스콜라 철학을 대표하며, "나는 이해하기 위해 믿는다"는 말을 남긴 신학자는 누구입니까?', '["토마스 아퀴나스", "안셀무스", "아벨라르", "아우구스티누스"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '교황의 권위가 약화되고 교황청이 프랑스 아비뇽으로 이전했던 사건을 무엇이라고 부릅니까?', '["동방교회 분열", "콘스탄츠 공의회", "아비뇽 유수", "카노사의 굴욕"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '1517 년, 마르틴 루터가 비텐베르크 성당 문에 95 개조 반박문을 붙이면서 시작된 역사적 사건은 무엇입니까?', '["계몽주의", "종교개혁", "르네상스", "프랑스 혁명"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '종교개혁의 5 대 솔라(Sola) 중, ''오직 성경으로만''을 의미하는 것은 무엇입니까?', '["Soli Deo Gloria", "Sola Gratia", "Sola Fide", "Sola Scriptura"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '존 칼빈이 제네바에서 신정 정치를 시행하고 개혁 신학을 체계화한 그의 대표 저서는 무엇입니까?', '["신학대전", "참된 기독교인의 삶", "루터의 95 개조 반박문", "기독교 강요"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '종교개혁 이후, 로마 가톨릭 교회가 내부 개혁을 추진하며 트리엔트 공의회를 개최하는 등 개신교에 대응했던 움직임을 무엇이라고 부릅니까?', '["교황권 강화 운동", "계몽주의 운동", "재세례파 운동", "반종교개혁 (가톨릭 개혁)"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '근대 유럽에서 신앙의 자유와 개인의 이성, 합리성을 강조하며 사회 전반에 큰 영향을 미친 사상 운동은 무엇입니까?', '["낭만주의", "산업혁명", "계몽주의", "르네상스"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '19 세기 말, 선교사들이 한국에 들어오면서 서양 문물과 함께 기독교가 전파된 후, 1907 년 평양에서 대규모 영적 부흥 운동이 일어난 것은 무엇입니까?', '["신사참배 거부 운동", "백만인 구령운동", "1 운동", "평양 대부흥 운동"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '일제강점기 시절, 한국 교회가 신앙의 정절을 지키기 위해 강요된 종교 행위인 무엇을 거부하며 저항했습니까?', '["신사참배", "창씨개명", "황국신민서사", "내선일체"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '해방 후 한국 전쟁을 겪으며 남북 분단이 고착화된 후, 한국 교회 내에서 신학적 입장 차이로 인해 여러 교단이 분열되었는데, 이는 어떤 가치를 강조했기 때문입니까?', '["순결함 (Purity)", "봉사 (Service)", "성장 (Growth)", "일치 (Unity)"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('상식', '한국 기독교가 사회 참여에 적극적으로 나섰던 대표적인 시기로, 1980 년대 민주화 운동에 많은 교회가 참여하고 인권 보호에 앞장섰던 것은 무엇을 보여줍니까?', '["교회의 세속화", "신앙과 사회 정의의 실천", "교회의 외형적 성장 추구", "교회의 정치적 중립"]'::jsonb, 1);
+
+select subject as "과목", count(*) as "문항" from public.exam_questions group by subject order by 1;

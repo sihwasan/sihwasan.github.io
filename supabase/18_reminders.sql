@@ -77,7 +77,7 @@ begin
        and meet_date >= current_date
        and meet_date <= current_date + coalesce(lead_days, 40)
   loop
-    v_when := to_char(m.meet_date, 'YYYY년 M월 D일') ||
+    v_when := to_char(m.meet_date, 'FMYYYY년 FMMM월 FMDD일') ||
               coalesce(' · ' || m.place, '') ||
               ' (' || (m.meet_date - current_date) || '일 남음)';
 

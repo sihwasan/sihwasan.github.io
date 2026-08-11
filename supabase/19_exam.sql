@@ -278,26 +278,31 @@ grant execute on function public.submit_exam(bigint, smallint[]) to authenticate
 
 
 -- ---------------------------------------------------------------------
--- 8. 자료실에 고시집 자리를 만든다
---    (파일은 자료실 관리에서 끌어다 놓아 올려 주세요)
+-- 8. 자료실에 고시집 안내를 둔다
+--    고시가이드북은 노회가 판매하는 자료이므로 파일을 올리거나 배포하지 않습니다.
+--    자료실에는 어떤 책인지 알리는 안내만 둡니다.
 -- ---------------------------------------------------------------------
 insert into public.archive_items (section, title, description, doc_date, access, link_url, file_name, sort)
-select '고시', '시화산노회 고시부 목사장로 고시가이드',
-       '고시 과목·제출서류 안내와 과목별 예상 문제가 실린 고시집입니다. (2025. 9. 고시부 발행) 이 책을 바탕으로 모의고사를 볼 수 있습니다.',
-       date '2025-09-01', 'member',
-       'https://sihwasan-photos.sihwasan.workers.dev/o/docs/gosi-guide-2025.docx',
-       '시화산노회 고시부 목사장로 고시가이드.docx', 200
+select '고시', '시화산노회 고시부 목사장로 고시가이드 (책자)',
+       '고시 과목·제출서류 안내와 과목별 예상 문제가 실린 고시집입니다. (2025. 9. 고시부 발행) ' ||
+       '노회에서 책자로 판매하는 자료이므로 홈페이지에서는 내려받으실 수 없습니다. ' ||
+       '구입은 노회 사무실(031-486-9993) 또는 고시부로 문의해 주세요.',
+       date '2025-09-01', 'public', null, null, 200
 where not exists (
-  select 1 from public.archive_items where title = '시화산노회 고시부 목사장로 고시가이드'
+  select 1 from public.archive_items where title like '시화산노회 고시부 목사장로 고시가이드%'
 );
 
--- 이미 등록되어 있으면 파일 주소만 채워 넣는다
+-- 이미 파일 주소가 들어가 있으면 지운다 (판매 자료이므로 배포하지 않는다)
 update public.archive_items
-   set link_url  = 'https://sihwasan-photos.sihwasan.workers.dev/o/docs/gosi-guide-2025.docx',
-       file_name = '시화산노회 고시부 목사장로 고시가이드.docx',
-       access    = 'member'
- where title = '시화산노회 고시부 목사장로 고시가이드'
-   and coalesce(link_url, '') not like '%gosi-guide%';
+   set title       = '시화산노회 고시부 목사장로 고시가이드 (책자)',
+       description = '고시 과목·제출서류 안내와 과목별 예상 문제가 실린 고시집입니다. (2025. 9. 고시부 발행) ' ||
+                     '노회에서 책자로 판매하는 자료이므로 홈페이지에서는 내려받으실 수 없습니다. ' ||
+                     '구입은 노회 사무실(031-486-9993) 또는 고시부로 문의해 주세요.',
+       link_url    = null,
+       file_path   = null,
+       file_name   = null,
+       access      = 'public'
+ where title like '시화산노회 고시부 목사장로 고시가이드%';
 
 select (select count(*) from public.exam_questions) as "문제",
        (select count(*) from public.exam_officers)  as "고시부 임원";

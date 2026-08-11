@@ -66,15 +66,12 @@ document.addEventListener('DOMContentLoaded', function () {
       var ok = canOpen(a.access);
       var badge = accessLabel(a.access)
         ? ' <span class="badge-locked">' + accessLabel(a.access) + '</span>' : '';
-      var docLink = window.SHSPhotos && SHSPhotos.isDocUrl(a.link_url);
-      var title = (ok && a.link_url && !docLink)
+      var title = (ok && a.link_url)
         ? '<a href="' + e(a.link_url) + '" style="color:var(--navy);text-decoration:underline">' + e(a.title) + '</a>'
         : e(a.title);
       var status;
       if (ok) {
         if (a.file_path) status = '<button class="btn ghost sm" data-arfile="' + a.id + '">내려받기</button>';
-        else if (window.SHSPhotos && SHSPhotos.isDocUrl(a.link_url))
-          status = '<button class="btn ghost sm" data-ardoc="' + a.id + '">내려받기</button>';
         else if (a.link_url) status = '<a href="' + e(a.link_url) + '" style="color:var(--navy);text-decoration:underline">바로가기</a>';
         else status = accessLabel(a.access) ? '열람 가능' : '공개';
       } else {
@@ -250,23 +247,6 @@ document.addEventListener('DOMContentLoaded', function () {
       var q = document.getElementById('rs-q');
       if (q) q.addEventListener('input', function () { drawResolutions(resolutions); });
     }
-
-    /* 보관소에 있는 자료 내려받기 (정회원 확인 후 내어 준다) */
-    area.querySelectorAll('button[data-ardoc]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var a = items.filter(function (x) { return String(x.id) === b.dataset.ardoc; })[0];
-        if (!a) return;
-        var old = b.textContent;
-        b.textContent = '받는 중...'; b.disabled = true;
-        SHSPhotos.download(a.link_url, a.file_name || (a.title + '.docx')).then(function () {
-          b.textContent = old; b.disabled = false;
-          SHS.logAction('view', '자료 내려받기', '[' + a.section + '] ' + a.title);
-        }, function (err) {
-          b.textContent = old; b.disabled = false;
-          alert(err.message || '내려받지 못했습니다.');
-        });
-      });
-    });
 
     /* 첨부파일 내려받기 */
     area.querySelectorAll('button[data-arfile]').forEach(function (b) {

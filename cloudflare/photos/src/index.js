@@ -20,11 +20,9 @@ const ALLOW_ORIGINS = [
 /* 올릴 수 있는 이름 형식만 허용한다 (경로를 거슬러 올라가는 장난 방지) */
 const KEY_RE = /^(full|thumb)\/[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(jpg|jpeg|png|webp)$/;
 
-/* 노회 문서 (고시집 등). 사진과 달리 정회원만 내려받을 수 있다. */
-const DOC_RE = /^docs\/[A-Za-z0-9][A-Za-z0-9._-]{0,160}\.(pdf|docx|doc|hwp|hwpx|xlsx|pptx|zip)$/;
-
+/* 이 보관소는 사진만 다룬다.
+ * 저작물(판매 자료 등)은 어떤 경로로도 내보내지 않는다. */
 const MAX_BYTES = 8 * 1024 * 1024;        /* 사진 한 장 8MB까지 */
-const MAX_DOC_BYTES = 60 * 1024 * 1024;   /* 문서 60MB까지 */
 
 function cors(origin) {
   const allow = ALLOW_ORIGINS.includes(origin) ? origin : ALLOW_ORIGINS[0];
@@ -87,34 +85,19 @@ export default {
 
     if (!url.pathname.startsWith('/o/')) return reply({ error: '없는 주소입니다.' }, 404, origin);
     const key = decodeURIComponent(url.pathname.slice(3));
-    const isDoc = DOC_RE.test(key);
-    if (!isDoc && !KEY_RE.test(key)) {
-      return reply({ error: '파일 이름 형식이 올바르지 않습니다.' }, 400, origin);
+    if (!KEY_RE.test(key)) {
+      return reply({ error: '사진 이름 형식이 올바르지 않습니다.' }, 400, origin);
     }
 
-    /* ---------- 보여주기 ----------
-     * 사진은 누구나, 문서는 정회원만 내려받을 수 있다. */
+    /* ---------- 보여주기 : 누구나 ---------- */
     if (request.method === 'GET' || request.method === 'HEAD') {
-      if (isDoc) {
-        const me = await whoIs(request, env);
-        if (!me) return reply({ error: '정회원 로그인이 필요한 자료입니다.' }, 401, origin);
-        if (me.role === 'pending') {
-          return reply({ error: '승인대기 상태에서는 열람할 수 없습니다.' }, 403, origin);
-        }
-      }
       const obj = await env.PHOTOS.get(key);
       if (!obj) return reply({ error: '파일을 찾을 수 없습니다.' }, 404, origin);
       const h = new Headers(cors(origin));
       obj.writeHttpMetadata(h);
       h.set('etag', obj.httpEtag);
       /* 사진은 한 번 올리면 바뀌지 않으므로 오래 보관해 두고 쓴다 */
-      h.set('Cache-Control', isDoc ? 'private, max-age=0, no-store'
-                                   : 'public, max-age=31536000, immutable');
-      if (isDoc) {
-        const nm = obj.customMetadata && obj.customMetadata.filename;
-        h.set('Content-Disposition',
-          "attachment; filename*=UTF-8''" + encodeURIComponent(nm || key.slice(5)));
-      }
+      h.set('Cache-Control', 'public, max-age=31536000, immutable');
       return new Response(request.method === 'HEAD' ? null : obj.body, { headers: h });
     }
 
@@ -126,21 +109,16 @@ export default {
         return reply({ error: '승인대기 상태에서는 사진을 올릴 수 없습니다.' }, 403, origin);
       }
 
-      if (isDoc && MANAGERS.indexOf(me.role) === -1) {
-        return reply({ error: '문서를 올리는 것은 관리자만 할 수 있습니다.' }, 403, origin);
-      }
-
-      const cap = isDoc ? MAX_DOC_BYTES : MAX_BYTES;
       const len = Number(request.headers.get('Content-Length') || 0);
-      if (len > cap) {
-        return reply({ error: '파일은 ' + Math.round(cap / 1024 / 1024) + 'MB까지 올릴 수 있습니다.' }, 413, origin);
+      if (len > MAX_BYTES) {
+        return reply({ error: '사진 한 장은 8MB까지 올릴 수 있습니다.' }, 413, origin);
       }
       if (await env.PHOTOS.head(key)) {
         return reply({ error: '같은 이름의 사진이 이미 있습니다.' }, 409, origin);
       }
 
       const type = request.headers.get('Content-Type') || 'image/jpeg';
-      if (!isDoc && type.indexOf('image/') !== 0) {
+      if (type.indexOf('image/') !== 0) {
         return reply({ error: '사진 파일만 올릴 수 있습니다.' }, 415, origin);
       }
 

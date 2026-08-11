@@ -102,44 +102,10 @@ var SHSPhotos = (function () {
     });
   }
 
-  /* 정회원 전용 문서 내려받기.
-   * 보관소가 로그인 증표를 확인한 뒤에만 파일을 내어 주므로,
-   * 주소를 그대로 눌러서는 열리지 않는다. */
-  function isDocUrl(u) {
-    return !!u && enabled() && u.indexOf(base() + '/o/docs/') === 0;
-  }
-
-  function download(docUrl, fileName) {
-    if (!isDocUrl(docUrl)) return Promise.reject(new Error('내려받을 수 있는 자료가 아닙니다.'));
-    return token().then(function (t) {
-      if (!t) throw new Error('로그인이 확인되지 않았습니다.');
-      return fetch(docUrl, { headers: { 'Authorization': 'Bearer ' + t } });
-    }).then(function (r) {
-      if (!r.ok) {
-        return r.json().catch(function () { return {}; }).then(function (j) {
-          throw new Error(j.error || ('내려받지 못했습니다. (' + r.status + ')'));
-        });
-      }
-      return r.blob();
-    }).then(function (blob) {
-      var a = document.createElement('a');
-      var u = URL.createObjectURL(blob);
-      a.href = u;
-      a.download = fileName || docUrl.split('/').pop();
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
-      return true;
-    });
-  }
-
   return {
     enabled: enabled,
     upload: upload,
     putPair: putPair,
-    isDocUrl: isDocUrl,
-    download: download,
     remove: remove,
     urlOf: urlOf,
     newKey: newKey

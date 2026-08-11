@@ -1,0 +1,95 @@
+-- =====================================================================
+--  고시 문제 은행 5/8 : 예배모범 (85문항)
+--  출처 : 「시화산노회 고시부 목사장로 고시가이드」 예상 문제 은행
+--  * 이 과목만 다시 넣습니다. 여러 번 실행해도 문제가 늘어나지 않습니다.
+-- =====================================================================
+
+delete from public.exam_questions where subject = '예배모범';
+
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배모범은 무엇을 위한 규범입니까?', '["교인들 간의 친목을 도모하기 위함", "교회의 재정 관리를 위함", "하나님께 모범적인 예배를 드리기 위함", "모범적인 교회 건물을 짓기 위함"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배는 하나님의 무엇으로서, 사람이 하나님께 대한 최상의 자발적 복종 행위로 드리는 경배입니까?', '["심판", "계획", "섭리", "창조의 목적"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배가 ''하나님의 지극한 영광에 대한 경배 행위''라는 것은 무엇을 강조합니까?', '["예배의 인간 중심성", "예배의 형식", "예배자의 감정", "예배의 하나님 중심성"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배의 문자적 정의에서 ''하나님께 대한 존경과 경외심으로 하나님 앞에서'' 행하는 것은 무엇입니까?', '["기도함", "찬양함", "몸을 낮추고 머리 숙여 경배함", "헌금함"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '요한복음 4:23,24 에 따르면, 예배는 어떻게 드려야 합니까?', '["정한 시간과 장소에서만", "신령과 진정으로", "많은 사람이 모여서", "큰 소리로 찬양하며"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '''신령과 진정으로'' 드리는 예배가 강조하는 것은?', '["예배자의 외적 자세", "예배의 형식적 완벽함", "성령의 이끄심과 진리 안에서 드리는 마음의 중심", "예배 장소의 웅장함"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '구약 시대에 유대인들이 지켜왔던 안식일은 무엇을 기념하는 안식일입니까?', '["창조", "출애굽", "부활", "유월절"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '신약 시대에 사도들이 지켜왔던 주일은 무엇을 기념하는 날입니까?', '["예수님의 탄생", "창조", "성령 강림", "예수님의 부활"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일을 거룩히 지키는 방법 중, 예배 후 힘써야 할 일에 해당하지 않는 것은?', '["말씀 묵상", "병자 방문", "성경 공부", "육신적 쾌락 추구"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일 성수를 위해 폐해야 할 것은 무엇입니까?', '["위급한 일", "말씀 묵상", "모든 사무와 육신적 쾌락", "교회집회"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배의 요소를 크게 세 가지로 나눌 때, ''하나님의 명령된 부분''에 해당하는 것은?', '["봉사", "예배", "응답", "제사"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배의 요소 중 ''사람이 하나님께 대한 간구와 요구의 부분''에 해당하는 것은?', '["교제", "응답", "예배", "제사"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배의 요소 중 ''하나님의 사람을 향한 불가항력적 은혜의 부분''에 해당하는 것은?', '["제사", "예배", "찬양", "응답"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배 시간은 하나님께 무엇을 드리고, 하나님으로부터 무엇을 받는 시간입니까?', '["계획을 드리고, 성공을 받는 시간", "경배와 찬양과 간구를 드리고, 말씀과 은혜와 축복을 받는 시간", "재물을 드리고, 세상 복을 받는 시간", "봉사를 드리고, 물질적 위로를 받는 시간"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배당에 들어가기 전에 가장 먼저 해야 할 일 중 하나는?', '["좌석 확인하기", "주변 사람과 인사하기", "물 마시기", "휴대폰 끄기"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배 시간 중 피해야 할 행동은?', '["설교 경청", "묵상 기도", "찬양 부르기", "성경 외의 책 읽기"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배 때의 성경 봉독은 공식 예배의 한 부분이니 누가 봉독해야 합니까?', '["교회의 대표자", "목사나 그 밖의 허락을 받은 사람", "누구든지", "성경 지식이 풍부한 사람"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '신‧구약 성경을 낭독할 때 청중으로 알아듣게 하기 위해 어떤 언어로 낭독해야 합니까?', '["한글 성경", "히브리어", "라틴어", "헬라어"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '인간이 창조주 하나님을 찬양하도록 지음을 받았다는 것은 무엇을 의미합니까?', '["찬송은 인간의 의무일 뿐이다.", "찬송은 인간의 본질적인 목적 중 하나이다.", "찬송은 인간의 기호이다.", "찬송은 인간의 감정 표현이다."]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '찬송의 내용에는 무엇이 포함됩니까?', '["정치적인 주장", "개인적인 불평", "시와 찬미와 신령한 노래", "세상 노래"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '노래를 부를 때는 어떻게 불러야 합니까?', '["정성된 마음으로 곡조에 맞추어", "큰 소리로만", "아무렇게나 불러도 좋다.", "개인적인 감정에 따라"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '기도는 누구에게 하며, 누구의 이름으로 해야 합니까?', '["삼위 하나님께 하며, 예수님의 이름으로", "천사에게 하며, 성령의 이름으로", "성도들에게 하며, 교회의 이름으로", "목사에게 하며, 개인의 이름으로"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '공식 기도에 포함되어야 할 내용 중 가장 먼저 언급되는 것은?', '["참된 회개", "하나님께 영광을 돌림", "하나님의 은혜와 축복 간구", "중보기도"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '공식 기도의 마지막은 누구의 이름으로 기도하는 것입니까?', '["성령의 이름", "자신의 이름", "예수님의 이름", "목사의 이름"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '누구나 강도(講道) 할 수 있습니까?', '["아니다", "재정 후원이 있으면 가능하다.", "교인의 허락이 있으면 가능하다.", "그렇다"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '당회나 목사의 허락 없이 강도함을 허락지 않는데, 단, 누구는 당회의 허락 없이도 강도 할 수 있습니까?', '["노회에서 보낸 사람", "성경 지식이 풍부한 사람", "교회의 직분자", "주일학교 교사"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '강도는 사람을 구원하는 하나님의 방침이니, 목사는 어떻게 해야 합니까?', '["전심전력하여 부끄럽지 아니한 일꾼이 될 만하게 힘써 진리의 말씀을 옳게 분별해야 한다.", "자신의 경험만 이야기해야 한다.", "세상 이야기를 많이 해야 한다.", "가볍게 준비해야 한다."]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '강도가 ''사람을 구원하는 하나님의 방침''이라는 것은 무엇을 강조합니까?', '["설교의 길이", "설교자의 권위", "설교의 영적인 생명력과 중요성", "설교의 오락성"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교는 항상 누구의 관할 및 감독 아래에 있어야 합니까?', '["목사 개인", "교육위원회", "당회", "교인 전체"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교 교사가 마땅히 해야 할 일 중 하나는?', '["건물 관리", "성경 연구", "행정 업무", "재정 관리"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교 교사의 중요한 역할 중 ''기도''가 강조되는 이유는?', '["개인적인 소원을 이루기 위함", "학생들을 통제하기 위함", "영적인 힘을 얻어 학생들을 바르게 양육하고 하나님께 인도하기 위함", "학부모들에게 좋은 인상을 주기 위함"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교 교사가 ''심방''을 해야 하는 이유는?', '["학생들의 생활 환경을 감시하기 위함", "학생들의 필요와 삶을 이해하고 영적인 돌봄을 제공하기 위함", "학부모들과 친목을 다지기 위함", "학교 숙제를 돕기 위함"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '헌금은 무엇을 하나님께 바치는 행위로서, 마땅히 예배의 한 부분으로 행해야 합니까?', '["노력", "성도가 받은 물질", "시간", "재능"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '헌금의 표준으로 제시된 것은?', '["십일조와 감사의 표준", "능력껏 내는 것", "강제로 걷는 것", "명확한 표준이 없다."]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '헌금할 때 피해야 할 마음가짐은?', '["기쁜 마음", "감사하는 마음", "인색한 마음이나 억지로 드리는 것", "자원하는 마음"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '고린도후서 9 장 7 절은 헌금할 때 어떤 마음으로 해야 한다고 가르칩니까?', '["근심하며", "많이 내야 한다는 부담감으로", "마음에 정한 대로 즐거운 마음으로", "억지로"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '성례가 ''거룩한 예식''으로 불리는 주된 이유는?', '["교인들이 많이 참여하기 때문", "오랜 전통을 가지고 있기 때문", "특별한 장소에서만 시행되기 때문", "그리스도께서 직접 제정하시고 특별한 은혜가 담겨 있기 때문"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '성례는 누가 세우신 것입니까?', '["교회의 지도자들", "교회의 전통", "사도들", "그리스도"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '성례는 단지 상징적인 의미만을 가집니까?', '["그렇다", "아니다, 영적인 유익과 은혜가 있다", "믿지 않는 자에게는 의미가 없다.", "교인들의 참여 여부에 따라 의미가 달라진다."]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '세례의 의의는 무엇입니까?', '["교인들 간의 친목 도모", "우리를 그리스도에게 접붙임과 주와 합하는 표와 인치는 것", "사회적으로 인정받는 의식", "죄를 짓는 것을 허락하는 것"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '세례를 베풀 수 있는 자는 누구입니까?', '["교회의 지도자", "세례를 받은 교인", "하나님의 사역자로 부르심을 받은 목사", "평신도"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '''불세례''가 의미하는 바는 무엇입니까?', '["성령의 역사로 죄를 회개하고 예수를 구주로 믿어 하나님의 자녀가 된 것을 확실히 하는 성령의 내적 증거(인침)", "죄를 불로 태워 없애는 의식", "성령이 불처럼 임하는 감정적인 체험", "뜨거운 열정으로 전도하는 것"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '유아세례 시 부모의 조건은?', '["부모 모두 교회의 직분자여야 한다.", "부모 중 한 사람 이상이 신자여야 한다.", "부모가 교회에 헌금을 많이 해야 한다.", "부모가 세례를 받지 않아도 된다."]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '유아세례의 성경적 근거로 제시된 것은?', '["구약의 할례, 예수께서 어린이를 축복한 것, 사도 시대 어린이들도 세례를 받은 것", "구약의 제사 의식", "예수님의 성인 세례만", "성경에는 유아세례 근거가 없다."]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '유아세례자가 성찬에 참여하기 위한 최소 연령은?', '["만 12 세 이상", "만 14 세 이상", "만 15 세 이상", "만 18 세 이상"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '입교식이란 무엇입니까?', '["신자의 가정에서 출생한 자녀로 유아세례를 받은 후 신앙으로 성년이 된 자를 문답하고 세례 교인으로 세우는 예식", "교회를 개척하는 예식", "다른 교회에서 온 교인을 환영하는 예식", "새로운 직분자를 임명하는 예식"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '입교식의 대상은 주로 누구입니까?', '["유아세례를 받은 후 성장한 자녀", "타 교단에서 전입해 온 신자", "직분자 후보", "새로 교회를 찾은 사람"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '입교식에서 가장 중요한 절차는?', '["헌금", "찬양", "문답", "식사"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '입교식을 통해 유아세례자가 어떤 교인이 됩니까?', '["학습교인", "서리 집사", "세례 교인", "원입교인"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '성찬은 언제부터 언제까지 시행됩니까?', '["예수님의 죽으심으로부터 재림 때까지", "사도시대부터 현재까지", "예수님의 탄생으로부터 재림 때까지", "예수님의 부활로부터 재림 때까지"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '세례와 성만찬을 통틀어 지칭하는 용어는?', '["성례", "규례", "법례", "예식"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '세례가 죄 씻음과 하나님의 자녀 됨의 무엇이라고 말합니까?', '["의무", "인침표", "증거", "약속"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '성만찬은 예수님의 십자가의 죽으심을 기념하는 예식으로서 무엇을 먹습니까?', '["과자와 음료", "빵과 물", "밥과 국", "떡과 포도즙"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '성례는 예수님께서 친히 받으시고 베푸셨으며, 언제까지 행하여 자신을 기념하라고 하셨습니까?', '["재림할 때까지", "부활하실 때까지", "교회가 없어질 때까지", "사도시대까지"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '혼례(婚禮)는 성례입니까?', '["아니다, 신성한 예법이다.", "교단마다 다르다.", "구약 시대에는 성례였다.", "그렇다"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '성도들은 혼례를 어떻게 해야 한다고 교훈합니까?', '["재정적인 부분을 우선해야 한다.", "교회의 허락 없이 진행해야 한다.", "자유롭게 선택해야 한다.", "주 안에서 결혼해야 한다."]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '혼례를 ''하나님이 세우신 신성한 예법''이라고 하는 것은 무엇을 강조합니까?', '["결혼의 사회적 중요성", "결혼의 법적 구속력", "결혼이 하나님의 창조 질서와 축복 안에 있음을", "결혼의 개인적인 행복"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '혼례에 특별한 훈계와 적당한 기도로 행하기 위하여 누가 주례하게 함이 옳다고 합니까?', '["사회 명사", "목사나 그 밖에 교역자", "가족의 대표자", "교회의 장로"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '''사망에 이르는 죄를 범한 것으로 알려진 자를 위해서는 기도하지 말라''고 하는 이유는?', '["하나님이 그를 미워하시기 때문", "그를 위한 기도는 소용이 없다고 보기 때문", "다른 성도들이 실족할까 봐", "그가 회개할 마음이 없기 때문"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '예배 때 공식 기도(대표 기도)는 언제 하는 것이 좋다고 제시됩니까?', '["중간에", "제일 나중에", "시나 찬송을 부른 후 강도하기 전에", "제일 먼저"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '공식 기도의 이 시점이 가지는 예배적 의미는?', '["예배를 마무리한다.", "성도들이 설교를 듣기 전 마음을 준비하게 한다.", "헌금을 바친 후에 한다.", "예배의 시작을 알린다."]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '공식 기도는 예배의 어떤 부분과 직접적으로 연결됩니까?', '["교제 시간", "성례전", "헌금", "말씀 선포"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '공식 기도가 예배 순서에서 가지는 중요한 역할은?', '["특정 교인의 참여를 독려하기 위함", "예배 시간을 길게 하기 위함", "예배의 흐름을 방해하기 위함", "공동체의 간구를 하나님께 올려드리고 말씀 사역을 위한 영적인 통로를 여는 것"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교에서 적용해야 할 절차로 제시된 것들은?', '["시험, 평가, 경쟁", "기도, 찬송, 성경, 신조, 교회의 요리, 헌법, 헌금", "오락, 여행, 체육 활동", "세상의 교과목 학습"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교에서 ''모두 적용해야 한다''는 것은 무엇을 강조합니까?', '["주일학교도 교회 공동체의 한 부분으로서 교회의 본질적인 가르침과 예전을 따르고 참여해야 한다.", "주일학교 운영은 엄격해야 한다.", "주일학교는 독립적인 기관이다.", "모든 교인들이 주일학교에 참석해야 한다."]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교에서 ''신조''와 ''교회의 요리''를 적용하는 주된 목적은?', '["교회의 역사만 가르치기 위함", "교회의 규칙을 강요하기 위함", "아이들에게 복잡한 교리를 가르치기 위함", "교단 및 교회의 기본적인 신앙 고백과 교리를 다음 세대에게 바르게 교육하기 위함"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교에서 ''헌금''을 적용하는 목적은?', '["주일학교 재정을 확보하기 위함", "다른 교회와 비교하기 위함", "교사들의 수고비를 마련하기 위함", "어릴 때부터 신앙적인 헌신의 태도와 경제관념을 가르치기 위함"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교 교장이 가장 먼저 해야 할 일 중 하나는?', '["교사들을 훈련하는 것", "일정한 시간에 개회하는 것", "학생들을 모집하는 것", "학부모들과 상담하는 것"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '주일학교 교장이 ''시종 각 반을 살펴보아'' 해야 할 일은?', '["선생과 학생을 믿는 마음으로 공부에 열중하게 지도하고 경건한 태도를 가지게 하는 것", "교사들의 수업 방식을 평가하는 것", "학부모들의 불만을 듣는 것", "학생들의 성적을 확인하는 것"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '교장이 학생들을 ''믿는 마음으로 공부에 열중하게 지도''하는 것은 무엇을 의미합니까?', '["강제로 공부시키는 것", "교사의 부담을 줄이는 것", "신앙적인 동기를 부여하여 자발적인 학습을 유도하는 것", "지식적인 학습만을 강조하는 것"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '교장이 ''경건한 태도를 가지게 하는'' 역할은 무엇을 목표로 합니까?', '["학생들의 행동을 통제하는 것", "주일학교의 엄격한 분위기 조성", "학생들이 신앙적인 예절과 바른 자세로 하나님을 대하도록 지도하는 것", "교사들의 권위를 높이는 것"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '우리나라 최초의 순교 선교사로 인정받는 사람은 누구입니까?', '["구츠라프", "토마스", "뮐렌도르프", "하멜"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '1907 년에 일어났던 유명한 교회사 사건이 아닌 것은?', '["신학교에서 첫 졸업생 7 인 배출 및 목사 안수", "백만인 구령운동이 열화와 같이 일어남", "장로교 첫 번째 독노회 조직", "영적 대각성 운동으로 처음 새벽기도회 시작"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '장로교회가 채택하고 있는 사상의 본질과 다른 것은?', '["개혁주의", "보수주의", "알미니안주의", "칼빈주의"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '교회의 권세 세 가지가 있다. 그 중에 들지 않는 것은?', '["교황권", "교리권", "치리권", "봉사(사역)권"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '기독교의 성격을 가장 정확하게 설명한 것은?', '["윤리종교", "자연종교", "민족종교", "계시종교"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '다음은 유명한 16세기 종교개혁자들이다. 그 중에 들지 않는 사람은?', '["마르틴 루터", "츠빙글리", "존 칼빈", "존 후스"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '시한부 종말론자들이 사회를 혼란시킨 적이 있었다. 이와 유사한 시한부적인 문제를 야기(惹起)했었던 이단 종파는 무엇입니까?', '["여호와의 증인", "몰몬교", "크리스천 사이언스", "유니테리안"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '세계 최대 제국이었던 로마 제국을 멸망시켰던 민족은 어느 민족?', '["라틴 민족", "노르만 민족", "슬라브 민족", "게르만 민족"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '한국 기독교의 놀랄만한 성장은 선교 초기 "네비우스 정책"의 영향이 컸다고 할 수 있다. 이 선교 정책 중에 들지 않는 것은 무엇입니까?', '["자전(自傳)", "자립(自立)", "자급(自給)", "자치(自治)"]'::jsonb, 1);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '기독학생 운동 단체인 ''학생기독연맹(Student Christian Federation)''의 약자는 무엇입니까?', '["S.C.F", "K.N.C.C", "W.C.C", "C.C.C."]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '형사소송과 민사소송에서 차이가 나는 부분은 무엇입니까?', '["원고 (형사소송에서 원고는 검사, 민사소송에서의 원고는 피해자)", "피고", "판사", "변호사"]'::jsonb, 0);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '사회 복지 시설이라고 볼 수 없는 것은?', '["탁아소", "양로원", "고아원", "감화원"]'::jsonb, 3);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '언제 어디서나 네트워크에 접속하여 컴퓨터를 사용할 수 있는 정보통신 환경을 무엇이라고 합니까?', '["WAN", "GUI", "Ubiquitous", "cyber space"]'::jsonb, 2);
+insert into public.exam_questions (subject, question, options, answer) values ('예배모범', '미국에서 가장 권위 있는 문학상으로 헝가리 태생의 미국 신문왕의 이름을 딴 상은 무엇입니까?', '["퓰리처상", "뉴베리상", "칼데콧 상", "노벨상"]'::jsonb, 0);
+
+select subject as "과목", count(*) as "문항" from public.exam_questions group by subject order by 1;
