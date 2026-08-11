@@ -43,7 +43,8 @@ document.addEventListener('DOMContentLoaded', function () {
     { key: '결의사항', desc: '정기노회와 임원회에서 결의한 내용입니다.' },
     { key: '규칙',     desc: '노회규칙 전문입니다.' },
     { key: '내규',     desc: '각 위원회와 부서의 내규입니다.' },
-    { key: '서식',     desc: '노회에 올리는 각종 청원 서식입니다.' }
+    { key: '서식',     desc: '노회에 올리는 각종 청원 서식입니다.' },
+    { key: '고시',     desc: '목사·장로·전도사·목사후보생 고시 준비 자료입니다.' }
   ];
 
   function accessLabel(a) {
@@ -138,6 +139,24 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('scroll', hide, { passive: true });
   }
 
+  /* ---------- 고시 모의고사 안내 ---------- */
+  function examHtml() {
+    return '<div class="admin-card" style="max-width:720px;margin-top:16px">' +
+      '<h3 style="margin-top:0">고시 모의고사</h3>' +
+      '<p style="font-size:0.9rem;color:var(--gray-7)">고시집의 과목별 예상 문제로 실제 고시처럼 풀어 보고 ' +
+      '바로 채점받으실 수 있습니다. 응시하시려면 <strong>고시부의 승인</strong>이 필요하며, ' +
+      '개인당 <strong>2회</strong>까지 보실 수 있습니다.</p>' +
+      '<table class="tbl" style="max-width:640px"><thead><tr><th style="width:130px">구분</th><th>필기 과목</th></tr></thead><tbody>' +
+      '<tr><td>목사</td><td class="left">목회학 · 권징조례 · 신조 · 예배모범</td></tr>' +
+      '<tr><td>장로</td><td class="left">정치 · 권징조례 · 신조 · 상식 · 소요리</td></tr>' +
+      '<tr><td>전도사</td><td class="left">상식 · 영어</td></tr>' +
+      '<tr><td>목사후보생</td><td class="left">상식 · 영어</td></tr>' +
+      '</tbody></table>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5)">노회규칙 제7장 22~23조에 따른 배정입니다. ' +
+      '면접은 필기가 아니므로, 성경은 성경통신 신구약 수료증으로 대체되므로 모의고사에서 제외했습니다.</p>' +
+      '<a class="btn" href="exam.html">모의고사 보러 가기</a></div>';
+  }
+
   /* ---------- 노회 회의결의 ---------- */
   function resolutionsHtml(rows) {
     if (!isMember) {
@@ -214,6 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<h2>' + e(s.key) + '</h2>' +
         '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>' + itemRows(list);
       if (s.key === '서식') html += formsHtml();
+      if (s.key === '고시') html += examHtml();
     });
 
     area.innerHTML = html;

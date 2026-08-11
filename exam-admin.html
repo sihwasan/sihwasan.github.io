@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>모의고사 응시 관리 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>모의고사 응시 관리</h1>
+    <div class="crumb">홈 &gt; 고시부 &gt; 모의고사 응시 관리</div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <div id="xa-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('xa-area');
+  var e = SHS.esc;
+  var canManage = user && SHSAuth.canManageMembers(user);
+  var tab = 'req';
+  var reqs = [], atts = [], officers = [], qstat = [];
+
+  if (!user || !user.cloud) {
+    area.innerHTML = '<div class="notice-banner">모의고사 응시 관리는 로그인 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+    return;
+  }
+
+  function db() { return SHSCloud.init(); }
+
+  function load() {
+    db().then(function (c) {
+      return c.from('exam_officers').select('*');
+    }).then(function (r) {
+      officers = (r && r.data) || [];
+      var mine = officers.filter(function (o) { return o.user_id === user.id; })[0];
+      if (!mine && !canManage) {
+        area.innerHTML = '<div class="notice-banner">모의고사 응시 관리는 <strong>고시부 부장·서기</strong>가 ' +
+          '이용할 수 있습니다. 현재 계정에는 권한이 없습니다.</div>';
+        return;
+      }
+      return db().then(function (c) {
+        return Promise.all([
+          c.from('exam_requests').select('*').order('created_at', { ascending: false }),
+          c.from('exam_attempts').select('*').order('started_at', { ascending: false }),
+          c.from('exam_questions').select('subject')
+        ]);
+      }).then(function (rs) {
+        if (rs[0].error) {
+          area.innerHTML = '<div class="notice-banner">불러오지 못했습니다: ' + e(rs[0].error.message) +
+            ' (19 고시 모의고사 등록이 필요할 수 있습니다)</div>';
+          return;
+        }
+        reqs = rs[0].data || [];
+        atts = (rs[1] && rs[1].data) || [];
+        var byS = {};
+        ((rs[2] && rs[2].data) || []).forEach(function (q) { byS[q.subject] = (byS[q.subject] || 0) + 1; });
+        qstat = Object.keys(byS).map(function (k) { return { subject: k, n: byS[k] }; })
+                      .sort(function (a, b) { return b.n - a.n; });
+        draw(mine);
+      });
+    });
+  }
+
+  function draw(mine) {
+    var pend = reqs.filter(function (r) { return r.status === 'pending'; });
+    var h = '<div class="notice-banner">' +
+      (mine ? '<strong>고시부 ' + e(mine.position) + '</strong>으로 등록되어 있습니다. '
+            : '<strong>관리자</strong> 권한으로 열람하고 있습니다. ') +
+      '응시 요청을 확인하고 승인해 주세요. 승인받은 분은 개인당 2회까지 모의고사를 볼 수 있습니다.' +
+      (pend.length ? ' <strong>지금 기다리는 요청 ' + pend.length + '건</strong>' : '') +
+      '</div>';
+
+    h += '<div class="tabs" id="xa-tabs">' +
+      '<button class="' + (tab === 'req' ? 'active' : '') + '" data-t="req">응시 요청 (' + pend.length + ')</button>' +
+      '<button class="' + (tab === 'att' ? 'active' : '') + '" data-t="att">응시 현황</button>' +
+      '<button class="' + (tab === 'q' ? 'active' : '') + '" data-t="q">문제 은행</button>' +
+      (canManage ? '<button class="' + (tab === 'off' ? 'active' : '') + '" data-t="off">고시부 임원 지정</button>' : '') +
+      '</div><div id="xa-body"></div>';
+    area.innerHTML = h;
+
+    area.querySelectorAll('#xa-tabs button').forEach(function (b) {
+      b.addEventListener('click', function () { tab = b.dataset.t; draw(mine); });
+    });
+
+    if (tab === 'req') drawReq();
+    else if (tab === 'att') drawAtt();
+    else if (tab === 'q') drawQ();
+    else drawOff();
+  }
+
+  /* ---------- 응시 요청 ---------- */
+  function drawReq() {
+    var box = document.getElementById('xa-body');
+    if (!reqs.length) { box.innerHTML = '<p style="color:var(--gray-5)">아직 응시 요청이 없습니다.</p>'; return; }
+    var h = '<table class="tbl"><thead><tr><th style="width:110px">성명</th><th style="width:150px">소속 교회</th>' +
+      '<th style="width:110px">구분</th><th>남긴 말</th><th style="width:150px">요청일</th>' +
+      '<th style="width:110px">상태</th><th style="width:190px">처리</th></tr></thead><tbody>';
+    reqs.forEach(function (r) {
+      var used = atts.filter(function (a) { return a.user_id === r.user_id; }).length;
+      var label = { pending: '대기', approved: '승인', rejected: '반려' }[r.status] || r.status;
+      h += '<tr><td>' + e(r.user_name || '-') + '</td><td>' + e(r.user_church || '-') + '</td>' +
+        '<td>' + e(r.track) + '</td>' +
+        '<td class="left">' + e(r.note || '') +
+        (r.status === 'approved' ? '<div style="font-size:0.8rem;color:var(--gray-5)">응시 ' + used + ' / 2회</div>' : '') +
+        (r.decided_by ? '<div style="font-size:0.8rem;color:var(--gray-5)">처리: ' + e(r.decided_by) + '</div>' : '') +
+        '</td>' +
+        '<td>' + e(String(r.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
+        '<td><span class="role-badge">' + label + '</span></td>' +
+        '<td>' + (r.status === 'pending'
+          ? '<button class="btn sm" data-ok="' + r.id + '">승인</button> ' +
+            '<button class="btn danger sm" data-no="' + r.id + '">반려</button>'
+          : (r.status === 'approved'
+              ? '<button class="btn ghost sm" data-no="' + r.id + '">승인 취소</button>'
+              : '<button class="btn sm" data-ok="' + r.id + '">다시 승인</button>')) +
+        '</td></tr>';
+    });
+    h += '</tbody></table><div class="form-msg" id="xa-msg"></div>';
+    box.innerHTML = h;
+
+    function decide(id, status) {
+      var msg = document.getElementById('xa-msg');
+      var note = null;
+      if (status === 'rejected') {
+        note = prompt('반려 사유를 적어 주세요. (응시자에게 보입니다)', '');
+        if (note === null) return;
+      }
+      msg.className = 'form-msg'; msg.textContent = '처리 중입니다...';
+      db().then(function (c) {
+        return c.from('exam_requests').update({
+          status: status, note: note || undefined,
+          decided_by: user.name, decided_at: new Date().toISOString()
+        }).eq('id', id);
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        var t = reqs.filter(function (x) { return String(x.id) === String(id); })[0];
+        SHSCloud.log('update', '모의고사 응시 ' + (status === 'approved' ? '승인' : '반려'),
+                     (t ? t.user_name + ' / ' + t.track : id));
+        /* 응시자에게 알림을 보낸다 */
+        if (t) {
+          db().then(function (c) {
+            return c.from('notifications').insert({
+              user_id: t.user_id, kind: '고시',
+              title: status === 'approved' ? '모의고사 응시가 승인되었습니다'
+                                           : '모의고사 응시 요청이 반려되었습니다',
+              body: status === 'approved'
+                ? t.track + ' 구분으로 응시가 승인되었습니다. 자료실 → 모의고사에서 시험을 보실 수 있습니다. (개인당 2회)'
+                : '요청이 반려되었습니다.' + (note ? ' 사유: ' + note : '') + ' 자세한 사항은 고시부로 문의해 주세요.'
+            });
+          }).catch(function () {});
+        }
+        load();
+      });
+    }
+    box.querySelectorAll('button[data-ok]').forEach(function (b) {
+      b.addEventListener('click', function () { decide(b.dataset.ok, 'approved'); });
+    });
+    box.querySelectorAll('button[data-no]').forEach(function (b) {
+      b.addEventListener('click', function () { decide(b.dataset.no, 'rejected'); });
+    });
+  }
+
+  /* ---------- 응시 현황 ---------- */
+  function drawAtt() {
+    var box = document.getElementById('xa-body');
+    var done = atts.filter(function (a) { return a.submitted_at; });
+    if (!atts.length) { box.innerHTML = '<p style="color:var(--gray-5)">아직 응시 기록이 없습니다.</p>'; return; }
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">전체 ' + atts.length + '회 응시 / 제출 완료 ' + done.length + '회</p>' +
+      '<table class="tbl"><thead><tr><th style="width:120px">성명</th><th style="width:110px">구분</th>' +
+      '<th style="width:170px">시작</th><th style="width:170px">제출</th>' +
+      '<th style="width:120px">점수</th><th>백분율</th></tr></thead><tbody>';
+    atts.forEach(function (a) {
+      var pct = (a.submitted_at && a.total) ? Math.round(a.score * 100 / a.total) : null;
+      h += '<tr><td>' + e(a.user_name || '-') + '</td><td>' + e(a.track) + '</td>' +
+        '<td>' + e(String(a.started_at).replace('T', ' ').slice(0, 16)) + '</td>' +
+        '<td>' + (a.submitted_at ? e(String(a.submitted_at).replace('T', ' ').slice(0, 16))
+                                 : '<span style="color:var(--gray-5)">진행 중</span>') + '</td>' +
+        '<td>' + (a.submitted_at ? a.score + ' / ' + a.total : '-') + '</td>' +
+        '<td class="left">' + (pct === null ? '-' :
+          '<span class="' + (pct >= 60 ? 'pass' : 'fail') + '">' + pct + '점</span>') + '</td></tr>';
+    });
+    box.innerHTML = h + '</tbody></table>';
+  }
+
+  /* ---------- 문제 은행 ---------- */
+  function drawQ() {
+    var box = document.getElementById('xa-body');
+    var total = qstat.reduce(function (s, x) { return s + x.n; }, 0);
+    var h = '<div class="notice-banner">문제는 「시화산노회 고시부 목사장로 고시가이드」의 과목별 예상 문제 은행에서 옮겨 왔습니다. ' +
+      '정답은 서버에만 보관되며 응시자 화면으로는 내려가지 않습니다.</div>' +
+      '<p style="color:var(--gray-5);font-size:0.88rem">전체 ' + total + '문항</p>' +
+      '<table class="tbl" style="max-width:520px"><thead><tr><th style="width:180px">과목</th><th>문항 수</th></tr></thead><tbody>';
+    qstat.forEach(function (s) {
+      h += '<tr><td>' + e(s.subject) + '</td><td class="left">' + s.n + '문항</td></tr>';
+    });
+    h += '</tbody></table>' +
+      '<h3 style="margin-top:26px">구분별 출제 과목</h3>' +
+      '<table class="tbl" style="max-width:720px"><thead><tr><th style="width:130px">구분</th><th>필기 과목</th></tr></thead><tbody>' +
+      '<tr><td>목사</td><td class="left">목회학 · 권징조례 · 신조 · 예배모범</td></tr>' +
+      '<tr><td>장로</td><td class="left">정치 · 권징조례 · 신조 · 상식 · 소요리</td></tr>' +
+      '<tr><td>전도사</td><td class="left">상식 · 영어</td></tr>' +
+      '<tr><td>목사후보생</td><td class="left">상식 · 영어</td></tr>' +
+      '</tbody></table>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5)">노회규칙 제7장 22~23조에 따른 배정입니다. ' +
+      '면접은 필기가 아니므로, 성경은 성경통신 수료증으로 대체되므로 모의고사에서 제외했습니다.</p>';
+    box.innerHTML = h;
+  }
+
+  /* ---------- 고시부 임원 지정 (관리자) ---------- */
+  function drawOff() {
+    var box = document.getElementById('xa-body');
+    box.innerHTML = '<p style="color:var(--gray-5)">회원 목록을 불러오는 중...</p>';
+    db().then(function (c) {
+      return c.from('profiles').select('id, name, church, role').order('name');
+    }).then(function (r) {
+      var people = (r && r.data) || [];
+      var h = '<div class="notice-banner">고시부 부장·서기로 지정된 분에게 <strong>고시부</strong> 메뉴가 나타나고, ' +
+        '모의고사 응시 요청을 승인할 수 있습니다. 지정은 관리자만 할 수 있습니다.</div>';
+
+      h += '<h3>현재 고시부 임원</h3>';
+      if (!officers.length) {
+        h += '<p style="color:var(--gray-5)">아직 지정된 분이 없습니다.</p>';
+      } else {
+        h += '<table class="tbl" style="max-width:620px"><thead><tr><th style="width:140px">성명</th>' +
+          '<th style="width:120px">직책</th><th style="width:150px">소속</th><th style="width:110px">관리</th></tr></thead><tbody>';
+        officers.forEach(function (o) {
+          var p = people.filter(function (x) { return x.id === o.user_id; })[0] || {};
+          h += '<tr><td>' + e(p.name || '(알 수 없음)') + '</td><td>' + e(o.position) + '</td>' +
+            '<td>' + e(p.church || '-') + '</td>' +
+            '<td><button class="btn danger sm" data-offdel="' + o.id + '" data-offn="' + e(p.name || '') + '">해제</button></td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+
+      h += '<h3 style="margin-top:24px">임원 지정</h3>' +
+        '<div class="admin-card" style="max-width:640px"><div class="inline-form">' +
+        '<div class="field"><label>회원</label><select id="off-user">' +
+        people.filter(function (p) { return p.role !== 'pending'; }).map(function (p) {
+          return '<option value="' + e(p.id) + '">' + e(p.name || p.id) +
+            (p.church ? ' (' + e(p.church) + ')' : '') + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 140px"><label>직책</label>' +
+        '<select id="off-pos"><option>부장</option><option>서기</option></select></div>' +
+        '<button class="btn" id="off-add">지정</button>' +
+        '</div><div class="form-msg" id="off-msg"></div></div>';
+      box.innerHTML = h;
+
+      document.getElementById('off-add').addEventListener('click', function () {
+        var msg = document.getElementById('off-msg');
+        var d = {
+          user_id: document.getElementById('off-user').value,
+          position: document.getElementById('off-pos').value,
+          created_by: user.name
+        };
+        msg.className = 'form-msg'; msg.textContent = '지정 중입니다...';
+        db().then(function (c) { return c.from('exam_officers').insert(d); }).then(function (r) {
+          if (r.error) {
+            msg.className = 'form-msg err';
+            msg.textContent = r.error.code === '23505' ? '이미 고시부 임원으로 지정된 분입니다.' : r.error.message;
+            return;
+          }
+          SHSCloud.log('update', '고시부 임원 지정', d.position);
+          load();
+        });
+      });
+
+      box.querySelectorAll('button[data-offdel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('"' + b.dataset.offn + '" 님을 고시부 임원에서 해제하시겠습니까?')) return;
+          db().then(function (c) { return c.from('exam_officers').delete().eq('id', b.dataset.offdel); })
+            .then(function (r) {
+              if (r.error) { alert(r.error.message); return; }
+              SHSCloud.log('update', '고시부 임원 해제', b.dataset.offn);
+              load();
+            });
+        });
+      });
+    });
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>

@@ -33,8 +33,10 @@
     ]},
     { title: '자료실', href: 'archive.html', sub: [
       { t: '자료 목록', h: 'archive.html' },
-      { t: '지난 회기 결의사항', h: 'archive.html#resolutions' },
-      { t: '구비서류 안내', h: 'archive.html#forms' }
+      { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
+      { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
+      { t: '목사·장로 고시', h: 'archive.html#sec-%EA%B3%A0%EC%8B%9C' },
+      { t: '고시 모의고사', h: 'exam.html' }
     ]},
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
@@ -67,6 +69,23 @@
     { t: '시스템 운영', h: 'ops.html' },
     { t: '감독 (감사 기록)', h: 'audit.html' }
   ]};
+
+  /* 고시부 부장·서기에게만 보이는 메뉴 */
+  function addExamMenu() {
+    var list = document.querySelector('.gnb-list');
+    if (!list || document.getElementById('gnb-exam')) return;
+    var here = location.pathname.split('/').pop() || 'index.html';
+    var li = document.createElement('li');
+    li.className = 'gnb-item gnb-admin' + (here === 'exam-admin.html' ? ' active' : '');
+    li.id = 'gnb-exam';
+    li.innerHTML = '<a href="exam-admin.html">고시부</a><div class="gnb-sub">' +
+      '<a href="exam-admin.html">모의고사 응시 관리</a>' +
+      '<a href="exam.html">모의고사 보기</a>' +
+      '<a href="archive.html#sec-%EA%B3%A0%EC%8B%9C">고시집</a>' +
+      '</div>';
+    var admin = document.getElementById('gnb-admin');
+    if (admin) list.insertBefore(li, admin); else list.appendChild(li);
+  }
 
   function addAdminMenu() {
     var list = document.querySelector('.gnb-list');
@@ -279,6 +298,13 @@
 
         /* 관리자에게 관리자 메뉴를 붙인다 */
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) addAdminMenu();
+
+        /* 고시부 부장·서기이면 고시부 메뉴를 붙인다 */
+        SHSCloud.init().then(function (c) {
+          return c.from('exam_officers').select('user_id').eq('user_id', p.id);
+        }).then(function (r) {
+          if (r && r.data && r.data.length) addExamMenu();
+        }, function () {});
 
         /* 아직 성명·소속 교회를 등록하지 않은 회원은 등록 화면으로 안내한다. */
         var here = location.pathname.split('/').pop() || 'index.html';

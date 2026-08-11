@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>목사·장로 고시 모의고사 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>목사·장로 고시 모의고사</h1>
+    <div class="crumb">홈 &gt; 자료실 &gt; 모의고사</div>
+  </div>
+</div>
+
+<div class="page-body container" style="max-width:900px">
+  <div id="ex-area"><p style="color:var(--gray-5)">확인하는 중...</p></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('ex-area');
+  var e = SHS.esc;
+
+  /* 고시 과목 (노회규칙 제7장 22~23조 / 고시부 가이드북) */
+  var TRACKS = [
+    { v: '목사',       subs: '목회학 · 권징조례 · 신조 · 예배모범' },
+    { v: '장로',       subs: '정치 · 권징조례 · 신조 · 상식 · 소요리' },
+    { v: '전도사',     subs: '상식 · 영어' },
+    { v: '목사후보생', subs: '상식 · 영어' }
+  ];
+  var MAX_TRY = 2;
+
+  var gate = SHS.memberGate(user, '고시 모의고사');
+  if (gate) { area.innerHTML = gate; return; }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">모의고사는 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var reqs = [], attempts = [];
+  function db() { return SHSCloud.init(); }
+
+  function load() {
+    db().then(function (c) {
+      return Promise.all([
+        c.from('exam_requests').select('*').order('created_at', { ascending: false }),
+        c.from('exam_attempts').select('*').order('started_at', { ascending: false })
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) {
+        area.innerHTML = '<div class="notice-banner">모의고사 정보를 불러오지 못했습니다: ' +
+          e(rs[0].error.message) + ' (19 고시 모의고사 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      reqs = rs[0].data || [];
+      attempts = (rs[1] && rs[1].data) || [];
+      drawHome();
+    });
+  }
+
+  function approvedTrack() {
+    var a = reqs.filter(function (r) { return r.status === 'approved'; })[0];
+    return a ? a.track : null;
+  }
+
+  /* ---------- 첫 화면 ---------- */
+  function drawHome() {
+    var done = attempts.filter(function (a) { return a.submitted_at; });
+    var left = Math.max(0, MAX_TRY - attempts.length);
+    var app = approvedTrack();
+    var pending = reqs.filter(function (r) { return r.status === 'pending'; })[0];
+    var rejected = reqs.filter(function (r) { return r.status === 'rejected'; })[0];
+
+    var h = '<div class="notice-banner">' +
+      '「시화산노회 고시부 목사장로 고시가이드」의 과목별 예상 문제로 실제 고시처럼 풀어 보고 ' +
+      '바로 채점받으실 수 있습니다. 응시는 <strong>고시부의 승인</strong>을 받으셔야 하고, ' +
+      '<strong>개인당 ' + MAX_TRY + '회</strong>까지 가능합니다.</div>';
+
+    /* 응시 자격 */
+    h += '<h2>응시 자격</h2>';
+    if (app) {
+      h += '<div class="exam-state ok"><strong>' + e(app) + '</strong> 구분으로 응시가 승인되었습니다. ' +
+        '남은 응시 횟수 <strong>' + left + '회</strong></div>';
+    } else if (pending) {
+      h += '<div class="exam-state wait"><strong>' + e(pending.track) + '</strong> 구분으로 응시를 요청하셨습니다. ' +
+        '고시부 부장·서기의 승인을 기다리는 중입니다.</div>';
+    } else {
+      if (rejected) {
+        h += '<div class="exam-state no">지난 요청은 승인되지 않았습니다.' +
+          (rejected.note ? ' 사유: ' + e(rejected.note) : '') + ' 다시 요청하실 수 있습니다.</div>';
+      }
+      h += '<div class="admin-card" style="max-width:640px">' +
+        '<h3 style="margin-top:0">응시 요청</h3>' +
+        '<p style="font-size:0.88rem;color:var(--gray-7)">응시하실 구분을 고르시면 고시부에 요청이 전달됩니다.</p>' +
+        '<div class="field"><label>구분</label><select id="ex-track">' +
+        TRACKS.map(function (t) {
+          return '<option value="' + e(t.v) + '">' + e(t.v) + ' — ' + e(t.subs) + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field"><label>남기실 말씀 (선택)</label><input type="text" id="ex-note" placeholder="예: 2026년 가을 고시 준비"></div>' +
+        '<button class="btn" id="ex-req">응시 요청하기</button>' +
+        '<div class="form-msg" id="ex-msg"></div></div>';
+    }
+
+    /* 과목 안내 */
+    h += '<h2>구분별 고시 과목</h2>' +
+      '<table class="tbl" style="max-width:720px"><thead><tr><th style="width:130px">구분</th><th>필기 과목</th></tr></thead><tbody>' +
+      TRACKS.map(function (t) {
+        return '<tr><td>' + e(t.v) + '</td><td class="left">' + e(t.subs) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5)">' +
+      '· 면접은 모든 응시자 공통이며 필기가 아니므로 모의고사에서 제외됩니다.<br>' +
+      '· 성경 과목은 성경통신 신구약 수료증으로 대체되므로 모의고사에 포함되지 않습니다.<br>' +
+      '· 실제 고시 합격 기준은 전 과목 평균 60점 이상입니다.</p>';
+
+    /* 시험 시작 */
+    if (app && left > 0) {
+      h += '<h2>시험 보기</h2>' +
+        '<div class="admin-card" style="max-width:640px">' +
+        '<p style="font-size:0.88rem;color:var(--gray-7)">과목마다 문제를 무작위로 뽑아 출제합니다. ' +
+        '한 번 시작하면 <strong>응시 횟수가 1회 사용</strong>됩니다. ' +
+        '도중에 나가셨다가 다시 들어오시면 보던 시험을 이어서 보실 수 있습니다.</p>' +
+        '<div class="field"><label>과목당 문항 수</label><select id="ex-count">' +
+        '<option value="5">5문항 (짧게)</option><option value="10" selected>10문항 (권장)</option>' +
+        '<option value="20">20문항 (충분히)</option></select></div>' +
+        '<button class="btn" id="ex-start">시험 시작</button>' +
+        '<div class="form-msg" id="ex-smsg"></div></div>';
+    } else if (app) {
+      h += '<div class="notice-banner">응시 가능 횟수(' + MAX_TRY + '회)를 모두 사용하셨습니다. ' +
+        '추가 응시가 필요하시면 고시부로 문의해 주세요.</div>';
+    }
+
+    /* 지난 응시 */
+    if (done.length) {
+      h += '<h2>지난 응시 결과</h2><table class="tbl"><thead><tr>' +
+        '<th style="width:110px">구분</th><th style="width:170px">응시일</th>' +
+        '<th style="width:120px">점수</th><th>백분율</th></tr></thead><tbody>';
+      done.forEach(function (a) {
+        var pct = a.total ? Math.round(a.score * 100 / a.total) : 0;
+        h += '<tr><td>' + e(a.track) + '</td>' +
+          '<td>' + e(String(a.submitted_at).replace('T', ' ').slice(0, 16)) + '</td>' +
+          '<td>' + a.score + ' / ' + a.total + '</td>' +
+          '<td class="left"><span class="' + (pct >= 60 ? 'pass' : 'fail') + '">' + pct + '점' +
+          (pct >= 60 ? ' (합격 기준 이상)' : ' (합격 기준 미만)') + '</span></td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+
+    area.innerHTML = h;
+
+    if (document.getElementById('ex-req')) {
+      document.getElementById('ex-req').addEventListener('click', function () {
+        var msg = document.getElementById('ex-msg');
+        var d = {
+          user_id: user.id, user_name: user.name, user_church: user.church,
+          track: document.getElementById('ex-track').value,
+          note: document.getElementById('ex-note').value.trim() || null,
+          status: 'pending'
+        };
+        msg.className = 'form-msg'; msg.textContent = '요청을 보내는 중입니다...';
+        db().then(function (c) { return c.from('exam_requests').insert(d); }).then(function (r) {
+          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          SHS.logAction('create', '모의고사 응시 요청', d.track);
+          load();
+        });
+      });
+    }
+
+    if (document.getElementById('ex-start')) {
+      document.getElementById('ex-start').addEventListener('click', function () {
+        var msg = document.getElementById('ex-smsg');
+        msg.className = 'form-msg'; msg.textContent = '문제를 준비하는 중입니다...';
+        var n = parseInt(document.getElementById('ex-count').value, 10) || 10;
+        db().then(function (c) {
+          return c.rpc('start_exam', { p_track: app, p_per_subject: n });
+        }).then(function (r) {
+          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          if (!r.data || !r.data.length) {
+            msg.className = 'form-msg err'; msg.textContent = '출제할 문제가 없습니다. 고시부에 문의해 주세요.';
+            return;
+          }
+          SHS.logAction('create', '모의고사 응시 시작', app);
+          runExam(r.data);
+        });
+      });
+    }
+  }
+
+  /* ---------- 시험 진행 ---------- */
+  function runExam(rows) {
+    var attemptId = rows[0].attempt_id;
+    var picked = new Array(rows.length);
+
+    var h = '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님, 모의고사를 시작합니다. ' +
+      '전체 <strong>' + rows.length + '문항</strong>입니다. 답을 고르신 뒤 맨 아래 <strong>제출하고 채점받기</strong>를 눌러 주세요.</div>' +
+      '<div class="exam-progress"><span id="ex-prog">0 / ' + rows.length + ' 문항 선택</span></div>';
+
+    var lastSubject = null;
+    rows.forEach(function (q, i) {
+      if (q.subject !== lastSubject) {
+        lastSubject = q.subject;
+        h += '<h2 class="exam-subject">' + e(q.subject) + '</h2>';
+      }
+      h += '<div class="exam-q" id="q' + i + '">' +
+        '<div class="q-text"><span class="q-no">' + (i + 1) + '</span>' + e(q.question) + '</div>' +
+        '<div class="q-opts">' +
+        (q.options || []).map(function (o, k) {
+          return '<label><input type="radio" name="q' + i + '" value="' + k + '">' +
+            '<span>' + (k + 1) + '. ' + e(o) + '</span></label>';
+        }).join('') + '</div></div>';
+    });
+    h += '<div class="exam-submit">' +
+      '<button class="btn" id="ex-send">제출하고 채점받기</button>' +
+      '<div class="form-msg" id="ex-emsg"></div></div>';
+
+    area.innerHTML = h;
+    window.scrollTo(0, 0);
+
+    area.querySelectorAll('input[type="radio"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        picked[+r.name.slice(1)] = +r.value;
+        var n = picked.filter(function (x) { return x !== undefined; }).length;
+        document.getElementById('ex-prog').textContent = n + ' / ' + rows.length + ' 문항 선택';
+        var card = r.closest('.exam-q');
+        if (card) card.classList.add('answered');
+      });
+    });
+
+    document.getElementById('ex-send').addEventListener('click', function () {
+      var msg = document.getElementById('ex-emsg');
+      var blank = [];
+      for (var i = 0; i < rows.length; i++) if (picked[i] === undefined) blank.push(i + 1);
+      if (blank.length) {
+        if (!confirm(blank.length + '문항이 비어 있습니다. (' + blank.slice(0, 8).join(', ') +
+                     (blank.length > 8 ? ' 외' : '') + '번)\n비운 문항은 오답으로 처리됩니다. 제출하시겠습니까?')) {
+          var first = document.getElementById('q' + (blank[0] - 1));
+          if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+      }
+      var ans = [];
+      for (var k = 0; k < rows.length; k++) ans.push(picked[k] === undefined ? -1 : picked[k]);
+
+      msg.className = 'form-msg'; msg.textContent = '채점하는 중입니다...';
+      db().then(function (c) {
+        return c.rpc('submit_exam', { p_attempt: attemptId, p_answers: ans });
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        SHS.logAction('create', '모의고사 제출', '응시 ' + attemptId);
+        showResult(r.data || []);
+      });
+    });
+  }
+
+  /* ---------- 채점 결과 ---------- */
+  function showResult(rows) {
+    if (!rows.length) { load(); return; }
+    var score = rows[0].score, total = rows[0].total || rows.length;
+    var pct = total ? Math.round(score * 100 / total) : 0;
+
+    /* 과목별 점수 */
+    var bySub = {};
+    rows.forEach(function (r) {
+      var s = bySub[r.subject] || (bySub[r.subject] = { n: 0, ok: 0 });
+      s.n++;
+      if (r.chosen === r.correct) s.ok++;
+    });
+
+    var h = '<div class="exam-score ' + (pct >= 60 ? 'pass' : 'fail') + '">' +
+      '<div class="s-num">' + pct + '<span>점</span></div>' +
+      '<div class="s-detail">' + total + '문항 중 <strong>' + score + '문항</strong> 정답' +
+      '<div class="s-note">' + (pct >= 60 ? '실제 고시 합격 기준(평균 60점)을 넘었습니다.'
+                                          : '실제 고시 합격 기준은 평균 60점입니다. 조금 더 준비해 보십시오.') +
+      '</div></div></div>';
+
+    h += '<h2>과목별 결과</h2><table class="tbl" style="max-width:640px"><thead><tr>' +
+      '<th style="width:150px">과목</th><th style="width:120px">정답</th><th>점수</th></tr></thead><tbody>';
+    Object.keys(bySub).forEach(function (k) {
+      var s = bySub[k];
+      var p = Math.round(s.ok * 100 / s.n);
+      h += '<tr><td>' + e(k) + '</td><td>' + s.ok + ' / ' + s.n + '</td>' +
+        '<td class="left"><span class="' + (p >= 60 ? 'pass' : 'fail') + '">' + p + '점</span></td></tr>';
+    });
+    h += '</tbody></table>';
+
+    var wrong = rows.filter(function (r) { return r.chosen !== r.correct; });
+    h += '<h2>틀린 문항 다시 보기 (' + wrong.length + '문항)</h2>';
+    if (!wrong.length) {
+      h += '<p style="color:var(--gray-5)">틀린 문항이 없습니다.</p>';
+    } else {
+      wrong.forEach(function (r, i) {
+        h += '<div class="exam-q review">' +
+          '<div class="q-text"><span class="q-no">' + (i + 1) + '</span>' +
+          '<span class="q-sub">' + e(r.subject) + '</span>' + e(r.question) + '</div>' +
+          '<div class="q-opts">' +
+          (r.options || []).map(function (o, k) {
+            var cls = k === r.correct ? ' right' : (k === r.chosen ? ' mine' : '');
+            var tag = k === r.correct ? ' <em>정답</em>' : (k === r.chosen ? ' <em>내 답</em>' : '');
+            return '<div class="q-opt' + cls + '">' + (k + 1) + '. ' + e(o) + tag + '</div>';
+          }).join('') +
+          (r.chosen === -1 ? '<div class="q-opt mine">답을 고르지 않았습니다.</div>' : '') +
+          '</div></div>';
+      });
+    }
+    h += '<p style="margin-top:24px"><a class="btn" href="exam.html">모의고사 첫 화면으로</a> ' +
+      '<a class="btn ghost" href="archive.html#sec-고시">고시집 보기</a></p>';
+
+    area.innerHTML = h;
+    window.scrollTo(0, 0);
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>
