@@ -51,6 +51,7 @@
     { title: '임원방', href: 'officer.html', sub: [
       { t: '임원 자료실', h: 'officer.html' },
       { t: '노회 회의록', h: 'minutes.html' },
+      { t: '회칙 개정 반영', h: 'rules-edit.html' },
       { t: '서류 발급', h: 'documents.html' },
       { t: '홈페이지 설정', h: 'settings.html' },
       { t: '회원 관리', h: 'admin.html' },

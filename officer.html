@@ -89,6 +89,9 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '<div class="doc-item"><div class="d-name">홈페이지 설정</div><div class="d-desc">직인·도장을 등록하고, 사이트 관리·회원 관리·시스템 운영을 한곳에서 처리합니다.</div><a class="btn sm" href="settings.html">바로가기</a></div>';
   }
   html += '<div class="doc-item"><div class="d-name">사이트 관리</div><div class="d-desc">공지·일정·메인 문구·임원 명부·갤러리를 화면에서 직접 수정합니다. (노회장·서기·간사)</div><a class="btn sm" href="manage.html">바로가기</a></div>';
+  if (SHSAuth.canManageMembers(user)) {
+    html += '<div class="doc-item"><div class="d-name">회칙 개정 반영</div><div class="d-desc">노회규칙과 각 위원회 내규의 조문을 화면에서 직접 고칩니다.</div><a class="btn sm" href="rules-edit.html">바로가기</a></div>';
+  }
   html += '<div class="doc-item"><div class="d-name">노회 회의록</div><div class="d-desc">제19회 정기노회 회의록 전문을 열람합니다. (임원 전용)</div><a class="btn sm" href="minutes.html">바로가기</a></div>';
   html += '<div class="doc-item"><div class="d-name">서류 발급</div><div class="d-desc">소속·재직·대표자·직인 증명서 등 각종 서류를 발급합니다. 발급 권한은 서기에게 있습니다.</div><a class="btn sm" href="documents.html">바로가기</a></div>';
   html += '<div class="doc-item"><div class="d-name">회원 관리</div><div class="d-desc">회원명단과 홈페이지 계정을 추가·삭제하고, 승인대기 회원을 정회원으로 설정합니다.</div><a class="btn sm" href="admin.html">바로가기</a></div>';

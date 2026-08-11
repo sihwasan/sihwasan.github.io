@@ -72,7 +72,8 @@ document.addEventListener('DOMContentLoaded', function () {
     { n: '시스템 운영', d: '시스템 알림 확인, 운영 매뉴얼, 정기노회 기준 일정을 관리합니다.', h: 'ops.html' },
     { n: '서류 발급', d: '증명서를 발급하고 접수된 서류 신청을 처리합니다.', h: 'documents.html' },
     { n: '임원 자료실', d: '일반·대외비·기밀 자료를 등록하고 열람합니다.', h: 'officer.html' },
-    { n: '노회 회의록', d: '정기노회 회의록을 등록하고 열람합니다.', h: 'minutes.html' }
+    { n: '노회 회의록', d: '정기노회 회의록을 등록하고 열람합니다.', h: 'minutes.html' },
+    { n: '회칙 개정 반영', d: '노회규칙과 각 위원회 내규의 조문을 화면에서 직접 고칩니다.', h: 'rules-edit.html' }
   ];
   if (SHSAuth.canViewAudit(user)) {
     menu.push({ n: '감독 (감사 기록)', d: '개인정보 열람, 자료 추가·수정·삭제, 서류 발급 기록을 확인합니다.', h: 'audit.html' });
