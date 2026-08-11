@@ -41,6 +41,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var isSuper = SHSAuth.canAssignRoles(user);
   var canApprove = SHSAuth.canApproveMembers(user);
+  /* 등급 임명 권한: 노회장(서기·간사 등)과 최고관리자(비상시 전체) */
+  var canAppoint = isSuper || user.role === 'president';
 
   /* ---------- 서버(구글 로그인) 회원 관리 ---------- */
   if (user.cloud) {
@@ -83,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th>' +
         '<th style="width:150px">개인정보</th><th style="width:150px">남은 임기</th><th>등급</th>' +
         '<th style="width:110px">자격</th>' +
-        (isSuper ? '<th style="width:200px">등급 변경</th>' : '') + '</tr></thead><tbody>';
+        (canAppoint ? '<th style="width:200px">등급 임명</th>' : '') + '</tr></thead><tbody>';
       visible.forEach(function (p) {
         var cur = gradeValue(p);
         var issue = SHS.membershipIssue(p);
@@ -104,12 +106,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? '<div style="color:var(--red);font-size:0.78rem">' + e(issue) + '</div>'
                 : '<button class="btn danger sm" data-csuspend="' + e(p.id) + '" data-cname="' + e(p.name || '') + '">정지</button>')) +
           '</td>';
-        if (isSuper) {
+        if (canAppoint) {
           html += '<td><select data-crole="' + e(p.id) + '">' +
-            GRADES.map(function (g) {
+            assignable().map(function (g) {
               return '<option value="' + g.v + '"' + (cur === g.v ? ' selected' : '') + '>' + g.t + '</option>';
             }).join('') +
-            '</select> <button class="btn sm" data-cassign="' + e(p.id) + '">적용</button></td>';
+            '</select> <button class="btn sm" data-cassign="' + e(p.id) + '">임명</button></td>';
         }
         html += '</tr>';
       });
@@ -146,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
       function updateRole(id, grade, label) {
         var g = parseGrade(grade);
         SHSCloud.init().then(function (c) {
-          return c.from('profiles').update({ role: g.role, title: g.title, updated_at: new Date().toISOString() }).eq('id', id);
+          return c.rpc('set_member_role', { p_id: id, p_role: g.role, p_title: g.title });
         }).then(function (res) {
           if (res.error) { alert('처리하지 못했습니다: ' + res.error.message); return; }
           SHSCloud.log('update', label, '대상 ' + id + ' → ' + gradeLabel(grade));
@@ -158,13 +160,19 @@ document.addEventListener('DOMContentLoaded', function () {
       area.querySelectorAll('button[data-capprove]').forEach(function (b) {
         b.addEventListener('click', function () {
           if (!confirm('이 회원을 정회원으로 설정하시겠습니까?')) return;
-          updateRole(b.dataset.capprove, 'member', '정회원 승인');
+          SHSCloud.init().then(function (c) {
+            return c.rpc('approve_member', { p_id: b.dataset.capprove });
+          }).then(function (res) {
+            if (res.error) { alert('처리하지 못했습니다: ' + res.error.message); return; }
+            SHSCloud.log('update', '정회원 승인', '대상 ' + b.dataset.capprove);
+            renderCloud();
+          });
         });
       });
       area.querySelectorAll('button[data-cassign]').forEach(function (b) {
         b.addEventListener('click', function () {
           var sel = area.querySelector('select[data-crole="' + b.dataset.cassign + '"]');
-          if (!confirm('등급을 ' + gradeLabel(sel.value) + '(으)로 변경하시겠습니까?')) return;
+          if (!confirm('등급을 ' + gradeLabel(sel.value) + '(으)로 임명하시겠습니까?')) return;
           updateRole(b.dataset.cassign, sel.value, '등급 변경');
         });
       });
@@ -265,6 +273,14 @@ document.addEventListener('DOMContentLoaded', function () {
   function gradeValue(p) {
     if (p.role === 'officer' && p.title) return 'officer:' + p.title;
     return p.role;
+  }
+
+  /* 임명할 수 있는 등급 목록
+   * · 노회장    : 서기·간사 등 관리자와 임원 직책 (노회장 등급은 권한 이양으로만)
+   * · 최고관리자 : 비상시 노회장을 포함해 전부 */
+  function assignable() {
+    if (isSuper) return GRADES;
+    return GRADES.filter(function (g) { return g.role !== 'president' && g.role !== 'superadmin'; });
   }
 
   /* ---------- 노회 명단 관리 (추가·수정·삭제) ---------- */

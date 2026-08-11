@@ -48,6 +48,27 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .topbar a:hover { color: #fff; }
 .topbar .util { display: flex; gap: 18px; align-items: center; }
 .topbar .util .user-name { color: #fff; font-weight: 500; }
+.topbar .util .noti-link { position: relative; }
+.noti-badge {
+  display: inline-block; min-width: 17px; height: 17px; line-height: 17px;
+  padding: 0 5px; margin-left: 4px; border-radius: 9px;
+  background: #d63b3b; color: #fff; font-size: 0.7rem; font-weight: 700;
+  text-align: center; vertical-align: middle;
+}
+
+/* 알림함 */
+.noti-item {
+  border: 1px solid var(--gray-2); border-left: 4px solid var(--gray-3);
+  padding: 16px 18px; margin-bottom: 12px; background: #fff;
+}
+.noti-item.unread { border-left-color: var(--accent); background: #fffdf5; }
+.noti-item .n-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.noti-item .n-title { font-weight: 700; color: var(--navy); font-size: 1.02rem; }
+.noti-item .n-date { margin-left: auto; font-size: 0.78rem; color: var(--gray-5); }
+.noti-item .n-body { font-size: 0.92rem; color: var(--gray-7); white-space: pre-wrap; line-height: 1.75; }
+.noti-item .n-kind {
+  font-size: 0.72rem; border: 1px solid var(--accent); color: var(--accent); padding: 1px 7px;
+}
 
 /* ---------- header ---------- */
 .site-header {

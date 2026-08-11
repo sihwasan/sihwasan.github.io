@@ -224,9 +224,11 @@
             '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
             '<span class="user-name">' + (p.name || p.email) + '</span>' +
             '<span>(' + displayRole(p.role, p.title) + ')</span>' +
+            '<a class="noti-link" href="notifications.html" id="noti-link">알림</a>' +
             '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
+          loadUnread();
         }
 
         /* 아직 성명·소속 교회를 등록하지 않은 회원은 등록 화면으로 안내한다. */
@@ -265,6 +267,43 @@
       docRequestWatch(u);
     });
   });
+
+  /* ---------- 알림 표시 ----------
+   * 읽지 않은 알림이 있으면 상단에 개수를 표시하고,
+   * 임명·취임 같은 중요한 알림은 화면 위에 배너로 한 번 더 알린다. */
+  function loadUnread() {
+    if (!(window.SHSCloud && SHSCloud.enabled())) return;
+    SHSCloud.init().then(function (c) {
+      if (!c) return null;
+      return c.from('notifications').select('*').is('read_at', null)
+        .order('created_at', { ascending: false });
+    }).then(function (r) {
+      if (!r || r.error || !r.data || !r.data.length) return;
+      var rows = r.data;
+      var link = document.getElementById('noti-link');
+      if (link) link.insertAdjacentHTML('beforeend', '<span class="noti-badge">' + rows.length + '</span>');
+
+      /* 임명·취임 알림은 놓치지 않도록 배너로도 안내한다 */
+      var big = rows.filter(function (n) { return n.kind === '임명'; })[0];
+      if (!big) return;
+      if (localStorage.getItem('shs_noti_seen_' + big.id)) return;
+      var bar = document.createElement('div');
+      bar.className = 'container';
+      bar.style.marginTop = '16px';
+      bar.innerHTML =
+        '<div class="notice-banner" style="border-left:4px solid var(--accent)">' +
+        '<strong>[' + SHS.esc(big.title) + ']</strong> 새로운 알림이 도착했습니다. ' +
+        '<a class="btn sm" style="margin-left:8px" href="notifications.html">알림 확인</a> ' +
+        '<button class="btn ghost sm" id="noti-hide">나중에 보기</button></div>';
+      var gnb = document.querySelector('.gnb');
+      if (gnb) gnb.insertAdjacentElement('afterend', bar);
+      var hb = document.getElementById('noti-hide');
+      if (hb) hb.addEventListener('click', function () {
+        localStorage.setItem('shs_noti_seen_' + big.id, '1');
+        bar.remove();
+      });
+    }).catch(function () {});
+  }
 
   /* 서버가 아닌 이 컴퓨터 전용 계정으로 로그인한 경우 안내한다.
    * 이 상태에서는 서버에 저장된 회의록·자료·회원 정보를 읽을 수 없다. */

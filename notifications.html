@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>알림 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>알림</h1>
+    <div class="crumb">홈 &gt; 알림</div>
+  </div>
+</div>
+
+<div class="page-body container" style="max-width:820px">
+  <div id="nt-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('nt-area');
+  var e = SHS.esc;
+
+  if (!user) {
+    area.innerHTML = '<div class="notice-banner">알림은 로그인 후 확인하실 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+    return;
+  }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">알림은 서버 로그인 후 확인하실 수 있습니다.</div>';
+    return;
+  }
+
+  function load() {
+    SHSCloud.init().then(function (c) {
+      return c.from('notifications').select('*').order('created_at', { ascending: false }).limit(100);
+    }).then(function (r) {
+      if (r.error) {
+        area.innerHTML = '<div class="notice-banner">알림을 불러오지 못했습니다: ' + e(r.error.message) +
+          ' (11 알림함 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      var rows = r.data || [];
+      var unread = rows.filter(function (n) { return !n.read_at; });
+
+      var html = '';
+      if (unread.length) {
+        html += '<div class="board-controls"><span style="align-self:center;color:var(--gray-7)">' +
+          '읽지 않은 알림 <strong>' + unread.length + '</strong>건</span>' +
+          '<button class="btn ghost" id="nt-allread">모두 읽음으로 표시</button></div>';
+      }
+      if (!rows.length) {
+        html += '<p style="color:var(--gray-5)">받은 알림이 없습니다.</p>';
+      } else {
+        rows.forEach(function (n) {
+          html += '<div class="noti-item' + (n.read_at ? '' : ' unread') + '">' +
+            '<div class="n-head"><span class="n-kind">' + e(n.kind) + '</span>' +
+            '<span class="n-title">' + e(n.title) + '</span>' +
+            '<span class="n-date">' + e(String(n.created_at).replace('T', ' ').slice(0, 16)) + '</span></div>' +
+            '<div class="n-body">' + e(n.body || '') + '</div>' +
+            (n.read_at ? '' : '<p style="margin:10px 0 0"><button class="btn ghost sm" data-ntread="' + n.id + '">읽음</button></p>') +
+            '</div>';
+        });
+      }
+      area.innerHTML = html;
+
+      function markRead(ids) {
+        SHSCloud.init().then(function (c) {
+          return c.from('notifications').update({ read_at: new Date().toISOString() }).in('id', ids);
+        }).then(function () { load(); });
+      }
+      area.querySelectorAll('button[data-ntread]').forEach(function (b) {
+        b.addEventListener('click', function () { markRead([b.dataset.ntread]); });
+      });
+      var all = document.getElementById('nt-allread');
+      if (all) all.addEventListener('click', function () {
+        markRead(unread.map(function (n) { return n.id; }));
+      });
+    });
+  }
+  load();
+ });
+});
+</script>
+</body>
+</html>

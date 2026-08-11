@@ -89,6 +89,23 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="form-msg" id="q-msg"></div>' +
       '</div>';
 
+    /* 노회장 전용: 차기 노회장에게 권한 이양 */
+    if (p.role === 'president') {
+      html += '<h2>차기 노회장에게 관리자 권한 넘기기</h2>';
+      html += '<div class="form-card" style="max-width:520px;margin:0;border-color:var(--red)">' +
+        '<p style="font-size:0.9rem;color:var(--gray-7);margin-bottom:14px">' +
+        '임기를 마치시고 차기 노회장께 홈페이지 관리 권한을 넘기실 때 사용합니다.<br><br>' +
+        '<strong style="color:var(--red)">넘기시는 즉시 회원님의 등급은 정회원으로 바뀌고, ' +
+        '관리자 기능을 더 이상 사용하실 수 없습니다. 되돌릴 수 없습니다.</strong><br><br>' +
+        '차기 노회장께는 취임 축하와 권한 안내가 알림으로 전달됩니다.</p>' +
+        '<div class="field"><label>차기 노회장</label><select id="t-target"><option value="">— 불러오는 중 —</option></select></div>' +
+        '<div class="field"><label>확인을 위해 차기 노회장의 성명을 그대로 입력하세요</label>' +
+        '<input type="text" id="t-name" placeholder="예: 박흥열"></div>' +
+        '<button class="btn danger" id="t-go" style="width:100%">권한 넘기기</button>' +
+        '<div class="form-msg" id="t-msg"></div>' +
+        '</div>';
+    }
+
     html += '<h2>로그아웃</h2>';
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
       '<p style="font-size:0.88rem;color:var(--gray-7);margin-bottom:16px">' +
@@ -149,6 +166,50 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('q-out').addEventListener('click', function () {
       SHSCloud.signOut().then(function () { location.href = 'index.html'; });
     });
+
+    /* ---------- 노회장 권한 이양 ---------- */
+    if (p.role === 'president') {
+      var sel = document.getElementById('t-target');
+      SHSCloud.init().then(function (c) {
+        return c.from('profiles').select('id,name,church,role,position')
+          .in('role', ['member', 'officer', 'clerk', 'staff']).order('name');
+      }).then(function (r) {
+        var list = (r.data || []).filter(function (x) { return x.id !== p.id; });
+        sel.innerHTML = '<option value="">— 선택하세요 —</option>' +
+          list.map(function (x) {
+            return '<option value="' + e(x.id) + '">' + e(x.name || '(이름 없음)') +
+              ' · ' + e(x.church || '') + ' (' + SHS.displayRole(x.role) + ')</option>';
+          }).join('');
+      });
+
+      document.getElementById('t-go').addEventListener('click', function () {
+        var msg = document.getElementById('t-msg');
+        var targetId = sel.value;
+        var typed = document.getElementById('t-name').value.trim();
+        if (!targetId) { msg.className = 'form-msg err'; msg.textContent = '차기 노회장을 선택해 주세요.'; return; }
+        if (!typed) { msg.className = 'form-msg err'; msg.textContent = '확인을 위해 성명을 입력해 주세요.'; return; }
+
+        var label = sel.options[sel.selectedIndex].textContent;
+        if (!confirm('정말 노회장 권한을 넘기시겠습니까?\n\n대상: ' + label +
+                     '\n\n넘기시는 즉시 회원님은 정회원이 되고 관리자 기능을 사용하실 수 없습니다.\n되돌릴 수 없습니다.')) return;
+        if (!confirm('다시 한 번 확인합니다.\n\n"' + typed + '" 님에게 노회장 권한을 넘깁니다.\n\n진행하시겠습니까?')) return;
+
+        msg.className = 'form-msg';
+        msg.textContent = '처리 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.rpc('transfer_presidency', { p_target_id: targetId, p_confirm_name: typed });
+        }).then(function (r) {
+          if (r.error) {
+            msg.className = 'form-msg err';
+            msg.textContent = r.error.message;
+            return;
+          }
+          alert('권한 이양이 완료되었습니다.\n\n' + r.data + ' 님이 새 노회장이 되셨습니다.\n' +
+                '회원님의 등급은 정회원으로 바뀌었습니다.\n\n그동안 노회를 섬겨 주셔서 감사합니다.');
+          location.href = 'index.html';
+        });
+      });
+    }
 
     document.getElementById('q-del').addEventListener('click', function () {
       if (!confirm('정말 탈퇴하시겠습니까? 회원 정보가 삭제되며 되돌릴 수 없습니다.')) return;
