@@ -163,16 +163,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function doLogin() {
-    var id = document.getElementById('login-id').value.trim();
-    var pw = document.getElementById('login-pw').value;
-    var keep = document.getElementById('login-keep').checked;
-    var msg = document.getElementById('login-msg');
-    if (!id || !pw) {
-      msg.className = 'form-msg err';
-      msg.textContent = '이메일과 비밀번호를 입력해 주세요.';
-      return;
-    }
+  function localLogin(id, pw, keep, msg) {
     var r = SHSAuth.login(id, pw, keep);
     if (r.ok) {
       msg.className = 'form-msg ok';
@@ -182,6 +173,36 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.className = 'form-msg err';
       msg.textContent = r.msg;
     }
+  }
+
+  function doLogin() {
+    var id = document.getElementById('login-id').value.trim().toLowerCase();
+    var pw = document.getElementById('login-pw').value;
+    var keep = document.getElementById('login-keep').checked;
+    var msg = document.getElementById('login-msg');
+    if (!id || !pw) {
+      msg.className = 'form-msg err';
+      msg.textContent = '이메일과 비밀번호를 입력해 주세요.';
+      return;
+    }
+    /* 서버 로그인 우선 (관리자 권한과 사이트 관리가 서버 인증으로 동작).
+     * 서버에 계정이 없으면 이 컴퓨터의 체험 계정으로 로그인을 시도한다. */
+    if (window.SHSCloud && SHSCloud.enabled()) {
+      msg.className = 'form-msg';
+      msg.textContent = '확인 중입니다...';
+      SHSCloud.init().then(function (c) {
+        if (!c) { localLogin(id, pw, keep, msg); return; }
+        c.auth.signInWithPassword({ email: id, password: pw }).then(function (r) {
+          if (r.error) { localLogin(id, pw, keep, msg); return; }
+          msg.className = 'form-msg ok';
+          msg.textContent = '환영합니다.';
+          SHSCloud.log('auth', '이메일 로그인', id);
+          setTimeout(function () { location.href = 'index.html'; }, 400);
+        });
+      });
+      return;
+    }
+    localLogin(id, pw, keep, msg);
   }
   document.getElementById('btn-login').addEventListener('click', doLogin);
   document.getElementById('login-pw').addEventListener('keydown', function (ev) {
@@ -270,6 +291,64 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.textContent = '이용약관과 개인정보처리방침에 동의해야 가입할 수 있습니다.';
       return;
     }
+
+    /* 서버 가입 우선: 어떤 컴퓨터에서든 같은 계정으로 로그인할 수 있다. */
+    if (window.SHSCloud && SHSCloud.enabled()) {
+      var email = document.getElementById('reg-id').value.trim().toLowerCase();
+      var pw = document.getElementById('reg-pw').value;
+      var name = document.getElementById('reg-name').value.trim();
+      var church = document.getElementById('reg-church').value.trim();
+      var position = document.getElementById('reg-pos').value;
+      var phone = document.getElementById('reg-phone').value.trim();
+      if (!email || !pw || !name || !church) {
+        msg.className = 'form-msg err';
+        msg.textContent = '이메일, 비밀번호, 성명, 소속 교회는 필수 항목입니다.';
+        return;
+      }
+      if (pw.length < 6) {
+        msg.className = 'form-msg err';
+        msg.textContent = '비밀번호는 6자 이상으로 입력해 주세요.';
+        return;
+      }
+      msg.className = 'form-msg';
+      msg.textContent = '가입 처리 중입니다...';
+      SHSCloud.init().then(function (c) {
+        return c.auth.signUp({
+          email: email, password: pw,
+          options: { data: { name: name, church: church, position: position, phone: phone } }
+        });
+      }).then(function (r) {
+        if (r.error) {
+          msg.className = 'form-msg err';
+          msg.textContent = r.error.message.indexOf('already') !== -1 ? '이미 가입된 이메일입니다.' : r.error.message;
+          return;
+        }
+        if (r.data && r.data.user && r.data.user.identities && r.data.user.identities.length === 0) {
+          msg.className = 'form-msg err';
+          msg.textContent = '이미 가입된 이메일입니다. 로그인해 주세요.';
+          return;
+        }
+        if (!r.data.session) {
+          msg.className = 'form-msg ok';
+          msg.textContent = '가입 신청이 완료되었습니다. ' + email + ' 메일함에서 확인 링크를 누른 뒤 로그인해 주세요.';
+          return;
+        }
+        /* 바로 로그인된 경우: 명단과 대조하여 등급 부여 */
+        SHSCloud.claimMembership(name, church, position, phone).then(function (cr) {
+          msg.className = 'form-msg ok';
+          if (cr.ok && cr.role && cr.role !== 'pending') {
+            msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하여 ' +
+              (cr.title ? cr.title + '(' + cr.roleName + ')' : cr.roleName) + ' 등급으로 가입되었습니다.';
+          } else {
+            msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
+              '서기·간사·최고관리자 확인 후 정회원으로 전환됩니다.';
+          }
+          setTimeout(function () { location.href = 'index.html'; }, 1800);
+        });
+      });
+      return;
+    }
+
     var r = SHSAuth.register({
       email: document.getElementById('reg-id').value.trim(),
       pw: document.getElementById('reg-pw').value,
