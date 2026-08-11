@@ -191,8 +191,8 @@ var SHSData = {
 
   /* ---------- 자료실 목록 ---------- */
   archives: [
-    { title: '제19회 정기노회 회의록 (2026. 4. 13)', date: '2026-04-13', type: '회의록', officerOnly: true,
-      desc: '제19회 정기노회 회의록 전문입니다. 노회 임원만 열람할 수 있습니다.', href: 'minutes.html' },
+    { title: '노회 회의록 (제19회기 봄 정기노회 외)', date: '2026-04-13', type: '회의록', officerOnly: true,
+      desc: '역대 정기노회 회의록입니다. 노회 임원만 열람할 수 있습니다.', href: 'minutes.html' },
     { title: '제19회 정기노회(봄) 회의자료', date: '2026-04-13', type: '회의자료', memberOnly: false,
       desc: '제19회 정기노회 회의순서, 회원명단, 각 부 보고서, 노회규칙 전문이 수록된 회의자료입니다.' },
     { title: '제19회기 임원회 결의사항 모음', date: '2026-04-13', type: '결의사항', memberOnly: true,

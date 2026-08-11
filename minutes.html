@@ -17,7 +17,8 @@
 
 <div class="page-body container" style="max-width:900px">
   <div id="minutes-gate"></div>
-  <div id="minutes-content" class="hidden"></div>
+  <div id="minutes-list" class="hidden"></div>
+  <div id="minutes-view" class="hidden"></div>
 </div>
 
 <script src="js/auth.js"></script>
@@ -29,7 +30,9 @@
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
   var gate = document.getElementById('minutes-gate');
-  var box = document.getElementById('minutes-content');
+  var listBox = document.getElementById('minutes-list');
+  var viewBox = document.getElementById('minutes-view');
+  var e = SHS.esc;
 
   if (!SHSAuth.isOfficer(user)) {
     if (!user) {
@@ -44,38 +47,184 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  function show(html) {
-    box.innerHTML = html;
-    box.classList.remove('hidden');
-    SHS.logAction('view', '회의록 열람', '제19회 정기노회 회의록 열람');
+  var canEdit = SHSAuth.canManageMembers(user);
+  var docs = [];   /* {id, title, meeting_date, html, body} */
+
+  gate.innerHTML =
+    '<div class="notice-banner">본 회의록은 <strong>노회 임원만</strong> 열람할 수 있는 자료입니다. 외부 유출을 금합니다.</div>';
+
+  /* ---------- 목록 ---------- */
+  function renderList() {
+    viewBox.classList.add('hidden');
+    var html = '<h2>회의록 목록</h2>';
+
+    if (canEdit) {
+      html += '<div class="admin-card" style="margin-bottom:16px">' +
+        '<h3 style="margin-top:0" id="mb-form-title">회의록 등록</h3>' +
+        '<input type="hidden" id="mb-id">' +
+        '<div class="inline-form" style="margin-bottom:8px">' +
+        '<div class="field"><label>제목 (예: 제20회기 봄 정기노회 회의록)</label><input type="text" id="mb-title"></div>' +
+        '<div class="field" style="flex:0 0 170px"><label>회의 날짜</label><input type="date" id="mb-date"></div>' +
+        '</div>' +
+        '<div class="field"><label>내용 (줄바꿈 그대로 표시됩니다)</label><textarea id="mb-body" rows="10"></textarea></div>' +
+        '<button class="btn" id="mb-save">저장</button> ' +
+        '<button class="btn ghost hidden" id="mb-cancel">새 글로 전환</button>' +
+        '<div class="form-msg" id="mb-msg"></div>' +
+        '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:8px">모든 등록·수정·삭제는 감사 기록에 남습니다.</p></div>';
+    }
+
+    if (!docs.length) {
+      html += '<p style="color:var(--gray-5)">등록된 회의록이 없습니다.</p>';
+    } else {
+      html += '<table class="tbl"><thead><tr><th style="width:70px">번호</th><th>제목</th><th style="width:120px">회의 날짜</th>' +
+        (canEdit ? '<th style="width:130px">관리</th>' : '') + '</tr></thead><tbody>';
+      docs.forEach(function (d, i) {
+        html += '<tr><td>' + (docs.length - i) + '</td>' +
+          '<td class="left"><a href="#" data-mbview="' + i + '" style="color:var(--navy);text-decoration:underline">' + e(d.title) + '</a></td>' +
+          '<td>' + e(d.meeting_date || '-') + '</td>';
+        if (canEdit) {
+          html += '<td>' +
+            (d.body ? '<button class="btn ghost sm" data-mbedit="' + i + '">수정</button> ' : '') +
+            '<button class="btn danger sm" data-mbdel="' + i + '">삭제</button></td>';
+        }
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+    listBox.innerHTML = html;
+    listBox.classList.remove('hidden');
+    bindList();
   }
 
-  /* 1) 노회 내부 컴퓨터: 로컬 비공개 파일에서 불러온다.
-   * 2) 인터넷: 서버(임원 인증)에서 불러온다. 서버가 임원 여부를 확인하므로 우회할 수 없다. */
-  fetch('private/minutes-content.html')
-    .then(function (res) {
-      if (!res.ok) throw new Error('not available');
-      return res.text();
-    })
-    .then(show)
-    .catch(function () {
-      if (window.SHSCloud && SHSCloud.enabled() && user.cloud) {
-        SHSCloud.init().then(function (c) {
-          return c.from('archive_docs').select('html').eq('key', 'minutes').single();
-        }).then(function (r) {
-          if (r && r.data && r.data.html) {
-            show(r.data.html);
-          } else {
-            gate.innerHTML = '<div class="notice-banner">회의록이 아직 서버에 등록되지 않았습니다. ' +
-              '노회 사무실(031-486-9993)로 문의해 주세요.</div>';
-          }
-        });
+  function renderView(d) {
+    listBox.classList.add('hidden');
+    var content = d.html
+      ? d.html
+      : String(d.body || '').split('\n').map(function (l) {
+          return l.trim() ? '<p style="margin-bottom:8px">' + e(l) + '</p>' : '';
+        }).join('');
+    viewBox.innerHTML =
+      '<p><button class="btn ghost sm" id="mb-back">목록으로</button></p>' +
+      '<h2>' + e(d.title) + '</h2>' +
+      (d.meeting_date ? '<p style="color:var(--gray-5);font-size:0.9rem">회의 날짜: ' + e(d.meeting_date) + '</p>' : '') +
+      '<div style="margin-top:16px">' + content + '</div>' +
+      '<p style="margin-top:24px"><button class="btn ghost sm" id="mb-back2">목록으로</button></p>';
+    viewBox.classList.remove('hidden');
+    window.scrollTo({ top: 0 });
+    ['mb-back', 'mb-back2'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.addEventListener('click', renderList);
+    });
+    SHS.logAction('view', '회의록 열람', d.title);
+  }
+
+  function bindList() {
+    listBox.querySelectorAll('a[data-mbview]').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        renderView(docs[+a.dataset.mbview]);
+      });
+    });
+    if (!canEdit) return;
+
+    var save = document.getElementById('mb-save');
+    if (save) save.addEventListener('click', function () {
+      var msg = document.getElementById('mb-msg');
+      var id = document.getElementById('mb-id').value;
+      var d = {
+        title: document.getElementById('mb-title').value.trim(),
+        meeting_date: document.getElementById('mb-date').value || null,
+        body: document.getElementById('mb-body').value.trim(),
+        updated_at: new Date().toISOString()
+      };
+      if (!d.title || !d.body) {
+        msg.className = 'form-msg err';
+        msg.textContent = '제목과 내용을 입력해 주세요.';
         return;
       }
-      gate.innerHTML =
-        '<div class="notice-banner">회의록 본문은 보안을 위해 인터넷 홈페이지에 직접 게시하지 않습니다. ' +
-        '현재는 노회 사무실(031-486-9993)에서 열람하실 수 있습니다.</div>';
+      if (!(user.cloud && SHSCloud.enabled())) {
+        msg.className = 'form-msg err';
+        msg.textContent = '회의록 등록은 서버 로그인(구글 또는 이메일) 후 사용할 수 있습니다.';
+        return;
+      }
+      SHSCloud.init().then(function (c) {
+        var op = id ? c.from('minutes_board').update(d).eq('id', id) : c.from('minutes_board').insert(d);
+        return op;
+      }).then(function (res) {
+        if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+        SHSCloud.log(id ? 'update' : 'create', '회의록 ' + (id ? '수정' : '등록'), d.title);
+        load();
+      });
     });
+    var cancel = document.getElementById('mb-cancel');
+    if (cancel) cancel.addEventListener('click', function () {
+      document.getElementById('mb-id').value = '';
+      document.getElementById('mb-title').value = '';
+      document.getElementById('mb-date').value = '';
+      document.getElementById('mb-body').value = '';
+      document.getElementById('mb-form-title').textContent = '회의록 등록';
+      cancel.classList.add('hidden');
+    });
+    listBox.querySelectorAll('button[data-mbedit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = docs[+b.dataset.mbedit];
+        document.getElementById('mb-id').value = d.id;
+        document.getElementById('mb-title').value = d.title;
+        document.getElementById('mb-date').value = d.meeting_date || '';
+        document.getElementById('mb-body').value = d.body || '';
+        document.getElementById('mb-form-title').textContent = '회의록 수정';
+        document.getElementById('mb-cancel').classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+    listBox.querySelectorAll('button[data-mbdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = docs[+b.dataset.mbdel];
+        if (!confirm('"' + d.title + '" 을(를) 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+        SHSCloud.init().then(function (c) {
+          return c.from('minutes_board').delete().eq('id', d.id);
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('delete', '회의록 삭제', d.title);
+          load();
+        });
+      });
+    });
+  }
+
+  /* ---------- 자료 불러오기 ---------- */
+  function load() {
+    if (user.cloud && window.SHSCloud && SHSCloud.enabled()) {
+      SHSCloud.init().then(function (c) {
+        return c.from('minutes_board').select('*')
+          .order('meeting_date', { ascending: false }).order('id', { ascending: false });
+      }).then(function (r) {
+        if (r.error) {
+          gate.insertAdjacentHTML('beforeend',
+            '<div class="notice-banner">회의록을 불러오지 못했습니다: ' + e(r.error.message) +
+            ' (07 회의록 게시판 등록이 필요할 수 있습니다)</div>');
+          docs = [];
+          renderList();
+          return;
+        }
+        docs = r.data || [];
+        renderList();
+      });
+      return;
+    }
+    /* 노회 내부 컴퓨터: 비공개 파일의 제19회기 회의록 표시 */
+    fetch('private/minutes-content.html')
+      .then(function (res) { if (!res.ok) throw new Error(); return res.text(); })
+      .then(function (html) {
+        docs = [{ id: 'local', title: '제19회기 봄 정기노회 회의록', meeting_date: '2026-04-13', html: html }];
+        renderList();
+      })
+      .catch(function () {
+        gate.insertAdjacentHTML('beforeend',
+          '<div class="notice-banner">회의록 열람은 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.</div>');
+      });
+  }
+  load();
  });
 });
 </script>
