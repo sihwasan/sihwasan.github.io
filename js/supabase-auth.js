@@ -105,9 +105,13 @@ var SHSCloud = (function () {
   }
 
   /* 감사 로그 기록 */
+  /* 최고관리자는 홈페이지를 기술적으로 유지·보수하는 운영자 계정이므로
+   * 그 행위는 감사 기록 대상에서 제외한다. (개인정보처리방침에 고지)
+   * 서버에도 같은 규칙이 걸려 있어 다른 경로로도 기록되지 않는다. */
   function log(type, action, detail) {
     return init().then(function (c) {
       if (!c || !profile) return null;
+      if (profile.role === 'superadmin') return null;
       return c.from('audit_logs').insert({
         user_id: profile.id, user_email: profile.email, user_name: profile.name,
         role: profile.role, type: type, action: action, detail: detail || ''

@@ -142,6 +142,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div id="committee-area"><p style="color:var(--gray-5)">상비부 정보를 불러오는 중...</p></div>';
 
       area.innerHTML = html;
+      SHS.sectionize(area);
       renderRoster();
       renderCommittees();
 
@@ -479,6 +480,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '</p></div>';
 
     area.innerHTML = html;
+    SHS.sectionize(area);
     bind();
   }
 

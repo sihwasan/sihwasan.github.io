@@ -180,6 +180,11 @@ var SHSAuth = (function () {
     return !!u && u.role === 'superadmin';
   }
 
+  /* 감사 기록 열람: 관리자(노회장·서기·간사)와 최고관리자 */
+  function canViewAudit(u) {
+    return canManageMembers(u);
+  }
+
   /* 정회원 이상 열람 자료 (승인대기 회원 제외) */
   function isMember(u) { return !!u && u.role !== 'pending'; }
 
@@ -534,6 +539,7 @@ var SHSAuth = (function () {
     canManageMembers: canManageMembers,
     canIssueDocuments: canIssueDocuments,
     canAssignRoles: canAssignRoles,
+    canViewAudit: canViewAudit,
     isMember: isMember,
     isOfficer: isOfficer,
     canApproveMembers: canApproveMembers,

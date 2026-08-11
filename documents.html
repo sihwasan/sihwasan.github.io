@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 발급 대장 */
   html += '<h2>발급 대장</h2><div id="log-table"></div>';
   area.innerHTML = html;
+  SHS.sectionize(area);
 
   /* ---------- 직인·도장 ---------- */
   var seals = {};        /* key → { label, holder, url } */

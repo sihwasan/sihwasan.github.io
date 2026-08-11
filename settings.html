@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function () {
     { n: '임원 자료실', d: '일반·대외비·기밀 자료를 등록하고 열람합니다.', h: 'officer.html' },
     { n: '노회 회의록', d: '정기노회 회의록을 등록하고 열람합니다.', h: 'minutes.html' }
   ];
-  if (user.role === 'superadmin') {
+  if (SHSAuth.canViewAudit(user)) {
     menu.push({ n: '감독 (감사 기록)', d: '개인정보 열람, 자료 추가·수정·삭제, 서류 발급 기록을 확인합니다.', h: 'audit.html' });
   }
   document.getElementById('st-menu').innerHTML =

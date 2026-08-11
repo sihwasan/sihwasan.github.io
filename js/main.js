@@ -519,6 +519,8 @@
     if (window.SHSCloud && SHSCloud.enabled() && SHSCloud.currentProfile()) {
       SHSCloud.log(type, action, detail);
     } else {
+      var u = SHSAuth.currentUser();
+      if (u && u.role === 'superadmin') return;   /* 운영자 계정은 기록 대상 아님 */
       SHSAudit.log(type, action, detail);
     }
   }
@@ -637,9 +639,95 @@
   }
 
   /* 전역 헬퍼 */
+  /* 한 화면에 여러 영역이 이어져 스크롤이 길어지면 보기가 어렵다.
+   * 큰 제목(h2)을 기준으로 영역을 나누고, 위쪽 띠에서 하나씩 골라 보게 한다.
+   * 주소 뒤에 #영역이름을 붙이면 그 영역이 바로 열린다. */
+  function sectionize(container, opts) {
+    if (!container) return;
+    opts = opts || {};
+    var kids = Array.prototype.slice.call(container.children);
+    var heads = kids.filter(function (el) { return el.tagName === 'H2'; });
+    if (heads.length < 2) return;
+
+    var intro = [];
+    var secs = [];
+    var cur = null;
+    kids.forEach(function (el) {
+      if (el.tagName === 'H2') {
+        cur = { label: (el.textContent || '').trim(), nodes: [el] };
+        secs.push(cur);
+      } else if (cur) {
+        cur.nodes.push(el);
+      } else {
+        intro.push(el);
+      }
+    });
+
+    function slug(s, i) {
+      var t = s.replace(/\s*\(.*$/, '').replace(/\s+/g, '-');
+      return encodeURIComponent(t) || 's' + (i + 1);
+    }
+
+    var nav = document.createElement('div');
+    nav.className = 'section-nav';
+    var panels = [];
+
+    secs.forEach(function (s, i) {
+      var p = document.createElement('div');
+      p.className = 'page-section';
+      /* 제목에 이름표가 붙어 있으면 그대로 물려받는다.
+       * 알림에서 보내는 documents.html#requests 같은 바로가기가 계속 통하도록. */
+      if (s.nodes[0].id) { p.id = s.nodes[0].id; s.nodes[0].removeAttribute('id'); }
+      else p.id = 'sec-' + slug(s.label, i);
+      s.nodes.forEach(function (n) { p.appendChild(n); });
+      /* 영역 안에서는 제목을 한 번만 보이게 한다 */
+      panels.push(p);
+
+      var a = document.createElement('a');
+      a.href = '#' + p.id;
+      a.textContent = opts.labels && opts.labels[i] ? opts.labels[i] : s.label;
+      nav.appendChild(a);
+    });
+
+    container.innerHTML = '';
+    intro.forEach(function (n) { container.appendChild(n); });
+    container.appendChild(nav);
+    panels.forEach(function (p) { container.appendChild(p); });
+
+    function show(id) {
+      var hit = false;
+      panels.forEach(function (p, i) {
+        var on = p.id === id;
+        if (on) hit = true;
+        p.classList.toggle('hidden', !on);
+        nav.children[i].classList.toggle('active', on);
+        if (on) nav.children[i].setAttribute('aria-current', 'page');
+        else nav.children[i].removeAttribute('aria-current');
+      });
+      if (!hit) show(panels[0].id);
+    }
+
+    nav.querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var id = a.getAttribute('href').slice(1);
+        if (history.replaceState) history.replaceState(null, '', '#' + id);
+        else location.hash = id;
+        show(id);
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    show(location.hash ? location.hash.slice(1) : panels[0].id);
+    window.addEventListener('hashchange', function () {
+      show(location.hash ? location.hash.slice(1) : panels[0].id);
+    });
+  }
+
   window.SHS = {
     user: user,
     getUser: getUser,
+    sectionize: sectionize,
     logAction: logAction,
     displayRole: displayRole,
     isActiveMember: isActiveMember,

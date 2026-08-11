@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('audit-area');
   var e = SHS.esc;
 
-  if (!user || !SHSAuth.canAssignRoles(user)) {
+  if (!user || !SHSAuth.canViewAudit(user)) {
     area.innerHTML =
       '<div class="notice-banner">감사 기록을 열람할 권한이 없습니다.' +
       (user ? '' : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
@@ -42,6 +42,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 서버 로그인(구글) 시에는 서버에 보존된 기록을, 아니면 이 컴퓨터의 기록을 본다 */
   var cloudRows = null;
+  var PAGE_MAX = 2000;   /* 한 화면에 불러오는 최대 건수 */
+  var capped = false;
 
   function loadRows() {
     if (!user.cloud) {
@@ -52,8 +54,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (cloudRows) return Promise.resolve(cloudRows);
     return SHSCloud.init().then(function (c) {
-      return c.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(500);
+      /* 보관 기간(3년)이 지난 기록을 먼저 정리한다. 없으면 아무 일도 하지 않는다. */
+      return c.rpc('purge_audit_logs').then(function () { return c; }, function () { return c; });
+    }).then(function (c) {
+      return c.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(PAGE_MAX);
     }).then(function (r) {
+      capped = (r.data || []).length >= PAGE_MAX;
       cloudRows = (r.data || []).map(function (row) {
         return {
           time: String(row.created_at).replace('T', ' ').slice(0, 19),
@@ -68,7 +74,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var html = '';
   html += '<div class="notice-banner">개인정보 열람, 자료의 추가·수정·삭제, 서류 발급, 로그인 등 주요 행위가 자동으로 기록됩니다. ' +
-    '기록은 삭제할 수 없으며 최근 500건까지 보존됩니다.</div>';
+    '기록은 고치거나 지울 수 없으며, <strong>3년</strong> 동안 보관된 뒤 자동으로 폐기됩니다. ' +
+    '열람 권한은 <strong>관리자(노회장·서기·간사)</strong>와 최고관리자에게 있습니다. ' +
+    '홈페이지의 기술적 유지·보수를 맡은 최고관리자 계정의 시스템 조작은 기록 대상이 아닙니다.</div>';
   html += '<div class="board-controls">' +
     '<select id="filter-type" style="border:1px solid var(--gray-3);padding:8px 12px">' +
     '<option value="">전체 구분</option>' +
@@ -108,7 +116,9 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       t.innerHTML = '<table class="tbl"><thead><tr><th style="width:170px">일시</th><th style="width:160px">이용자</th>' +
         '<th style="width:100px">구분</th><th>내용</th></tr></thead><tbody>' + body + '</tbody></table>' +
-        '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '건</p>';
+        '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '건' +
+        (capped ? ' (화면에는 최근 ' + PAGE_MAX + '건까지 표시됩니다. 그 이전 기록도 서버에 그대로 남아 있습니다.)' : '') +
+        '</p>';
     });
   }
   document.getElementById('filter-type').addEventListener('change', render);
