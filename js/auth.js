@@ -186,7 +186,8 @@ var SHSAuth = (function () {
    * 노회장은 허락 주체로서, 간사는 서기를 대행하여 발급 실무를 처리하므로
    * 화면 접근은 허용하되 발급 기록에는 대행·승인으로 구분해 남긴다. */
   function canIssueDocuments(u) {
-    return !!u && (u.role === 'clerk' || u.role === 'president' || u.role === 'staff');
+    return !!u && (u.role === 'clerk' || u.role === 'president' || u.role === 'staff' ||
+                   u.role === 'superadmin');
   }
 
   /* 직책(서기·노회장·간사) 지정: 최고관리자 */

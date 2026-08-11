@@ -50,9 +50,11 @@
   ];
 
   /* 화면 표기용 등급 이름
-   * 노회장·서기·간사와 시스템 관리 계정은 모두 '관리자'로 통일해 표기한다. */
+   * 노회장·서기·간사는 '관리자'로 통일 표기한다.
+   * 최고관리자는 본인 화면에서만 그대로 표기되며, 회원 목록에는 나타나지 않는다. */
   function displayRole(role, title) {
-    if (role === 'superadmin' || role === 'president' || role === 'clerk' || role === 'staff') return '관리자';
+    if (role === 'superadmin') return '최고관리자';
+    if (role === 'president' || role === 'clerk' || role === 'staff') return '관리자';
     if (role === 'officer') return title || '임원';
     if (role === 'member') return '정회원';
     if (role === 'pending') return '승인대기';
@@ -248,10 +250,31 @@
 
     /* 관리자에게 운영 알림·서류 신청 안내 */
     getUser().then(function (u) {
+      localSessionNotice(u);
       meetingReminder(u);
       docRequestWatch(u);
     });
   });
+
+  /* 서버가 아닌 이 컴퓨터 전용 계정으로 로그인한 경우 안내한다.
+   * 이 상태에서는 서버에 저장된 회의록·자료·회원 정보를 읽을 수 없다. */
+  function localSessionNotice(u) {
+    if (!u || u.cloud) return;
+    if (!(window.SHSCloud && SHSCloud.enabled())) return;
+    if (!SHSAuth.canManageMembers(u)) return;
+    var bar = document.createElement('div');
+    bar.className = 'container';
+    bar.style.marginTop = '16px';
+    bar.innerHTML =
+      '<div class="notice-banner" style="border-left:4px solid var(--red)">' +
+      '<strong>[안내]</strong> 지금은 <strong>이 컴퓨터 전용 계정</strong>으로 로그인되어 있어 ' +
+      '서버에 저장된 회의록·자료·회원 정보를 읽을 수 없습니다. ' +
+      '로그아웃 후 <strong>서버 계정(구글 또는 이메일)</strong>으로 다시 로그인해 주세요. ' +
+      '<a class="btn sm" style="margin-left:8px" href="login.html">로그인 화면으로</a>' +
+      '</div>';
+    var gnb = document.querySelector('.gnb');
+    if (gnb) gnb.insertAdjacentElement('afterend', bar);
+  }
 
   /* ---------- 서류 신청 실시간 알림 (관리자 로그인 중) ---------- */
   function docRequestWatch(u) {

@@ -221,7 +221,10 @@ document.addEventListener('DOMContentLoaded', function () {
       })
       .catch(function () {
         gate.insertAdjacentHTML('beforeend',
-          '<div class="notice-banner">회의록 열람은 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.</div>');
+          '<div class="notice-banner">회의록은 서버에 보관되어 있습니다. ' +
+          '지금은 <strong>이 컴퓨터 전용 계정</strong>으로 로그인되어 있어 열람할 수 없습니다. ' +
+          '로그아웃 후 <strong>서버 계정(구글 또는 이메일)</strong>으로 다시 로그인해 주세요. ' +
+          '<a class="btn sm" style="margin-left:8px" href="login.html">로그인 화면으로</a></div>');
       });
   }
   load();
