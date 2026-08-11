@@ -143,6 +143,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (h.line1) hero.querySelector('h1').innerHTML = e(h.line1) + '<br>' + e(h.line2 || '');
             if (h.desc) hero.querySelector('p').textContent = h.desc;
             if (h.verse) hero.querySelector('.hero-verse').textContent = h.verse;
+            /* 관리자가 바꾼 배경 사진이 있으면 그것으로 깐다 */
+            if (h.image) {
+              hero.style.backgroundImage = 'url("' + h.image.replace(/"/g, '%22') + '")';
+              hero.style.backgroundPosition = 'center 42%';
+              hero.style.backgroundSize = 'cover';
+              hero.style.backgroundRepeat = 'no-repeat';
+            }
           }
           if (row.key === 'meeting_result') {
             var m = row.value || {};
