@@ -52,6 +52,7 @@
       { t: '임원 자료실', h: 'officer.html' },
       { t: '노회 회의록', h: 'minutes.html' },
       { t: '서류 발급', h: 'documents.html' },
+      { t: '홈페이지 설정', h: 'settings.html' },
       { t: '회원 관리', h: 'admin.html' },
       { t: '사이트 관리', h: 'manage.html' },
       { t: '시스템 운영', h: 'ops.html' }

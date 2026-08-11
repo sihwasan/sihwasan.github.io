@@ -78,7 +78,11 @@ document.addEventListener('DOMContentLoaded', function () {
     '<option>연말정산용</option><option>은행제출용</option><option>기관제출용</option><option>총회제출용</option><option>회사제출용</option><option>교회제출용</option><option>기타</option>' +
     '</select></div>' +
     '<button class="btn" id="btn-issue">발급</button>' +
-    '</div><div class="form-msg" id="d-msg"></div></div>';
+    '</div>' +
+    '<div><label style="font-size:0.85rem;font-weight:500;color:var(--gray-7)">날인할 도장</label>' +
+    '<div class="seal-pick" id="seal-pick"><span style="color:var(--gray-5)">직인 정보를 불러오는 중...</span></div>' +
+    '<p style="font-size:0.8rem;color:var(--gray-5)">등록된 도장은 <a href="settings.html" style="color:var(--navy);text-decoration:underline">홈페이지 설정 → 직인·도장</a>에서 관리합니다.</p></div>' +
+    '<div class="form-msg" id="d-msg"></div></div>';
 
   /* 접수된 신청 */
   html += '<h2 id="requests">접수된 서류 신청</h2><div id="req-list"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
@@ -86,6 +90,56 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 발급 대장 */
   html += '<h2>발급 대장</h2><div id="log-table"></div>';
   area.innerHTML = html;
+
+  /* ---------- 직인·도장 ---------- */
+  var seals = {};        /* key → { label, holder, url } */
+
+  function loadSeals() {
+    var pick = document.getElementById('seal-pick');
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      pick.innerHTML = '<span style="color:var(--gray-5)">서버 로그인 시 등록된 도장을 날인할 수 있습니다.</span>';
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return c.from('seals').select('*').order('sort');
+    }).then(function (r) {
+      if (r.error || !r.data) {
+        pick.innerHTML = '<span style="color:var(--gray-5)">등록된 도장이 없습니다. ' +
+          '홈페이지 설정에서 직인을 먼저 등록해 주세요.</span>';
+        return;
+      }
+      var withFile = r.data.filter(function (s) { return s.file_path; });
+      if (!withFile.length) {
+        pick.innerHTML = '<span style="color:var(--gray-5)">아직 등록된 도장 이미지가 없습니다. ' +
+          '홈페이지 설정 → 직인·도장에서 등록해 주세요.</span>';
+        return;
+      }
+      pick.innerHTML = withFile.map(function (s) {
+        var on = (s.key === '노회직인') ? ' checked' : '';
+        return '<label><input type="checkbox" data-seal="' + e(s.key) + '"' + on + '>' + e(s.label) + '</label>';
+      }).join('');
+
+      /* 서명용 임시 링크를 미리 받아 둔다 (1시간) */
+      SHSCloud.init().then(function (c) {
+        withFile.forEach(function (s) {
+          c.storage.from('seals').createSignedUrl(s.file_path, 3600).then(function (r2) {
+            if (r2.error) return;
+            seals[s.key] = { label: s.label, holder: s.holder, url: r2.data.signedUrl };
+          });
+        });
+      });
+      SHS.logAction('view', '직인 열람', '서류 발급 화면에서 도장 ' + withFile.length + '종 불러옴');
+    });
+  }
+  loadSeals();
+
+  function pickedSeals() {
+    var out = [];
+    document.querySelectorAll('#seal-pick input[data-seal]').forEach(function (i) {
+      if (i.checked && seals[i.dataset.seal]) out.push({ key: i.dataset.seal, s: seals[i.dataset.seal] });
+    });
+    return out;
+  }
 
   /* ---------- 접수된 신청 목록 ---------- */
   function loadRequests() {
@@ -167,9 +221,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var rows = '';
     log.slice().reverse().forEach(function (d) {
-      rows += '<tr><td>' + e(d.no) + '</td><td>' + e(d.date) + '</td><td>' + e(d.doc) + '</td><td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose) + '</td><td>' + e(d.issuer) + '</td></tr>';
+      rows += '<tr><td>' + e(d.no) + '</td><td>' + e(d.date) + '</td><td>' + e(d.doc) + '</td><td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose) + '</td><td>' + e(d.issuer) + '</td><td>' + e(d.sealed || '-') + '</td></tr>';
     });
-    t.innerHTML = '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th><th>대상자</th><th>교회</th><th>용도</th><th>발급자</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    t.innerHTML = '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th><th>대상자</th><th>교회</th><th>용도</th><th>발급자</th><th>날인</th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
   renderLog();
 
@@ -190,11 +244,18 @@ document.addEventListener('DOMContentLoaded', function () {
     var today = new Date();
     var ds = today.getFullYear() + '. ' + (today.getMonth() + 1) + '. ' + today.getDate() + '.';
     var no = '시화산노 제19-' + String(seq).padStart(3, '0') + '호';
+    var chosen = pickedSeals();
+    var sealMap = {};
+    chosen.forEach(function (x) { sealMap[x.key] = x.s; });
+
     var rec = { no: no, date: ds, doc: doc, name: name, pos: pos, church: church,
-                purpose: purpose, issuer: user.name + proxyNote };
-    log.push(rec);
+                purpose: purpose, issuer: user.name + proxyNote, seals: sealMap };
+    log.push({ no: no, date: ds, doc: doc, name: name, pos: pos, church: church,
+               purpose: purpose, issuer: user.name + proxyNote,
+               sealed: chosen.map(function (x) { return x.key; }).join(', ') });
     saveLog(log);
-    SHS.logAction('issue', '서류 발급', no + ' ' + doc + ' (대상 ' + name + ', ' + church + ', ' + purpose + ')' + proxyNote);
+    SHS.logAction('issue', '서류 발급', no + ' ' + doc + ' (대상 ' + name + ', ' + church + ', ' + purpose + ')' +
+      proxyNote + (chosen.length ? ' / 날인: ' + chosen.map(function (x) { return x.key; }).join('·') : ' / 날인 없음'));
     msg.className = 'form-msg ok';
     msg.textContent = no + ' ' + doc + '가 발급되었습니다. 아래 증명서를 인쇄하시기 바랍니다.';
     renderLog();
@@ -231,8 +292,23 @@ document.addEventListener('DOMContentLoaded', function () {
       '</tbody></table>' +
       '<div class="c-text">' + e(certText(rec)) + '</div>' +
       '<div class="c-date">' + e(rec.date) + '</div>' +
-      '<div class="c-issuer">대한예수교장로회 시화산노회장</div>' +
-      '<p style="text-align:center;font-size:0.8rem;color:var(--gray-5);margin-top:20px" class="no-print">노회 직인은 노회 사무실에서 날인합니다.</p>' +
+      '<div class="cert-issuer-wrap"><div class="c-issuer">대한예수교장로회 시화산노회장' +
+      (rec.seals && rec.seals['노회직인']
+        ? '<img class="cert-seal" src="' + rec.seals['노회직인'].url + '" alt="노회 직인">' : '') +
+      '</div></div>' +
+      /* 노회장·서기·회록서기 도장 */
+      (function () {
+        var rows = ['노회장', '서기', '회록서기'].filter(function (k) { return rec.seals && rec.seals[k]; });
+        if (!rows.length) return '';
+        return '<div class="cert-signs">' + rows.map(function (k) {
+          var s = rec.seals[k];
+          return '<span class="row">' + e(k) + (s.holder ? ' ' + e(s.holder) : '') +
+            '<img src="' + s.url + '" alt="' + e(k) + ' 도장"></span>';
+        }).join('') + '</div>';
+      })() +
+      (rec.seals && Object.keys(rec.seals).length
+        ? ''
+        : '<p style="text-align:center;font-size:0.8rem;color:var(--gray-5);margin-top:20px" class="no-print">날인할 도장을 선택하지 않았습니다. 노회 사무실에서 직접 날인해 주세요.</p>') +
       '</div>' +
       '<p class="text-right no-print" style="max-width:720px;margin:0 auto 40px">' +
       '<button class="btn" onclick="window.print()">인쇄</button></p>';

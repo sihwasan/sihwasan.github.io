@@ -452,7 +452,36 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .cert-sheet .c-body td:first-child { width: 130px; color: var(--gray-7); }
 .cert-sheet .c-text { margin: 40px 0; text-align: center; font-size: 1.05rem; line-height: 2; }
 .cert-sheet .c-date { text-align: center; margin: 40px 0 24px; }
-.cert-sheet .c-issuer { text-align: center; font-size: 1.35rem; font-weight: 700; letter-spacing: 6px; }
+.cert-sheet .c-issuer {
+  text-align: center; font-size: 1.35rem; font-weight: 700; letter-spacing: 6px;
+  position: relative; display: inline-block; left: 50%; transform: translateX(-50%);
+}
+.cert-issuer-wrap { text-align: center; }
+/* 직인은 발급 명의 끝에 겹쳐 찍는다 */
+.cert-seal {
+  position: absolute; right: -74px; top: 50%; transform: translateY(-50%);
+  width: 72px; height: 72px; object-fit: contain;
+  mix-blend-mode: multiply; opacity: 0.92; pointer-events: none;
+}
+.cert-signs { margin-top: 30px; text-align: center; }
+.cert-signs .row {
+  display: inline-block; position: relative; margin: 0 18px;
+  font-size: 1rem; letter-spacing: 2px;
+}
+.cert-signs .row img {
+  position: absolute; right: -58px; top: 50%; transform: translateY(-50%);
+  width: 54px; height: 54px; object-fit: contain;
+  mix-blend-mode: multiply; opacity: 0.92;
+}
+.seal-pick { display: flex; flex-wrap: wrap; gap: 16px; margin: 10px 0 4px; font-size: 0.9rem; }
+.seal-pick label { display: flex; align-items: center; gap: 6px; }
+.seal-pick input { width: auto; }
+
+@media print {
+  .cert-seal, .cert-signs img {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+}
 
 /* footer */
 .site-footer { background: #1b222d; color: #97a1af; margin-top: 40px; }
