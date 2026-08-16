@@ -33,19 +33,28 @@
       <div class="login-divider"><span>또는 이메일로 로그인</span></div>
     </div>
 
-    <div class="field">
-      <label for="login-id">이메일</label>
-      <input type="email" id="login-id" autocomplete="username" placeholder="hong@naver.com">
-    </div>
-    <div class="field">
-      <label for="login-pw">비밀번호</label>
-      <input type="password" id="login-pw" autocomplete="current-password">
-    </div>
-    <div class="field">
-      <label><input type="checkbox" id="login-keep" style="width:auto;margin-right:6px">로그인 상태 유지</label>
-    </div>
-    <button class="btn" id="btn-login" style="width:100%">로그인</button>
+    <!-- 브라우저가 아이디·비밀번호 저장을 제안하려면 form 안에 있어야 한다 -->
+    <form id="login-form" method="post" action="#" autocomplete="on">
+      <div class="field">
+        <label for="login-id">이메일</label>
+        <input type="email" id="login-id" name="username" autocomplete="username" placeholder="hong@naver.com">
+      </div>
+      <div class="field">
+        <label for="login-pw">비밀번호</label>
+        <input type="password" id="login-pw" name="password" autocomplete="current-password">
+      </div>
+      <div class="field login-opts">
+        <label><input type="checkbox" id="login-save" style="width:auto;margin-right:6px">아이디 저장</label>
+        <label><input type="checkbox" id="login-keep" style="width:auto;margin-right:6px">로그인 상태 유지</label>
+      </div>
+      <button class="btn" id="btn-login" type="submit" style="width:100%">로그인</button>
+    </form>
     <div class="form-msg" id="login-msg"></div>
+    <p class="login-pw-tip">
+      비밀번호 저장은 브라우저에 맡깁니다. 로그인하시면 브라우저가
+      <strong>“비밀번호를 저장하시겠습니까?”</strong>라고 물어봅니다. 저장을 누르시면
+      다음부터 자동으로 채워집니다. (홈페이지에는 비밀번호를 보관하지 않습니다.)
+    </p>
     <div class="find-links">
       <a href="#" id="link-find-id">이메일 찾기</a>
       <span class="sep">|</span>
@@ -124,6 +133,38 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  /* ---- 아이디 저장 ----
+   * 저장에 동의하신 경우에만 이메일을 이 컴퓨터에 남긴다.
+   * 비밀번호는 홈페이지가 보관하지 않고 브라우저 비밀번호 관리자에 맡긴다. */
+  var SAVE_KEY = 'shs_saved_id_v1';
+  var idInput = document.getElementById('login-id');
+  var saveBox = document.getElementById('login-save');
+  try {
+    var savedId = localStorage.getItem(SAVE_KEY);
+    if (savedId) {
+      idInput.value = savedId;
+      saveBox.checked = true;
+      document.getElementById('login-pw').focus();
+    }
+  } catch (x) {}
+
+  saveBox.addEventListener('change', function () {
+    try {
+      if (saveBox.checked) {
+        if (idInput.value.trim()) localStorage.setItem(SAVE_KEY, idInput.value.trim().toLowerCase());
+      } else {
+        localStorage.removeItem(SAVE_KEY);
+      }
+    } catch (x) {}
+  });
+
+  function rememberId(id) {
+    try {
+      if (saveBox.checked) localStorage.setItem(SAVE_KEY, id);
+      else localStorage.removeItem(SAVE_KEY);
+    } catch (x) {}
+  }
+
   function doLogin() {
     var id = document.getElementById('login-id').value.trim().toLowerCase();
     var pw = document.getElementById('login-pw').value;
@@ -134,6 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.textContent = '이메일과 비밀번호를 입력해 주세요.';
       return;
     }
+    rememberId(id);
     /* 로그인은 항상 서버 인증으로 처리한다.
      * (예전의 이 컴퓨터 전용 로그인은 서버 자료를 읽지 못해 혼란을 주므로 사용하지 않는다.) */
     if (window.SHSCloud && SHSCloud.enabled()) {
@@ -163,9 +205,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     localLogin(id, pw, keep, msg);
   }
-  document.getElementById('btn-login').addEventListener('click', doLogin);
-  document.getElementById('login-pw').addEventListener('keydown', function (ev) {
-    if (ev.key === 'Enter') doLogin();
+  /* 폼 제출로 처리해야 브라우저가 비밀번호 저장을 제안한다 */
+  document.getElementById('login-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    doLogin();
   });
 
   /* ---- 아이디 찾기 / 비밀번호 재설정 ---- */
