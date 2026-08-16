@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>증명서 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head no-print">
+  <div class="container">
+    <h1>증명서</h1>
+    <div class="crumb">홈 &gt; 서류발급 &gt; 증명서</div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <div id="cert-msg"><p style="color:var(--gray-5)">증명서를 불러오는 중입니다…</p></div>
+  <div id="cert-area"></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script src="js/certificate.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var msg = document.getElementById('cert-msg');
+  var area = document.getElementById('cert-area');
+  var e = SHS.esc;
+
+  function fail(t) {
+    msg.innerHTML = '<div class="notice-banner">' + e(t) + '</div>';
+    area.innerHTML = '';
+  }
+
+  var id = (location.search.match(/[?&]id=(\d+)/) || [])[1];
+  if (!id) { fail('증명서 번호가 없습니다. 서류발급 화면에서 다시 열어 주세요.'); return; }
+
+  if (!user) {
+    msg.innerHTML = '<div class="notice-banner">증명서는 로그인 후 열람할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+    return;
+  }
+  if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+    fail('증명서는 서버 로그인(구글 또는 이메일) 후 열람할 수 있습니다.');
+    return;
+  }
+
+  SHSCloud.init().then(function (c) {
+    return c.from('doc_issues').select('*').eq('id', id).single();
+  }).then(function (r) {
+    if (r.error || !r.data) {
+      fail('증명서를 찾을 수 없습니다. 본인이 받으신 증명서만 열람할 수 있습니다.');
+      return;
+    }
+    var rec = r.data;
+
+    msg.innerHTML =
+      '<div class="notice-banner no-print">' +
+      '<strong>' + e(rec.doc_no) + '</strong> ' + e(rec.doc_type) +
+      ' (발급일 ' + e(SHSCert.dateKo(rec.issued_on)) + ')' +
+      (rec.void_yn
+        ? '<br><strong style="color:var(--red)">이 증명서는 무효 처리되었습니다.' +
+          (rec.void_reason ? ' 사유: ' + e(rec.void_reason) : '') + '</strong>'
+        : '<br>아래 <strong>PDF로 저장</strong>을 누른 뒤, 인쇄 화면의 <strong>대상(프린터)</strong>을 ' +
+          '<strong>“PDF로 저장”</strong>으로 고르시면 PDF 파일로 받으실 수 있습니다.') +
+      '</div>';
+
+    area.innerHTML =
+      '<div class="cert-actions no-print">' +
+      '<button class="btn" id="c-pdf">PDF로 저장 / 인쇄</button>' +
+      '<a class="btn ghost" href="request.html">서류발급으로 돌아가기</a>' +
+      '</div>' +
+      SHSCert.sheet(rec);
+
+    document.getElementById('c-pdf').addEventListener('click', function () {
+      SHSCert.print(rec);
+    });
+
+    SHS.logAction('view', '증명서 열람', rec.doc_no + ' ' + rec.doc_type);
+  }).catch(function () {
+    fail('증명서를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  });
+ });
+});
+</script>
+</body>
+</html>

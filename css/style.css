@@ -1019,3 +1019,52 @@ td.sat .cal-d { color: #2a4d8f; }
 .ph-drop span { color: var(--navy); font-weight: 700; text-decoration: underline; }
 .ph-drop small { display: block; margin-top: 6px; color: var(--gray-5); font-size: 0.76rem; }
 .ph-drop:hover, .ph-drop.over { border-color: var(--navy); background: var(--gray-1); }
+
+/* ---------- 증명서 (PDF 저장 / 인쇄) ---------- */
+.cert-actions {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  max-width: 720px; margin: 0 auto 6px;
+}
+.cert-sheet .c-body { width: 100%; }
+.cert-sheet .cert-foot {
+  margin-top: 46px; padding-top: 14px; border-top: 1px solid var(--gray-2);
+  text-align: center; font-size: 0.76rem; color: var(--gray-5);
+  font-family: 'Noto Sans KR', sans-serif;
+}
+.cert-sheet { position: relative; }
+.cert-void-mark {
+  position: absolute; top: 44%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-22deg);
+  font-size: 5rem; font-weight: 700; color: rgba(176, 58, 58, 0.22);
+  letter-spacing: 20px; pointer-events: none; z-index: 2;
+}
+
+@media print {
+  /* 증명서는 A4 한 장에 그대로 앉힌다 */
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff; }
+  .notice-banner, .form-msg, .admin-card, .tbl, h2 { display: none !important; }
+  #cert-print, #cert-area { display: block !important; }
+  .cert-sheet {
+    display: block !important;
+    box-sizing: border-box;
+    width: 210mm; min-height: 297mm; max-width: none;
+    margin: 0; padding: 28mm 24mm 20mm;
+    border: none;
+    page-break-after: always;
+  }
+  .cert-sheet h2 { display: block !important; }
+  .cert-sheet .c-body, .cert-sheet .c-body tbody,
+  .cert-sheet .c-body tr, .cert-sheet .c-body td { display: revert !important; }
+  .cert-sheet .cert-foot { position: absolute; left: 24mm; right: 24mm; bottom: 14mm; }
+}
+
+/* 자간 때문에 마지막 글자 뒤 여백이 생겨 제목이 오른쪽으로 밀리는 것을 바로잡는다 */
+.cert-sheet h2 { text-indent: 12px; }
+.cert-sheet .c-issuer { text-indent: 6px; }
+
+@media print {
+  /* 증명 문구와 발급 명의를 종이 가운데 아래쪽에 앉힌다 */
+  .cert-sheet .c-text { margin: 22mm 0 0; }
+  .cert-sheet .c-date { margin: 20mm 0 10mm; }
+}

@@ -25,12 +25,12 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/certificate.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
   var area = document.getElementById('doc-area');
   var e = SHS.esc;
-  var LOG_KEY = 'shs_doclog_v1';
 
   if (!user || !SHSAuth.canIssueDocuments(user)) {
     area.innerHTML =
@@ -47,11 +47,6 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>';
     return;
   }
-
-  function loadLog() {
-    try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch (x) { return []; }
-  }
-  function saveLog(l) { localStorage.setItem(LOG_KEY, JSON.stringify(l)); }
 
   /* 서류 발급 권한은 서기에게 있다.
    * 간사는 서기를 대행하여 실무를 처리하며, 발급 기록에 대행으로 남는다. */
@@ -77,8 +72,11 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div class="field"><label>용도</label><select id="d-purpose">' +
     '<option>연말정산용</option><option>은행제출용</option><option>기관제출용</option><option>총회제출용</option><option>회사제출용</option><option>교회제출용</option><option>기타</option>' +
     '</select></div>' +
+    '<div class="field" style="flex:0 0 90px"><label>회기</label><input type="number" id="d-session" value="19" min="1" max="99"></div>' +
     '<button class="btn" id="btn-issue">발급</button>' +
     '</div>' +
+    '<input type="hidden" id="d-reqid" value="">' +
+    '<div id="d-reqnote" class="hidden" style="font-size:0.85rem;color:var(--navy);margin-bottom:8px"></div>' +
     '<div><label style="font-size:0.85rem;font-weight:500;color:var(--gray-7)">날인할 도장</label>' +
     '<div class="seal-pick" id="seal-pick"><span style="color:var(--gray-5)">직인 정보를 불러오는 중...</span></div>' +
     '<p style="font-size:0.8rem;color:var(--gray-5)">등록된 도장은 <a href="settings.html" style="color:var(--navy);text-decoration:underline">홈페이지 설정 → 직인·도장</a>에서 관리합니다.</p></div>' +
@@ -93,7 +91,29 @@ document.addEventListener('DOMContentLoaded', function () {
   SHS.sectionize(area);
 
   /* ---------- 직인·도장 ---------- */
-  var seals = {};        /* key → { label, holder, url } */
+  var seals = {};        /* key → { label, holder, url, data } */
+
+  /* 도장 그림을 증명서에 함께 담을 수 있는 형태(그림 자체)로 바꾼다.
+   * 배경이 비치도록 PNG로 두고, 너무 크지 않게 200px로 줄인다. */
+  function toDataUrl(url) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = function () {
+        try {
+          var MAX = 200;
+          var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+          var cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(img.naturalWidth * sc));
+          cv.height = Math.max(1, Math.round(img.naturalHeight * sc));
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          resolve(cv.toDataURL('image/png'));
+        } catch (x) { resolve(null); }
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = url;
+    });
+  }
 
   function loadSeals() {
     var pick = document.getElementById('seal-pick');
@@ -120,12 +140,18 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<label><input type="checkbox" data-seal="' + e(s.key) + '"' + on + '>' + e(s.label) + '</label>';
       }).join('');
 
-      /* 서명용 임시 링크를 미리 받아 둔다 (1시간) */
+      /* 도장 그림을 미리 받아 둔다.
+       * 직인은 관리자만 볼 수 있는 자료여서, 발급할 때 증명서 안에 그림째로
+       * 박아 보관한다. 그래야 신청자도 자기 증명서를 열어 볼 수 있고,
+       * 나중에 도장을 바꾸어도 이미 발급한 증명서는 그대로 남는다. */
       SHSCloud.init().then(function (c) {
         withFile.forEach(function (s) {
           c.storage.from('seals').createSignedUrl(s.file_path, 3600).then(function (r2) {
             if (r2.error) return;
             seals[s.key] = { label: s.label, holder: s.holder, url: r2.data.signedUrl };
+            toDataUrl(r2.data.signedUrl).then(function (d) {
+              if (d && seals[s.key]) seals[s.key].data = d;
+            });
           });
         });
       });
@@ -194,6 +220,18 @@ document.addEventListener('DOMContentLoaded', function () {
           document.getElementById('d-name').value = q.name;
           document.getElementById('d-church').value = q.church || '';
           if (q.purpose) document.getElementById('d-purpose').value = q.purpose;
+          if (q.position) {
+            var ps = document.getElementById('d-pos');
+            for (var i = 0; i < ps.options.length; i++) {
+              if (ps.options[i].value === q.position) { ps.value = q.position; break; }
+            }
+          }
+          /* 이 신청 건과 연결해서 발급한다 (발급하면 신청자에게 바로 전달된다) */
+          document.getElementById('d-reqid').value = q.id;
+          var note = document.getElementById('d-reqnote');
+          note.textContent = '신청번호 ' + q.id + ' (' + q.name + ' / ' + (q.church || '') +
+            ') 건으로 발급합니다. 발급하면 신청자에게 알림이 가고 신청자가 PDF로 내려받습니다.';
+          note.classList.remove('hidden');
           document.getElementById('d-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
       });
@@ -213,106 +251,157 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   loadRequests();
 
+  /* ---------- 발급 대장 (노회 서버에 보관) ---------- */
   function renderLog() {
-    var log = loadLog();
     var t = document.getElementById('log-table');
-    if (!log.length) {
-      t.innerHTML = '<p style="color:var(--gray-5)">발급 기록이 없습니다.</p>';
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      t.innerHTML = '<p style="color:var(--gray-5)">서버 로그인 시 발급 대장을 볼 수 있습니다.</p>';
       return;
     }
-    var rows = '';
-    log.slice().reverse().forEach(function (d) {
-      rows += '<tr><td>' + e(d.no) + '</td><td>' + e(d.date) + '</td><td>' + e(d.doc) + '</td><td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose) + '</td><td>' + e(d.issuer) + '</td><td>' + e(d.sealed || '-') + '</td></tr>';
+    SHSCloud.init().then(function (c) {
+      return c.from('doc_issues').select('*').order('id', { ascending: false }).limit(200);
+    }).then(function (r) {
+      if (r.error) {
+        t.innerHTML = '<p style="color:var(--gray-5)">발급 대장을 불러오지 못했습니다: ' + e(r.error.message) +
+          ' (31 증명서 발급 등록이 필요할 수 있습니다)</p>';
+        return;
+      }
+      var rows = r.data || [];
+      if (!rows.length) {
+        t.innerHTML = '<p style="color:var(--gray-5)">발급 기록이 없습니다.</p>';
+        return;
+      }
+      t.innerHTML = '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th>' +
+        '<th>대상자</th><th>교회</th><th>용도</th><th>발급자</th><th>날인</th>' +
+        '<th style="width:150px">증명서</th></tr></thead><tbody>' +
+        rows.map(function (d) {
+          var sealed = Object.keys(d.seals || {}).join(', ');
+          return '<tr' + (d.void_yn ? ' style="opacity:.55"' : '') + '>' +
+            '<td>' + e(d.doc_no) + (d.void_yn ? ' <span class="fail">(무효)</span>' : '') + '</td>' +
+            '<td>' + e(d.issued_on) + '</td><td>' + e(d.doc_type) + '</td>' +
+            '<td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose || '-') + '</td>' +
+            '<td>' + e(d.issuer_name || '-') + '</td><td>' + e(sealed || '-') + '</td>' +
+            '<td><a class="btn sm" href="certificate.html?id=' + d.id + '" target="_blank" rel="noopener">열기</a>' +
+            (d.void_yn ? '' : ' <button class="btn danger sm" data-void="' + d.id + '">취소</button>') +
+            '</td></tr>';
+        }).join('') + '</tbody></table>';
+
+      t.querySelectorAll('button[data-void]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var why = prompt('이 증명서를 무효 처리합니다. 사유를 적어 주세요.');
+          if (why === null) return;
+          SHSCloud.init().then(function (c) {
+            return c.rpc('void_document', { p_id: parseInt(b.dataset.void, 10), p_reason: why });
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            renderLog();
+          });
+        });
+      });
     });
-    t.innerHTML = '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th><th>대상자</th><th>교회</th><th>용도</th><th>발급자</th><th>날인</th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
   renderLog();
 
+  /* 발급 명의로 쓸 노회장 성명 */
+  var presidentName = (function () {
+    var o = (SHSData.officers || []).filter(function (x) { return x.role === '노회장'; })[0];
+    return o ? o.name : '';
+  })();
+  if (window.SHSCloud && SHSCloud.enabled()) {
+    SHSCloud.init().then(function (c) {
+      return c.from('site_settings').select('*').eq('key', 'officers').single();
+    }).then(function (r) {
+      var list = (r.data && r.data.value) || [];
+      var o = (list.officers || list || []).filter
+        ? (list.officers || list).filter(function (x) { return x && x.role === '노회장'; })[0] : null;
+      if (o && o.name) presidentName = o.name;
+    }).catch(function () {});
+  }
+
   document.getElementById('btn-issue').addEventListener('click', function () {
     var msg = document.getElementById('d-msg');
+    var btn = document.getElementById('btn-issue');
     var doc = document.getElementById('d-type').value;
     var name = document.getElementById('d-name').value.trim();
     var pos = document.getElementById('d-pos').value;
     var church = document.getElementById('d-church').value.trim();
     var purpose = document.getElementById('d-purpose').value;
+    var session = parseInt(document.getElementById('d-session').value, 10) || 19;
+    var reqId = document.getElementById('d-reqid').value;
     if (!name || !church) {
       msg.className = 'form-msg err';
       msg.textContent = '대상자 성명과 소속 교회를 입력해 주세요.';
       return;
     }
-    var log = loadLog();
-    var seq = log.length + 1;
-    var today = new Date();
-    var ds = today.getFullYear() + '. ' + (today.getMonth() + 1) + '. ' + today.getDate() + '.';
-    var no = '시화산노 제19-' + String(seq).padStart(3, '0') + '호';
-    var chosen = pickedSeals();
-    var sealMap = {};
-    chosen.forEach(function (x) { sealMap[x.key] = x.s; });
-
-    var rec = { no: no, date: ds, doc: doc, name: name, pos: pos, church: church,
-                purpose: purpose, issuer: user.name + proxyNote, seals: sealMap };
-    log.push({ no: no, date: ds, doc: doc, name: name, pos: pos, church: church,
-               purpose: purpose, issuer: user.name + proxyNote,
-               sealed: chosen.map(function (x) { return x.key; }).join(', ') });
-    saveLog(log);
-    SHS.logAction('issue', '서류 발급', no + ' ' + doc + ' (대상 ' + name + ', ' + church + ', ' + purpose + ')' +
-      proxyNote + (chosen.length ? ' / 날인: ' + chosen.map(function (x) { return x.key; }).join('·') : ' / 날인 없음'));
-    msg.className = 'form-msg ok';
-    msg.textContent = no + ' ' + doc + '가 발급되었습니다. 아래 증명서를 인쇄하시기 바랍니다.';
-    renderLog();
-    renderCert(rec);
-    document.getElementById('cert-print').scrollIntoView({ behavior: 'smooth' });
-  });
-
-  function certText(rec) {
-    switch (rec.doc) {
-      case '재직증명서':
-        return '위 사람은 대한예수교장로회(합동) 시화산노회 소속 ' + rec.church + ' ' + rec.pos + '로 재직 중임을 증명합니다.';
-      case '대표자증명서':
-        return '위 사람은 대한예수교장로회(합동) 시화산노회 소속 ' + rec.church + '의 대표자임을 증명합니다.';
-      case '직인증명서':
-        return '위 ' + rec.church + '의 직인은 본 노회에 등록된 직인임을 증명합니다.';
-      case '은퇴목사확인서':
-        return '위 사람은 대한예수교장로회(합동) 시화산노회 소속 은퇴목사임을 확인합니다.';
-      default:
-        return '위 사람은 대한예수교장로회(합동) 시화산노회 소속 ' + rec.church + ' ' + rec.pos + '임을 증명합니다.';
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      msg.className = 'form-msg err';
+      msg.textContent = '증명서 발급은 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.';
+      return;
     }
-  }
+
+    /* 발급 당시 도장 모습을 증명서에 함께 담는다 */
+    var sealMap = {};
+    pickedSeals().forEach(function (x) {
+      sealMap[x.key] = { label: x.s.label, holder: x.s.holder || '', url: x.s.data || '' };
+    });
+    var missing = Object.keys(sealMap).filter(function (k) { return !sealMap[k].url; });
+    if (missing.length) {
+      msg.className = 'form-msg err';
+      msg.textContent = '도장 그림을 아직 다 불러오지 못했습니다(' + missing.join(', ') + '). 잠시 후 다시 눌러 주세요.';
+      return;
+    }
+
+    var body = SHSCert.bodyText({ doc_type: doc, church: church, position: pos });
+    btn.disabled = true;
+    msg.className = 'form-msg';
+    msg.textContent = '발급 중입니다...';
+
+    SHSCloud.init().then(function (c) {
+      return c.rpc('issue_document', {
+        p_request_id: reqId ? parseInt(reqId, 10) : null,
+        p_doc_type: doc, p_name: name, p_position: pos, p_church: church,
+        p_purpose: purpose, p_copies: 1, p_body_text: body,
+        p_seals: sealMap, p_president: presidentName, p_session_no: session
+      });
+    }).then(function (res) {
+      btn.disabled = false;
+      if (res.error) {
+        msg.className = 'form-msg err';
+        msg.textContent = res.error.message;
+        return;
+      }
+      var rec = Array.isArray(res.data) ? res.data[0] : res.data;
+      msg.className = 'form-msg ok';
+      msg.innerHTML = e(rec.doc_no) + ' ' + e(rec.doc_type) + '가 발급되었습니다.' +
+        (rec.user_id ? ' 신청자에게 알림이 전달되어 홈페이지에서 PDF로 받으실 수 있습니다.' : '') +
+        ' <a href="certificate.html?id=' + rec.id + '" target="_blank" rel="noopener" ' +
+        'style="color:var(--navy);text-decoration:underline">증명서 새 창으로 열기</a>';
+      document.getElementById('d-reqid').value = '';
+      document.getElementById('d-reqnote').classList.add('hidden');
+      renderLog();
+      loadRequests();
+      renderCert(rec);
+      document.getElementById('cert-print').scrollIntoView({ behavior: 'smooth' });
+    }).catch(function (x) {
+      btn.disabled = false;
+      msg.className = 'form-msg err';
+      msg.textContent = (x && x.message) || '발급하지 못했습니다.';
+    });
+  });
 
   function renderCert(rec) {
     var c = document.getElementById('cert-print');
     c.innerHTML =
-      '<div class="cert-sheet">' +
-      '<div class="c-no">' + e(rec.no) + '</div>' +
-      '<h2>' + e(rec.doc) + '</h2>' +
-      '<table class="c-body" style="width:100%"><tbody>' +
-      '<tr><td>성명</td><td>' + e(rec.name) + '</td></tr>' +
-      '<tr><td>직위</td><td>' + e(rec.pos) + '</td></tr>' +
-      '<tr><td>소속</td><td>대한예수교장로회 ' + e(rec.church) + '</td></tr>' +
-      '<tr><td>용도</td><td>' + e(rec.purpose) + '</td></tr>' +
-      '</tbody></table>' +
-      '<div class="c-text">' + e(certText(rec)) + '</div>' +
-      '<div class="c-date">' + e(rec.date) + '</div>' +
-      '<div class="cert-issuer-wrap"><div class="c-issuer">대한예수교장로회 시화산노회장' +
-      (rec.seals && rec.seals['노회직인']
-        ? '<img class="cert-seal" src="' + rec.seals['노회직인'].url + '" alt="노회 직인">' : '') +
-      '</div></div>' +
-      /* 노회장·서기·회록서기 도장 */
-      (function () {
-        var rows = ['노회장', '서기', '회록서기'].filter(function (k) { return rec.seals && rec.seals[k]; });
-        if (!rows.length) return '';
-        return '<div class="cert-signs">' + rows.map(function (k) {
-          var s = rec.seals[k];
-          return '<span class="row">' + e(k) + (s.holder ? ' ' + e(s.holder) : '') +
-            '<img src="' + s.url + '" alt="' + e(k) + ' 도장"></span>';
-        }).join('') + '</div>';
-      })() +
-      (rec.seals && Object.keys(rec.seals).length
-        ? ''
-        : '<p style="text-align:center;font-size:0.8rem;color:var(--gray-5);margin-top:20px" class="no-print">날인할 도장을 선택하지 않았습니다. 노회 사무실에서 직접 날인해 주세요.</p>') +
+      '<div class="cert-actions no-print">' +
+      '<button class="btn" id="cert-pdf">PDF로 저장 / 인쇄</button>' +
+      '<a class="btn ghost" href="certificate.html?id=' + rec.id + '" target="_blank" rel="noopener">새 창으로 열기</a>' +
       '</div>' +
-      '<p class="text-right no-print" style="max-width:720px;margin:0 auto 40px">' +
-      '<button class="btn" onclick="window.print()">인쇄</button></p>';
+      SHSCert.sheet(rec) +
+      (rec.seals && Object.keys(rec.seals).length ? ''
+        : '<p style="text-align:center;font-size:0.8rem;color:var(--gray-5)" class="no-print">' +
+          '날인할 도장을 선택하지 않았습니다. 노회 사무실에서 직접 날인해 주세요.</p>');
+    var b = document.getElementById('cert-pdf');
+    if (b) b.addEventListener('click', function () { SHSCert.print(rec); });
   }
  });
 });
