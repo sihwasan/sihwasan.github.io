@@ -9,12 +9,21 @@
 <body>
 
 <section class="hero">
+  <canvas class="hero-canvas" id="hero-canvas" aria-hidden="true"></canvas>
   <div class="container">
     <div class="hero-kicker">대한예수교장로회(합동)</div>
     <h1>시화산노회가 하나 됨을 이루고<br>함께 지어져 가는 교회를 세웁니다</h1>
     <p>화성, 안산, 시흥, 수원, 용인, 오산 지역의 교회들이 그리스도 안에서 한 몸을 이루어
        복음 전파와 교회 섬김의 사명을 감당하고 있습니다.</p>
     <div class="hero-verse">"그의 안에서 건물마다 서로 연결하여 주 안에서 성전이 되어 가고" (엡 2:21)</div>
+    <div class="hero-cities">
+      <div class="chips" role="group" aria-label="시화산을 이루는 세 지역">
+        <button type="button" class="city-chip" data-city="si" aria-pressed="false"><b class="syl">시</b>흥</button>
+        <button type="button" class="city-chip" data-city="hwa" aria-pressed="false"><b class="syl">화</b>성</button>
+        <button type="button" class="city-chip" data-city="san" aria-pressed="false">안<b class="syl">산</b></button>
+      </div>
+      <div class="hero-cities-note" id="hero-cities-note">세 지역이 모여 한 이름, ‘시화산’을 이룹니다</div>
+    </div>
   </div>
 </section>
 
@@ -87,6 +96,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/hero.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var e = SHS.esc;
@@ -235,8 +245,9 @@ document.addEventListener('DOMContentLoaded', function () {
             if (h.line1) hero.querySelector('h1').innerHTML = e(h.line1) + '<br>' + e(h.line2 || '');
             if (h.desc) hero.querySelector('p').textContent = h.desc;
             if (h.verse) hero.querySelector('.hero-verse').textContent = h.verse;
-            /* 관리자가 바꾼 배경 사진이 있으면 그것으로 깐다 */
+            /* 관리자가 바꾼 배경 사진이 있으면 그것으로 깔고, 인터랙티브 배경은 멈춘다 */
             if (h.image) {
+              hero.classList.add('has-image');
               hero.style.backgroundImage = 'url("' + h.image.replace(/"/g, '%22') + '")';
               hero.style.backgroundPosition = 'center 42%';
               hero.style.backgroundSize = 'cover';
