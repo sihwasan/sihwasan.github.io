@@ -119,14 +119,14 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 /* ---------- hero ---------- */
 .hero {
   position: relative;
-  background: linear-gradient(128deg, #0a1830 0%, #0f2444 46%, #1a3a6e 100%);
+  background: linear-gradient(126deg, #081221 0%, #0d1e3a 48%, #143152 100%);
   min-height: 480px;
   display: flex; align-items: center;
   overflow: hidden;
 }
 .hero::before {
   content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse 62% 70% at 70% 46%, rgba(58, 98, 168, 0.30), transparent 70%);
+  background: radial-gradient(ellipse 62% 70% at 72% 46%, rgba(64, 104, 168, 0.24), transparent 70%);
   pointer-events: none;
 }
 /* 입자 위에서 본문 글씨가 잘 읽히도록 왼쪽을 살짝 어둡게 */
@@ -138,41 +138,38 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .hero-canvas { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; }
 .hero .container { position: relative; z-index: 2; color: #fff; padding-top: 54px; padding-bottom: 54px; }
 .hero .hero-kicker {
-  font-size: 0.9rem; letter-spacing: 4px; color: #b9c8e0; margin-bottom: 14px;
+  font-size: 0.8rem; letter-spacing: 6px; color: #93a8cc; margin-bottom: 16px;
 }
 .hero h1 {
   font-family: 'Noto Serif KR', serif;
   font-size: 2.7rem; font-weight: 700; line-height: 1.35;
   margin-bottom: 18px;
 }
-.hero p { font-size: 1.05rem; color: #d5deed; max-width: 560px; }
-.hero .hero-verse { margin-top: 26px; font-size: 0.88rem; color: #a9bad7; }
+.hero p { font-size: 1.05rem; color: #c3cfe2; max-width: 560px; }
+.hero .hero-verse { margin-top: 26px; font-size: 0.86rem; color: #90a5c7; }
 
-/* 시·화·산 지역 칩 */
-.hero-cities { margin-top: 28px; }
-.hero-cities .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+/* 시·화·산 지역 — 절제된 텍스트 버튼 */
+.hero-cities { margin-top: 30px; }
+.hero-cities .chips { display: flex; gap: 26px; flex-wrap: wrap; }
 .city-chip {
-  display: inline-flex; align-items: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(185, 200, 224, 0.35);
-  color: #dce5f3; padding: 8px 18px; border-radius: 999px;
-  font-size: 0.95rem; letter-spacing: 2px; line-height: 1;
-  transition: border-color .25s, background .25s, transform .25s, box-shadow .25s, color .25s;
+  display: inline-block;
+  background: none; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ccd7e9; padding: 5px 2px 8px; border-radius: 0;
+  font-size: 0.93rem; letter-spacing: 4px; line-height: 1;
+  transition: color .25s, border-color .25s;
 }
-.city-chip .syl { font-family: 'Noto Serif KR', serif; color: #d9b96a; font-weight: 700; }
+.city-chip .syl { font-family: inherit; color: inherit; font-weight: 600; }
 .city-chip:hover, .city-chip:focus-visible, .city-chip.on {
-  border-color: #d9b96a; background: rgba(176, 141, 62, 0.18);
-  transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
-  color: #fff; outline: none;
+  color: #fff; border-bottom-color: rgba(236, 229, 212, 0.9);
+  outline: none;
 }
-.city-chip.on .syl { color: #f4d894; }
 .hero-cities-note {
-  margin-top: 12px; font-size: 0.84rem; color: #96a9cc;
+  margin-top: 14px; font-size: 0.83rem; color: #8299bd;
   letter-spacing: 0.5px; min-height: 1.5em; transition: color .25s;
 }
-.hero-cities-note.on { color: #e8d6a5; }
+.hero-cities-note.on { color: #e4dcc6; }
 @media (prefers-reduced-motion: reduce) {
-  .city-chip, .city-chip:hover, .city-chip:focus-visible, .city-chip.on { transform: none; transition: none; }
+  .city-chip { transition: none; }
 }
 
 /* 관리자가 사이트 관리에서 배경 사진을 지정한 경우: 기존 사진 히어로로 복귀 */
@@ -831,8 +828,8 @@ td.sat .cal-d { color: #2a4d8f; }
   .hero { min-height: 440px; }
   .hero h1 { font-size: 1.9rem; }
   .hero::after { background: linear-gradient(90deg, rgba(8, 18, 38, 0.55) 0%, rgba(8, 18, 38, 0.30) 55%, rgba(8, 18, 38, 0.10) 100%); }
-  /* 글 아래로 별자리가 들어갈 띠를 비워 둔다 */
-  .hero .container { padding-top: 44px; padding-bottom: 148px; }
+  /* 글 아래로 하나 됨의 원이 들어갈 띠를 비워 둔다 */
+  .hero .container { padding-top: 44px; padding-bottom: 212px; }
   .city-chip { padding: 7px 14px; font-size: 0.88rem; }
   .cert-sheet { padding: 30px 24px; }
 }
