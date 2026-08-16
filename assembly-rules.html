@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>총회 규정 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>총회 규정</h1>
+    <div class="crumb">홈 &gt; 총회자료실 &gt; 총회 규정</div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <p class="lead">총회 규칙과 산하 상비부·위원회·기관의 각종 규정 전문입니다.</p>
+  <div class="lib-updated" id="lib-updated"></div>
+
+  <div class="lib-tabs" id="lib-tabs"></div>
+
+  <div class="lib-wrap">
+    <aside class="lib-side-wrap">
+      <input type="text" class="lib-search" id="lib-search" placeholder="규정 이름 검색">
+      <nav class="lib-side" id="lib-side"></nav>
+    </aside>
+    <div class="lib-doc" id="lib-doc"></div>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script src="js/assembly-lib.js"></script>
+<script>
+AsmLib.initDocs({
+  indexUrl: 'data/assembly/rules-index.json',
+  listKey: 'cats',
+  tocLv0Only: true,
+  itemUrl: function (n) { return 'data/assembly/rules-' + n + '.json'; }
+});
+</script>
+</body>
+</html>

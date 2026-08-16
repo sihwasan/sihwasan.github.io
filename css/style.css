@@ -839,3 +839,112 @@ td.sat .cal-d { color: #2a4d8f; }
   .page-body { padding: 0; }
   .cert-sheet { border: 2px solid #000; margin: 0 auto; }
 }
+
+/* ---------- 총회자료실 ---------- */
+.lib-updated { font-size: 0.78rem; color: var(--gray-5); margin: -6px 0 18px; }
+.lib-note { font-size: 0.85rem; color: var(--gray-7); margin: -8px 0 14px; }
+
+.lib-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.lib-tab {
+  background: #fff; border: 1px solid var(--gray-3); color: var(--gray-7);
+  padding: 8px 16px; font-size: 0.92rem; line-height: 1;
+  transition: all .18s;
+}
+.lib-tab:hover { border-color: var(--navy); color: var(--navy); }
+.lib-tab.on { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 500; }
+
+.lib-wrap { display: grid; grid-template-columns: 280px 1fr; gap: 28px; align-items: start; }
+.lib-side-wrap { position: sticky; top: 16px; }
+.lib-search {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--gray-3);
+  font-size: 0.9rem; margin-bottom: 10px;
+}
+.lib-search:focus { outline: none; border-color: var(--navy); }
+.lib-side {
+  border: 1px solid var(--gray-2); background: var(--gray-1);
+  max-height: 68vh; overflow-y: auto;
+}
+.lib-side a {
+  display: block; padding: 9px 14px; font-size: 0.87rem; color: var(--gray-7);
+  border-bottom: 1px solid var(--gray-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lib-side a:hover { background: #fff; color: var(--navy); }
+.lib-side a.lv1 { padding-left: 28px; font-size: 0.83rem; }
+.lib-side a.lv2 { padding-left: 40px; font-size: 0.8rem; }
+.lib-side-empty { padding: 18px 14px; font-size: 0.85rem; color: var(--gray-5); }
+
+.lib-doc { min-width: 0; }
+.lib-loading, .lib-error { padding: 40px 0; color: var(--gray-5); font-size: 0.95rem; }
+.lib-error { color: var(--red); }
+.lib-sec { margin-bottom: 34px; }
+.lib-sec.lv1 { margin-left: 14px; }
+.lib-sec-title {
+  font-family: 'Noto Serif KR', serif; font-size: 1.25rem; color: var(--navy);
+  border-bottom: 2px solid var(--navy); padding-bottom: 8px; margin-bottom: 14px;
+}
+.lib-sec.lv1 .lib-sec-title { font-size: 1.05rem; border-bottom: 1px solid var(--gray-3); }
+.lib-sec-body { font-size: 0.95rem; line-height: 1.85; color: var(--ink); }
+.lib-sec-body h3, .lib-sec-body h4, .lib-sec-body h5 {
+  color: var(--navy); margin: 20px 0 8px; font-size: 1.02rem;
+}
+.lib-sec-body p { margin-bottom: 10px; }
+.lib-sec-body ol, .lib-sec-body ul { margin: 8px 0 12px 22px; }
+.lib-sec-body ol { list-style: decimal; }
+.lib-sec-body ul { list-style: disc; }
+.lib-sec-body table {
+  border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.88rem;
+}
+.lib-sec-body table td, .lib-sec-body table th {
+  border: 1px solid var(--gray-3); padding: 6px 10px;
+}
+.lib-sec-body blockquote {
+  border-left: 3px solid var(--gray-3); padding: 4px 14px; margin: 10px 0;
+  color: var(--gray-7);
+}
+
+/* 회의결의 */
+.lib-res-tbl tbody tr { cursor: pointer; }
+.lib-res-tbl tbody tr:hover td { background: var(--gray-1); }
+.lib-res-head { margin: 18px 0 20px; }
+.lib-res-head h2 {
+  font-family: 'Noto Serif KR', serif; color: var(--navy); font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+.lib-res-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.88rem; color: var(--gray-7); }
+.lib-res-cont { border-top: 2px solid var(--navy); padding-top: 18px; font-size: 0.95rem; line-height: 1.9; }
+
+/* 보고서 */
+.rpt-tree { margin-top: 4px; }
+.rpt-group {
+  border: 1px solid var(--gray-2); margin-bottom: 12px; background: #fff;
+}
+.rpt-group > summary {
+  cursor: pointer; padding: 13px 18px; font-weight: 700; color: var(--navy);
+  background: var(--gray-1); font-size: 0.98rem; list-style: none;
+}
+.rpt-group > summary::-webkit-details-marker { display: none; }
+.rpt-group > summary::before { content: '▸ '; color: var(--accent); }
+.rpt-group[open] > summary::before { content: '▾ '; }
+.rpt-cnt {
+  font-size: 0.75rem; color: var(--gray-5); font-weight: 400; margin-left: 4px;
+}
+.rpt-list { padding: 8px 18px 12px; }
+.rpt-list ul { margin-left: 20px; }
+.rpt-list li { border-bottom: 1px dashed var(--gray-2); }
+.rpt-list li:last-child { border-bottom: none; }
+.rpt-file, .rpt-name { display: inline-block; padding: 8px 2px; font-size: 0.9rem; }
+.rpt-file { color: var(--gray-7); }
+.rpt-file:hover { color: var(--navy); text-decoration: underline; }
+.rpt-name { color: var(--gray-5); }
+.rpt-ext {
+  display: inline-block; margin-left: 7px; padding: 1px 6px; font-size: 0.68rem;
+  border: 1px solid var(--accent); color: var(--accent); vertical-align: 1px;
+}
+
+@media (max-width: 900px) {
+  .lib-wrap { grid-template-columns: 1fr; }
+  .lib-side-wrap { position: static; }
+  .lib-side { max-height: 240px; }
+  .hide-m { display: none; }
+}

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>총회 헌법 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>총회 헌법</h1>
+    <div class="crumb">홈 &gt; 총회자료실 &gt; 총회 헌법</div>
+  </div>
+</div>
+
+<div class="page-body container">
+  <p class="lead">대한예수교장로회총회(합동) 헌법 전문입니다. 정치·권징조례·예배모범과 교리 표준(신조, 신앙고백서, 대소요리문답)을 열람할 수 있습니다.</p>
+  <div class="lib-updated" id="lib-updated"></div>
+
+  <div class="lib-tabs" id="lib-tabs"></div>
+
+  <div class="lib-wrap">
+    <aside class="lib-side-wrap">
+      <input type="text" class="lib-search" id="lib-search" placeholder="목차 검색 (예: 노회, 목사)">
+      <nav class="lib-side" id="lib-side"></nav>
+    </aside>
+    <div class="lib-doc" id="lib-doc"></div>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script src="js/assembly-lib.js"></script>
+<script>
+AsmLib.initDocs({
+  indexUrl: 'data/assembly/constitution-index.json',
+  listKey: 'books',
+  itemUrl: function (n) { return 'data/assembly/constitution-' + n + '.json'; }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>총회 보고서 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>총회 보고서</h1>
+    <div class="crumb">홈 &gt; 총회자료실 &gt; 총회 보고서</div>
+  </div>
+</div>
+
+<div class="page-body container" style="max-width:1000px">
+  <p class="lead">회기별 총회 보고서입니다. 총회·상비부·위원회·연합회·기관사업 보고서 전문을 볼 수 있습니다.</p>
+  <p class="lib-note">보고서 파일(PDF)은 총회 자료실 원본으로 연결되며, 새 창에서 열립니다.</p>
+  <div class="lib-updated" id="lib-updated"></div>
+
+  <div class="lib-tabs" id="lib-tabs"></div>
+  <div class="rpt-tree" id="rpt-tree"></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script src="js/assembly-lib.js"></script>
+<script>AsmLib.initReports();</script>
+</body>
+</html>

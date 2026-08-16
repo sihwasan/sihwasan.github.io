@@ -38,6 +38,12 @@
       { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
       { t: '고시 모의고사', h: 'exam.html' }
     ]},
+    { title: '총회자료실', href: 'assembly-constitution.html', sub: [
+      { t: '총회 헌법', h: 'assembly-constitution.html' },
+      { t: '총회 규정', h: 'assembly-rules.html' },
+      { t: '총회 회의결의', h: 'assembly-resolution.html' },
+      { t: '총회 보고서', h: 'assembly-report.html' }
+    ]},
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
       { t: '발급 서류 안내', h: 'request.html#docs' },
@@ -170,7 +176,9 @@
     var here = location.pathname.split('/').pop() || 'index.html';
     var html = '<nav class="gnb"><ul class="gnb-list">';
     NAV.forEach(function (m) {
-      var active = here === m.href ? ' active' : '';
+      var active = (here === m.href || m.sub.some(function (s) {
+        return s.h.split('#')[0] === here;
+      })) ? ' active' : '';
       html += '<li class="gnb-item' + active + '"><a href="' + m.href + '">' + m.title + '</a><div class="gnb-sub">';
       m.sub.forEach(function (s) { html += '<a href="' + s.h + '">' + s.t + '</a>'; });
       html += '</div></li>';
