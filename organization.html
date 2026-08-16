@@ -119,7 +119,6 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="notice-banner">노회 임원 명단은 공개되며, 성명은 개인정보 보호를 위해 일부 가려서 표시됩니다. ' +
       '회원명단·시찰회·상비부는 <strong>정회원</strong>만 열람할 수 있습니다.</div>');
   }
-  function dn(name) { return e(canSee ? name : SHS.maskName(name)); }
   /* "김종수 목사(섬기는교회)" / "박흥열 (노회장)" 등 이름이 앞에 오는 문자열 마스킹 */
   function dt(s) {
     if (canSee) return e(s);
@@ -131,13 +130,19 @@ document.addEventListener('DOMContentLoaded', function () {
     if (canSee) return e(s);
     return e(String(s).split(',').map(function (x) { return SHS.maskName(x.trim()); }).join(', '));
   }
+  /* 정회원에게는 이름을 누르면 회원정보 카드가 열리는 링크로 그린다 */
+  function mlink(name, church) {
+    if (!canSee) return e(SHS.maskName(name));
+    return '<a href="#" class="mb-link" data-name="' + e(name) +
+      '" data-church="' + e(church || '') + '">' + e(name) + '</a>';
+  }
 
   var ob = document.getElementById('officers-body');
   function renderOfficers(list) {
     ob.innerHTML = '';
     list.forEach(function (o) {
       ob.insertAdjacentHTML('beforeend',
-        '<tr><td><span class="role-badge">' + e(o.role) + '</span></td><td>' + dn(o.name) + '</td><td>' + e(o.position) + '</td><td>' + e(o.church) + '</td></tr>');
+        '<tr><td><span class="role-badge">' + e(o.role) + '</span></td><td>' + mlink(o.name, o.church) + '</td><td>' + e(o.position) + '</td><td>' + e(o.church) + '</td></tr>');
     });
   }
   renderOfficers(SHSData.officers);
@@ -173,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
                      : ' <span style="color:var(--gray-5)">(' + left + '일 남음)</span>');
       }
       return '<tr><td>' + e(d.kind) + '</td>' +
-        '<td>' + dn(d.name) + (d.title ? ' <span style="font-size:0.78rem;color:var(--gray-5)">(' + e(d.title) + ')</span>' : '') + '</td>' +
+        '<td>' + mlink(d.name, d.church) + (d.title ? ' <span style="font-size:0.78rem;color:var(--gray-5)">(' + e(d.title) + ')</span>' : '') + '</td>' +
         '<td>' + e(d.church || '-') + '</td>' +
         '<td class="left">' + term + '</td></tr>';
     }).join('');
@@ -212,12 +217,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function renderRoster(D) {
     fill('senior-body', (D.seniorPastors || []).map(function (m, i) {
-      return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) +
+      return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td><td>' + e(m.church) +
         '</td><td>' + e(m.retired || '') + '</td></tr>';
     }).join(''));
 
     fill('retired-body', (D.retiredPastors || []).map(function (m, i) {
-      return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>';
+      return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td><td>' + e(m.church) + '</td></tr>';
     }).join(''));
 
     /* 담임목사는 두 줄로 나누어 보여준다 */
@@ -226,19 +231,21 @@ document.addEventListener('DOMContentLoaded', function () {
     var rows = '';
     for (var i = 0; i < half; i++) {
       var a = ps[i], b = ps[i + half];
-      rows += '<tr><td>' + (i + 1) + '</td><td>' + dn(a.name) + '</td><td>' + e(a.church) + '</td>' +
-        (b ? '<td>' + (i + half + 1) + '</td><td>' + dn(b.name) + '</td><td>' + e(b.church) + '</td>'
+      rows += '<tr><td>' + (i + 1) + '</td><td>' + mlink(a.name, a.church) + '</td><td>' + e(a.church) + '</td>' +
+        (b ? '<td>' + (i + half + 1) + '</td><td>' + mlink(b.name, b.church) + '</td><td>' + e(b.church) + '</td>'
            : '<td></td><td></td><td></td>') + '</tr>';
     }
     fill('pastors-body', rows);
 
     fill('assoc-body', (D.assocPastors || []).map(function (m, i) {
-      return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>';
+      return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td><td>' + e(m.church) + '</td></tr>';
     }).join(''));
 
     var nc = document.getElementById('nocharge-body');
-    if (nc) nc.textContent = (D.pastorsWithoutCharge || []).map(function (n) {
-      return canSee ? n : SHS.maskName(n);
+    if (nc) nc.innerHTML = (D.pastorsWithoutCharge || []).map(function (n) {
+      var nm = typeof n === 'string' ? n : n.name;
+      var ch = typeof n === 'string' ? '' : (n.church || '');
+      return canSee ? mlink(nm, ch) : e(SHS.maskName(nm));
     }).join(', ');
 
     var eldersHtml = '';
@@ -248,7 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<h4 style="color:var(--navy);margin:18px 0 8px">' + e(k) + ' (' + list.length + '명)</h4>' +
         '<table class="tbl" style="max-width:640px"><thead><tr><th>번호</th><th>성명</th><th>교회</th></tr></thead><tbody>' +
         list.map(function (m, i) {
-          return '<tr><td>' + (i + 1) + '</td><td>' + dn(m.name) + '</td><td>' + e(m.church) + '</td></tr>';
+          return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td><td>' + e(m.church) + '</td></tr>';
         }).join('') + '</tbody></table>';
     });
     fill('elders-body', eldersHtml);
@@ -280,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function () {
         case '원로목사': D.seniorPastors.push(m); break;
         case '은퇴목사': D.retiredPastors.push(m); break;
         case '부목사':   D.assocPastors.push(m); break;
-        case '무임목사': D.pastorsWithoutCharge.push(r.name); break;
+        case '무임목사': D.pastorsWithoutCharge.push({ name: r.name, church: r.church }); break;
         case '장로':
           var k = r.sichal || '기타';
           (D.elders[k] = D.elders[k] || []).push(m);
@@ -310,6 +317,110 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   renderCommittees(SHSData.committees);
+
+  /* ---------- 회원정보 카드 ----------
+   * 명단에서 이름을 누르면 사진·교회·교회 주소·연락처·생년월일·남은 임기를
+   * 보여준다. 본인이 내 정보에서 등록한 내용만 표시되며, 열람은 감사 기록에 남는다. */
+  document.body.insertAdjacentHTML('beforeend',
+    '<div class="mb-overlay hidden" id="mb-overlay">' +
+    '<div class="mb-card" role="dialog" aria-modal="true" aria-label="회원 정보">' +
+    '<button type="button" class="mb-close" id="mb-close" aria-label="닫기">&times;</button>' +
+    '<div id="mb-body"></div>' +
+    '</div></div>');
+  var mbOverlay = document.getElementById('mb-overlay');
+  var mbBody = document.getElementById('mb-body');
+
+  function closeCard() { mbOverlay.classList.add('hidden'); }
+  document.getElementById('mb-close').addEventListener('click', closeCard);
+  mbOverlay.addEventListener('click', function (ev) { if (ev.target === mbOverlay) closeCard(); });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') closeCard(); });
+
+  function fmtBirth(d) {
+    if (!d) return '';
+    var m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[1] + '. ' + m[2] + '. ' + m[3] + '.' : String(d);
+  }
+
+  /* 남은 임기: 총회 정년(만 70세)까지 남은 기간 */
+  function fmtRemain(birth, retire) {
+    if (!birth) return null;
+    var rd = retire ? new Date(retire + 'T00:00:00') : SHS.retireDate(birth);
+    if (!rd || isNaN(rd)) return null;
+    var today = new Date();
+    if (rd <= today) return '정년(만 70세) 경과';
+    var months = (rd.getFullYear() - today.getFullYear()) * 12 + (rd.getMonth() - today.getMonth());
+    if (rd.getDate() < today.getDate()) months--;
+    var y = Math.floor(months / 12), mm = months % 12;
+    return '정년(' + rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.)까지 ' +
+      (y > 0 ? y + '년 ' : '') + mm + '개월';
+  }
+
+  function cardRow(k, v) {
+    return '<tr><th>' + k + '</th><td>' +
+      (v ? e(v) : '<span class="mb-dim">미등록</span>') + '</td></tr>';
+  }
+
+  function renderCard(meta, info, photoUrl) {
+    var ph = photoUrl
+      ? '<img class="mb-photo" src="' + e(photoUrl) + '" alt="회원 사진">'
+      : '<div class="mb-photo mb-photo-empty">사진<br>없음</div>';
+    var h = '<div class="mb-head">' + ph +
+      '<div class="mb-title"><div class="mb-name">' + e(meta.name) +
+      (info && info.position ? ' <span class="mb-pos">' + e(info.position) + '</span>' : '') + '</div>' +
+      '<div class="mb-church">' + e((info && info.church) || meta.church || '') + '</div></div></div>';
+    if (info === null) {
+      h += '<div class="mb-note">상세 정보는 서버 로그인(구글·이메일) 회원만 볼 수 있습니다.</div>';
+    } else if (!info) {
+      h += '<div class="mb-note">아직 홈페이지에 회원 정보를 등록하지 않은 회원입니다.<br>' +
+        '본인이 로그인 후 <strong>내 정보</strong>에서 등록하면 여기에 표시됩니다.</div>';
+    } else {
+      h += '<table class="mb-tbl"><tbody>' +
+        cardRow('교회 주소', info.church_addr) +
+        cardRow('연락처', info.phone) +
+        cardRow('생년월일', fmtBirth(info.birth)) +
+        cardRow('남은 임기', fmtRemain(info.birth, info.retire)) +
+        '</tbody></table>' +
+        '<div class="mb-note">본인 정보는 로그인 후 <strong>내 정보</strong>에서 수정할 수 있으며, ' +
+        '열람 기록은 감사 기록에 남습니다.</div>';
+    }
+    mbBody.innerHTML = h;
+  }
+
+  function showCard(name, church) {
+    var meta = { name: name, church: church };
+    mbBody.innerHTML = '<div class="mb-loading">불러오는 중입니다…</div>';
+    mbOverlay.classList.remove('hidden');
+    SHS.logAction('view', '회원정보 카드 열람', name + (church ? ' / ' + church : ''));
+    if (!(user && user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      renderCard(meta, null, null);
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return c.rpc('member_card', { p_name: name, p_church: church || '' }).then(function (r) {
+        var p = r.data && r.data[0];
+        if (!p) { renderCard(meta, false, null); return; }
+        var info = {
+          church: p.out_church, position: p.out_position,
+          church_addr: p.out_church_addr, phone: p.out_phone,
+          birth: p.out_birth_date, retire: p.out_retire_date
+        };
+        if (p.out_photo_path) {
+          return c.storage.from('member-photos').createSignedUrl(p.out_photo_path, 300)
+            .then(function (r2) {
+              renderCard(meta, info, (r2.data && r2.data.signedUrl) || null);
+            }, function () { renderCard(meta, info, null); });
+        }
+        renderCard(meta, info, null);
+      });
+    }).catch(function () { renderCard(meta, false, null); });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest ? ev.target.closest('.mb-link') : null;
+    if (!a) return;
+    ev.preventDefault();
+    showCard(a.getAttribute('data-name'), a.getAttribute('data-church'));
+  });
 
   /* 관리자가 회원 관리에서 고친 명단·시찰·상비부가 서버에 있으면 그것으로 갱신한다.
    * 서버 연결이 안 되면 위에서 그린 내용이 그대로 남는다. */

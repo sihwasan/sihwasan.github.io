@@ -81,12 +81,28 @@ document.addEventListener('DOMContentLoaded', function () {
       }).join('') + '</select></div>' +
       '<div class="field"><label>연락처</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
       '<div class="field"><label>생년월일</label><input type="date" id="q-birth" value="' + e(p.birth_date || '') + '">' +
-      '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인에 사용됩니다.</span></div>' +
-      '<div class="field"><label>주소</label><input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
-      '<p style="font-size:0.82rem;color:var(--gray-5)">생년월일·연락처·주소는 노회 행정에만 사용하며, ' +
-      '홈페이지에서는 가려서 표시됩니다. 관리자가 열람하는 경우 열람 기록이 감사 기록에 남습니다.</p>' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 회원명단 카드의 남은 임기 표시에 사용됩니다.</span></div>' +
+      '<div class="field"><label>교회 주소</label><input type="text" id="q-charr" value="' + e(p.church_addr || '') + '" placeholder="예: 안산시 단원구 ○○로 12"></div>' +
+      '<div class="field"><label>자택 주소</label><input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5)">교회 주소·연락처·생년월일은 정회원에게만 회원명단 카드에서 보여집니다. ' +
+      '자택 주소는 노회 행정에만 사용합니다. 관리자가 열람하는 경우 열람 기록이 감사 기록에 남습니다.</p>' +
       '<button class="btn" id="q-save" style="width:100%">저장</button>' +
       '<div class="form-msg" id="q-msg"></div>' +
+      '</div>';
+
+    /* 내 사진: 회원명단 카드에 보여진다 */
+    html += '<h2>내 사진</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<div class="ph-wrap">' +
+      '<div class="ph-preview" id="ph-preview">사진 없음</div>' +
+      '<div class="ph-drop" id="ph-drop">여기에 사진을 끌어다 놓거나<br><span>눌러서 선택</span>하세요' +
+      '<small>어떤 크기의 사진이든 자동으로 웹 크기로 줄여 저장합니다</small></div>' +
+      '</div>' +
+      '<input type="file" id="ph-file" accept="image/*" class="hidden">' +
+      '<button class="btn ghost hidden" id="ph-del" style="width:100%;margin-top:12px">사진 지우기</button>' +
+      '<div class="form-msg" id="ph-msg"></div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:8px">사진은 비공개 보관소에 저장되며, ' +
+      '정회원에게만 회원명단 카드에서 보여집니다.</p>' +
       '</div>';
 
     /* 노회장 전용: 차기 노회장에게 권한 이양 */
@@ -131,6 +147,142 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>';
 
     area.innerHTML = html;
+    setupPhoto();
+
+    /* ---------- 내 사진 올리기 ----------
+     * 끌어다 놓거나 눌러서 선택하면 캔버스로 웹 크기(긴 변 480px, JPEG)로
+     * 줄인 뒤 비공개 보관소의 내 폴더(내 uid)에 저장한다. */
+    function setupPhoto() {
+      var drop = document.getElementById('ph-drop');
+      var fileIn = document.getElementById('ph-file');
+      var preview = document.getElementById('ph-preview');
+      var delBtn = document.getElementById('ph-del');
+      var msg = document.getElementById('ph-msg');
+      if (!drop) return;
+
+      function setMsg(t, err) {
+        msg.className = 'form-msg' + (err ? ' err' : ' ok');
+        msg.textContent = t || '';
+      }
+
+      function refresh() {
+        if (!p.photo_path) {
+          preview.textContent = '사진 없음';
+          delBtn.classList.add('hidden');
+          return;
+        }
+        delBtn.classList.remove('hidden');
+        SHSCloud.init().then(function (c) {
+          return c.storage.from('member-photos').createSignedUrl(p.photo_path, 300);
+        }).then(function (r) {
+          if (r.data && r.data.signedUrl) {
+            preview.innerHTML = '<img src="' + e(r.data.signedUrl) + '" alt="내 사진">';
+          }
+        }).catch(function () {});
+      }
+
+      /* 긴 변 480px, JPEG 85%로 줄인다 */
+      function shrink(f) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          var url = URL.createObjectURL(f);
+          img.onload = function () {
+            var MAX = 480;
+            var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+            var cw = Math.max(1, Math.round(img.naturalWidth * sc));
+            var ch = Math.max(1, Math.round(img.naturalHeight * sc));
+            var cv = document.createElement('canvas');
+            cv.width = cw; cv.height = ch;
+            cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+            URL.revokeObjectURL(url);
+            cv.toBlob(function (b) {
+              if (b) resolve(b);
+              else reject(new Error('사진을 변환하지 못했습니다.'));
+            }, 'image/jpeg', 0.85);
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            reject(new Error('사진 파일을 읽지 못했습니다.'));
+          };
+          img.src = url;
+        });
+      }
+
+      function uploadPhoto(f) {
+        if (!f) return;
+        if (!/^image\//.test(f.type)) {
+          setMsg('이미지 파일만 올릴 수 있습니다.', true);
+          return;
+        }
+        setMsg('사진을 웹 크기로 줄여서 올리는 중입니다…');
+        shrink(f).then(function (blob) {
+          return SHSCloud.init().then(function (c) {
+            var path = p.id + '/photo.jpg';
+            return c.storage.from('member-photos')
+              .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+              .then(function (r) {
+                if (r.error) throw r.error;
+                return c.from('profiles').update({
+                  photo_path: path,
+                  updated_at: new Date().toISOString()
+                }).eq('id', p.id);
+              }).then(function (r2) {
+                if (r2.error) throw r2.error;
+                p.photo_path = path;
+                SHSCloud.log('update', '내 사진 등록', p.email);
+                setMsg('사진이 저장되었습니다.');
+                refresh();
+              });
+          });
+        }).catch(function (err) {
+          setMsg((err && err.message) || '사진을 올리지 못했습니다.', true);
+        });
+      }
+
+      drop.addEventListener('click', function () { fileIn.click(); });
+      fileIn.addEventListener('change', function () {
+        uploadPhoto(fileIn.files && fileIn.files[0]);
+        fileIn.value = '';
+      });
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        drop.addEventListener(ev, function (x) {
+          x.preventDefault(); x.stopPropagation();
+          drop.classList.add('over');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        drop.addEventListener(ev, function (x) {
+          x.preventDefault(); x.stopPropagation();
+          drop.classList.remove('over');
+        });
+      });
+      drop.addEventListener('drop', function (x) {
+        uploadPhoto(x.dataTransfer && x.dataTransfer.files && x.dataTransfer.files[0]);
+      });
+
+      delBtn.addEventListener('click', function () {
+        if (!p.photo_path) return;
+        if (!confirm('등록된 사진을 지우시겠습니까?')) return;
+        SHSCloud.init().then(function (c) {
+          return c.storage.from('member-photos').remove([p.photo_path])
+            .then(function () {
+              return c.from('profiles').update({
+                photo_path: null,
+                updated_at: new Date().toISOString()
+              }).eq('id', p.id);
+            });
+        }).then(function () {
+          p.photo_path = null;
+          SHSCloud.log('update', '내 사진 삭제', p.email);
+          setMsg('사진을 지웠습니다.');
+          refresh();
+        }).catch(function () {
+          setMsg('사진을 지우지 못했습니다.', true);
+        });
+      });
+
+      refresh();
+    }
 
     document.getElementById('q-save').addEventListener('click', function () {
       var msg = document.getElementById('q-msg');
@@ -158,11 +310,12 @@ document.addEventListener('DOMContentLoaded', function () {
           msg.textContent = r.msg;
           return;
         }
-        /* 생년월일·주소는 본인만 수정할 수 있는 항목이므로 별도 저장 */
+        /* 생년월일·주소·교회 주소는 본인만 수정할 수 있는 항목이므로 별도 저장 */
         return SHSCloud.init().then(function (c) {
           return c.from('profiles').update({
             birth_date: document.getElementById('q-birth').value || null,
             address: document.getElementById('q-addr').value.trim(),
+            church_addr: document.getElementById('q-charr').value.trim(),
             updated_at: new Date().toISOString()
           }).eq('id', p.id);
         }).then(function () {
