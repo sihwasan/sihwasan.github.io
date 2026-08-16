@@ -1,0 +1,11 @@
+{
+  "_안내": "이 파일을 config.json 으로 복사한 뒤 아래 값을 채워 주세요. config.json 은 저장소에 올라가지 않습니다.",
+
+  "botToken": "여기에 BotFather 가 준 봇 토큰을 붙여 넣으세요",
+  "chatId": null,
+
+  "supabaseUrl": "https://ltbhgwozkffenahqdzfj.supabase.co",
+  "supabaseServiceKey": "여기에 Supabase service_role 키를 붙여 넣으세요",
+
+  "pollSeconds": 30
+}

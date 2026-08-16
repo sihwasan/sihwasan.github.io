@@ -176,27 +176,62 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     SHSCloud.init().then(function (c) {
-      return c.from('doc_requests').select('*').order('id', { ascending: false }).limit(100);
-    }).then(function (r) {
+      return Promise.all([
+        c.from('doc_requests').select('*').order('id', { ascending: false }).limit(100),
+        c.from('doc_issues').select('id,request_id,doc_no,void_yn')
+          .then(function (x) { return x; }, function (x) { return { error: x }; })
+      ]);
+    }).then(function (rs) {
+      var r = rs[0];
       if (r.error) {
         box.innerHTML = '<p style="color:var(--gray-5)">신청 내역을 불러오지 못했습니다: ' + e(r.error.message) + '</p>';
         return;
       }
+      /* 발급된 증명서를 신청번호로 묶어 둔다 */
+      var issued = {}, issueErr = rs[1] && rs[1].error;
+      ((rs[1] && rs[1].data) || []).forEach(function (x) {
+        if (x.request_id && !x.void_yn && !issued[x.request_id]) issued[x.request_id] = x;
+      });
+
       var rows = r.data || [];
       if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-5)">접수된 신청이 없습니다.</p>'; return; }
-      var html2 = '<table class="tbl"><thead><tr><th>신청일</th><th>신청자</th><th>소속</th><th>서류</th><th>용도</th><th>부수</th><th>요청사항</th><th>상태</th><th style="width:180px">처리</th></tr></thead><tbody>';
+
+      var warn = issueErr
+        ? '<div class="notice-banner" style="border-left-color:var(--red)">증명서 보관표(doc_issues)를 읽지 못했습니다. ' +
+          'Supabase에서 <strong>31_doc_issue.sql</strong>을 아직 실행하지 않으셨다면 먼저 실행해 주세요.<br>' +
+          '<span style="font-size:0.82rem;color:var(--gray-5)">' + e(issueErr.message || '') + '</span></div>'
+        : '';
+
+      var html2 = warn +
+        '<table class="tbl"><thead><tr><th>신청일</th><th>신청자</th><th>소속</th><th>서류</th><th>용도</th>' +
+        '<th>부수</th><th>요청사항</th><th>상태</th><th style="width:210px">처리</th></tr></thead><tbody>';
       rows.forEach(function (q) {
+        var iss = issued[q.id];
+        var act;
+        if (iss) {
+          /* 이미 증명서가 만들어진 건 */
+          act = '<a class="btn sm" href="certificate.html?id=' + iss.id + '" target="_blank" rel="noopener">증명서 열기</a>' +
+            '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' + e(iss.doc_no) + '</div>';
+        } else if (q.status === '반려') {
+          act = '<span style="color:var(--gray-5)">-</span>';
+        } else {
+          /* 아직 증명서가 없으면 상태와 상관없이 발급할 수 있어야 한다.
+           * (예전에 '발급완료'로만 표시한 건도 여기서 다시 발급한다) */
+          act = '<button class="btn sm" data-rqfill="' + q.id + '">증명서 발급</button> ' +
+            (q.status === '신청'
+              ? '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>'
+              : '') +
+            (q.status === '발급완료'
+              ? '<div style="font-size:0.72rem;color:var(--red);margin-top:4px">증명서 없음 · 발급 필요</div>'
+              : '');
+        }
         html2 += '<tr><td>' + e(String(q.created_at).slice(0, 10)) + '</td>' +
           '<td>' + e(q.name) + '<div style="font-size:0.75rem;color:var(--gray-5)">' + e(q.position || '') + '</div></td>' +
           '<td>' + e(q.church || '-') + '</td><td>' + e(q.doc_type) + '</td><td>' + e(q.purpose || '-') + '</td>' +
           '<td>' + e(q.copies) + '</td><td class="left" style="font-size:0.82rem">' + e(q.memo || '-') + '</td>' +
           '<td><span class="role-badge">' + e(q.status) + '</span>' +
           (q.handled_by ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(q.handled_by) + '</div>' : '') + '</td>' +
-          '<td>' + (q.status === '신청'
-            ? '<button class="btn sm" data-rqfill="' + q.id + '">양식 채우기</button> ' +
-              '<button class="btn ghost sm" data-rqdone="' + q.id + '">발급완료</button> ' +
-              '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>'
-            : '-') + '</td></tr>';
+          '<td>' + act + '</td></tr>';
       });
       html2 += '</tbody></table>';
       box.innerHTML = html2;
@@ -233,12 +268,6 @@ document.addEventListener('DOMContentLoaded', function () {
             ') 건으로 발급합니다. 발급하면 신청자에게 알림이 가고 신청자가 PDF로 내려받습니다.';
           note.classList.remove('hidden');
           document.getElementById('d-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
-      });
-      box.querySelectorAll('button[data-rqdone]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (!confirm('이 신청을 발급완료로 표시하시겠습니까?')) return;
-          setStatus(b.dataset.rqdone, '발급완료');
         });
       });
       box.querySelectorAll('button[data-rqrej]').forEach(function (b) {

@@ -112,8 +112,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? '<span class="fail">무효 처리됨</span>'
                 : '<a class="btn sm" href="certificate.html?id=' + iss.id + '">PDF로 받기</a>' +
                   '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' + e(iss.doc_no) + '</div>')
-            : (r.status === '반려' ? '<span style="color:var(--gray-5)">-</span>'
-                                   : '<span style="color:var(--gray-5)">발급 대기</span>')) +
+            : (r.status === '반려'
+                ? '<span style="color:var(--gray-5)">-</span>'
+                : (r.status === '발급완료'
+                    ? '<span style="color:var(--gray-5)">노회 사무실에서 수령<div style="font-size:0.72rem">' +
+                      '(홈페이지 내려받기 준비 중)</div></span>'
+                    : '<span style="color:var(--gray-5)">발급 대기</span>'))) +
           '</td></tr>';
       });
       html += '</tbody></table>';
