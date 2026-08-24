@@ -422,13 +422,27 @@ document.addEventListener('DOMContentLoaded', function () {
     var c = document.getElementById('cert-print');
     c.innerHTML =
       '<div class="cert-actions no-print">' +
-      '<button class="btn" id="cert-pdf">PDF로 저장 / 인쇄</button>' +
+      '<button class="btn" id="cert-download">PDF 다운로드</button>' +
+      '<button class="btn ghost" id="cert-pdf">인쇄</button>' +
       '<a class="btn ghost" href="certificate.html?id=' + rec.id + '" target="_blank" rel="noopener">새 창으로 열기</a>' +
       '</div>' +
       SHSCert.sheet(rec) +
       (rec.seals && Object.keys(rec.seals).length ? ''
         : '<p style="text-align:center;font-size:0.8rem;color:var(--gray-5)" class="no-print">' +
           '날인할 도장을 선택하지 않았습니다. 노회 사무실에서 직접 날인해 주세요.</p>');
+    var dl = document.getElementById('cert-download');
+    if (dl) dl.addEventListener('click', function () {
+      dl.disabled = true;
+      dl.textContent = 'PDF 만드는 중...';
+      SHSCert.downloadPdf(rec).then(function () {
+        dl.disabled = false;
+        dl.textContent = 'PDF 다운로드';
+      }, function (x) {
+        dl.disabled = false;
+        dl.textContent = 'PDF 다운로드';
+        alert((x && x.message) || 'PDF를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      });
+    });
     var b = document.getElementById('cert-pdf');
     if (b) b.addEventListener('click', function () { SHSCert.print(rec); });
   }

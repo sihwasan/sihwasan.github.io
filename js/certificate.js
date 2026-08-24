@@ -87,9 +87,11 @@ var SHSCert = (function () {
     return h;
   }
 
-  /* 파일 이름: 소속증명서_홍길동_20260816 */
+  /* 파일 이름: 소속증명서_홍길동_20260816 (날짜는 발급일 기준) */
   function fileName(rec) {
-    var d = new Date();
+    var src = rec.issued_on || rec.date;
+    var d = src ? new Date(String(src).length <= 10 ? src + 'T00:00:00' : src) : new Date();
+    if (isNaN(d)) d = new Date();
     var ymd = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') +
       String(d.getDate()).padStart(2, '0');
     return ((rec.doc_type || rec.doc || '증명서') + '_' + (rec.name || '') + '_' + ymd)
@@ -106,11 +108,95 @@ var SHSCert = (function () {
     setTimeout(function () { document.title = prev; }, 800);
   }
 
+  /* ---------- PDF 바로 내려받기 ----------
+   * 증명서를 화면 밖에 A4 크기로 그려 놓고 html2pdf.js(html2canvas 기반)로
+   * 그림을 떠서 PDF로 저장한다. 글자를 그림으로 담기 때문에 한글이 깨지지
+   * 않고, 화면에 보이는 양식 그대로 파일이 된다. */
+  var CDN = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+  var loading = null;
+
+  /* html2pdf.js는 내려받기 단추를 처음 눌렀을 때에만 불러온다 */
+  function loadTool() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (loading) return loading;
+    loading = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = CDN;
+      s.onload = function () {
+        if (window.html2pdf) resolve(window.html2pdf);
+        else reject(new Error('PDF 저장 도구를 불러오지 못했습니다.'));
+      };
+      s.onerror = function () {
+        loading = null;
+        reject(new Error('PDF 저장 도구를 불러오지 못했습니다. 인터넷 연결을 확인하시고 다시 눌러 주세요.'));
+      };
+      document.head.appendChild(s);
+    });
+    return loading;
+  }
+
+  /* 화면에서는 도장을 mix-blend-mode(multiply)로 겹쳐 찍지만, PDF를 뜨는
+   * html2canvas는 이를 지원하지 않는다. 흰 바탕 도장이 글씨를 가리지 않도록
+   * 내려받기 직전에 도장 그림의 흰 바탕을 투명하게 바꿔 둔다. */
+  function sealToAlpha(img) {
+    return new Promise(function (resolve) {
+      function run() {
+        try {
+          if (!img.naturalWidth) { resolve(); return; }
+          var cv = document.createElement('canvas');
+          cv.width = img.naturalWidth;
+          cv.height = img.naturalHeight;
+          var cx = cv.getContext('2d');
+          cx.drawImage(img, 0, 0);
+          var d = cx.getImageData(0, 0, cv.width, cv.height);
+          var p = d.data;
+          for (var i = 0; i < p.length; i += 4) {
+            if (p[i] > 235 && p[i + 1] > 235 && p[i + 2] > 235) p[i + 3] = 0;
+          }
+          cx.putImageData(d, 0, 0);
+          img.onload = null;
+          img.src = cv.toDataURL('image/png');
+        } catch (x) {}
+        resolve();
+      }
+      if (img.complete) run();
+      else { img.onload = run; img.onerror = function () { resolve(); }; }
+    });
+  }
+
+  function downloadPdf(rec) {
+    return loadTool().then(function (html2pdf) {
+      var stage = document.createElement('div');
+      stage.className = 'cert-pdf-stage';
+      stage.setAttribute('aria-hidden', 'true');
+      stage.innerHTML = sheet(rec);
+      stage.firstChild.classList.add('cert-pdf-a4');
+      document.body.appendChild(stage);
+      var seals = [];
+      stage.querySelectorAll('img').forEach(function (img) { seals.push(sealToAlpha(img)); });
+      /* 글꼴이 다 준비된 뒤에 그려야 한글이 제 모양으로 담긴다 */
+      var fonts = (document.fonts && document.fonts.ready)
+        ? document.fonts.ready.then(null, function () {}) : Promise.resolve();
+      return Promise.all(seals.concat([fonts])).then(function () {
+        return html2pdf().set({
+          margin: 0,
+          filename: fileName(rec) + '.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          /* scrollX·scrollY 0: 화면이 내려가 있어도 증명서가 밀리지 않게 한다 */
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(stage.firstChild).save();
+      }).then(function () { stage.remove(); },
+        function (x) { stage.remove(); throw x; });
+    });
+  }
+
   return {
     sheet: sheet,
     bodyText: bodyText,
     dateKo: dateKo,
     fileName: fileName,
-    print: print
+    print: print,
+    downloadPdf: downloadPdf
   };
 })();

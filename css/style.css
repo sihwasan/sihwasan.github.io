@@ -1069,6 +1069,26 @@ td.sat .cal-d { color: #2a4d8f; }
   .cert-sheet .c-date { margin: 20mm 0 10mm; }
 }
 
+/* PDF 내려받기용: 인쇄 양식과 같은 A4 세로(794 x 1123px = 210 x 297mm)
+ * 크기로 화면 밖에 그려 놓고 html2pdf.js가 사진을 찍어 간다.
+ * (html2pdf가 시트만 떼어 자기 상자로 옮겨 가므로,
+ *  A4 모양은 무대가 아니라 시트 자신의 클래스에 붙인다) */
+.cert-pdf-stage {
+  position: fixed; left: -9999px; top: 0;
+  width: 794px; background: #fff; z-index: -1;
+}
+.cert-sheet.cert-pdf-a4 {
+  display: block; box-sizing: border-box;
+  width: 794px; min-height: 1116px; max-width: none;
+  margin: 0; padding: 106px 91px 76px; border: none;
+  background: #fff; position: relative;
+}
+.cert-sheet.cert-pdf-a4 .c-text { margin: 83px 0 0; }
+.cert-sheet.cert-pdf-a4 .c-date { margin: 76px 0 38px; }
+.cert-sheet.cert-pdf-a4 .cert-foot {
+  position: absolute; left: 91px; right: 91px; bottom: 53px; margin-top: 0;
+}
+
 /* 로그인 옵션 (아이디 저장 / 로그인 상태 유지) */
 .login-opts { display: flex; gap: 18px; flex-wrap: wrap; }
 .login-opts label {

@@ -67,17 +67,31 @@ document.addEventListener('DOMContentLoaded', function () {
       (rec.void_yn
         ? '<br><strong style="color:var(--red)">이 증명서는 무효 처리되었습니다.' +
           (rec.void_reason ? ' 사유: ' + e(rec.void_reason) : '') + '</strong>'
-        : '<br>아래 <strong>PDF로 저장</strong>을 누른 뒤, 인쇄 화면의 <strong>대상(프린터)</strong>을 ' +
-          '<strong>“PDF로 저장”</strong>으로 고르시면 PDF 파일로 받으실 수 있습니다.') +
+        : '<br>아래 <strong>PDF 다운로드</strong>를 누르시면 증명서가 PDF 파일로 바로 저장됩니다.') +
       '</div>';
 
     area.innerHTML =
       '<div class="cert-actions no-print">' +
-      '<button class="btn" id="c-pdf">PDF로 저장 / 인쇄</button>' +
+      '<button class="btn" id="c-download">PDF 다운로드</button>' +
+      '<button class="btn ghost" id="c-pdf">인쇄</button>' +
       '<a class="btn ghost" href="request.html">서류발급으로 돌아가기</a>' +
       '</div>' +
       SHSCert.sheet(rec);
 
+    var dl = document.getElementById('c-download');
+    dl.addEventListener('click', function () {
+      dl.disabled = true;
+      dl.textContent = 'PDF 만드는 중...';
+      SHSCert.downloadPdf(rec).then(function () {
+        dl.disabled = false;
+        dl.textContent = 'PDF 다운로드';
+        SHS.logAction('view', '증명서 PDF 저장', rec.doc_no + ' ' + rec.doc_type);
+      }, function (x) {
+        dl.disabled = false;
+        dl.textContent = 'PDF 다운로드';
+        alert((x && x.message) || 'PDF를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      });
+    });
     document.getElementById('c-pdf').addEventListener('click', function () {
       SHSCert.print(rec);
     });

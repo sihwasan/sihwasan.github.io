@@ -36,7 +36,7 @@
       <tr><th>2단계</th><td class="left">신청 즉시 관리자(노회장·서기·간사)에게 알림이 전달됩니다.</td></tr>
       <tr><th>3단계</th><td class="left">노회장의 허락 아래 서기가 서류를 발급합니다. (간사가 대행할 수 있습니다)</td></tr>
       <tr><th>4단계</th><td class="left">발급이 완료되면 알림이 오고, 위 <strong>내 신청 내역</strong>에서
-        <strong>PDF로 받기</strong>를 눌러 증명서를 내려받으실 수 있습니다.
+        <strong>PDF 다운로드</strong>를 눌러 증명서를 PDF 파일로 바로 내려받으실 수 있습니다.
         원본(직인 날인본)이 필요하시면 노회 사무실(031-486-9993)에서 수령해 주세요.</td></tr>
     </tbody>
   </table>
@@ -51,6 +51,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/certificate.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -73,8 +74,10 @@ document.addEventListener('DOMContentLoaded', function () {
   var PURPOSES = ['연말정산용', '은행제출용', '기관제출용', '총회제출용', '회사제출용', '교회제출용', '기타'];
 
   var issued = {};   /* 신청번호 → 발급된 증명서 */
+  var pdfRecs = {};  /* 신청번호 → PDF로 그릴 증명서 내용 */
 
   function render(myList) {
+    pdfRecs = {};
     var html = '';
     html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님, 아래에서 필요한 서류를 신청하실 수 있습니다. ' +
       '신청하시면 관리자에게 바로 알림이 전달됩니다.</div>';
@@ -101,28 +104,63 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<p style="color:var(--gray-5)">신청 내역이 없습니다.</p>';
     } else {
       html += '<table class="tbl" style="max-width:900px"><thead><tr><th>신청일</th><th>서류</th><th>용도</th>' +
-        '<th>부수</th><th>상태</th><th style="width:190px">증명서</th></tr></thead><tbody>';
+        '<th>부수</th><th>상태</th><th style="width:210px">증명서</th></tr></thead><tbody>';
       myList.forEach(function (r) {
         var iss = issued[r.id];
+        var cell;
+        if (iss && iss.void_yn) {
+          cell = '<span class="fail">무효 처리됨</span>';
+        } else if (iss) {
+          /* 발급된 증명서 그대로 PDF 파일로 내려받는다 */
+          pdfRecs[r.id] = iss;
+          cell = '<button class="btn sm" data-pdf="' + r.id + '">PDF 다운로드</button> ' +
+            '<a class="btn ghost sm" href="certificate.html?id=' + iss.id + '">보기</a>' +
+            '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' + e(iss.doc_no) + '</div>';
+        } else if (r.status === '반려') {
+          cell = '<span style="color:var(--gray-5)">-</span>';
+        } else if (r.status === '발급완료') {
+          /* 예전에 발급완료로만 처리되어 보관본이 없는 건은
+           * 신청 내용으로 같은 양식을 그려 내려받는다 (직인·발급번호 없음) */
+          pdfRecs[r.id] = {
+            doc_type: r.doc_type === '기타' ? '증명서' : r.doc_type,
+            name: r.name, position: r.position, church: r.church,
+            purpose: r.purpose,
+            issued_on: String(r.updated_at || r.created_at).slice(0, 10)
+          };
+          cell = '<button class="btn sm" data-pdf="' + r.id + '">PDF 다운로드</button>' +
+            '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' +
+            '직인 날인본은 노회 사무실(031-486-9993)에서 수령</div>';
+        } else {
+          cell = '<span style="color:var(--gray-5)">발급 대기</span>';
+        }
         html += '<tr><td>' + e(String(r.created_at).slice(0, 10)) + '</td><td>' + e(r.doc_type) + '</td>' +
           '<td>' + e(r.purpose || '-') + '</td><td>' + e(r.copies) + '</td>' +
           '<td><span class="role-badge">' + e(r.status) + '</span></td>' +
-          '<td>' + (iss
-            ? (iss.void_yn
-                ? '<span class="fail">무효 처리됨</span>'
-                : '<a class="btn sm" href="certificate.html?id=' + iss.id + '">PDF로 받기</a>' +
-                  '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' + e(iss.doc_no) + '</div>')
-            : (r.status === '반려'
-                ? '<span style="color:var(--gray-5)">-</span>'
-                : (r.status === '발급완료'
-                    ? '<span style="color:var(--gray-5)">노회 사무실에서 수령<div style="font-size:0.72rem">' +
-                      '(홈페이지 내려받기 준비 중)</div></span>'
-                    : '<span style="color:var(--gray-5)">발급 대기</span>'))) +
-          '</td></tr>';
+          '<td>' + cell + '</td></tr>';
       });
       html += '</tbody></table>';
     }
     area.innerHTML = html;
+
+    area.querySelectorAll('button[data-pdf]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var rec = pdfRecs[b.dataset.pdf];
+        if (!rec) return;
+        var label = b.textContent;
+        b.disabled = true;
+        b.textContent = 'PDF 만드는 중...';
+        SHSCert.downloadPdf(rec).then(function () {
+          b.disabled = false;
+          b.textContent = label;
+          SHS.logAction('view', '증명서 PDF 저장',
+            (rec.doc_no ? rec.doc_no + ' ' : '') + rec.doc_type + ' (' + rec.name + ')');
+        }, function (x) {
+          b.disabled = false;
+          b.textContent = label;
+          alert((x && x.message) || 'PDF를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        });
+      });
+    });
 
     document.getElementById('rq-send').addEventListener('click', function () {
       var msg = document.getElementById('rq-msg');
@@ -163,8 +201,9 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSCloud.init().then(function (c) {
       return Promise.all([
         c.from('doc_requests').select('*').eq('user_id', user.id).order('id', { ascending: false }),
-        /* 발급된 증명서 (31 증명서 발급을 아직 등록하지 않았으면 조용히 넘어간다) */
-        c.from('doc_issues').select('id,request_id,doc_no,doc_type,void_yn')
+        /* 발급된 증명서 (31 증명서 발급을 아직 등록하지 않았으면 조용히 넘어간다)
+         * PDF로 다시 그려야 하므로 직인·문구까지 통째로 받아 둔다 */
+        c.from('doc_issues').select('*')
           .order('id', { ascending: false })
           .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
