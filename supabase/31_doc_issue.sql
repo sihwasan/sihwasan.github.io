@@ -5,7 +5,7 @@
 --  신청자가 받을 수 없었습니다. 이제는 발급한 증명서를 노회 서버에
 --  보관하고, 신청자가 홈페이지에서 바로 열어 PDF로 저장합니다.
 --
---  · 발급번호는 회기별로 자동 채번합니다. (예: 시화산노 제19-001호)
+--  · 발급번호는 회기별로 자동 채번합니다. (예: 시화산 제19-001호)
 --  · 발급 즉시 신청 건이 발급완료로 바뀌고 신청자에게 알림이 갑니다.
 --  · 직인은 발급 당시 모습 그대로 증명서에 박아 보관하므로,
 --    나중에 직인을 바꾸어도 이미 발급한 증명서는 그대로 유지됩니다.
@@ -26,7 +26,7 @@ create table if not exists public.doc_issues (
   user_id      uuid references auth.users on delete set null,  -- 신청자(수령인)
   session_no   int  not null default 19,                       -- 회기
   seq          int  not null,                                  -- 회기 안에서의 순번
-  doc_no       text not null,                                  -- 시화산노 제19-001호
+  doc_no       text not null,                                  -- 시화산 제19-001호
   doc_type     text not null,
   name         text not null,
   position     text,
@@ -100,7 +100,7 @@ begin
   perform pg_advisory_xact_lock(hashtext('shs_doc_issue_' || v_session));
   select coalesce(max(seq), 0) + 1 into v_seq
     from public.doc_issues where session_no = v_session;
-  v_no := '시화산노 제' || v_session || '-' || lpad(v_seq::text, 3, '0') || '호';
+  v_no := '시화산 제' || v_session || '-' || lpad(v_seq::text, 3, '0') || '호';
 
   -- 신청서에서 온 발급이면 신청자를 수령인으로 연결한다
   if p_request_id is not null then
