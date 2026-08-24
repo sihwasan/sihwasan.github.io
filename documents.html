@@ -267,6 +267,11 @@ document.addEventListener('DOMContentLoaded', function () {
           note.textContent = '신청번호 ' + q.id + ' (' + q.name + ' / ' + (q.church || '') +
             ') 건으로 발급합니다. 발급하면 신청자에게 알림이 가고 신청자가 PDF로 내려받습니다.';
           note.classList.remove('hidden');
+          /* 발급 양식은 다른 탭(증명서 발급)에 있으므로 그 탭으로 옮겨 준다.
+           * 그러지 않으면 양식만 몰래 채워지고 화면에는 아무 변화가 없어 보인다. */
+          var panel = document.getElementById('d-name').closest('.page-section');
+          var tab = panel ? document.querySelector('.section-nav a[href="#' + panel.id + '"]') : null;
+          if (tab) tab.click();
           document.getElementById('d-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
       });
