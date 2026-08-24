@@ -350,7 +350,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       t.innerHTML = '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th>' +
         '<th>대상자</th><th>교회</th><th>용도</th><th>발급자</th><th>날인</th>' +
-        '<th style="width:150px">증명서</th></tr></thead><tbody>' +
+        '<th style="width:190px">증명서</th></tr></thead><tbody>' +
         rows.map(function (d) {
           var sealed = Object.keys(d.seals || {}).join(', ');
           return '<tr' + (d.void_yn ? ' style="opacity:.55"' : '') + '>' +
@@ -360,6 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
             '<td>' + e(d.issuer_name || '-') + '</td><td>' + e(sealed || '-') + '</td>' +
             '<td><a class="btn sm" href="certificate.html?id=' + d.id + '" target="_blank" rel="noopener">열기</a>' +
             (d.void_yn ? '' : ' <button class="btn danger sm" data-void="' + d.id + '">취소</button>') +
+            ' <button class="btn danger sm" data-del="' + d.id + '">삭제</button>' +
             '</td></tr>';
         }).join('') + '</tbody></table>';
 
@@ -372,6 +373,26 @@ document.addEventListener('DOMContentLoaded', function () {
           }).then(function (res) {
             if (res.error) { alert(res.error.message); return; }
             renderLog();
+          });
+        });
+      });
+
+      /* 잘못 발급한 기록을 발급 대장에서 완전히 지운다.
+       * 무효 처리와 달리 기록이 남지 않으며, 신청자도 더 이상 내려받을 수 없다. */
+      t.querySelectorAll('button[data-del]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var row = rows.filter(function (x) { return String(x.id) === b.dataset.del; })[0];
+          var label = row ? row.doc_no + ' ' + row.doc_type + ' (' + row.name + ')' : '발급번호 ' + b.dataset.del;
+          if (!confirm(label + '\n\n이 발급 기록을 완전히 삭제합니다.\n' +
+            '무효 처리와 달리 발급 대장에서 사라지고 신청자도 더 이상 내려받을 수 없습니다.\n' +
+            '삭제하시겠습니까?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('doc_issues').delete().eq('id', parseInt(b.dataset.del, 10));
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('delete', '증명서 발급 기록 삭제', label + proxyNote);
+            renderLog();
+            loadRequests();
           });
         });
       });
