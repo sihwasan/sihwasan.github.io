@@ -58,8 +58,7 @@
     ]},
     { title: '임원방', href: 'officer.html', sub: [
       { t: '임원 자료실', h: 'officer.html' },
-      { t: '노회 회의록', h: 'minutes.html' },
-      { t: '서류 발급', h: 'documents.html' }
+      { t: '노회 회의록', h: 'minutes.html' }
     ]}
   ];
 
