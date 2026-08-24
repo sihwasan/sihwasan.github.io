@@ -35,6 +35,13 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 
 .container { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
 
+/* 본문 바로가기 — 키보드·스크린 리더 사용자가 메뉴를 건너뛴다 */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 999;
+  background: var(--navy); color: #fff; padding: 10px 18px; font-size: 0.9rem;
+}
+.skip-link:focus { left: 0; }
+
 /* ---------- top utility bar ---------- */
 .topbar {
   background: var(--navy-dark);

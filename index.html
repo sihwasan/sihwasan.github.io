@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>대한예수교장로회 시화산노회</title>
+<meta name="description" content="대한예수교장로회(합동) 시화산노회 공식 홈페이지. 화성·안산·시흥·수원·용인·오산 지역 교회들의 노회 소식, 회원명단, 노회 회칙, 결의사항, 서류 발급 안내를 제공합니다.">
+<link rel="canonical" href="https://sihwasan.org/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="대한예수교장로회 시화산노회">
+<meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
+<meta property="og:url" content="https://sihwasan.org/">
+<meta property="og:image" content="https://sihwasan.org/images/logo.svg">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -27,22 +34,22 @@
   </div>
 </section>
 
-<div class="container">
+<main class="container" id="main">
   <div class="home-grid">
-    <div>
+    <section aria-label="공지사항">
       <div class="section-title">
         <h2>공지사항</h2>
         <a class="more" href="board.html">더보기</a>
       </div>
       <ul class="notice-list" id="home-notices"></ul>
-    </div>
-    <div>
-      <div class="side-box">
-        <div class="box-head">노회 일정</div>
+    </section>
+    <aside aria-label="노회 일정과 정기노회 결과">
+      <section class="side-box">
+        <h3 class="box-head">노회 일정</h3>
         <div class="box-body" id="home-schedule"></div>
-      </div>
-      <div class="side-box">
-        <div class="box-head" id="home-meet-title">제19회 정기노회 결과</div>
+      </section>
+      <section class="side-box">
+        <h3 class="box-head" id="home-meet-title">제19회 정기노회 결과</h3>
         <div class="box-body" id="home-meet-body">
           <p><strong>일시</strong> 2026년 4월 13일(월)</p>
           <p><strong>장소</strong> 섬기는교회 (화성특례시 수노을2로 15)</p>
@@ -50,20 +57,20 @@
           <p><strong>서기</strong> 권병렬 목사 / <strong>회계</strong> 김득철 장로</p>
           <p style="margin-top:10px"><a href="organization.html#officers" style="color:var(--navy);text-decoration:underline">임원 명단 전체 보기</a></p>
         </div>
-      </div>
-    </div>
+      </section>
+    </aside>
   </div>
 
-  <div class="home-committees hidden" id="home-com-wrap">
+  <section class="home-committees hidden" id="home-com-wrap" aria-label="대시보드">
     <div class="section-title">
       <h2>대시보드</h2>
       <a class="more" href="dashboard.html">상비부 전체 보기</a>
     </div>
     <div id="home-noti"></div>
     <div id="home-committees"></div>
-  </div>
+  </section>
 
-  <div class="quick-links">
+  <nav class="quick-links" aria-label="주요 바로가기">
     <a href="organization.html#members">
       <div class="q-title">회원명단</div>
       <div class="q-desc">노회 소속 목사와 총대 장로 명단을 확인합니다.</div>
@@ -76,20 +83,20 @@
       <div class="q-title">결의사항</div>
       <div class="q-desc">지난 회기 임원회와 정기노회의 결의사항입니다.</div>
     </a>
-    <a href="documents.html">
+    <a href="request.html">
       <div class="q-title">서류 발급</div>
-      <div class="q-desc">소속·재직·대표자 증명서 등 각종 서류를 발급합니다.</div>
+      <div class="q-desc">소속·재직·대표자 증명서 등 각종 서류를 신청하고 발급받습니다.</div>
     </a>
-  </div>
+  </nav>
 
-  <div class="home-gallery">
+  <section class="home-gallery" aria-label="갤러리">
     <div class="section-title">
       <h2>갤러리</h2>
       <a class="more" href="gallery.html">더보기</a>
     </div>
     <div class="grid" id="home-gallery"></div>
-  </div>
-</div>
+  </section>
+</main>
 
 <script src="js/auth.js"></script>
 <script src="js/data.js"></script>

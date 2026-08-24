@@ -1,0 +1,21 @@
+User-agent: *
+Allow: /
+
+# 로그인이 있어야 볼 수 있는 화면은 검색 결과에 담기지 않게 한다
+Disallow: /admin.html
+Disallow: /manage.html
+Disallow: /settings.html
+Disallow: /ops.html
+Disallow: /audit.html
+Disallow: /documents.html
+Disallow: /certificate.html
+Disallow: /mypage.html
+Disallow: /notifications.html
+Disallow: /dashboard.html
+Disallow: /exam-admin.html
+Disallow: /archive-edit.html
+Disallow: /rules-edit.html
+Disallow: /auth-callback.html
+Disallow: /reset-password.html
+
+Sitemap: https://sihwasan.org/sitemap.xml

@@ -173,7 +173,8 @@
     } else {
       right = '<a href="login.html">로그인</a><a href="signup.html">회원가입</a>';
     }
-    return '<div class="topbar"><div class="container">' +
+    return '<a class="skip-link" href="#main">본문 바로가기</a>' +
+      '<div class="topbar"><div class="container">' +
       '<div>대한예수교장로회(합동) 시화산노회</div>' +
       '<div class="util"><a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' + right + '</div>' +
       '</div></div>';
@@ -191,7 +192,7 @@
 
   function buildGnb() {
     var here = location.pathname.split('/').pop() || 'index.html';
-    var html = '<nav class="gnb"><ul class="gnb-list">';
+    var html = '<nav class="gnb" aria-label="주 메뉴"><ul class="gnb-list">';
     NAV.forEach(function (m) {
       var active = (here === m.href || m.sub.some(function (s) {
         return s.h.split('#')[0] === here;
