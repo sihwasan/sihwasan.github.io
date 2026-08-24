@@ -49,7 +49,8 @@ var SHSCert = (function () {
     var pos = rec.position || rec.pos || '';
     var docName = rec.doc_type || rec.doc || '증명서';
     var body = rec.body_text || bodyText(rec);
-    var signRows = ['노회장', '서기', '회록서기'].filter(function (k) {
+    /* 노회장 도장은 발급 명의 줄에 찍으므로 여기서는 뺀다 */
+    var signRows = ['서기', '회록서기'].filter(function (k) {
       return seals[k] && seals[k].url;
     });
 
@@ -68,10 +69,15 @@ var SHSCert = (function () {
     h += '<div class="c-text">' + esc(body) + '</div>';
     h += '<div class="c-date">' + esc(dateKo(rec.issued_on || rec.date)) + '</div>';
 
-    h += '<div class="cert-issuer-wrap"><div class="c-issuer">' + NOHOE + '장' +
-      (rec.president ? ' ' + esc(rec.president) : '') +
+    /* 발급 명의 두 줄: 노회 이름(직인) / 노회장 성명(도장) */
+    h += '<div class="cert-issuer-wrap"><div class="c-issuer">' + NOHOE +
       (seals['노회직인'] && seals['노회직인'].url
         ? '<img class="cert-seal" src="' + esc(seals['노회직인'].url) + '" alt="노회 직인">' : '') +
+      '</div></div>';
+    h += '<div class="cert-issuer-wrap"><div class="c-issuer">노회장' +
+      (rec.president ? ' ' + esc(rec.president) : '') +
+      (seals['노회장'] && seals['노회장'].url
+        ? '<img class="cert-seal sm" src="' + esc(seals['노회장'].url) + '" alt="노회장 도장">' : '') +
       '</div></div>';
 
     if (signRows.length) {

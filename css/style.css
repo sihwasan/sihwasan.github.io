@@ -769,6 +769,12 @@ td.sat .cal-d { color: #2a4d8f; }
   position: relative; display: inline-block; left: 50%; transform: translateX(-50%);
 }
 .cert-issuer-wrap { text-align: center; }
+/* 부모의 text-align:center 가 이미 가운데에 놓으므로,
+ * left:50% 이동까지 겹치면 짧은 줄이 오른쪽으로 밀린다 */
+.cert-issuer-wrap .c-issuer { left: auto; transform: none; }
+/* 발급 명의 둘째 줄(노회장 성명)은 첫 줄과 간격을 둔다 */
+.cert-issuer-wrap + .cert-issuer-wrap { margin-top: 18px; }
+.cert-seal.sm { width: 56px; height: 56px; right: -62px; }
 /* 직인은 발급 명의 끝에 겹쳐 찍는다 */
 .cert-seal {
   position: absolute; right: -74px; top: 50%; transform: translateY(-50%);
