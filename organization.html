@@ -152,36 +152,42 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderDelegates(d) {
     dgb.innerHTML =
       '<tr><th style="width:140px">목사 정총대</th><td class="left">' + dlist(d.pastorMain) + '</td></tr>' +
-      '<tr><th>목사 부총대</th><td class="left">' + dlist(d.pastorSub) + '</td></tr>' +
       '<tr><th>장로 정총대</th><td class="left">' + dlist(d.elderMain) + '</td></tr>' +
+      '<tr><th>목사 부총대</th><td class="left">' + dlist(d.pastorSub) + '</td></tr>' +
       '<tr><th>장로 부총대</th><td class="left">' + dlist(d.elderSub) + '</td></tr>';
   }
 
-  /* 서버 총대 명단이 있으면 소속 교회와 자격 기간까지 함께 보여준다 */
+  /* 서버 총대 명단이 있으면 소속 교회까지 함께,
+   * 정총대와 부총대를 나누어 보여준다 */
   function renderDelegateRows(rows) {
     var table = dgb.closest('table');
     if (!table || !rows.length) return;
-    var today = new Date();
     var head = table.querySelector('thead');
     if (head) head.remove();
     table.insertAdjacentHTML('afterbegin',
-      '<thead><tr><th style="width:130px">구분</th><th style="width:110px">성명</th>' +
-      '<th style="width:170px">소속 교회</th><th>자격 기간</th></tr></thead>');
+      '<thead><tr><th style="width:130px">구분</th><th style="width:150px">성명</th>' +
+      '<th>소속 교회</th></tr></thead>');
 
-    dgb.innerHTML = rows.map(function (d) {
-      var term = '-';
-      if (d.term_until) {
-        var until = new Date(d.term_until + 'T00:00:00');
-        var left = Math.ceil((until - today) / 86400000);
-        term = e(d.term_from || '?') + ' ~ ' + e(d.term_until) +
-          (left <= 0 ? ' <span class="fail">(자격 만료)</span>'
-                     : ' <span style="color:var(--gray-5)">(' + left + '일 남음)</span>');
+    /* 정총대 먼저, 그 다음 부총대. 같은 무리에서는 목사 → 장로 순 */
+    var ORDER = ['목사 정총대', '장로 정총대', '목사 부총대', '장로 부총대'];
+    var sorted = rows.slice().sort(function (a, b) {
+      var d = ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind);
+      return d !== 0 ? d : (a.sort || 0) - (b.sort || 0);
+    });
+
+    var html = '', lastGroup = '';
+    sorted.forEach(function (d) {
+      var group = (d.kind || '').indexOf('부총대') !== -1 ? '부총대' : '정총대';
+      if (group !== lastGroup) {
+        html += '<tr><th colspan="3" style="background:var(--gray-1);color:var(--navy);text-align:left;padding-left:14px">' +
+          group + '</th></tr>';
+        lastGroup = group;
       }
-      return '<tr><td>' + e(d.kind) + '</td>' +
+      html += '<tr><td>' + e((d.kind || '').split(' ')[0]) + '</td>' +
         '<td>' + mlink(d.name, d.church) + (d.title ? ' <span style="font-size:0.78rem;color:var(--gray-5)">(' + e(d.title) + ')</span>' : '') + '</td>' +
-        '<td>' + e(d.church || '-') + '</td>' +
-        '<td class="left">' + term + '</td></tr>';
-    }).join('');
+        '<td>' + e(d.church || '-') + '</td></tr>';
+    });
+    dgb.innerHTML = html;
   }
 
   renderDelegates(SHSData.delegates);
