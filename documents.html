@@ -61,12 +61,18 @@ document.addEventListener('DOMContentLoaded', function () {
         (user.role === 'staff' ? '서기 대행' : '노회장 승인') + '</strong>으로 기록됩니다.'
       : '서류 발급 권한이 확인되었습니다.') +
     ' 발급된 서류는 발급 대장에 자동 기록됩니다.</div>';
-  html += '<h2>증명서 발급</h2>';
-  html += '<div class="admin-card" style="max-width:760px"><div class="inline-form">' +
+  html += '<h2>증명서 직권 발급</h2>';
+  html += '<div class="admin-card" style="max-width:760px">' +
+    '<p style="font-size:0.85rem;color:var(--gray-7);margin-bottom:14px">' +
+    '회원의 <strong>신청이 없어도</strong> 아래 내용을 채워 바로 발급할 수 있습니다. ' +
+    '대상자 성명을 노회 명단에서 고르면 직위·소속 교회가 자동으로 채워집니다. ' +
+    '회원이 신청한 건은 <a href="#requests" style="color:var(--navy);text-decoration:underline">접수된 서류 신청</a>에서 발급해 주세요.</p>' +
+    '<div class="inline-form">' +
     '<div class="field"><label>서류 종류</label><select id="d-type">' +
     '<option>소속증명서</option><option>재직증명서</option><option>대표자증명서</option><option>직인증명서</option><option>은퇴목사확인서</option>' +
     '</select></div>' +
-    '<div class="field"><label>대상자 성명</label><input type="text" id="d-name"></div>' +
+    '<div class="field"><label>대상자 성명</label><input type="text" id="d-name" list="d-roster" autocomplete="off">' +
+    '<datalist id="d-roster"></datalist></div>' +
     '<div class="field"><label>직위</label><select id="d-pos"><option>목사</option><option>부목사</option><option>장로</option><option>전도사</option></select></div>' +
     '<div class="field"><label>소속 교회</label><input type="text" id="d-church"></div>' +
     '<div class="field"><label>용도</label><select id="d-purpose">' +
@@ -159,6 +165,43 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   loadSeals();
+
+  /* ---------- 노회 명단으로 대상자 자동 채우기 (직권 발급 편의) ---------- */
+  var rosterRows = [];
+  function loadRoster() {
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('roster').select('name,church,position').order('id');
+    }).then(function (r) {
+      if (r.error || !r.data) return;
+      rosterRows = r.data;
+      var dl = document.getElementById('d-roster');
+      if (!dl) return;
+      dl.innerHTML = rosterRows.map(function (m) {
+        return '<option value="' + e(m.name) + '">' +
+          e((m.position ? m.position + ' · ' : '') + (m.church || '')) + '</option>';
+      }).join('');
+    });
+  }
+  loadRoster();
+
+  /* 명단의 직분(위임목사·시무목사 등)을 발급 양식의 직위 보기로 맞춘다 */
+  function posToOption(p) {
+    p = p || '';
+    if (p.indexOf('부목사') !== -1) return '부목사';
+    if (p.indexOf('목사') !== -1) return '목사';
+    if (p.indexOf('장로') !== -1) return '장로';
+    if (p.indexOf('전도사') !== -1) return '전도사';
+    return '';
+  }
+  document.getElementById('d-name').addEventListener('change', function () {
+    var v = this.value.trim();
+    var hit = rosterRows.filter(function (m) { return m.name === v; });
+    if (hit.length !== 1) return;   /* 동명이인이거나 명단에 없으면 손으로 채운다 */
+    if (hit[0].church) document.getElementById('d-church').value = hit[0].church;
+    var po = posToOption(hit[0].position);
+    if (po) document.getElementById('d-pos').value = po;
+  });
 
   function pickedSeals() {
     var out = [];
