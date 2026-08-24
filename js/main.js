@@ -72,7 +72,6 @@
     { t: '회칙 개정 반영', h: 'rules-edit.html' },
     { t: '자료실 관리', h: 'archive-edit.html' },
     { t: '상비부 대시보드', h: 'dashboard.html' },
-    { t: '서류 발급', h: 'documents.html' },
     { t: '시스템 운영', h: 'ops.html' },
     { t: '감독 (감사 기록)', h: 'audit.html' }
   ]};
@@ -124,6 +123,25 @@
       ADMIN_NAV.sub.map(function (s) { return '<a href="' + s.h + '">' + s.t + '</a>'; }).join('') +
       '</div>';
     list.appendChild(li);
+    addIssueMenu();
+  }
+
+  /* 관리자에게는 서류발급 메뉴에 직권 발급 화면을 함께 보여준다 */
+  function addIssueMenu() {
+    var links = document.querySelectorAll('.gnb-item > a');
+    for (var i = 0; i < links.length; i++) {
+      if (links[i].getAttribute('href') !== 'request.html') continue;
+      var li = links[i].parentElement;
+      var sub = li.querySelector('.gnb-sub');
+      if (!sub || sub.querySelector('a[href="documents.html"]')) return;
+      var a = document.createElement('a');
+      a.href = 'documents.html';
+      a.textContent = '증명서 직권 발급';
+      sub.appendChild(a);
+      var here = location.pathname.split('/').pop() || 'index.html';
+      if (here === 'documents.html') li.classList.add('active');
+      return;
+    }
   }
 
   /* 화면 표기용 등급 이름
