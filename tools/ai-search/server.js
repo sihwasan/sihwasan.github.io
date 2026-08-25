@@ -25,6 +25,8 @@ const CFG = {
   allowRoles: ['president', 'clerk', 'staff', 'superadmin'],
   /* 홈페이지 주소 (이 주소에서 오는 요청만 받는다) */
   allowOrigins: [
+    'https://sihwasan.org',
+    'https://www.sihwasan.org',
     'https://sihwasan.github.io',
     'http://localhost:8123',
     'http://127.0.0.1:8123'

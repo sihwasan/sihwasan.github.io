@@ -12,7 +12,11 @@
  * 이 창구는 비밀 열쇠를 따로 갖고 있지 않으므로, 남의 이름으로 올릴 수 없다.
  */
 
+/* 홈페이지 주소. 맨 앞이 기본값이므로 지금 쓰는 주소를 맨 앞에 둔다.
+ * (sihwasan.github.io 는 예전 주소이지만 그대로 열리므로 함께 허용한다) */
 const ALLOW_ORIGINS = [
+  'https://sihwasan.org',
+  'https://www.sihwasan.org',
   'https://sihwasan.github.io',
   'http://localhost:8899'
 ];
