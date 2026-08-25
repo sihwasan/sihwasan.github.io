@@ -24,6 +24,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/audit-mark.js"></script>
 <script src="js/audit-view.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -58,12 +59,14 @@ document.addEventListener('DOMContentLoaded', function () {
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
     '<button data-tab="ops-sched">운영 일정</button>' +
     '<button data-tab="ops-meet">정기노회 일정</button>' +
+    '<button data-tab="ops-aw">감사 기간</button>' +
     (canAudit ? '<button data-tab="ops-audit">감독 (감사 기록)</button>' : '') +
     '</div>' +
     '<div class="tab-panel active" id="ops-alert"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     '<div class="tab-panel" id="ops-manual"></div>' +
     '<div class="tab-panel" id="ops-sched"></div>' +
     '<div class="tab-panel" id="ops-meet"></div>' +
+    '<div class="tab-panel" id="ops-aw"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     (canAudit ? '<div class="tab-panel" id="ops-audit"></div>' : '');
 
   var auditReady = false;
@@ -99,8 +102,94 @@ document.addEventListener('DOMContentLoaded', function () {
 
   SHSCloud.init().then(function (c) {
     db = c;
-    loadAlerts(); loadManual(); loadSchedule(); loadMeetings();
+    loadAlerts(); loadManual(); loadSchedule(); loadMeetings(); loadAuditWindow();
   });
+
+  /* ---------- 감사 기간 ----------
+   * 감사는 3월(봄)·9월(가을)에 저절로 열린다. 그 달 안에 마치지 못하는
+   * 일이 있으므로, 노회 관리자가 여기서 손으로 열고 닫을 수 있다. */
+  function loadAuditWindow() {
+    var box = document.getElementById('ops-aw');
+    db.from('site_settings').select('*').eq('key', 'audit_window').maybeSingle()
+      .then(function (r) {
+        var v = (r && r.data && r.data.value) || { open: false };
+        drawAuditWindow(v, r && r.error);
+      }, function () { drawAuditWindow({ open: false }, null); });
+  }
+
+  function drawAuditWindow(v, err) {
+    var box = document.getElementById('ops-aw');
+    var now = new Date();
+    var m = now.getMonth() + 1;
+    var byMonth = (m === 3 ? '봄' : (m === 9 ? '가을' : null));
+
+    var h = '<h2>감사 기간</h2>' +
+      '<p>봄·가을 정기노회 전에 감사부(감사헌의부)가 상비부·시찰의 ' +
+      '<strong>회의록</strong>과 <strong>회계 장부</strong>를 감사합니다. ' +
+      '감사 기간에만 감사부에게 <strong>감사필 처리</strong> 단추가 열립니다.</p>';
+
+    if (err) {
+      h += '<div class="notice-banner">감사 기간 설정을 읽지 못했습니다: ' + e(err.message || '') +
+        '<br>Supabase에서 <strong>37_boards_and_audit_window.sql</strong>을 먼저 실행해 주세요.</div>';
+      box.innerHTML = h;
+      return;
+    }
+
+    h += '<div class="notice-banner">' +
+      '<strong>달력대로</strong> — 3월이면 봄 감사, 9월이면 가을 감사가 저절로 열립니다. ' +
+      '지금은 ' + now.getFullYear() + '년 ' + m + '월이므로 ' +
+      (byMonth ? '<strong>' + byMonth + ' 감사 기간</strong>입니다.' : '감사 기간이 <strong>아닙니다</strong>.') +
+      '</div>';
+
+    h += '<div class="admin-card" style="max-width:720px">' +
+      '<h3 style="margin-top:0">손으로 열어 두기</h3>' +
+      '<p style="font-size:0.86rem;color:var(--gray-7)">' +
+      '3월·9월을 넘겨 감사를 마쳐야 할 때 켜 주세요. 켜 두는 동안에는 달과 상관없이 ' +
+      '감사부가 감사필을 찍을 수 있습니다. 감사를 마치면 <strong>꺼 주세요.</strong></p>' +
+      '<div class="field"><label>' +
+      '<input type="checkbox" id="aw-open"' + (v.open ? ' checked' : '') + '> ' +
+      '지금 감사 기간으로 열어 둔다</label></div>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 160px"><label>회기 연도</label>' +
+      '<input type="number" id="aw-year" min="2020" max="2100" value="' +
+      (v.year || now.getFullYear()) + '"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>봄·가을</label>' +
+      '<select id="aw-period">' +
+      ['봄', '가을'].map(function (x) {
+        return '<option' + ((v.period || byMonth || '봄') === x ? ' selected' : '') + '>' + x + '</option>';
+      }).join('') + '</select></div>' +
+      '</div>' +
+      '<div class="field"><label>메모 (선택 · 감사 칸에 함께 보입니다)</label>' +
+      '<input type="text" id="aw-note" value="' + e(v.note || '') +
+      '" placeholder="예: 3월 안에 마치지 못해 4월 10일까지 연장"></div>' +
+      '<button class="btn" id="aw-save">저장</button>' +
+      '<div class="form-msg" id="aw-msg"></div>' +
+      (v.at ? '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:10px">마지막 변경 : ' +
+        e(String(v.at).slice(0, 10)) + (v.by ? ' · ' + e(v.by) : '') + '</p>' : '') +
+      '</div>';
+
+    box.innerHTML = h;
+    document.getElementById('aw-save').addEventListener('click', function () {
+      var msg = document.getElementById('aw-msg');
+      var d = {
+        open: document.getElementById('aw-open').checked,
+        year: parseInt(document.getElementById('aw-year').value, 10) || now.getFullYear(),
+        period: document.getElementById('aw-period').value,
+        note: document.getElementById('aw-note').value.trim(),
+        by: user.name,
+        at: new Date().toISOString()
+      };
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      db.from('site_settings').upsert({ key: 'audit_window', value: d, updated_at: d.at })
+        .then(function (r) {
+          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          SHSCloud.log('update', '감사 기간 ' + (d.open ? '열기' : '닫기'),
+            d.year + '년 ' + d.period + (d.note ? ' / ' + d.note : ''));
+          if (window.SHSAuditMark) SHSAuditMark.forget();
+          loadAuditWindow();
+        });
+    });
+  }
 
   /* ---------- 시스템 알림 (현재 표시 중 + 전체 규칙) ---------- */
   function loadAlerts() {

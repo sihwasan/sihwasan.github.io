@@ -252,7 +252,8 @@ var SHSMinutesBox = (function () {
       });
     }
 
-    load();
+    /* 손으로 열어 둔 감사 기간이 있는지 먼저 읽고 그린다 */
+    SHSAuditMark.ready().then(load, load);
   }
 
   return { mount: mount };

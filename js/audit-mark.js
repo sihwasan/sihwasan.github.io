@@ -16,6 +16,8 @@ var SHSAuditMark = (function () {
   var SEAL_KEYS = ['감사부장', '감사부서기'];
   var seals = null;      /* 한 번 불러오면 담아 둔다 */
   var loading = null;
+  var override = null;   /* 노회 관리자가 손으로 열어 둔 감사 기간 */
+  var overLoading = null;
 
   function esc(s) {
     return String(s == null ? '' : s)
@@ -24,14 +26,50 @@ var SHSAuditMark = (function () {
   }
 
   /* ---------- 지금이 감사 기간인가 ----------
-   * 봄 정기노회 전 3월, 가을 정기노회 전 9월. */
+   * 봄 정기노회 전 3월, 가을 정기노회 전 9월에 저절로 열린다.
+   * 그 달 안에 감사를 마치지 못하는 일이 있으므로, 노회 관리자가
+   * 시스템 운영 화면에서 손으로 열어 둘 수도 있다. 손으로 열어 둔
+   * 것이 있으면 그것을 먼저 따른다. */
   function windowNow(now) {
     var d = now || new Date();
     var m = d.getMonth() + 1;
+    if (override && override.open) {
+      return {
+        open: true,
+        year: override.year || d.getFullYear(),
+        period: override.period || (m >= 7 ? '가을' : '봄'),
+        manual: true,
+        note: override.note || ''
+      };
+    }
     if (m === 3) return { open: true, year: d.getFullYear(), period: '봄' };
     if (m === 9) return { open: true, year: d.getFullYear(), period: '가을' };
     return { open: false, year: d.getFullYear(), period: null };
   }
+
+  /* 손으로 열어 둔 감사 기간을 서버에서 한 번 읽어 둔다.
+   * 감사 칸을 그리기 전에 불러 주면 된다. 못 읽어도 달력대로 움직인다. */
+  function ready() {
+    if (override) return Promise.resolve(override);
+    if (overLoading) return overLoading;
+    if (!(window.SHSCloud && SHSCloud.enabled())) {
+      override = { open: false };
+      return Promise.resolve(override);
+    }
+    overLoading = SHSCloud.init().then(function (c) {
+      return c.from('site_settings').select('value').eq('key', 'audit_window').single();
+    }).then(function (r) {
+      override = (r && r.data && r.data.value) || { open: false };
+      return override;
+    }).catch(function () {
+      override = { open: false };
+      return override;
+    });
+    return overLoading;
+  }
+
+  /* 설정을 고친 뒤 다시 읽게 한다 */
+  function forget() { override = null; overLoading = null; }
 
   /* ---------- 감사부 도장 ----------
    * 비공개 보관함에서 꺼내 그림 자체로 바꾼다.
@@ -104,7 +142,10 @@ var SHSAuditMark = (function () {
         h += '<button class="btn danger sm" data-audit-undo="' + esc(rec.id) + '">감사 표시 풀기</button>';
       }
     } else if (opts.isAuditor && w.open) {
-      h += '<div class="audit-head">' + w.year + '년 ' + w.period + ' 감사 기간입니다.</div>' +
+      h += '<div class="audit-head">' + w.year + '년 ' + w.period + ' 감사 기간입니다.' +
+        (w.manual ? ' <span style="font-size:0.82rem;color:var(--gray-5)">' +
+          '(노회 관리자가 열어 둔 기간' + (w.note ? ' · ' + esc(w.note) : '') + ')</span>' : '') +
+        '</div>' +
         '<div class="field"><label>감사 의견 (선택)</label>' +
         '<input type="text" data-audit-opinion="' + esc(rec.id) + '" ' +
         'placeholder="예: 이상 없음"></div>' +
@@ -113,7 +154,9 @@ var SHSAuditMark = (function () {
     } else if (opts.isAuditor) {
       h += '<div class="audit-head">아직 감사 전입니다.</div>' +
         '<div class="audit-note">감사는 <strong>3월(봄)</strong>과 <strong>9월(가을)</strong>에 시행합니다. ' +
-        '지금은 감사 기간이 아니어서 감사필 처리를 할 수 없습니다.</div>';
+        '지금은 감사 기간이 아니어서 감사필 처리를 할 수 없습니다.<br>' +
+        '기간을 넘겨 감사해야 한다면 노회 관리자가 ' +
+        '<strong>시스템 운영 → 감사 기간</strong>에서 열어 드릴 수 있습니다.</div>';
     } else {
       h += '<div class="audit-head">아직 감사 전입니다.</div>' +
         '<div class="audit-note">감사는 봄·가을 정기노회 전에 감사부가 시행합니다.</div>';
@@ -209,6 +252,8 @@ var SHSAuditMark = (function () {
   function locked(rec) { return !!(rec && rec.audited_yn); }
 
   return {
+    ready: ready,
+    forget: forget,
     windowNow: windowNow,
     loadSeals: loadSeals,
     panel: panel,

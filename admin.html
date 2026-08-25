@@ -149,6 +149,8 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div id="elder-area"><p style="color:var(--gray-5)">장로 총대를 불러오는 중...</p></div>';
       html += '<h2>총회 총대</h2>';
       html += '<div id="delegate-area"><p style="color:var(--gray-5)">총대 명단을 불러오는 중...</p></div>';
+      html += '<h2>이사 관리</h2>';
+      html += '<div id="board-area"><p style="color:var(--gray-5)">이사 명단을 불러오는 중...</p></div>';
       html += '<h2>시찰회 관리</h2>';
       html += '<div id="sichal-area"><p style="color:var(--gray-5)">시찰 정보를 불러오는 중...</p></div>';
       html += '<h2>상비부 배정 관리</h2>';
@@ -165,6 +167,7 @@ document.addEventListener('DOMContentLoaded', function () {
       renderRoster();
       renderElders();
       renderDelegates();
+      renderBoards();
       renderSichals();
       renderCommittees();
 
@@ -708,6 +711,125 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 총회 총대 관리 ----------
    * 근거: 노회규칙 제16조 (총대)
    * 노회장과 장로부노회장은 자동총대, 그 외는 선거관리위원회 내규에 따라 선정 */
+  /* ---------- 이사 관리 ----------
+   * 총회 실행위원·총신대 운영이사·GMS 이사·기독신문 이사.
+   * 총대와 마찬가지로 정기노회에서 선정하므로 같은 모양으로 관리한다. */
+  var BKINDS = ['총회 실행위원', '총신대 운영이사', 'GMS 이사', '기독신문 이사'];
+
+  function renderBoards() {
+    var box = document.getElementById('board-area');
+    if (!box) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('board_members').select('*').order('sort').order('id');
+    }).then(function (r) {
+      if (r.error) {
+        box.innerHTML = '<div class="notice-banner">이사 명단을 불러오지 못했습니다: ' + e(r.error.message) +
+          '<br><span style="font-size:0.85rem;color:var(--gray-5)">' +
+          'Supabase에서 <strong>37_boards_and_audit_window.sql</strong>을 먼저 실행해 주세요.</span></div>';
+        return;
+      }
+      var rows = r.data || [];
+      var html = '<p>정기노회에서 선정한 이사입니다. 조직 페이지의 <strong>이사</strong> 표에 그대로 나옵니다.</p>';
+
+      html += '<table class="tbl"><thead><tr><th style="width:170px">구분</th>' +
+        '<th style="width:130px">성명</th><th style="width:100px">직분</th>' +
+        '<th>소속 교회</th><th style="width:150px">자격 시작</th>' +
+        '<th style="width:70px">표시</th><th style="width:130px">관리</th></tr></thead><tbody>';
+      if (!rows.length) {
+        html += '<tr><td colspan="7" style="color:var(--gray-5)">등록된 이사가 없습니다.</td></tr>';
+      }
+      rows.forEach(function (b) {
+        html += '<tr' + (b.active ? '' : ' style="opacity:.5"') + ' data-brow="' + b.id + '">' +
+          '<td><select data-bf="kind">' + BKINDS.map(function (k) {
+            return '<option' + (b.kind === k ? ' selected' : '') + '>' + e(k) + '</option>';
+          }).join('') + '</select></td>' +
+          '<td><input type="text" data-bf="name" value="' + e(b.name) + '"></td>' +
+          '<td><select data-bf="position">' + ['목사', '장로'].map(function (k) {
+            return '<option' + (b.position === k ? ' selected' : '') + '>' + k + '</option>';
+          }).join('') + '</select></td>' +
+          '<td><input type="text" data-bf="church" value="' + e(b.church || '') + '"></td>' +
+          '<td><input type="date" data-bf="term_from" value="' + e(b.term_from || '') + '"></td>' +
+          '<td><input type="checkbox" data-bf="active"' + (b.active ? ' checked' : '') + '></td>' +
+          '<td><button class="btn sm" data-bsave="' + b.id + '">저장</button> ' +
+          '<button class="btn danger sm" data-bdel="' + b.id + '" data-bname="' + e(b.name) + '">삭제</button></td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+
+      html += '<div class="admin-card" style="max-width:860px"><h3 style="margin-top:0">이사 추가</h3>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 170px"><label>구분</label><select id="bn-kind">' +
+        BKINDS.map(function (k) { return '<option>' + e(k) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="bn-name"></div>' +
+        '<div class="field" style="flex:0 0 110px"><label>직분</label>' +
+        '<select id="bn-pos"><option>목사</option><option>장로</option></select></div>' +
+        '<div class="field"><label>소속 교회</label><input type="text" id="bn-church"></div>' +
+        '<div class="field" style="flex:0 0 160px"><label>자격 시작</label><input type="date" id="bn-from"></div>' +
+        '<button class="btn" id="bn-add">추가</button>' +
+        '</div><div class="form-msg" id="bn-msg"></div></div>';
+
+      box.innerHTML = html;
+
+      function rowData(tr) {
+        var d = {};
+        tr.querySelectorAll('[data-bf]').forEach(function (el) {
+          d[el.dataset.bf] = el.type === 'checkbox' ? el.checked : (el.value.trim() || null);
+        });
+        d.updated_at = new Date().toISOString();
+        d.updated_by = user.name;
+        return d;
+      }
+
+      box.querySelectorAll('button[data-bsave]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var tr = box.querySelector('tr[data-brow="' + btn.dataset.bsave + '"]');
+          var d = rowData(tr);
+          if (!d.name) { alert('성명을 입력해 주세요.'); return; }
+          SHSCloud.init().then(function (c) {
+            return c.from('board_members').update(d).eq('id', btn.dataset.bsave);
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('update', '이사 수정', d.kind + ' ' + d.name);
+            renderBoards();
+          });
+        });
+      });
+      box.querySelectorAll('button[data-bdel]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (!confirm('"' + btn.dataset.bname + '" 이사를 명단에서 지우시겠습니까?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('board_members').delete().eq('id', btn.dataset.bdel);
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('delete', '이사 삭제', btn.dataset.bname);
+            renderBoards();
+          });
+        });
+      });
+      document.getElementById('bn-add').addEventListener('click', function () {
+        var msg = document.getElementById('bn-msg');
+        var d = {
+          kind: document.getElementById('bn-kind').value,
+          name: document.getElementById('bn-name').value.trim(),
+          position: document.getElementById('bn-pos').value,
+          church: document.getElementById('bn-church').value.trim() || null,
+          term_from: document.getElementById('bn-from').value || null,
+          sort: (rows.length + 1) * 10,
+          updated_by: user.name
+        };
+        if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명을 입력해 주세요.'; return; }
+        msg.className = 'form-msg'; msg.textContent = '추가하는 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.from('board_members').insert(d);
+        }).then(function (res) {
+          if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+          SHSCloud.log('create', '이사 추가', d.kind + ' ' + d.name);
+          renderBoards();
+        });
+      });
+    });
+  }
+
   var DKINDS = ['목사 정총대', '목사 부총대', '장로 정총대', '장로 부총대'];
 
   function renderDelegates() {

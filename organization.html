@@ -44,6 +44,13 @@
     <table class="tbl" style="max-width:720px">
       <tbody id="delegates-body"></tbody>
     </table>
+
+    <h2>이사</h2>
+    <p>제19회 정기노회에서 선정한 이사입니다.</p>
+    <table class="tbl" style="max-width:720px">
+      <thead><tr><th style="width:170px">구분</th><th style="width:150px">성명</th><th>소속 교회</th></tr></thead>
+      <tbody id="boards-body"><tr><td colspan="3" style="color:var(--gray-5)">불러오는 중...</td></tr></tbody>
+    </table>
   </div>
 
   <!-- 회원명단 -->
@@ -198,19 +205,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
   renderDelegates(SHSData.delegates);
 
+  /* 이사 — 정회원만 볼 수 있으므로, 못 읽으면 안내만 남긴다 */
+  var BOARD_ORDER = ['총회 실행위원', '총신대 운영이사', 'GMS 이사', '기독신문 이사'];
+  function renderBoards(rows) {
+    var bb = document.getElementById('boards-body');
+    if (!bb) return;
+    if (!rows || !rows.length) {
+      bb.innerHTML = '<tr><td colspan="3" style="color:var(--gray-5)">' +
+        '이사 명단은 정회원 로그인 후 보실 수 있습니다.</td></tr>';
+      return;
+    }
+    var sorted = rows.slice().sort(function (a, b) {
+      var d = BOARD_ORDER.indexOf(a.kind) - BOARD_ORDER.indexOf(b.kind);
+      return d !== 0 ? d : (a.sort || 0) - (b.sort || 0);
+    });
+    bb.innerHTML = sorted.map(function (x) {
+      return '<tr><td>' + e(x.kind) + '</td>' +
+        '<td>' + mlink(x.name, x.church) +
+        (x.position ? ' <span style="font-size:0.78rem;color:var(--gray-5)">' + e(x.position) + '</span>' : '') +
+        (x.title ? ' <span style="font-size:0.78rem;color:var(--gray-5)">(' + e(x.title) + ')</span>' : '') +
+        '</td><td>' + e(x.church || '-') + '</td></tr>';
+    }).join('');
+  }
+  renderBoards(null);   /* 서버 명단이 오기 전에는 안내만 보인다 */
+
   /* 관리자가 사이트 관리에서 수정한 임원 명부가 서버에 있으면 그것으로 교체 */
   if (window.SHSCloud && SHSCloud.enabled()) {
     SHSCloud.init().then(function (c) {
       if (!c) return;
       return Promise.all([
         c.from('site_settings').select('*').in('key', ['officers', 'delegates']),
-        c.from('delegates').select('*').eq('active', true).order('kind').order('sort')
+        c.from('delegates').select('*').eq('active', true).order('kind').order('sort'),
+        c.from('board_members').select('*').eq('active', true).order('sort')
+          .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
       ((rs[0] && rs[0].data) || []).forEach(function (row) {
         if (row.key === 'officers' && row.value && row.value.length) renderOfficers(row.value);
         if (row.key === 'delegates' && row.value) renderDelegates(row.value);
       });
+      renderBoards((rs[2] && rs[2].data) || []);
       /* 총대 표는 서버 명단이 있으면 그것으로 바꾼다 (소속 교회·자격 기간 포함) */
       var dg = (rs[1] && rs[1].data) || [];
       if (dg.length) renderDelegateRows(dg);
