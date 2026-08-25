@@ -858,6 +858,35 @@ td.sat .cal-d { color: #2a4d8f; }
   .cert-sheet { border: 2px solid #000; margin: 0 auto; }
 }
 
+/* ---------- 내가 맡은 일 ---------- */
+.duty-card { border: 1px solid var(--gray-2); }
+.duty-row { display: flex; border-bottom: 1px solid var(--gray-2); }
+.duty-row:last-child { border-bottom: none; }
+.duty-k {
+  flex: 0 0 110px; padding: 13px 16px; background: var(--gray-1);
+  color: var(--navy); font-size: 0.88rem; font-weight: 500;
+  border-right: 1px solid var(--gray-2);
+}
+.duty-v { flex: 1; padding: 13px 16px; font-size: 0.93rem; color: var(--gray-7); }
+.duty-v a { color: var(--navy); text-decoration: underline; }
+.duty-line { margin-bottom: 6px; }
+.duty-line:last-child { margin-bottom: 0; }
+.duty-tag {
+  display: inline-block; font-size: 0.76rem; padding: 1px 8px;
+  border: 1px solid var(--navy); color: var(--navy); vertical-align: middle;
+}
+.duty-tag.plain, .duty-plain {
+  display: inline-block; font-size: 0.76rem; padding: 1px 8px;
+  border: 1px solid var(--gray-3); color: var(--gray-5); vertical-align: middle;
+}
+.duty-none { color: var(--gray-5); }
+
+@media (max-width: 560px) {
+  .duty-row { display: block; }
+  .duty-k { border-right: none; border-bottom: 1px solid var(--gray-2); padding: 9px 14px; }
+  .duty-v { padding: 11px 14px; }
+}
+
 /* ---------- 감사필 · 회계 장부 ---------- */
 .audit-box {
   border: 1px solid var(--gray-2); border-left: 3px solid var(--gray-3);

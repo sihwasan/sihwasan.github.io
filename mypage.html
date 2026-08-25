@@ -24,6 +24,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/my-duties.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var user = SHSAuth.currentUser();
@@ -90,6 +91,10 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="form-msg" id="q-msg"></div>' +
       '</div>';
 
+    /* 내가 노회에서 맡은 일 — 시찰과 상비부, 그 안에서의 직책 */
+    html += '<h2>노회에서 맡은 일</h2>';
+    html += '<div id="duty-area" style="max-width:620px"></div>';
+
     /* 내 사진: 회원명단 카드에 보여진다 */
     html += '<h2>내 사진</h2>';
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
@@ -148,6 +153,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     area.innerHTML = html;
     setupPhoto();
+    SHSMyDuties.mount(document.getElementById('duty-area'), p);
 
     /* ---------- 내 사진 올리기 ----------
      * 끌어다 놓거나 눌러서 선택하면 캔버스로 웹 크기(긴 변 480px, JPEG)로
