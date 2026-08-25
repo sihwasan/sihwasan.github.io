@@ -886,6 +886,8 @@ td.sat .cal-d { color: #2a4d8f; }
 .np-item .np-n { font-weight: 700; color: var(--navy); min-width: 62px; }
 .np-item .np-p { font-size: 0.8rem; color: var(--gray-5); min-width: 58px; }
 .np-item .np-c { font-size: 0.86rem; color: var(--gray-7); }
+.np-warn { font-size: 0.82rem; color: var(--red); margin-top: 5px; }
+input.np-bad { border-color: var(--red); }
 
 /* ---------- 대시보드 ----------
  * 로그인해서 가장 오래 머무는 화면이므로 글자를 조금 크게 두었다. */

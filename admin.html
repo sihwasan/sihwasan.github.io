@@ -1151,21 +1151,34 @@ document.addEventListener('DOMContentLoaded', function () {
           var name = b.dataset.cmsave;
           var card = box.querySelector('div[data-cmt="' + name + '"]');
           var upd = { updated_at: new Date().toISOString() };
+          /* 적힌 이름을 회원 명부와 맞춰 늘 같은 모양으로 저장한다.
+           * 명부에 없는 이름은 그대로 저장하되 누구인지 알려 준다. */
+          var miss = [];
           card.querySelectorAll('input[data-f]').forEach(function (inp) {
-            upd[inp.dataset.f] = inp.value.trim();
+            var f = inp.dataset.f;
+            var r = SHSNames.fix(inp.value, {
+              multi: (f === 'y1' || f === 'y2' || f === 'y3'),
+              style: (f === 'y1' || f === 'y2' || f === 'y3') ? 'plain' : 'withPos'
+            });
+            inp.value = r.value;
+            upd[f] = r.value;
+            r.unknown.forEach(function (x) { if (miss.indexOf(x) === -1) miss.push(x); });
           });
           var msg = box.querySelector('span[data-cmmsg="' + name + '"]');
           SHSCloud.init().then(function (c) {
-            return c.from('committees').update(upd).eq('name', name);
+            return c.from('committees').update(upd).eq('name', name).select();
           }).then(function (res) {
-            if (res.error) {
+            var w = SHS.wrote(res);
+            if (!w.ok) {
               msg.className = 'form-msg err';
-              msg.textContent = res.error.message;
+              msg.textContent = w.why;
               return;
             }
             SHSCloud.log('update', '상비부 배정 수정', name);
-            msg.className = 'form-msg ok';
-            msg.textContent = '저장되었습니다.';
+            msg.className = miss.length ? 'form-msg err' : 'form-msg ok';
+            msg.textContent = miss.length
+              ? '저장했습니다. 다만 회원 명부에 없는 이름이 있습니다 — ' + miss.join(', ')
+              : '저장되었습니다. (회원 명부와 모두 맞습니다)';
           });
         });
       });

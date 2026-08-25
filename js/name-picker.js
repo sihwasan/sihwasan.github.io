@@ -69,15 +69,43 @@ var SHSNames = (function () {
     return (rows || []).filter(function (r) { return r.name === n; })[0] || null;
   }
 
-  /* ---------- 후보 고르기 ---------- */
+  /* ---------- 후보 고르기 ----------
+   * 적힌 그대로('이재용 목사')도 찾아야 한다. 칸에 이미 이름이 들어 있는
+   * 채로 눌렀을 때 후보가 하나도 안 뜨면 명부와 이어져 있지 않은 것처럼
+   * 보이기 때문이다. 그래도 못 찾으면 이름만 떼어 다시 찾는다. */
+  function hay(r) {
+    return [r.name, r.position, r.church].filter(Boolean).join(' ');
+  }
   function match(q) {
     var s = String(q || '').trim();
     if (!s) return (rows || []).slice(0, 20);
-    return (rows || []).filter(function (r) {
-      return (r.name || '').indexOf(s) !== -1
-          || (r.church || '').indexOf(s) !== -1
-          || (r.position || '').indexOf(s) !== -1;
-    }).slice(0, 20);
+    var hit = (rows || []).filter(function (r) { return hay(r).indexOf(s) !== -1; });
+    if (!hit.length) {
+      var n = nameOf(s);
+      if (n && n !== s) hit = (rows || []).filter(function (r) { return (r.name || '').indexOf(n) !== -1; });
+    }
+    return hit.slice(0, 20);
+  }
+
+  /* ---------- 명부와 맞추기 ----------
+   * 적힌 이름을 명부에서 찾아 늘 같은 모양으로 고쳐 준다.
+   * 명부에 없는 이름은 그대로 두고 알려만 준다. */
+  function fix(value, opts) {
+    opts = opts || {};
+    var style = opts.style || (opts.multi ? 'plain' : 'withPos');
+    var parts = opts.multi
+      ? String(value || '').split(',')
+      : [String(value || '')];
+    var unknown = [];
+    var out = parts.map(function (x) {
+      var t = String(x || '').trim();
+      if (!t) return '';
+      var r = find(t);
+      if (r) return format(r, style);
+      unknown.push(nameOf(t));
+      return t;
+    }).filter(function (x) { return x; });
+    return { value: out.join(opts.multi ? ', ' : ''), unknown: unknown };
   }
 
   /* ---------- 칸에 붙이기 ---------- */
@@ -105,7 +133,26 @@ var SHSNames = (function () {
     box.setAttribute('role', 'listbox');
     wrap.appendChild(box);
 
+    /* 명부에 없는 이름을 적었을 때 알려 주는 자리 */
+    var warn = document.createElement('div');
+    warn.className = 'np-warn hidden';
+    wrap.appendChild(warn);
+
     var list = [], active = -1;
+
+    /* 적힌 이름을 명부와 맞춰 보고, 없는 이름이 있으면 알려 준다 */
+    function verify() {
+      if (!rows || !rows.length) { warn.classList.add('hidden'); return; }
+      var r = fix(input.value, { multi: multi, style: style });
+      if (r.value !== input.value) input.value = r.value;
+      if (r.unknown.length) {
+        warn.textContent = '회원 명부에 없는 이름입니다 — ' + r.unknown.join(', ');
+        warn.classList.remove('hidden');
+      } else {
+        warn.classList.add('hidden');
+      }
+      input.classList.toggle('np-bad', !!r.unknown.length);
+    }
 
     /* 여러 사람 칸에서는 마지막 쉼표 뒤가 지금 적는 부분이다 */
     function head() {
@@ -189,8 +236,12 @@ var SHSNames = (function () {
             .filter(function (x) { return x; })
             .join(', ');
         }
+        verify();
       }, 120);
     });
+
+    /* 처음 그릴 때 이미 적혀 있던 이름도 한 번 맞춰 본다 */
+    ready().then(verify);
   }
 
   /* 한 화면에 있는 칸을 한꺼번에 붙인다.
@@ -214,6 +265,7 @@ var SHSNames = (function () {
     attach: attach,
     attachAll: attachAll,
     find: find,
+    fix: fix,
     nameOf: nameOf,
     format: format,
     all: function () { return (rows || []).slice(); }
