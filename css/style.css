@@ -858,6 +858,24 @@ td.sat .cal-d { color: #2a4d8f; }
   .cert-sheet { border: 2px solid #000; margin: 0 auto; }
 }
 
+/* ---------- 관내 교회 카드 ---------- */
+.ch-card { cursor: pointer; position: relative; transition: border-color .12s, box-shadow .12s; }
+.ch-card:hover, .ch-card:focus {
+  border-color: var(--navy); box-shadow: 0 2px 10px rgba(23, 51, 95, 0.10); outline: none;
+}
+.ch-card.open { border-color: var(--navy); box-shadow: inset 3px 0 0 var(--navy); }
+.ch-card.mine { background: #f7f9fc; }
+.ch-mine {
+  display: inline-block; font-size: 0.7rem; padding: 1px 7px; vertical-align: middle;
+  border: 1px solid var(--navy); color: var(--navy); font-weight: 500;
+}
+.ch-has { font-size: 0.8rem; color: var(--navy); }
+.ch-more {
+  margin-top: 8px; font-size: 0.78rem; color: var(--gray-5);
+  border-top: 1px dashed var(--gray-2); padding-top: 8px;
+}
+.ch-card:hover .ch-more, .ch-card.open .ch-more { color: var(--navy); }
+
 /* ---------- 회의록 (개회 예배 · 결의 사항) ---------- */
 .mn-sub {
   margin: 20px 0 8px; padding-bottom: 6px; color: var(--navy);
