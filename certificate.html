@@ -25,7 +25,9 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/certs-config.js"></script>
 <script src="js/certificate.js"></script>
+<script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -82,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
     dl.addEventListener('click', function () {
       dl.disabled = true;
       dl.textContent = 'PDF 만드는 중...';
-      SHSCert.downloadPdf(rec).then(function () {
+      SHSCerts.get(rec).then(function () {
         dl.disabled = false;
         dl.textContent = 'PDF 다운로드';
         SHS.logAction('view', '증명서 PDF 저장', rec.doc_no + ' ' + rec.doc_type);

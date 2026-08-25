@@ -25,7 +25,9 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/certs-config.js"></script>
 <script src="js/certificate.js"></script>
+<script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -350,19 +352,44 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       t.innerHTML = '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th>' +
         '<th>대상자</th><th>교회</th><th>용도</th><th>발급자</th><th>날인</th>' +
-        '<th style="width:190px">증명서</th></tr></thead><tbody>' +
+        '<th style="width:270px">증명서</th></tr></thead><tbody>' +
         rows.map(function (d) {
           var sealed = Object.keys(d.seals || {}).join(', ');
+          /* 보관본이 있으면 발급 당시 그 파일을 그대로 내려받고,
+           * 없으면 예전처럼 그때그때 새로 그려서 내려받는다. */
+          var kept = window.SHSCerts && SHSCerts.stored(d) && !d.void_yn;
           return '<tr' + (d.void_yn ? ' style="opacity:.55"' : '') + '>' +
             '<td>' + e(d.doc_no) + (d.void_yn ? ' <span class="fail">(무효)</span>' : '') + '</td>' +
             '<td>' + e(d.issued_on) + '</td><td>' + e(d.doc_type) + '</td>' +
             '<td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose || '-') + '</td>' +
             '<td>' + e(d.issuer_name || '-') + '</td><td>' + e(sealed || '-') + '</td>' +
-            '<td><a class="btn sm" href="certificate.html?id=' + d.id + '" target="_blank" rel="noopener">열기</a>' +
+            '<td><button class="btn sm" data-pdf="' + d.id + '">PDF</button> ' +
+            '<a class="btn ghost sm" href="certificate.html?id=' + d.id + '" target="_blank" rel="noopener">열기</a>' +
             (d.void_yn ? '' : ' <button class="btn danger sm" data-void="' + d.id + '">취소</button>') +
             ' <button class="btn danger sm" data-del="' + d.id + '">삭제</button>' +
+            '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' +
+            (kept ? '보관본 있음' : '보관본 없음 · 내려받을 때 새로 만듭니다') + '</div>' +
             '</td></tr>';
         }).join('') + '</tbody></table>';
+
+      /* 발급 대장에서 바로 PDF 내려받기 */
+      t.querySelectorAll('button[data-pdf]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var d = rows.filter(function (x) { return String(x.id) === b.dataset.pdf; })[0];
+          if (!d) return;
+          b.disabled = true;
+          b.textContent = '만드는 중...';
+          SHSCerts.get(d).then(function () {
+            b.disabled = false;
+            b.textContent = 'PDF';
+            SHS.logAction('view', '증명서 PDF 저장', d.doc_no + ' ' + d.doc_type);
+          }, function (x) {
+            b.disabled = false;
+            b.textContent = 'PDF';
+            alert((x && x.message) || 'PDF를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
+          });
+        });
+      });
 
       t.querySelectorAll('button[data-void]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -386,7 +413,13 @@ document.addEventListener('DOMContentLoaded', function () {
           if (!confirm(label + '\n\n이 발급 기록을 완전히 삭제합니다.\n' +
             '무효 처리와 달리 발급 대장에서 사라지고 신청자도 더 이상 내려받을 수 없습니다.\n' +
             '삭제하시겠습니까?')) return;
-          SHSCloud.init().then(function (c) {
+          /* 발급 기록을 지우기 전에 보관소의 PDF부터 치운다.
+           * (무효 처리와 달리 기록 자체가 사라지므로 파일도 남기지 않는다) */
+          var gone = (window.SHSCerts && SHSCerts.enabled())
+            ? SHSCerts.remove(b.dataset.del) : Promise.resolve(false);
+          gone.then(function () {
+            return SHSCloud.init();
+          }).then(function (c) {
             return c.from('doc_issues').delete().eq('id', parseInt(b.dataset.del, 10));
           }).then(function (res) {
             if (res.error) { alert(res.error.message); return; }
@@ -480,12 +513,37 @@ document.addEventListener('DOMContentLoaded', function () {
       loadRequests();
       renderCert(rec);
       document.getElementById('cert-print').scrollIntoView({ behavior: 'smooth' });
+      /* 방금 만든 증명서를 노회 보관소에 남긴다.
+       * 올리지 못해도 발급은 그대로이고, 내려받기도 예전 방식으로 된다. */
+      keepPdf(rec, msg);
     }).catch(function (x) {
       btn.disabled = false;
       msg.className = 'form-msg err';
       msg.textContent = (x && x.message) || '발급하지 못했습니다.';
     });
   });
+
+  /* 발급된 증명서 PDF를 노회 보관소에 올린다.
+   * 발급은 이미 끝난 뒤이므로, 여기서 실패해도 발급을 되돌리지 않는다.
+   * 보관에 실패한 건은 내려받을 때 예전처럼 새로 그려 준다. */
+  function keepPdf(rec, msg) {
+    if (!(window.SHSCerts && SHSCerts.enabled())) return;
+    var note = document.createElement('div');
+    note.style.cssText = 'font-size:0.82rem;color:var(--gray-5);margin-top:6px';
+    note.textContent = '증명서를 노회 보관소에 올리는 중입니다...';
+    msg.appendChild(note);
+    SHSCerts.keep(rec).then(function (out) {
+      if (SHSCerts.stored(out)) {
+        note.textContent = '증명서를 노회 보관소에 보관했습니다. ' +
+          '신청자는 발급 당시 모습 그대로 내려받습니다.';
+        renderLog();
+      } else {
+        note.style.color = 'var(--red)';
+        note.textContent = '증명서는 발급되었습니다. 다만 보관소에 올리지는 못했습니다. ' +
+          '내려받을 때 그때그때 새로 만들어 드리므로 이용에는 지장이 없습니다.';
+      }
+    });
+  }
 
   function renderCert(rec) {
     var c = document.getElementById('cert-print');
@@ -503,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (dl) dl.addEventListener('click', function () {
       dl.disabled = true;
       dl.textContent = 'PDF 만드는 중...';
-      SHSCert.downloadPdf(rec).then(function () {
+      SHSCerts.get(rec).then(function () {
         dl.disabled = false;
         dl.textContent = 'PDF 다운로드';
       }, function (x) {

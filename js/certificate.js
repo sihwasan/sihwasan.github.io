@@ -170,7 +170,9 @@ var SHSCert = (function () {
     });
   }
 
-  function downloadPdf(rec) {
+  /* 증명서를 화면 밖에 A4로 그려 놓고 PDF 만들 준비를 마친다.
+   * 준비가 끝나면 make(작업) 을 불러 주고, 끝나면 무대를 치운다. */
+  function onStage(rec, make) {
     return loadTool().then(function (html2pdf) {
       var stage = document.createElement('div');
       stage.className = 'cert-pdf-stage';
@@ -184,17 +186,27 @@ var SHSCert = (function () {
       var fonts = (document.fonts && document.fonts.ready)
         ? document.fonts.ready.then(null, function () {}) : Promise.resolve();
       return Promise.all(seals.concat([fonts])).then(function () {
-        return html2pdf().set({
+        return make(html2pdf().set({
           margin: 0,
           filename: fileName(rec) + '.pdf',
           image: { type: 'jpeg', quality: 0.98 },
           /* scrollX·scrollY 0: 화면이 내려가 있어도 증명서가 밀리지 않게 한다 */
           html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(stage.firstChild).save();
-      }).then(function () { stage.remove(); },
+        }).from(stage.firstChild));
+      }).then(function (out) { stage.remove(); return out; },
         function (x) { stage.remove(); throw x; });
     });
+  }
+
+  function downloadPdf(rec) {
+    return onStage(rec, function (w) { return w.save(); });
+  }
+
+  /* 파일로 떨어뜨리지 않고 PDF 알맹이만 만들어 돌려준다.
+   * 발급하는 순간 이것을 노회 보관소에 올려 둔다. */
+  function pdfBlob(rec) {
+    return onStage(rec, function (w) { return w.outputPdf('blob'); });
   }
 
   return {
@@ -203,6 +215,7 @@ var SHSCert = (function () {
     dateKo: dateKo,
     fileName: fileName,
     print: print,
-    downloadPdf: downloadPdf
+    downloadPdf: downloadPdf,
+    pdfBlob: pdfBlob
   };
 })();
