@@ -90,6 +90,12 @@
 
     <h3>장로 총대</h3>
     <div id="elders-body"></div>
+
+    <h3>직원</h3>
+    <table class="tbl" style="max-width:640px">
+      <thead><tr><th>번호</th><th>성명</th><th>소속</th><th>비고</th></tr></thead>
+      <tbody id="staff-body"></tbody>
+    </table>
   </div>
 
   <!-- 시찰회 -->
@@ -294,6 +300,11 @@ document.addEventListener('DOMContentLoaded', function () {
       return canSee ? mlink(nm, ch) : e(SHS.maskName(nm));
     }).join(', ');
 
+    fill('staff-body', (D.staff || []).map(function (m, i) {
+      return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td><td>' + e(m.church) +
+        '</td><td>' + e(m.retired || '') + '</td></tr>';
+    }).join(''));
+
     var eldersHtml = '';
     Object.keys(D.elders || {}).forEach(function (k) {
       var list = D.elders[k] || [];
@@ -328,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 서버 명단을 분류별로 묶어 화면이 쓰는 모양으로 바꾼다 */
   function groupRoster(rows) {
     var D = { seniorPastors: [], retiredPastors: [], pastors: [], assocPastors: [],
-              pastorsWithoutCharge: [], elders: {} };
+              pastorsWithoutCharge: [], elders: {}, staff: [] };
     rows.forEach(function (r) {
       var m = { name: r.name, church: r.church, retired: r.note || '' };
       switch (r.category) {
@@ -340,6 +351,7 @@ document.addEventListener('DOMContentLoaded', function () {
           var k = r.sichal || '기타';
           (D.elders[k] = D.elders[k] || []).push(m);
           break;
+        case '직원':     D.staff.push(m); break;
         case '목사':     D.pastors.push(m); break;
       }
     });

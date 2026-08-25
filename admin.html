@@ -293,6 +293,8 @@ document.addEventListener('DOMContentLoaded', function () {
    * 서기·노회장·간사는 홈페이지 관리 권한을 함께 갖는다. */
   var GRADES = [
     { v: 'pending', t: '승인대기', role: 'pending', title: null },
+    /* 총회 정년(만 70세)이 지나면 정회원이 아니라 일반회원이 된다 */
+    { v: 'general', t: '일반회원', role: 'general', title: null },
     { v: 'member', t: '정회원', role: 'member', title: null },
     { v: 'staff', t: '간사', role: 'staff', title: '간사' },
     { v: 'officer:회록부서기', t: '회록부서기', role: 'officer', title: '회록부서기' },
@@ -327,17 +329,47 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 노회 명단 관리 (추가·수정·삭제) ---------- */
-  var ROSTER_ROLES = { member: '정회원', officer: '임원', president: '노회장', clerk: '서기', staff: '간사' };
+  var ROSTER_ROLES = { member: '정회원', general: '일반회원', officer: '임원',
+                       president: '노회장', clerk: '서기', staff: '간사', pending: '승인대기' };
 
-  var CATEGORIES = ['목사', '부목사', '원로목사', '은퇴목사', '무임목사', '장로'];
+  /* 정년(만 70세)이 지났는가 — SHS 의 판정을 그대로 쓴다 */
+  function overAge(birth) {
+    var rd = SHS.retireDate(birth);
+    return !!(rd && rd <= new Date());
+  }
+  /* 명단 한 줄의 등급 고르개 값.
+   * 총회 정년(만 70세)이 지난 분은 정회원·임원 대신 일반회원으로 보여 준다. */
+  function rosterGrade(m) {
+    var v = (m.role === 'officer' && m.officer_title) ? 'officer:' + m.officer_title
+                                                      : (m.role || 'member');
+    if (overAge(m.birth_date) && ['member', 'officer'].indexOf(parseGrade(v).role) !== -1) {
+      return 'general';
+    }
+    return v;
+  }
+  function gradeOptions(v) {
+    return assignable().map(function (g) {
+      return '<option value="' + g.v + '"' + (g.v === v ? ' selected' : '') + '>' + e(g.t) + '</option>';
+    }).join('');
+  }
+
+  /* 직분 — 예전의 <직분>과 <조직 분류>를 하나로 합쳤다.
+   * 노회 사무실 간사는 <직원>으로 둔다. */
+  var CATEGORIES = ['목사', '부목사', '원로목사', '은퇴목사', '무임목사', '장로', '직원'];
 
   /* 시무 교회가 없는 분류는 교회 칸을 비우면 이 말이 대신 들어간다.
    * (명단은 교회 칸을 비워 둘 수 없으므로 상태를 적어 둔다) */
-  var NO_CHURCH = { '무임목사': '무임', '은퇴목사': '은퇴', '원로목사': '원로' };
+  var NO_CHURCH = { '무임목사': '무임', '은퇴목사': '은퇴', '원로목사': '원로',
+                    '직원': '노회 사무실' };
+
+  /* 직원(간사)은 노회 사무실 일을 맡으므로 관리자 등급을 함께 갖는다 */
+  var AUTO_GRADE = { '직원': 'staff' };
   function churchFor(church, category) {
     if (church) return church;
     return NO_CHURCH[category] || '';
   }
+
+  var rosterFlash = '';   /* 저장 뒤 다시 그려도 남겨 둘 알림말 */
 
   function renderRoster() {
     var box = document.getElementById('roster-area');
@@ -367,9 +399,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var html = '';
       html += '<div class="notice-banner">여기서 고친 내용은 <strong>조직 페이지의 회원명단</strong>에 바로 반영됩니다. ' +
-        '<strong>조직 분류</strong>를 정해 주셔야 조직 페이지에 나타납니다. ' +
-        '시무 교회를 사임하신 분은 조직 분류를 <strong>무임목사·은퇴목사·원로목사</strong>로 바꾸시면 ' +
-        '교회 칸을 비워 두셔도 저장됩니다. ' +
+        '<strong>직분</strong>을 정해 주셔야 조직 페이지에 나타납니다. ' +
+        '시무 교회를 사임하신 분은 직분을 <strong>무임목사·은퇴목사·원로목사</strong>로 바꾸시면 ' +
+        '교회 칸을 비워 두셔도 저장됩니다. 노회 사무실 간사는 <strong>직원</strong>으로 두십니다. ' +
         '<a href="organization.html" target="_blank" style="color:var(--navy);text-decoration:underline">조직 페이지 보기</a></div>';
       if (!hasOrg) {
         html += '<div class="notice-banner">아직 조직 분류가 채워지지 않았습니다. ' +
@@ -379,8 +411,8 @@ document.addEventListener('DOMContentLoaded', function () {
       /* 새 회원 추가 */
       html += '<p style="font-size:0.86rem;color:var(--gray-7)">' +
         '회원을 새로 넣거나 직분을 바꾸시면 <strong>그 직위 무리의 맨 뒤로 자동으로 들어갑니다.</strong> ' +
-        '예를 들어 새로 부임하신 위임목사는 마지막 위임목사 다음에 놓입니다.<br>' +
-        '순서 : 위임목사 → 시무목사 → 부목사 → 원로목사 → 은퇴목사 → 무임목사 → 장로</p>';
+        '예를 들어 새로 부임하신 목사는 마지막 목사 다음에 놓입니다.<br>' +
+        '순서 : 목사 → 부목사 → 원로목사 → 은퇴목사 → 무임목사 → 장로 → 직원</p>';
       html += '<p><button class="btn ghost" id="ro-order">명단 순서 다시 정리</button> ' +
         '<span style="font-size:0.84rem;color:var(--gray-5);margin-left:8px">' +
         '직위 순서가 흐트러졌을 때만 누르시면 됩니다. ' +
@@ -391,41 +423,66 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 120px"><label>성명</label><input type="text" id="ro-name"></div>' +
         '<div class="field"><label>소속 교회</label><input type="text" id="ro-church"></div>' +
-        '<div class="field" style="flex:0 0 120px"><label>직분</label><select id="ro-pos">' +
-        ['목사', '위임목사', '부목사', '원로목사', '은퇴목사', '장로', '간사'].map(function (x) { return '<option>' + x + '</option>'; }).join('') +
-        '</select></div>' +
-        '<div class="field" style="flex:0 0 130px"><label>조직 분류</label><select id="ro-cat">' + catOptions('목사') + '</select></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>직분</label><select id="ro-cat">' +
+        catOptions('목사') + '</select></div>' +
+        '<div class="field" style="flex:0 0 150px"><label>생년월일</label>' +
+        '<input type="date" id="ro-birth"></div>' +
         '<div class="field" style="flex:0 0 130px"><label>시찰</label><select id="ro-sichal">' + sichalOptions('') + '</select></div>' +
         '<div class="field" style="flex:0 0 160px"><label>부여 등급</label><select id="ro-grade">' +
         GRADES.filter(function (g) { return g.v !== 'pending'; }).map(function (g) {
-          return '<option value="' + g.v + '">' + g.t + '</option>';
+          return '<option value="' + g.v + '"' + (g.v === 'member' ? ' selected' : '') + '>' + g.t + '</option>';
         }).join('') + '</select></div>' +
         '<button class="btn" id="ro-add">추가</button>' +
         '</div><div class="form-msg" id="ro-msg"></div></div>';
 
+      /* 명단 조회 */
+      html += '<div class="inline-form" style="margin-bottom:12px">' +
+        '<div class="field" style="flex:1 1 240px"><label for="ro-q">명단 조회</label>' +
+        '<input type="search" id="ro-q" placeholder="성명·교회·시찰로 찾기"></div>' +
+        '<div class="field" style="flex:0 0 150px"><label for="ro-fcat">직분</label>' +
+        '<select id="ro-fcat"><option value="">직분 전체</option>' +
+        CATEGORIES.map(function (x) { return '<option>' + e(x) + '</option>'; }).join('') +
+        '</select></div>' +
+        '<div class="field" style="flex:0 0 160px"><label for="ro-fgrade">부여 등급</label>' +
+        '<select id="ro-fgrade"><option value="">등급 전체</option>' +
+        GRADES.map(function (g) { return '<option value="' + g.v + '">' + e(g.t) + '</option>'; }).join('') +
+        '</select></div>' +
+        '<button class="btn ghost" id="ro-qclear">지우기</button>' +
+        '</div>';
+
       /* 명단 표 (그 자리에서 고칠 수 있다) */
-      html += '<table class="tbl"><thead><tr><th style="width:50px">번호</th><th style="width:110px">성명</th>' +
-        '<th>소속 교회</th><th style="width:110px">직분</th><th style="width:120px">조직 분류</th>' +
-        '<th style="width:120px">시찰</th><th style="width:130px">비고</th>' +
-        '<th style="width:110px">부여 등급</th><th style="width:120px">관리</th></tr></thead><tbody>';
+      html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th><th style="width:110px">성명</th>' +
+        '<th>소속 교회</th><th style="width:130px">직분</th><th style="width:150px">생년월일</th>' +
+        '<th style="width:120px">시찰</th><th style="width:120px">비고</th>' +
+        '<th style="width:150px">부여 등급</th><th style="width:120px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
-        html += '<tr data-ro="' + m.id + '">' +
-          '<td>' + (i + 1) + '</td>' +
+        var old70 = overAge(m.birth_date);
+        html += '<tr data-ro="' + m.id + '" data-find="' +
+          e([m.name, m.church, m.category, m.sichal, m.note].filter(Boolean).join(' ')) + '"' +
+          ' data-cat="' + e(m.category || '') + '" data-grade="' + e(rosterGrade(m)) + '">' +
+          '<td class="ro-no">' + (i + 1) + '</td>' +
           '<td><input type="text" data-rf="name" value="' + e(m.name) + '"></td>' +
           '<td><input type="text" data-rf="church" value="' + e(m.church) + '"></td>' +
-          '<td><input type="text" data-rf="position" value="' + e(m.position || '') + '"></td>' +
           '<td><select data-rf="category">' + catOptions(m.category || '') + '</select></td>' +
+          '<td><input type="date" data-rf="birth_date" value="' + e(m.birth_date || '') + '">' +
+          (old70 ? '<div class="ro-hint">정년 경과</div>' : '') + '</td>' +
           '<td><select data-rf="sichal">' + sichalOptions(m.sichal || '') + '</select></td>' +
           '<td><input type="text" data-rf="note" value="' + e(m.note || '') + '" placeholder="추대일 등"></td>' +
-          '<td><span class="role-badge">' + e(m.officer_title || ROSTER_ROLES[m.role] || m.role) + '</span></td>' +
+          '<td><select data-rf="grade">' + gradeOptions(rosterGrade(m)) + '</select></td>' +
           '<td><button class="btn sm" data-rosave="' + m.id + '">저장</button> ' +
           '<button class="btn danger sm" data-rodel="' + m.id + '" data-roname="' + e(m.name) + '">삭제</button></td>' +
           '</tr>';
       });
       html += '</tbody></table>';
-      html += '<div class="form-msg" id="ro-rowmsg"></div>';
-      html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 ' + rows.length + '명. ' +
-        '칸을 고친 뒤 그 줄의 <strong>저장</strong>을 누르시면 됩니다. 모든 변경은 감사 기록에 남습니다.</p>';
+      html += '<div class="form-msg' + (rosterFlash ? ' ok' : '') + '" id="ro-rowmsg">' +
+        rosterFlash + '</div>';
+      rosterFlash = '';
+      html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 <strong>' + rows.length + '</strong>명' +
+        '<span id="ro-count"></span>. ' +
+        '칸을 고친 뒤 그 줄의 <strong>저장</strong>을 누르시면 됩니다. 모든 변경은 감사 기록에 남습니다.<br>' +
+        '총회 정년은 만 70세입니다. <strong>생년월일을 적으시면 정년이 지난 분은 ' +
+        '<em>일반회원</em>으로 저절로 바뀝니다.</strong> 직분을 <strong>직원</strong>으로 하시면 ' +
+        '간사(관리자) 등급이 함께 붙습니다. 두 가지 모두 등급 칸에서 고치실 수 있습니다.</p>';
       box.innerHTML = html;
 
       document.getElementById('ro-order').addEventListener('click', function () {
@@ -446,6 +503,58 @@ document.addEventListener('DOMContentLoaded', function () {
           });
       });
 
+      /* 조회 — 적으신 말이 든 줄만 남긴다 */
+      var qBox = document.getElementById('ro-q');
+      var fCat = document.getElementById('ro-fcat');
+      var fGrade = document.getElementById('ro-fgrade');
+      function applyFilter() {
+        var q = (qBox.value || '').trim();
+        var c = fCat.value, g = fGrade.value;
+        var shown = 0, n = 0;
+        box.querySelectorAll('#ro-tbl tbody tr').forEach(function (tr) {
+          var ok = (!q || (tr.dataset.find || '').indexOf(q) !== -1)
+                && (!c || tr.dataset.cat === c)
+                && (!g || tr.dataset.grade === g);
+          tr.classList.toggle('hidden', !ok);
+          if (ok) { shown++; tr.querySelector('.ro-no').textContent = ++n; }
+        });
+        var el = document.getElementById('ro-count');
+        el.textContent = (q || c || g) ? ' 가운데 ' + shown + '명' : '';
+      }
+      [qBox, fCat, fGrade].forEach(function (el) {
+        el.addEventListener('input', applyFilter);
+        el.addEventListener('change', applyFilter);
+      });
+      document.getElementById('ro-qclear').addEventListener('click', function () {
+        qBox.value = ''; fCat.value = ''; fGrade.value = '';
+        applyFilter(); qBox.focus();
+      });
+
+      /* 직분·생년월일을 고치면 등급을 규정대로 맞춰 준다.
+       * 정년(만 70세)이 지나면 일반회원, 직원은 간사(관리자). */
+      function autoGrade(scope, catEl, birthEl, gradeEl) {
+        function tune() {
+          if (overAge(birthEl.value)) {
+            if (['member', 'officer'].indexOf(parseGrade(gradeEl.value).role) !== -1) {
+              gradeEl.value = 'general';
+            }
+          } else if (AUTO_GRADE[catEl.value] && gradeEl.value === 'member') {
+            gradeEl.value = AUTO_GRADE[catEl.value];
+          }
+        }
+        catEl.addEventListener('change', tune);
+        birthEl.addEventListener('change', tune);
+      }
+      autoGrade(null,
+        document.getElementById('ro-cat'),
+        document.getElementById('ro-birth'),
+        document.getElementById('ro-grade'));
+      box.querySelectorAll('#ro-tbl tbody tr').forEach(function (tr) {
+        autoGrade(tr, tr.querySelector('[data-rf="category"]'),
+                  tr.querySelector('[data-rf="birth_date"]'),
+                  tr.querySelector('[data-rf="grade"]'));
+      });
+
       document.getElementById('ro-add').addEventListener('click', function () {
         var msg = document.getElementById('ro-msg');
         var g = parseGrade(document.getElementById('ro-grade').value);
@@ -453,8 +562,10 @@ document.addEventListener('DOMContentLoaded', function () {
         var d = {
           name: document.getElementById('ro-name').value.trim(),
           church: churchFor(document.getElementById('ro-church').value.trim(), ncat),
-          position: document.getElementById('ro-pos').value,
+          /* 직분과 조직 분류는 하나다. 담아 두는 자리만 둘일 뿐이다. */
+          position: ncat,
           category: ncat,
+          birth_date: document.getElementById('ro-birth').value || null,
           sichal: NO_CHURCH[ncat] ? null : (document.getElementById('ro-sichal').value || null),
           role: g.role, officer_title: g.title
           /* 순서는 서버가 정한다. 직위 무리의 맨 뒤로 자동으로 들어간다. */
@@ -487,12 +598,16 @@ document.addEventListener('DOMContentLoaded', function () {
           var msg = document.getElementById('ro-rowmsg');
           function v(f) { return tr.querySelector('[data-rf="' + f + '"]').value.trim(); }
           var cat = v('category') || null;
+          var g = parseGrade(v('grade'));
           var d = {
             name: v('name'), church: churchFor(v('church'), cat),
-            position: v('position') || null,
+            /* 직분과 조직 분류는 하나다. 담아 두는 자리만 둘일 뿐이다. */
+            position: cat,
             category: cat,
+            birth_date: v('birth_date') || null,
             sichal: v('sichal') || null,
-            note: v('note') || null
+            note: v('note') || null,
+            role: g.role, officer_title: g.title
           };
           if (!d.name) {
             msg.className = 'form-msg err';
@@ -502,7 +617,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (!d.church) {
             msg.className = 'form-msg err';
             msg.textContent = '소속 교회를 적어 주세요. ' +
-              '사임하셨다면 조직 분류를 무임목사·은퇴목사·원로목사로 바꾸시면 ' +
+              '사임하셨다면 직분을 무임목사·은퇴목사·원로목사로 바꾸시면 ' +
               '교회 칸을 비워 두셔도 됩니다.';
             return;
           }
@@ -519,10 +634,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 ? '같은 성명과 교회가 이미 명단에 있습니다.' : res.error.message;
               return;
             }
-            SHSCloud.log('update', '명단 수정', d.name + ' (' + d.church + ')');
+            SHSCloud.log('update', '명단 수정', d.name + ' (' + d.church + ' · ' +
+              (ROSTER_ROLES[d.role] || d.role) + ')');
+            rosterFlash = e(d.name) + ' 님 정보를 저장했습니다. (' + e(d.church) +
+              (d.category ? ' · ' + e(d.category) : '') + ' · ' +
+              e(d.officer_title || ROSTER_ROLES[d.role] || d.role) + ') 조직 페이지에 반영되었습니다.';
             msg.className = 'form-msg ok';
-            msg.textContent = d.name + ' 님 정보를 저장했습니다. (' + d.church +
-              (d.category ? ' · ' + d.category : '') + ') 조직 페이지에 반영되었습니다.';
+            msg.innerHTML = rosterFlash;
             renderRoster();
           });
         });
