@@ -94,13 +94,13 @@ document.addEventListener('DOMContentLoaded', function () {
       (isOfficer
         ? '<strong>' + e(SHS.honorific(user)) + '</strong>은 이 부서의 <strong>' + e(myDuty) + '</strong>이시므로 ' +
           '일정과 공지를 등록하고 부서 업무를 처리하실 수 있습니다.'
-        : '이 부서의 일정과 공지입니다. 등록·수정은 부장·서기가 합니다.') +
+        : '이 부서의 일정과 공지입니다. 등록·수정은 ' + SHS.headTitle(NAME) + '·서기가 합니다.') +
       '</div>';
 
     /* 부서 개요 */
     h += '<div class="cm-head">' +
       '<div class="cm-officers">' +
-      '<span><strong>부장</strong> ' + e(com.head || '-') + '</span>' +
+      '<span><strong>' + SHS.headTitle(NAME) + '</strong> ' + e(com.head || '-') + '</span>' +
       '<span><strong>서기</strong> ' + e(com.clerk || '-') + '</span>' +
       '<span><strong>회계</strong> ' + e(com.treasurer || '-') + '</span>' +
       '</div>' +
@@ -387,7 +387,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '상비부원은 매년 4월 봄 정기노회에서 공천위원회 보고로 인준되며, 임기는 3년으로 매년 3분의 1씩 개선합니다. ' +
       '(노회규칙 제11조)</p>' +
       '<table class="tbl" style="max-width:760px"><tbody>' +
-      row('부장', com.head) + row('서기', com.clerk) + row('회계', com.treasurer) +
+      row(SHS.headTitle(NAME), com.head) + row('서기', com.clerk) + row('회계', com.treasurer) +
       row('1년조', com.y1) + row('2년조', com.y2) + row('3년조', com.y3) +
       '</tbody></table>' +
       '<p style="font-size:0.84rem;color:var(--gray-5)">명단 수정은 ' +
@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!isOfficer) {
       var mineReq = accReqs.filter(function (r) { return r.user_id === user.id; });
       h += '<div class="notice-banner">이 부서가 보관하는 자료를 보시려면 열람을 요청해 주세요. ' +
-        '부장·서기가 확인한 뒤 알려 드립니다.</div>';
+        SHS.headTitle(NAME) + '·서기가 확인한 뒤 알려 드립니다.</div>';
       if (mineReq.length) {
         h += '<table class="tbl" style="max-width:760px"><thead><tr><th>요청 자료</th>' +
           '<th style="width:150px">요청일</th><th style="width:110px">상태</th></tr></thead><tbody>';

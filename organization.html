@@ -356,7 +356,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<p>' + e(c.duty) + '</p>' +
         '<table class="tbl" style="margin:10px 0 0">' +
         '<tbody>' +
-        '<tr><th style="width:90px">임원</th><td class="left">부장 ' + dt(c.head) + ' / 서기 ' + dt(c.clerk) + ' / 회계 ' + dt(c.treasurer) + '</td></tr>' +
+        '<tr><th style="width:90px">임원</th><td class="left">' + SHS.headTitle(c.name) + ' ' + dt(c.head) + ' / 서기 ' + dt(c.clerk) + ' / 회계 ' + dt(c.treasurer) + '</td></tr>' +
         '<tr><th style="width:90px">1년조</th><td class="left">' + dl(c.y1) + '</td></tr>' +
         '<tr><th>2년조</th><td class="left">' + dl(c.y2) + '</td></tr>' +
         '<tr><th>3년조</th><td class="left">' + dl(c.y3) + '</td></tr>' +

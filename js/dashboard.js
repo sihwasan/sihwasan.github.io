@@ -94,7 +94,7 @@ var SHSDash = (function () {
         h += '<a class="db-card' + (mineMap[c2.name] ? ' mine' : '') + '" href="committee.html?c=' +
           encodeURIComponent(c2.name) + '">' +
           '<div class="db-name">' + e(c2.name) + '</div>' +
-          '<div class="db-officer">부장 ' + e((c2.head || '-').split(' ')[0]) +
+          '<div class="db-officer">' + SHS.headTitle(c2.name) + ' ' + e((c2.head || '-').split(' ')[0]) +
           ' · 서기 ' + e((c2.clerk || '-').split(' ')[0]) + '</div>' +
           '<div class="db-lines">' +
           (next ? '<div><strong>다음 일정</strong> ' + e(next.event_date) + ' ' + e(next.title) + '</div>' : '') +

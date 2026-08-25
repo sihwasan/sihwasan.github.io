@@ -941,6 +941,12 @@
   /* 한 화면에 여러 영역이 이어져 스크롤이 길어지면 보기가 어렵다.
    * 큰 제목(h2)을 기준으로 영역을 나누고, 위쪽 띠에서 하나씩 골라 보게 한다.
    * 주소 뒤에 #영역이름을 붙이면 그 영역이 바로 열린다. */
+  /* 부서 이름에 맞는 우두머리 호칭.
+   * 상비부는 '부장', 위원회는 '위원장'이라 부른다. */
+  function headTitle(name) {
+    return /위원회\s*$/.test(String(name || '')) ? '위원장' : '부장';
+  }
+
   function sectionize(container, opts) {
     if (!container) return;
     opts = opts || {};
@@ -1056,6 +1062,7 @@
     user: user,
     getUser: getUser,
     sectionize: sectionize,
+    headTitle: headTitle,
     stepNav: stepNav,
     dropZone: dropZone,
     dropZoneAll: dropZoneAll,

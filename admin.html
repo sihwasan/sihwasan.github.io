@@ -1129,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '<div class="admin-card" style="margin-bottom:16px" data-cmt="' + e(cm.name) + '">' +
           '<h3 style="margin-top:0">' + e(cm.name) + '</h3>' +
           '<div class="inline-form" style="margin-bottom:8px">' +
-          '<div class="field"><label>부장</label><input type="text" data-f="head" value="' + e(cm.head || '') + '"></div>' +
+          '<div class="field"><label>' + SHS.headTitle(cm.name) + '</label><input type="text" data-f="head" value="' + e(cm.head || '') + '"></div>' +
           '<div class="field"><label>서기</label><input type="text" data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
           '<div class="field"><label>회계</label><input type="text" data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
           '</div>' +
