@@ -202,7 +202,7 @@ var SHSMinutesBox = (function () {
         '<input type="hidden" id="mn-id" value="">' +
         '<div class="inline-form">' +
         '<div class="field"><label>회의 이름</label>' +
-        '<input type="text" id="mn-title" placeholder="예: 제19회기 제2차 ' + cfg.what + '"></div>' +
+        '<input type="text" id="mn-title"></div>' +
         '<div class="field" style="flex:0 0 160px"><label>회의 날짜</label><input type="date" id="mn-date"></div>' +
         '<div class="field" style="flex:0 0 160px"><label>열람 범위</label><select id="mn-access">' +
         cfg.access.map(function (a) {
@@ -217,17 +217,17 @@ var SHSMinutesBox = (function () {
         '<h4 class="mn-sub">개회 예배</h4>' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 200px"><label>기도</label>' +
-        '<input type="text" id="mn-prayer" placeholder="예: 김종수 목사"></div>' +
+        '<input type="text" id="mn-prayer"></div>' +
         '<div class="field" style="flex:0 0 220px"><label>성경</label>' +
-        '<input type="text" id="mn-scripture" placeholder="예: 시편 133편 1-3절"></div>' +
+        '<input type="text" id="mn-scripture"></div>' +
         '<div class="field" style="flex:0 0 200px"><label>찬송</label>' +
-        '<input type="text" id="mn-hymn" placeholder="예: 찬송가 391장"></div>' +
+        '<input type="text" id="mn-hymn"></div>' +
         '</div>' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 200px"><label>설교자</label>' +
-        '<input type="text" id="mn-preacher" placeholder="예: 박흥열 목사"></div>' +
+        '<input type="text" id="mn-preacher"></div>' +
         '<div class="field"><label>제목</label>' +
-        '<input type="text" id="mn-sermon" placeholder="예: 하나 됨을 이루고"></div>' +
+        '<input type="text" id="mn-sermon"></div>' +
         '</div>' +
 
         '<h4 class="mn-sub">결의 사항</h4>' +
