@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>상비부 대시보드 - 시화산노회</title>
+<title>대시보드 - 시화산노회</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div class="page-head">
   <div class="container">
-    <h1>상비부 대시보드</h1>
-    <div class="crumb">홈 &gt; 조직 &gt; 상비부 대시보드</div>
+    <h1>대시보드</h1>
+    <div class="crumb">홈 &gt; 대시보드</div>
   </div>
 </div>
 
@@ -25,10 +25,14 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
 <script src="js/dashboard.js"></script>
+<script src="js/board.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   SHS.getUser().then(function (user) {
-    SHSDash.mount(document.getElementById('db-area'), user);
+    /* 정회원에게는 종합 대시보드를, 그 밖에는 상비부 대시보드만 보여 준다.
+     * (상비부 대시보드가 스스로 안내문을 띄운다) */
+    if (SHSBoard.can(user)) SHSBoard.mount(document.getElementById('db-area'), user);
+    else SHSDash.mount(document.getElementById('db-area'), user);
   });
 });
 </script>

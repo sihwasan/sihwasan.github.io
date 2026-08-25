@@ -35,7 +35,10 @@
 </section>
 
 <main class="container" id="main">
-  <div class="home-grid">
+  <!-- 로그인한 정회원에게는 대시보드를, 그 밖에는 아래 기존 화면을 보여 준다 -->
+  <section id="dash-area" class="hidden" aria-label="대시보드"></section>
+
+  <div class="home-grid" id="home-plain">
     <section aria-label="공지사항">
       <div class="section-title">
         <h2>공지사항</h2>
@@ -103,6 +106,8 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/board.js"></script>
 <script src="js/hero.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -199,6 +204,17 @@ document.addEventListener('DOMContentLoaded', function () {
     box.innerHTML = h + '</div>';
     wrap.classList.remove('hidden');
   }
+
+  /* 로그인한 정회원이면 대시보드를 보여 주고 기존 화면은 감춘다.
+   * 로그인하지 않은 분과 정회원이 아닌 분은 예전 그대로 공지·일정을 본다. */
+  SHS.getUser().then(function (me) {
+    if (!SHSBoard.can(me)) return;
+    var plain = document.getElementById('home-plain');
+    var com = document.getElementById('home-com-wrap');
+    if (plain) plain.classList.add('hidden');
+    if (com) com.remove();          /* 대시보드가 그 몫을 대신한다 */
+    SHSBoard.mount(document.getElementById('dash-area'), me);
+  });
 
   /* 우선 내장 자료로 표시 */
   renderNotices(SHSData.notices);
