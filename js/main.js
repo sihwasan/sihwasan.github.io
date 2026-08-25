@@ -173,7 +173,7 @@
     }
     return '<a class="skip-link" href="#main">본문 바로가기</a>' +
       '<div class="topbar"><div class="container">' +
-      '<div>대한예수교장로회(합동) 시화산노회</div>' +
+      '<div class="brandline">대한예수교장로회(합동) 시화산노회</div>' +
       '<div class="util">' + (user ? notiLink() : '') +
       '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' + right + '</div>' +
       '</div></div>';
@@ -186,12 +186,16 @@
       '<span class="brand-text"><span class="denom">THE PRESBYTERIAN CHURCH IN KOREA</span>' +
       '<span class="name">시화산노회</span></span></a>' +
       '<div class="header-contact">노회 사무실<strong>031-486-9993</strong>안산시 단원구 와동공원로1안길 13-7</div>' +
+      /* 휴대전화에서 메뉴를 여닫는 단추. 넓은 화면에서는 보이지 않는다. */
+      '<button type="button" class="gnb-toggle" id="gnb-toggle" aria-label="메뉴 열기" ' +
+      'aria-expanded="false" aria-controls="gnb-list">' +
+      '<span></span><span></span><span></span></button>' +
       '</div></header>';
   }
 
   function buildGnb() {
     var here = location.pathname.split('/').pop() || 'index.html';
-    var html = '<nav class="gnb" aria-label="주 메뉴"><ul class="gnb-list">';
+    var html = '<nav class="gnb" id="gnb" aria-label="주 메뉴"><ul class="gnb-list" id="gnb-list">';
     NAV.forEach(function (m) {
       /* sichal.html?s=북부시찰 처럼 물음표가 붙은 주소도 알아보게 한다 */
       var active = (here === m.href.split('?')[0] || m.sub.some(function (s) {
@@ -220,6 +224,30 @@
 
     function narrow() {
       return window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
+    }
+
+    /* 휴대전화에서는 메뉴를 접어 두고 석 줄 단추로 여닫는다.
+     * 좁은 화면에 열두 개 메뉴를 늘어놓으면 화면이 온통 메뉴가 되기 때문이다. */
+    var gnb = document.getElementById('gnb');
+    var btn = document.getElementById('gnb-toggle');
+    if (gnb && btn && !btn.dataset.ready) {
+      btn.dataset.ready = '1';
+      function setOpen(on) {
+        gnb.classList.toggle('open', on);
+        btn.classList.toggle('on', on);
+        btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+        btn.setAttribute('aria-label', on ? '메뉴 닫기' : '메뉴 열기');
+      }
+      btn.addEventListener('click', function () {
+        setOpen(!gnb.classList.contains('open'));
+      });
+      document.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Escape' && gnb.classList.contains('open')) { setOpen(false); btn.focus(); }
+      });
+      /* 넓은 화면으로 돌아가면 접어 둔 것을 되돌린다 */
+      window.addEventListener('resize', function () {
+        if (!narrow()) setOpen(false);
+      });
     }
 
     list.addEventListener('click', function (ev) {
