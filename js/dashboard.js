@@ -11,9 +11,12 @@
 var SHSDash = (function () {
   'use strict';
 
-  function mount(area, user) {
+  function mount(area, user, opts) {
     if (!area) return;
     var e = SHS.esc;
+    /* onlyMine : 내가 맡은 부서만 보여 준다.
+     * 메인 대시보드에서는 다른 부서의 일정·공지까지 볼 까닭이 없다. */
+    var onlyMine = !!(opts && opts.onlyMine);
 
 
     var gate = SHS.memberGate(user, '상비부 대시보드');
@@ -81,7 +84,8 @@ var SHSDash = (function () {
         h += '</div>';
       }
 
-      /* 전체 상비부 */
+      /* 전체 상비부 — 내 것만 볼 때는 보이지 않는다 */
+      if (!onlyMine) {
       h += '<h2>상비부 활동</h2>' +
         '<p style="color:var(--gray-5);font-size:0.88rem">노회규칙 제10~12조에 따른 7개 상비부입니다. ' +
         '부서를 누르시면 그 부서의 일정과 공지를 보실 수 있습니다.</p>' +
@@ -104,14 +108,17 @@ var SHSDash = (function () {
           '</div></a>';
       });
       h += '</div>';
+      }
 
-      /* 다가오는 일정 모아 보기 */
-      var upcoming = evs.filter(function (v) { return v.event_date && v.event_date >= today; })
+      /* 다가오는 일정 — 내 것만 볼 때는 내 부서 것만 추린다 */
+      var seen = evs.filter(function (v) { return !onlyMine || mineMap[v.committee]; });
+      var upcoming = seen.filter(function (v) { return v.event_date && v.event_date >= today; })
                         .sort(function (a, b) { return a.event_date < b.event_date ? -1 : 1; })
                         .slice(0, 12);
       h += '<h2>다가오는 상비부 일정</h2>';
       if (!upcoming.length) {
-        h += '<p style="color:var(--gray-5)">잡힌 일정이 없습니다.</p>';
+        h += '<p style="color:var(--gray-5)">' +
+          (onlyMine ? '내가 맡은 부서에 잡힌 일정이 없습니다.' : '잡힌 일정이 없습니다.') + '</p>';
       } else {
         h += '<table class="tbl"><thead><tr><th style="width:130px">날짜</th>' +
           '<th style="width:150px">상비부</th><th>내용</th><th style="width:150px">장소</th></tr></thead><tbody>';
@@ -126,7 +133,7 @@ var SHSDash = (function () {
       }
 
       /* 최근 공지 */
-      var notices = evs.filter(function (v) { return v.kind === '공지'; }).slice(0, 8);
+      var notices = seen.filter(function (v) { return v.kind === '공지'; }).slice(0, 8);
       h += '<h2>상비부 공지</h2>';
       if (!notices.length) {
         h += '<p style="color:var(--gray-5)">등록된 공지가 없습니다.</p>';

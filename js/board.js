@@ -2,7 +2,8 @@
  *
  * 흩어져 있던 것을 한자리에 모은다.
  *   나의 알림 · 노회 공지 · 노회 일정
- *   나의 상비부 · 상비부 일정 · 상비부 공지 · 상비부 전체
+ *   내가 맡은 상비부 · 그 부서의 일정과 공지
+ *   (대시보드 화면에서 <전체 보기>를 누르면 상비부 전체까지 본다)
  *   신청서류 발급 현황 · 교회상황 보고서
  *
  * 가운데 상비부 부분은 <상비부 대시보드>(js/dashboard.js)를 그대로
@@ -25,14 +26,18 @@ var SHSBoard = (function () {
               window.SHSCloud && SHSCloud.enabled());
   }
 
-  function mount(box, user) {
+  /* full : 상비부 전체까지 보여 준다 (대시보드 화면)
+   *        아니면 내가 맡은 부서만 보여 준다 (메인 화면) */
+  function mount(box, user, opts) {
     if (!box) return;
     if (!can(user)) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
+    var full = !!(opts && opts.full);
 
     box.innerHTML =
       '<div class="section-title"><h2>대시보드</h2>' +
-      '<a class="more" href="dashboard.html">전체 보기</a></div>' +
+      (full ? '' : '<a class="more" href="dashboard.html">전체 보기</a>') +
+      '</div>' +
       '<div id="dash-noti"></div>' +
       '<div class="dash-cols">' +
       '<section aria-label="노회 공지"><h3 class="dash-h">노회 공지</h3>' +
@@ -48,8 +53,11 @@ var SHSBoard = (function () {
       '<div id="dash-report"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>';
 
-    /* 상비부 부분은 상비부 대시보드를 그대로 쓴다 */
-    if (window.SHSDash) SHSDash.mount(document.getElementById('dash-com'), user);
+    /* 상비부 부분은 상비부 대시보드를 그대로 쓰되, 내가 맡은 것만 보여 준다.
+     * 다른 부서의 일정과 공지까지 여기서 볼 까닭은 없다. */
+    if (window.SHSDash) {
+      SHSDash.mount(document.getElementById('dash-com'), user, { onlyMine: !full });
+    }
 
     SHSCloud.init().then(function (c) {
       function soft(p) { return p.then(function (x) { return x; }, function () { return { data: null }; }); }
@@ -104,7 +112,7 @@ var SHSBoard = (function () {
       if (!rows.length) { el.innerHTML = '<p class="dash-none">등록된 공지가 없습니다.</p>'; return; }
       el.innerHTML = '<ul class="notice-list">' + rows.slice(0, 6).map(function (n) {
         return '<li><span class="cat">' + esc(n.cat) + '</span>' +
-          '<a href="board.html#notice">' + esc(n.title) + '</a>' +
+          '<a href="board.html#notice">' + SHS.newTag(n.date) + esc(n.title) + '</a>' +
           '<span class="date">' + esc(n.date) + '</span></li>';
       }).join('') + '</ul>' +
         '<div class="dash-more"><a href="board.html">공지사항 더보기</a></div>';
@@ -191,9 +199,7 @@ var SHSBoard = (function () {
       }
 
       h += '<div class="dash-more">' +
-        '<a href="sichal.html#report">내 시찰에서 내기</a>' +
-        (officer ? ' · <a href="officer.html#sec-교회상황-보고서">임원방에서 모아 보기</a>' : '') +
-        '</div>';
+        '<a href="sichal.html#report">내 시찰에서 내기</a></div>';
       el.innerHTML = h;
     }
   }

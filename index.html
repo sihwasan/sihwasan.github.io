@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
     list.slice(0, 6).forEach(function (n) {
       ul.insertAdjacentHTML('beforeend',
         '<li><span class="cat">' + e(n.cat) + '</span>' +
-        '<a href="board.html#notice">' + e(n.title) + '</a>' +
+        '<a href="board.html#notice">' + SHS.newTag(n.date) + e(n.title) + '</a>' +
         '<span class="date">' + e(n.date) + '</span></li>');
     });
   }

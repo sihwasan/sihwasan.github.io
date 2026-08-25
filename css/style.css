@@ -858,6 +858,15 @@ td.sat .cal-d { color: #2a4d8f; }
   .cert-sheet { border: 2px solid #000; margin: 0 auto; }
 }
 
+/* 새로 올라온 글 표시 */
+.new-tag {
+  display: inline-block; margin-right: 6px; padding: 0 5px;
+  background: var(--red); color: #fff; font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.5px; vertical-align: 1px; line-height: 15px;
+}
+/* 상단 대시보드 메뉴 */
+.gnb-item.gnb-dash > a { box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.22); }
+
 /* ---------- 이름 고르기 ---------- */
 .np-wrap { position: relative; display: block; }
 .np-box {

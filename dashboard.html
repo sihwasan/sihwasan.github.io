@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
   SHS.getUser().then(function (user) {
     /* 정회원에게는 종합 대시보드를, 그 밖에는 상비부 대시보드만 보여 준다.
      * (상비부 대시보드가 스스로 안내문을 띄운다) */
-    if (SHSBoard.can(user)) SHSBoard.mount(document.getElementById('db-area'), user);
+    if (SHSBoard.can(user)) SHSBoard.mount(document.getElementById('db-area'), user, { full: true });
     else SHSDash.mount(document.getElementById('db-area'), user);
   });
 });

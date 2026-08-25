@@ -101,7 +101,8 @@ document.addEventListener('DOMContentLoaded', function () {
     list.forEach(function (n, i) {
       nb.insertAdjacentHTML('beforeend',
         '<tr><td>' + (list.length - i) + '</td><td>' + e(n.cat) + '</td>' +
-        '<td class="left"><a href="#" data-nid="' + n.id + '" style="color:var(--ink)">' + e(n.title) + '</a></td>' +
+        '<td class="left"><a href="#" data-nid="' + n.id + '" style="color:var(--ink)">' +
+        SHS.newTag(n.date) + e(n.title) + '</a></td>' +
         '<td>' + e(n.date) + '</td></tr>');
     });
   }

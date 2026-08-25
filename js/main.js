@@ -87,6 +87,19 @@
     { t: '시스템 운영', h: 'ops.html' }
   ]};
 
+  /* 로그인한 정회원에게 상단 메뉴 맨 앞에 <대시보드>를 보여 준다.
+   * 공지·일정·내 상비부·서류·교회상황 보고서를 한자리에서 본다. */
+  function addDashMenu() {
+    var list = document.querySelector('.gnb-list');
+    if (!list || document.getElementById('gnb-dash')) return;
+    var here = location.pathname.split('/').pop() || 'index.html';
+    var li = document.createElement('li');
+    li.className = 'gnb-item gnb-dash' + (here === 'dashboard.html' ? ' active' : '');
+    li.id = 'gnb-dash';
+    li.innerHTML = '<a href="dashboard.html">대시보드</a>';
+    list.insertBefore(li, list.firstChild);
+  }
+
   /* 상비부 임원에게 내가 맡은 부서 메뉴를 보여준다 */
   function addCommitteeMenu(list) {
     var ul = document.querySelector('.gnb-list');
@@ -399,6 +412,9 @@
             }, function () {});
           }
         } catch (x) {}
+
+        /* 정회원에게 대시보드 메뉴를 맨 앞에 붙인다 */
+        if (isActiveMember(toCloudUser(p))) addDashMenu();
 
         /* 관리자에게 관리자 메뉴를 붙인다 */
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) addAdminMenu();
@@ -963,6 +979,22 @@
   /* 한 화면에 여러 영역이 이어져 스크롤이 길어지면 보기가 어렵다.
    * 큰 제목(h2)을 기준으로 영역을 나누고, 위쪽 띠에서 하나씩 골라 보게 한다.
    * 주소 뒤에 #영역이름을 붙이면 그 영역이 바로 열린다. */
+  /* 올린 지 얼마 안 된 글인가 (기본 2주).
+   * 공지 목록에서 NEW 를 붙일지 가리는 데 쓴다. */
+  function isNew(dateStr, days) {
+    if (!dateStr) return false;
+    var s = String(dateStr).slice(0, 10);
+    var t = new Date(s + 'T00:00:00');
+    if (isNaN(t)) return false;
+    var 지난날 = (Date.now() - t.getTime()) / 86400000;
+    return 지난날 >= -1 && 지난날 < (days || 14);
+  }
+
+  /* 목록에 붙일 NEW 표 */
+  function newTag(dateStr, days) {
+    return isNew(dateStr, days) ? '<span class="new-tag">NEW</span>' : '';
+  }
+
   /* 저장이 정말 되었는가.
    *
    * 권한이 없으면 Supabase 는 오류를 내지 않고 '0줄 바꿈'으로 조용히 끝난다.
@@ -1105,6 +1137,8 @@
     sectionize: sectionize,
     headTitle: headTitle,
     wrote: wrote,
+    isNew: isNew,
+    newTag: newTag,
     stepNav: stepNav,
     dropZone: dropZone,
     dropZoneAll: dropZoneAll,
