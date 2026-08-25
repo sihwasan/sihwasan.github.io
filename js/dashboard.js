@@ -59,8 +59,8 @@ var SHSDash = (function () {
 
       var h = '';
 
-      /* 왼쪽 — 내가 맡은 상비부 */
-      var left = '<h2>내가 맡은 상비부</h2>';
+      /* 왼쪽 — 내가 맡은 부서 */
+      var left = '<h2>내가 맡은 부서</h2>';
       if (mine.length) {
         left += '<div class="db-grid">';
         mine.forEach(function (m) {
@@ -84,11 +84,11 @@ var SHSDash = (function () {
         });
         left += '</div>';
       } else {
-        left += '<p style="color:var(--gray-5)">맡으신 상비부가 없습니다.</p>';
+        left += '<p style="color:var(--gray-5)">맡으신 부서가 없습니다.</p>';
       }
 
       /* 오른쪽 — 그 부서의 일정과 공지.
-       * 내가 맡은 상비부 옆에 나란히 두어 한눈에 보이게 한다. */
+       * 내가 맡은 부서 옆에 나란히 두어 한눈에 보이게 한다. */
       var seen = evs.filter(function (v) { return !onlyMine || mineMap[v.committee]; });
       var upcoming = seen.filter(function (v) { return v.event_date && v.event_date >= today; })
                         .sort(function (a, b) { return a.event_date < b.event_date ? -1 : 1; })
@@ -106,7 +106,7 @@ var SHSDash = (function () {
           '</span></a>';
       }
 
-      var right = '<h2>다가오는 상비부 일정</h2>';
+      var right = '<h2>부서 일정</h2>';
       if (!upcoming.length) {
         right += '<p style="color:var(--gray-5)">' +
           (onlyMine ? '내가 맡은 부서에 잡힌 일정이 없습니다.' : '잡힌 일정이 없습니다.') + '</p>';
@@ -117,7 +117,7 @@ var SHSDash = (function () {
       }
 
       var notices = seen.filter(function (v) { return v.kind === '공지'; }).slice(0, 8);
-      right += '<h2>상비부 공지</h2>';
+      right += '<h2>부서 공지</h2>';
       if (!notices.length) {
         right += '<p style="color:var(--gray-5)">등록된 공지가 없습니다.</p>';
       } else {
@@ -127,8 +127,8 @@ var SHSDash = (function () {
       }
 
       h += '<div class="dash-cols dash-com-cols">' +
-        '<section aria-label="내가 맡은 상비부">' + left + '</section>' +
-        '<section aria-label="상비부 일정과 공지">' + right + '</section>' +
+        '<section aria-label="내가 맡은 부서">' + left + '</section>' +
+        '<section aria-label="부서 일정과 공지">' + right + '</section>' +
         '</div>';
 
       /* 전체 상비부 — 내 것만 볼 때는 보이지 않는다 */

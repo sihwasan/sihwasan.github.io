@@ -1,16 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Noto+Serif+KR:wght@600;700&display=swap');
 
+/* 색 — 남색과 금색은 노회의 빛깔이므로 그대로 두고,
+ * 회색만 아주 조금 따뜻하게 옮겼다. 화면이 종이에 가까워 눈이 덜 시리다. */
 :root {
   --navy: #17335f;
   --navy-dark: #0f2444;
   --navy-light: #24478a;
-  --accent: #b08d3e;
-  --ink: #222831;
-  --gray-7: #4a5361;
-  --gray-5: #767f8c;
-  --gray-3: #c6ccd4;
-  --gray-2: #e3e7ec;
-  --gray-1: #f4f6f8;
+  --accent: #a8813a;
+  --ink: #20242b;
+  --gray-7: #4c525c;
+  --gray-5: #7a808a;
+  --gray-3: #c7c8c6;
+  --gray-2: #e5e4df;
+  --gray-1: #f7f6f3;
+  --paper: #fcfbf9;
   --white: #ffffff;
   --red: #b03a3a;
 }
@@ -22,9 +25,18 @@ html { font-size: 16px; }
 body {
   font-family: 'Noto Sans KR', 'Malgun Gothic', sans-serif;
   color: var(--ink);
-  background: var(--white);
-  line-height: 1.6;
+  background: var(--paper);
+  line-height: 1.72;
+  letter-spacing: -0.004em;
   word-break: keep-all;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 제목은 명조로 둔다. 규칙·회의록을 다루는 곳이라 활자가 무게를 갖는다. */
+.section-title h2, .page-body h2, .dash-h, .admin-card h3,
+.side-box .box-head, .dash-box-t, .dash-com-cols > section > h2 {
+  font-family: 'Noto Serif KR', serif; font-weight: 600; letter-spacing: -0.015em;
 }
 
 a { color: inherit; text-decoration: none; }
@@ -193,12 +205,16 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   padding: 48px 0;
 }
 .section-title {
+  position: relative;
   display: flex; justify-content: space-between; align-items: baseline;
-  border-bottom: 2px solid var(--navy); padding-bottom: 10px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--gray-2); padding-bottom: 12px; margin-bottom: 6px;
 }
-.section-title h2 {
-  font-size: 1.25rem; color: var(--navy); font-weight: 700;
+/* 굵은 줄로 밑을 다 긋는 대신, 제목 아래에만 짧게 남색을 둔다 */
+.section-title::after {
+  content: ''; position: absolute; left: 0; bottom: -1px;
+  width: 44px; height: 2px; background: var(--navy);
 }
+.section-title h2 { font-size: 1.28rem; color: var(--navy); }
 .section-title .more { font-size: 0.8rem; color: var(--gray-5); }
 .section-title .more:hover { color: var(--navy); }
 
@@ -215,29 +231,33 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   border: 1px solid var(--navy-light); padding: 1px 8px; margin-right: 4px;
 }
 
-.side-box { border: 1px solid var(--gray-2); }
+.side-box { border: 1px solid var(--gray-2); background: var(--white); }
 .side-box + .side-box { margin-top: 20px; }
 .side-box .box-head {
-  background: var(--gray-1); border-bottom: 1px solid var(--gray-2);
-  padding: 12px 16px; font-weight: 700; color: var(--navy); font-size: 1rem;
+  background: transparent; border-bottom: 1px solid var(--gray-2);
+  padding: 13px 18px; color: var(--navy); font-size: 1rem;
 }
-.side-box .box-body { padding: 16px; font-size: 0.9rem; }
+.side-box .box-body { padding: 16px 18px; font-size: 0.92rem; }
 .side-box .box-body p + p { margin-top: 8px; }
 .schedule-item { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--gray-1); }
 .schedule-item:last-child { border-bottom: none; }
 .schedule-item .d {
   flex-shrink: 0; width: 52px; text-align: center;
-  border: 1px solid var(--navy-light); color: var(--navy);
-  font-size: 0.78rem; font-weight: 700; padding: 2px 0;
+  background: var(--gray-1); color: var(--navy);
+  font-size: 0.78rem; font-weight: 700; padding: 3px 0;
 }
 .schedule-item .t { font-size: 0.88rem; }
 
 .quick-links { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 10px 0 48px; }
 .quick-links a {
-  border: 1px solid var(--gray-2); padding: 22px 18px; background: #fff;
-  transition: border-color 0.15s;
+  border: 1px solid var(--gray-2); padding: 24px 20px; background: var(--white);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
 }
-.quick-links a:hover { border-color: var(--navy); }
+.quick-links a:hover {
+  border-color: var(--navy);
+  box-shadow: 0 6px 18px rgba(23, 51, 95, 0.07);
+  transform: translateY(-1px);
+}
 .quick-links .q-title { font-weight: 700; color: var(--navy); margin-bottom: 6px; }
 .quick-links .q-desc { font-size: 0.82rem; color: var(--gray-5); line-height: 1.5; }
 
@@ -258,8 +278,14 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .page-head .crumb { font-size: 0.82rem; color: #aebdd6; margin-top: 8px; }
 .page-body { padding: 44px 0 70px; }
 .page-body h2 {
-  font-size: 1.3rem; color: var(--navy); border-left: 4px solid var(--navy);
-  padding-left: 12px; margin: 36px 0 16px;
+  position: relative;
+  font-size: 1.32rem; color: var(--navy);
+  border-bottom: 1px solid var(--gray-2);
+  padding: 0 0 12px; margin: 46px 0 20px;
+}
+.page-body h2::after {
+  content: ''; position: absolute; left: 0; bottom: -1px;
+  width: 44px; height: 2px; background: var(--navy);
 }
 .page-body h2:first-child { margin-top: 0; }
 .page-body h3 { font-size: 1.05rem; color: var(--ink); margin: 24px 0 10px; }
@@ -267,24 +293,30 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .page-body .lead { font-size: 1.05rem; color: var(--ink); }
 
 /* tabs */
-.tabs { display: flex; border-bottom: 2px solid var(--navy); margin-bottom: 24px; flex-wrap: wrap; }
+.tabs { display: flex; border-bottom: 1px solid var(--gray-2); margin-bottom: 26px; flex-wrap: wrap; }
 .tabs button {
-  background: var(--gray-1); border: 1px solid var(--gray-2); border-bottom: none;
-  padding: 11px 26px; font-size: 0.95rem; color: var(--gray-7); margin-right: 4px;
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; padding: 12px 20px; font-size: 0.95rem; color: var(--gray-5);
+  transition: color 0.15s, border-color 0.15s;
 }
-.tabs button.active { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 700; }
+.tabs button:hover { color: var(--navy); }
+.tabs button.active { color: var(--navy); border-bottom-color: var(--navy); font-weight: 700; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
 /* tables */
-.tbl { width: 100%; border-collapse: collapse; font-size: 0.92rem; margin-bottom: 20px; }
+/* 표는 가로줄만 남긴다. 칸마다 테두리를 두르면 장부처럼 빽빽해 보인다. */
+.tbl { width: 100%; border-collapse: collapse; font-size: 0.93rem; margin-bottom: 22px; }
 .tbl th {
-  background: var(--gray-1); color: var(--navy); font-weight: 700;
-  border: 1px solid var(--gray-2); padding: 10px 12px;
+  background: transparent; color: var(--gray-5); font-weight: 500;
+  font-size: 0.82rem; letter-spacing: 0.02em; white-space: nowrap;
+  border: none; border-bottom: 1px solid var(--gray-3); padding: 9px 12px;
 }
-.tbl td { border: 1px solid var(--gray-2); padding: 9px 12px; text-align: center; }
+.tbl td { border: none; border-bottom: 1px solid var(--gray-2); padding: 12px; text-align: center; }
+/* 줄 머리(왼쪽 칸 제목)는 칸 제목과 달리 본문 곁의 이름표다 */
+.tbl tbody th { border-bottom-color: var(--gray-2); color: var(--gray-7); }
 .tbl td.left { text-align: left; }
-.tbl tbody tr:hover { background: #fafbfd; }
+.tbl tbody tr:hover { background: var(--gray-1); }
 .tbl .role-badge {
   display: inline-block; font-size: 0.75rem; padding: 1px 8px;
   border: 1px solid var(--accent); color: var(--accent);
@@ -307,11 +339,12 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .board-controls input[type=text] { border: 1px solid var(--gray-3); padding: 8px 12px; width: 240px; }
 .btn {
   display: inline-block; background: var(--navy); color: #fff; border: 1px solid var(--navy);
-  padding: 9px 22px; font-size: 0.9rem; font-weight: 500;
+  padding: 9px 22px; font-size: 0.9rem; font-weight: 500; letter-spacing: -0.01em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.btn:hover { background: var(--navy-dark); }
-.btn.ghost { background: #fff; color: var(--navy); }
-.btn.ghost:hover { background: var(--gray-1); }
+.btn:hover { background: var(--navy-dark); border-color: var(--navy-dark); }
+.btn.ghost { background: transparent; color: var(--navy); border-color: var(--gray-3); }
+.btn.ghost:hover { background: var(--gray-1); border-color: var(--navy); }
 .btn.danger { background: #fff; border-color: var(--red); color: var(--red); }
 .btn.danger:hover { background: #fdf3f3; }
 .btn.sm { padding: 4px 12px; font-size: 0.8rem; }
@@ -457,7 +490,7 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .home-committees { padding: 10px 0 30px; }
 
 /* 나의 알림 */
-.noti-card { border: 1px solid var(--gray-2); background: #fff; margin-bottom: 16px; }
+.noti-card { border: 1px solid var(--gray-2); background: var(--white); margin-bottom: 18px; }
 .noti-card.has { border-color: var(--navy); border-left: 4px solid var(--accent); }
 .noti-card-head {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -496,14 +529,19 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
   gap: 14px; margin-bottom: 30px;
 }
 .db-card {
-  display: block; border: 1px solid var(--gray-2); border-top: 3px solid var(--gray-3);
-  padding: 18px 20px; background: #fff; color: inherit;
+  display: block; border: 1px solid var(--gray-2); border-top: 2px solid var(--gray-3);
+  padding: 20px 22px; background: var(--white); color: inherit;
+  transition: border-color 0.18s, box-shadow 0.18s;
 }
-.db-card:hover { border-color: var(--gray-5); border-top-color: var(--navy); }
-.db-card.mine { border-top-color: var(--navy); background: var(--gray-1); }
+.db-card:hover {
+  border-color: var(--gray-3); border-top-color: var(--navy);
+  box-shadow: 0 6px 18px rgba(23, 51, 95, 0.07);
+}
+.db-card.mine { border-top-color: var(--navy); background: var(--white); }
 .db-role {
-  display: inline-block; font-size: 0.8rem; color: #fff; background: var(--navy);
-  padding: 1px 8px; margin-bottom: 7px;
+  display: inline-block; font-size: 0.78rem; color: var(--navy);
+  background: var(--gray-1); border: 1px solid var(--gray-2);
+  padding: 2px 9px; margin-bottom: 9px; letter-spacing: -0.01em;
 }
 .db-name { font-size: 1.16rem; font-weight: 700; color: var(--navy); margin-bottom: 5px; }
 .db-officer { font-size: 0.9rem; color: var(--gray-5); margin-bottom: 9px; }
@@ -740,21 +778,22 @@ td.sat .cal-d { color: #2a4d8f; }
 .form-msg.ok { color: #22703a; }
 
 .notice-banner {
-  border: 1px solid var(--gray-2); background: var(--gray-1);
-  padding: 14px 18px; font-size: 0.88rem; color: var(--gray-7); margin-bottom: 24px;
+  border: 1px solid var(--gray-2); border-left: 2px solid var(--navy);
+  background: var(--white);
+  padding: 15px 18px; font-size: 0.9rem; color: var(--gray-7); margin-bottom: 24px;
 }
 .notice-banner strong { color: var(--navy); }
 
 /* admin */
 .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-.admin-card { border: 1px solid var(--gray-2); padding: 24px; }
-.admin-card h3 { margin-top: 0; color: var(--navy); }
+.admin-card { border: 1px solid var(--gray-2); padding: 26px; background: var(--white); }
+.admin-card h3 { margin-top: 0; margin-bottom: 16px; color: var(--navy); font-size: 1.08rem; }
 .inline-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
 .inline-form .field { margin-bottom: 0; flex: 1; min-width: 120px; }
 
 /* documents */
 .doc-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 28px; }
-.doc-item { border: 1px solid var(--gray-2); padding: 20px; }
+.doc-item { border: 1px solid var(--gray-2); padding: 20px; background: var(--white); }
 .doc-item .d-name { font-weight: 700; color: var(--navy); margin-bottom: 4px; }
 .doc-item .d-desc { font-size: 0.84rem; color: var(--gray-5); margin-bottom: 14px; }
 
@@ -918,8 +957,12 @@ input.np-bad { border-color: var(--red); }
   display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-bottom: 26px;
 }
 .dash-h {
-  color: var(--navy); font-size: 1.14rem; margin: 0 0 12px;
-  padding-bottom: 8px; border-bottom: 2px solid var(--navy);
+  position: relative; color: var(--navy); font-size: 1.14rem; margin: 0 0 14px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--gray-2);
+}
+.dash-h::after {
+  content: ''; position: absolute; left: 0; bottom: -1px;
+  width: 36px; height: 2px; background: var(--navy);
 }
 .dash-none { color: var(--gray-5); font-size: 0.98rem; margin: 6px 0; }
 .dash-sub { font-size: 0.94rem; color: var(--gray-7); margin: 10px 0 0; }
@@ -927,13 +970,13 @@ input.np-bad { border-color: var(--red); }
 .dash-more { margin-top: 10px; font-size: 0.94rem; color: var(--gray-5); }
 .dash-more a { color: var(--navy); text-decoration: underline; }
 .dash-alert {
-  border: 1px solid var(--red); border-left: 3px solid var(--red);
-  background: #fdf6f6; padding: 11px 14px; font-size: 0.98rem; color: var(--gray-7);
+  border: 1px solid var(--gray-2); border-left: 2px solid var(--red);
+  background: var(--white); padding: 12px 15px; font-size: 0.98rem; color: var(--gray-7);
 }
 .dash-alert a { color: var(--red); text-decoration: underline; font-weight: 500; }
 .dash-ok {
-  border: 1px solid var(--gray-2); border-left: 3px solid var(--navy);
-  background: var(--gray-1); padding: 11px 14px; font-size: 0.98rem; color: var(--gray-7);
+  border: 1px solid var(--gray-2); border-left: 2px solid var(--navy);
+  background: var(--white); padding: 12px 15px; font-size: 0.98rem; color: var(--gray-7);
 }
 .dash-tbl { font-size: 0.96rem; margin-bottom: 0; }
 #dash-com .db-grid { margin-bottom: 22px; }
@@ -948,8 +991,8 @@ input.np-bad { border-color: var(--red); }
 #dash-noti .noti-card-head .more { font-size: 0.9rem; }
 
 /* 나의 교회 · 나의 시찰 상자 */
-.dash-box { border: 1px solid var(--gray-2); border-top: 3px solid var(--navy);
-  background: #fff; padding: 18px 20px; }
+.dash-box { border: 1px solid var(--gray-2); border-top: 2px solid var(--navy);
+  background: var(--white); padding: 20px 22px; }
 .dash-box-t { font-size: 1.2rem; font-weight: 700; color: var(--navy); }
 .dash-box-s { font-size: 0.96rem; color: var(--gray-5); margin-top: 4px; }
 .dash-kv { margin: 14px 0 0; font-size: 0.98rem; }
@@ -961,9 +1004,13 @@ input.np-bad { border-color: var(--red); }
 /* 내가 맡은 상비부 옆에 나란히 놓는 일정·공지.
  * 칸이 좁으므로 표 대신 한 줄씩 늘어놓는다. */
 .dash-com-cols > section > h2 {
-  font-size: 1.14rem; color: var(--navy); font-weight: 700;
-  border: none; border-bottom: 2px solid var(--navy); border-left: none;
-  padding: 0 0 8px; margin: 0 0 12px;
+  position: relative; font-size: 1.14rem; color: var(--navy);
+  border: none; border-bottom: 1px solid var(--gray-2); border-left: none;
+  padding: 0 0 10px; margin: 0 0 14px;
+}
+.dash-com-cols > section > h2::after {
+  content: ''; position: absolute; left: 0; bottom: -1px;
+  width: 36px; height: 2px; background: var(--navy);
 }
 .dash-com-cols > section > h2 ~ h2 { margin-top: 26px; }
 .dash-com-cols .db-grid { grid-template-columns: 1fr; margin-bottom: 0; }
