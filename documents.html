@@ -25,6 +25,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/name-picker.js"></script>
 <script src="js/certs-config.js"></script>
 <script src="js/certificate.js"></script>
 <script src="js/certs.js"></script>
@@ -73,8 +74,8 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div class="field"><label>서류 종류</label><select id="d-type">' +
     '<option>소속증명서</option><option>재직증명서</option><option>대표자증명서</option><option>직인증명서</option><option>은퇴목사확인서</option>' +
     '</select></div>' +
-    '<div class="field"><label>대상자 성명</label><input type="text" id="d-name" list="d-roster" autocomplete="off">' +
-    '<datalist id="d-roster"></datalist></div>' +
+    '<div class="field"><label>대상자 성명</label>' +
+    '<input type="text" data-names="plain" id="d-name" autocomplete="off"></div>' +
     '<div class="field"><label>직위</label><select id="d-pos"><option>목사</option><option>부목사</option><option>장로</option><option>전도사</option></select></div>' +
     '<div class="field"><label>소속 교회</label><input type="text" id="d-church"></div>' +
     '<div class="field"><label>용도</label><select id="d-purpose">' +
@@ -97,6 +98,7 @@ document.addEventListener('DOMContentLoaded', function () {
   html += '<h2>발급 대장</h2><div id="log-table"></div>';
   area.innerHTML = html;
   SHS.sectionize(area);
+  SHSNames.attachAll(area);
 
   /* ---------- 직인·도장 ---------- */
   var seals = {};        /* key → { label, holder, url, data } */

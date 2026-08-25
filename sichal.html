@@ -25,6 +25,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/minutes-box.js"></script>
 <script src="js/ledger.js"></script>
@@ -250,6 +251,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (isOfficer) h += churchForm();
     box.innerHTML = h;
+    SHSNames.attachAll(box);
     if (isOfficer) bindChurchForm();
 
     box.querySelectorAll('[data-chopen]').forEach(function (el) {
@@ -310,7 +312,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '교회 이름과 소속 시찰은 시찰장·서기가 정합니다.</p>' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 190px"><label>담임목사</label>' +
-        '<input type="text" id="cv-pastor" value="' + e(ch.pastor || '') + '"></div>' +
+        '<input type="text" data-names="plain" id="cv-pastor" value="' + e(ch.pastor || '') + '"></div>' +
         '<div class="field" style="flex:0 0 210px"><label>연락처</label>' +
         '<input type="text" id="cv-phone" value="' + e(ch.phone || '') + '"></div>' +
         '</div>' +
@@ -331,6 +333,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     h += '</div>';
     v.innerHTML = h;
+    SHSNames.attachAll(v);
 
     if (edit) {
       document.getElementById('cv-save').addEventListener('click', function () {
@@ -341,9 +344,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
         db().then(function (c) {
-          return c.from('sichal_churches').update(d).eq('id', ch.id);
+          /* .select() 로 고친 줄을 되받아 정말 저장되었는지 확인한다.
+           * 권한이 없으면 Supabase 는 오류 없이 0줄만 돌려주기 때문이다. */
+          return c.from('sichal_churches').update(d).eq('id', ch.id).select();
         }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          var w = SHS.wrote(r);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
           SHSCloud.log('update', '관내 교회 정보 수정', NAME + ' / ' + ch.name);
           load();
         });
@@ -372,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<input type="hidden" id="ch-id" value="">' +
       '<div class="inline-form">' +
       '<div class="field"><label>교회 이름</label><input type="text" id="ch-name" placeholder="예: 반월교회"></div>' +
-      '<div class="field" style="flex:0 0 150px"><label>담임목사</label><input type="text" id="ch-pastor"></div>' +
+      '<div class="field" style="flex:0 0 150px"><label>담임목사</label><input type="text" data-names="plain" id="ch-pastor"></div>' +
       '<div class="field" style="flex:0 0 170px"><label>연락처</label><input type="text" id="ch-phone" placeholder="031-000-0000"></div>' +
       '</div>' +
       '<div class="field"><label>홈페이지 주소 (없으면 비워 두세요)</label>' +
@@ -403,13 +409,14 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!id) d.sort = (churches.length + 1) * 10;
       msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
       db().then(function (c) {
-        return id ? c.from('sichal_churches').update(d).eq('id', id)
-                  : c.from('sichal_churches').insert(d);
+        return id ? c.from('sichal_churches').update(d).eq('id', id).select()
+                  : c.from('sichal_churches').insert(d).select();
       }).then(function (r) {
-        if (r.error) {
+        var w = SHS.wrote(r);
+        if (!w.ok) {
           msg.className = 'form-msg err';
-          msg.textContent = r.error.code === '23505'
-            ? '같은 이름의 교회가 이미 등록되어 있습니다.' : r.error.message;
+          msg.textContent = (r.error && r.error.code === '23505')
+            ? '같은 이름의 교회가 이미 등록되어 있습니다.' : w.why;
           return;
         }
         SHSCloud.log(id ? 'update' : 'create', '관내 교회 ' + (id ? '수정' : '추가'), NAME + ' / ' + d.name);
@@ -596,11 +603,12 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         return pre.then(function (f) {
           if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
-          return id ? c.from('sichal_docs').update(d).eq('id', id)
-                    : c.from('sichal_docs').insert(d);
+          return id ? c.from('sichal_docs').update(d).eq('id', id).select()
+                    : c.from('sichal_docs').insert(d).select();
         });
       }).then(function (r) {
-        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        var w = SHS.wrote(r);
+        if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
         SHSCloud.log(id ? 'update' : 'create', '시찰 자료 ' + (id ? '수정' : '등록'), NAME + ' / ' + d.title);
         docFile = null;
         load();
@@ -808,7 +816,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<input type="hidden" id="rp-id" value="' + (cur.id || '') + '">' +
       '<input type="hidden" id="rp-church" value="' + e(church) + '">' +
       '<div class="field" style="max-width:260px"><label>담임목사</label>' +
-      '<input type="text" id="rp-pastor" value="' + e(cur.pastor || ch.pastor || '') + '"></div>';
+      '<input type="text" data-names="plain" id="rp-pastor" value="' + e(cur.pastor || ch.pastor || '') + '"></div>';
 
     Object.keys(groups).forEach(function (g) {
       h += '<h4 style="margin:14px 0 6px;color:var(--navy)">' + e(g) + '</h4><div class="inline-form">' +
@@ -830,6 +838,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="form-msg" id="rp-msg"></div></div>';
 
     box.innerHTML = h;
+    SHSNames.attachAll(box);
     SHS.dropZone(document.getElementById('rp-file'), { what: '보고서 파일' });
     document.getElementById('rp-file').addEventListener('change', function () {
       repFile = this.files[0] || null;
@@ -869,15 +878,16 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       return pre.then(function (f) {
         if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
-        return id ? c.from('church_reports').update(d).eq('id', id)
-                  : c.from('church_reports').insert(d);
+        return id ? c.from('church_reports').update(d).eq('id', id).select()
+                  : c.from('church_reports').insert(d).select();
       });
     }).then(function (r) {
-      if (r.error) {
+      var w = SHS.wrote(r);
+      if (!w.ok) {
         msg.className = 'form-msg err';
-        msg.textContent = r.error.code === '23505'
+        msg.textContent = (r.error && r.error.code === '23505')
           ? '그 해의 보고서가 이미 있습니다. 화면을 새로 고친 뒤 수정으로 저장해 주세요.'
-          : r.error.message;
+          : w.why;
         return;
       }
       SHSCloud.log(id ? 'update' : 'create', '교회상황 보고서 ' + (id ? '수정' : '제출'),

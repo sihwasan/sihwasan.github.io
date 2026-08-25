@@ -24,6 +24,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/name-picker.js"></script>
 <script src="js/dashboard.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -743,7 +744,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><select data-bf="kind">' + BKINDS.map(function (k) {
             return '<option' + (b.kind === k ? ' selected' : '') + '>' + e(k) + '</option>';
           }).join('') + '</select></td>' +
-          '<td><input type="text" data-bf="name" value="' + e(b.name) + '"></td>' +
+          '<td><input type="text" data-names="plain" data-bf="name" value="' + e(b.name) + '"></td>' +
           '<td><select data-bf="position">' + ['목사', '장로'].map(function (k) {
             return '<option' + (b.position === k ? ' selected' : '') + '>' + k + '</option>';
           }).join('') + '</select></td>' +
@@ -760,7 +761,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 170px"><label>구분</label><select id="bn-kind">' +
         BKINDS.map(function (k) { return '<option>' + e(k) + '</option>'; }).join('') + '</select></div>' +
-        '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="bn-name"></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" data-names="plain" id="bn-name"></div>' +
         '<div class="field" style="flex:0 0 110px"><label>직분</label>' +
         '<select id="bn-pos"><option>목사</option><option>장로</option></select></div>' +
         '<div class="field"><label>소속 교회</label><input type="text" id="bn-church"></div>' +
@@ -769,6 +770,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '</div><div class="form-msg" id="bn-msg"></div></div>';
 
       box.innerHTML = html;
+      SHSNames.attachAll(box);
 
       function rowData(tr) {
         var d = {};
@@ -1034,9 +1036,9 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field"><label>관할 지역</label><input type="text" data-sf="area" value="' + e(s.area || '') + '"></div>' +
           '</div>' +
           '<div class="inline-form" style="margin-bottom:6px">' +
-          '<div class="field"><label>시찰장</label><input type="text" data-sf="head" value="' + e(s.head || '') + '"></div>' +
-          '<div class="field"><label>서기</label><input type="text" data-sf="clerk" value="' + e(s.clerk || '') + '"></div>' +
-          '<div class="field"><label>회계</label><input type="text" data-sf="treasurer" value="' + e(s.treasurer || '') + '"></div>' +
+          '<div class="field"><label>시찰장</label><input type="text" data-names data-sf="head" value="' + e(s.head || '') + '"></div>' +
+          '<div class="field"><label>서기</label><input type="text" data-names data-sf="clerk" value="' + e(s.clerk || '') + '"></div>' +
+          '<div class="field"><label>회계</label><input type="text" data-names data-sf="treasurer" value="' + e(s.treasurer || '') + '"></div>' +
           '</div>' +
           '<div class="field"><label>소속 교회 (한 줄에 한 교회씩 적어 주세요)</label>' +
           '<textarea data-sf="churches" rows="8">' + e(s.churches || '') + '</textarea></div>' +
@@ -1050,6 +1052,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button class="btn" id="si-add">추가</button></div>' +
         '<div class="form-msg" id="si-newmsg"></div></div>';
       box.innerHTML = html;
+      SHSNames.attachAll(box);
 
       box.querySelectorAll('button[data-sisave]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -1129,18 +1132,19 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '<div class="admin-card" style="margin-bottom:16px" data-cmt="' + e(cm.name) + '">' +
           '<h3 style="margin-top:0">' + e(cm.name) + '</h3>' +
           '<div class="inline-form" style="margin-bottom:8px">' +
-          '<div class="field"><label>' + SHS.headTitle(cm.name) + '</label><input type="text" data-f="head" value="' + e(cm.head || '') + '"></div>' +
-          '<div class="field"><label>서기</label><input type="text" data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
-          '<div class="field"><label>회계</label><input type="text" data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
+          '<div class="field"><label>' + SHS.headTitle(cm.name) + '</label><input type="text" data-names data-f="head" value="' + e(cm.head || '') + '"></div>' +
+          '<div class="field"><label>서기</label><input type="text" data-names data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
+          '<div class="field"><label>회계</label><input type="text" data-names data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
           '</div>' +
-          '<div class="field"><label>1년조</label><input type="text" data-f="y1" value="' + e(cm.y1 || '') + '"></div>' +
-          '<div class="field"><label>2년조</label><input type="text" data-f="y2" value="' + e(cm.y2 || '') + '"></div>' +
-          '<div class="field"><label>3년조</label><input type="text" data-f="y3" value="' + e(cm.y3 || '') + '"></div>' +
+          '<div class="field"><label>1년조</label><input type="text" data-names="multi" data-f="y1" value="' + e(cm.y1 || '') + '"></div>' +
+          '<div class="field"><label>2년조</label><input type="text" data-names="multi" data-f="y2" value="' + e(cm.y2 || '') + '"></div>' +
+          '<div class="field"><label>3년조</label><input type="text" data-names="multi" data-f="y3" value="' + e(cm.y3 || '') + '"></div>' +
           '<button class="btn sm" data-cmsave="' + e(cm.name) + '">저장</button>' +
           '<span class="form-msg" data-cmmsg="' + e(cm.name) + '" style="margin-left:10px"></span>' +
           '</div>';
       });
       box.innerHTML = html;
+      SHSNames.attachAll(box);
 
       box.querySelectorAll('button[data-cmsave]').forEach(function (b) {
         b.addEventListener('click', function () {

@@ -963,6 +963,25 @@
   /* 한 화면에 여러 영역이 이어져 스크롤이 길어지면 보기가 어렵다.
    * 큰 제목(h2)을 기준으로 영역을 나누고, 위쪽 띠에서 하나씩 골라 보게 한다.
    * 주소 뒤에 #영역이름을 붙이면 그 영역이 바로 열린다. */
+  /* 저장이 정말 되었는가.
+   *
+   * 권한이 없으면 Supabase 는 오류를 내지 않고 '0줄 바꿈'으로 조용히 끝난다.
+   * 그대로 두면 화면에는 저장된 것처럼 보이므로, 고친 줄을 되받아(.select())
+   * 정말 바뀌었는지 여기서 가린다.
+   *
+   *   c.from('표').update(값).eq('id', n).select()   ← .select() 를 꼭 붙인다
+   *   var w = SHS.wrote(r); if (!w.ok) { ...w.why 를 보여 준다... }
+   */
+  function wrote(res) {
+    if (!res) return { ok: false, why: '서버에서 답이 오지 않았습니다. 잠시 후 다시 시도해 주세요.' };
+    if (res.error) return { ok: false, why: res.error.message };
+    if (Array.isArray(res.data) && res.data.length === 0) {
+      return { ok: false, why: '저장할 권한이 없어 아무것도 바뀌지 않았습니다. ' +
+                              '노회 사무실(031-486-9993)로 알려 주시기 바랍니다.' };
+    }
+    return { ok: true };
+  }
+
   /* 부서 이름에 맞는 우두머리 호칭.
    * 상비부는 '부장', 위원회는 '위원장'이라 부른다. */
   function headTitle(name) {
@@ -1085,6 +1104,7 @@
     getUser: getUser,
     sectionize: sectionize,
     headTitle: headTitle,
+    wrote: wrote,
     stepNav: stepNav,
     dropZone: dropZone,
     dropZoneAll: dropZoneAll,

@@ -123,6 +123,7 @@ var SHSMinutesBox = (function () {
       if (opts.canEdit) h += form();
       box.innerHTML = h;
       if (opts.canEdit) bindForm();
+      if (window.SHSNames) SHSNames.attachAll(box);
       bindList();
     }
 
@@ -211,13 +212,13 @@ var SHSMinutesBox = (function () {
         '</div>' +
         '<div class="field"><label>장소</label><input type="text" id="mn-place"></div>' +
         '<div class="field"><label>참석자</label>' +
-        '<input type="text" id="mn-att" placeholder="쉼표로 나누어 적어 주세요"></div>' +
+        '<input type="text" data-names="multi" id="mn-att" placeholder="쉼표로 나누어 적어 주세요"></div>' +
 
         /* 개회 예배 — 회의는 예배로 시작하므로 함께 적어 둔다 */
         '<h4 class="mn-sub">개회 예배</h4>' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 200px"><label>기도</label>' +
-        '<input type="text" id="mn-prayer"></div>' +
+        '<input type="text" data-names id="mn-prayer"></div>' +
         '<div class="field" style="flex:0 0 220px"><label>성경</label>' +
         '<input type="text" id="mn-scripture"></div>' +
         '<div class="field" style="flex:0 0 200px"><label>찬송</label>' +
@@ -225,7 +226,7 @@ var SHSMinutesBox = (function () {
         '</div>' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 200px"><label>설교자</label>' +
-        '<input type="text" id="mn-preacher"></div>' +
+        '<input type="text" data-names id="mn-preacher"></div>' +
         '<div class="field"><label>제목</label>' +
         '<input type="text" id="mn-sermon"></div>' +
         '</div>' +
@@ -287,11 +288,12 @@ var SHSMinutesBox = (function () {
           }
           return pre.then(function (f) {
             if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
-            return id ? c.from(cfg.table).update(d).eq('id', id)
-                      : c.from(cfg.table).insert(d);
+              return id ? c.from(cfg.table).update(d).eq('id', id).select()
+                      : c.from(cfg.table).insert(d).select();
           });
         }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          var w = SHS.wrote(r);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
           SHSCloud.log(id ? 'update' : 'create', cfg.what + ' 회의록 ' + (id ? '수정' : '등록'),
             opts.owner + ' / ' + d.title);
           file = null;

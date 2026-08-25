@@ -224,9 +224,10 @@ var SHSLedger = (function () {
           return c.from('ledger_books').insert({
             owner_kind: ownerKind, owner: opts.owner, year: year,
             opening_balance: open, updated_by: opts.user.name
-          });
+          }).select();
         }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          var w = SHS.wrote(r);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
           SHSCloud.log('create', '회계 장부 개설', opts.owner + ' ' + year + '년');
           load();
         });
@@ -242,9 +243,10 @@ var SHSLedger = (function () {
           return c.from('ledger_books')
                   .update({ opening_balance: open, updated_at: new Date().toISOString(),
                             updated_by: opts.user.name })
-                  .eq('id', book.id);
+                  .eq('id', book.id).select();
         }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          var w = SHS.wrote(r);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
           SHSCloud.log('update', '이월금 수정', opts.owner + ' ' + year + '년 → ' + won(open) + '원');
           load();
         });
@@ -318,10 +320,11 @@ var SHSLedger = (function () {
         if (!id) d.created_by = opts.user.name;
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
         SHSCloud.init().then(function (c) {
-          return id ? c.from('ledger_entries').update(d).eq('id', id)
-                    : c.from('ledger_entries').insert(d);
+          return id ? c.from('ledger_entries').update(d).eq('id', id).select()
+                    : c.from('ledger_entries').insert(d).select();
         }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+          var w = SHS.wrote(r);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
           SHSCloud.log(id ? 'update' : 'create', '회계 ' + d.kind + ' ' + (id ? '수정' : '등록'),
             opts.owner + ' ' + year + '년 / ' + d.title + ' ' + won(d.amount) + '원');
           load();
