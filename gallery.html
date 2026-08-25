@@ -84,7 +84,10 @@
     </div>
     <div class="inline-form" style="margin-bottom:16px">
       <div class="field"><label>날짜</label><input type="date" id="up-date"></div>
-      <div class="field"><label>카테고리</label><select id="up-cat"></select></div>
+      <div class="field"><label>카테고리</label>
+        <input type="text" id="up-cat" list="up-cat-list" placeholder="고르거나 직접 입력" autocomplete="off" maxlength="30">
+        <datalist id="up-cat-list"></datalist>
+      </div>
     </div>
     <div class="field">
       <label>한 줄 소식 (선택)</label>
@@ -335,7 +338,9 @@ document.addEventListener('DOMContentLoaded', function () {
     var msg = document.getElementById('up-msg');
     var title = document.getElementById('up-title').value.trim();
     var taken = document.getElementById('up-date').value;
-    var cat = document.getElementById('up-cat').value;
+    var cat = (document.getElementById('up-cat').value || '').trim().replace(/\s+/g, ' ');
+    if (!cat) cat = '기타';
+    if (cat.length > 30) cat = cat.slice(0, 30);
     var caption = document.getElementById('up-caption').value.trim();
     var link = document.getElementById('up-link').value.trim();
 
@@ -393,18 +398,35 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   /* ---------- 카테고리 ---------- */
+  /* 고를 수도 있고 직접 적을 수도 있다.
+   * 고를 거리는 미리 정해 둔 목록 + 지금까지 실제로 쓰인 값을 합쳐서 만든다.
+   * 새로 적은 값은 사진과 함께 저장되므로 다음부터 목록에 저절로 나타난다. */
   function loadCats() {
-    var sel = document.getElementById('up-cat');
+    var inp = document.getElementById('up-cat');
+    var dl = document.getElementById('up-cat-list');
     var fallback = ['정기노회', '노회 행사', '임원회', '수련회', '교회 소식', '기타'];
     function fill(list) {
-      sel.innerHTML = list.map(function (n) { return '<option>' + e(n) + '</option>'; }).join('');
+      var seen = {}, out = [];
+      list.forEach(function (n) {
+        n = (n || '').trim();
+        if (!n || seen[n]) return;
+        seen[n] = 1; out.push(n);
+      });
+      dl.innerHTML = out.map(function (n) { return '<option value="' + e(n) + '"></option>'; }).join('');
     }
     fill(fallback);
+    if (!inp.value) inp.value = '기타';
     if (!(window.SHSCloud && SHSCloud.enabled())) return;
     SHSCloud.init().then(function (c) {
-      return c.from('gallery_categories').select('name').order('sort');
-    }).then(function (r) {
-      if (r && r.data && r.data.length) fill(r.data.map(function (x) { return x.name; }));
+      return Promise.all([
+        c.from('gallery_categories').select('name').order('sort'),
+        c.from('gallery_items').select('category').limit(1000)
+      ]);
+    }).then(function (rs) {
+      var names = [];
+      if (rs[0] && rs[0].data) names = names.concat(rs[0].data.map(function (x) { return x.name; }));
+      if (rs[1] && rs[1].data) names = names.concat(rs[1].data.map(function (x) { return x.category; }));
+      if (names.length) fill(names);
     }).catch(function () {});
   }
 
