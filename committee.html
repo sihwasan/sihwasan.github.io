@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function () {
       (isOfficer
         ? '<strong>' + e(SHS.honorific(user)) + '</strong>은 이 부서의 <strong>' + e(myDuty) + '</strong>이시므로 ' +
           '일정과 공지를 등록하고 부서 업무를 처리하실 수 있습니다.'
-        : '이 부서의 일정과 공지입니다. 등록·수정은 ' + SHS.headTitle(NAME) + '·서기가 합니다.') +
+        : '이 부서의 일정과 공지입니다. 등록·수정은 ' + SHS.headTitle(NAME) + '·서기·회계가 합니다.') +
       '</div>';
 
     /* 부서 개요 */
@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!isOfficer) {
       var mineReq = accReqs.filter(function (r) { return r.user_id === user.id; });
       h += '<div class="notice-banner">이 부서가 보관하는 자료를 보시려면 열람을 요청해 주세요. ' +
-        SHS.headTitle(NAME) + '·서기가 확인한 뒤 알려 드립니다.</div>';
+        SHS.headTitle(NAME) + '·서기·회계가 확인한 뒤 알려 드립니다.</div>';
       if (mineReq.length) {
         h += '<table class="tbl" style="max-width:760px"><thead><tr><th>요청 자료</th>' +
           '<th style="width:150px">요청일</th><th style="width:110px">상태</th></tr></thead><tbody>';

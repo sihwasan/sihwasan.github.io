@@ -15,9 +15,14 @@
  *     kind:   'sichal' | 'committee',
  *     owner:  '북부시찰' | '재정부',
  *     user:   지금 로그인한 사람,
- *     canEdit:  적을 수 있는가 (시찰장·서기 / 부장·서기·회계)
  *     isAuditor: 감사부인가
  *   })
+ *
+ * 적을 수 있는 사람은 화면이 짐작하지 않고 데이터베이스에 물어본다.
+ *   is_ledger_owner(종류, 이름)
+ *     상비부 : 부장·서기·회계
+ *     시찰   : 시찰장·서기·회계
+ * 그래야 화면에 보이는 것과 실제로 저장되는 것이 어긋나지 않는다.
  */
 var SHSLedger = (function () {
   'use strict';
@@ -32,6 +37,23 @@ var SHSLedger = (function () {
     var ownerKind = opts.kind === 'committee' ? 'committee' : 'sichal';
     var books = [], book = null, entries = [];
     var year = new Date().getFullYear();
+    /* 적을 수 있는가. 데이터베이스에 물어본 답으로 채운다. */
+    var canEdit = !!opts.canEdit;
+
+    function askCanEdit() {
+      return SHSCloud.init().then(function (c) {
+        return c.rpc('is_ledger_owner', { p_kind: ownerKind, p_owner: opts.owner });
+      }).then(function (r) {
+        if (r && !r.error && typeof r.data === 'boolean') canEdit = r.data;
+      }, function () { /* 못 물어보면 부르는 쪽이 준 값을 그대로 쓴다 */ });
+    }
+
+    /* 이 장부를 누가 쓰는지 알려 주는 말 */
+    function who() {
+      return opts.kind === 'committee'
+        ? SHS.headTitle(opts.owner) + '·서기·회계'
+        : '시찰장·서기·회계';
+    }
 
     function load() {
       box.innerHTML = '<p style="color:var(--gray-5)">회계 장부를 불러오는 중...</p>';
@@ -79,7 +101,7 @@ var SHSLedger = (function () {
 
     function draw() {
       var lock = SHSAuditMark.locked(book);
-      var canWrite = opts.canEdit && !lock;
+      var canWrite = canEdit && !lock;
       var s = sums();
 
       var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
@@ -99,8 +121,8 @@ var SHSLedger = (function () {
 
       if (!book) {
         h += '<div class="notice-banner">' + year + '년 장부가 아직 없습니다.' +
-          (opts.canEdit ? ' 아래에서 만들어 주세요.' : ' 장부는 부장·서기(시찰장·서기)가 만듭니다.') + '</div>';
-        if (opts.canEdit) {
+          (canEdit ? ' 아래에서 만들어 주세요.' : ' 장부는 ' + who() + '가 만듭니다.') + '</div>';
+        if (canEdit) {
           h += '<div class="admin-card"><h3 style="margin-top:0">' + year + '년 장부 만들기</h3>' +
             '<div class="inline-form">' +
             '<div class="field" style="flex:0 0 220px"><label>이월금 (원)</label>' +
@@ -116,7 +138,7 @@ var SHSLedger = (function () {
         }
         box.innerHTML = h;
         bindYear();
-        if (opts.canEdit) bindNew();
+        if (canEdit) bindNew();
         return;
       }
 
@@ -338,8 +360,8 @@ var SHSLedger = (function () {
       });
     }
 
-    /* 손으로 열어 둔 감사 기간이 있는지 먼저 읽고 그린다 */
-    SHSAuditMark.ready().then(load, load);
+    /* 감사 기간과 저장 권한을 먼저 확인하고 그린다 */
+    Promise.all([SHSAuditMark.ready(), askCanEdit()]).then(load, load);
   }
 
   return { mount: mount };
