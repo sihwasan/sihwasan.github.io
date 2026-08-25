@@ -995,11 +995,11 @@
     return { ok: true };
   }
 
-  /* 부서 이름에 맞는 우두머리 호칭.
-   * 상비부는 '부장', 위원회는 '위원장'이라 부른다. */
-  function headTitle(name) {
-    return /위원회\s*$/.test(String(name || '')) ? '위원장' : '부장';
-  }
+  /* 상비부인가 위원회인가.
+   * 상비부는 임기가 3년이라 1·2·3년조로 나누고 우두머리를 '부장'이라 하지만,
+   * 위원회는 년조 없이 위원으로만 이루어지고 '위원장'이라 부른다. */
+  function isBoard(name) { return /위원회\s*$/.test(String(name || '')); }
+  function headTitle(name) { return isBoard(name) ? '위원장' : '부장'; }
 
   function sectionize(container, opts) {
     if (!container) return;
@@ -1116,6 +1116,7 @@
     user: user,
     getUser: getUser,
     sectionize: sectionize,
+    isBoard: isBoard,
     headTitle: headTitle,
     wrote: wrote,
     isNew: isNew,

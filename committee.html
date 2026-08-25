@@ -389,12 +389,18 @@ document.addEventListener('DOMContentLoaded', function () {
       return '<tr><th style="width:110px">' + label + '</th><td class="left">' +
         (s ? e(s) : '<span style="color:var(--gray-5)">-</span>') + '</td></tr>';
     }
+    /* 위원회는 년조로 나누지 않고 위원 명단만 둔다 */
+    var board = SHS.isBoard(NAME);
     box.innerHTML = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-      '상비부원은 매년 4월 봄 정기노회에서 공천위원회 보고로 인준되며, 임기는 3년으로 매년 3분의 1씩 개선합니다. ' +
-      '(노회규칙 제11조)</p>' +
+      (board
+        ? '위원회는 년조로 나누지 않고 위원들로 구성됩니다.'
+        : '상비부원은 매년 4월 봄 정기노회에서 공천위원회 보고로 인준되며, ' +
+          '임기는 3년으로 매년 3분의 1씩 개선합니다. (노회규칙 제11조)') + '</p>' +
       '<table class="tbl" style="max-width:760px"><tbody>' +
       row(SHS.headTitle(NAME), com.head) + row('서기', com.clerk) + row('회계', com.treasurer) +
-      row('1년조', com.y1) + row('2년조', com.y2) + row('3년조', com.y3) +
+      (board
+        ? row('위원', com.members)
+        : row('1년조', com.y1) + row('2년조', com.y2) + row('3년조', com.y3)) +
       '</tbody></table>' +
       '<p style="font-size:0.84rem;color:var(--gray-5)">명단 수정은 ' +
       '<a href="admin.html" style="color:var(--navy);text-decoration:underline">회원 관리 → 상비부 배정</a>에서 합니다.</p>';

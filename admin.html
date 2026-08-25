@@ -1205,9 +1205,12 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field"><label>서기</label><input type="text" data-names data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
           '<div class="field"><label>회계</label><input type="text" data-names data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
           '</div>' +
-          yearBox('1년조', 'y1', cm.y1) +
-          yearBox('2년조', 'y2', cm.y2) +
-          yearBox('3년조', 'y3', cm.y3) +
+          /* 위원회는 년조로 나누지 않고 위원 명단만 둔다 */
+          (SHS.isBoard(cm.name)
+            ? yearBox('위원', 'members', cm.members)
+            : yearBox('1년조', 'y1', cm.y1) +
+              yearBox('2년조', 'y2', cm.y2) +
+              yearBox('3년조', 'y3', cm.y3)) +
           '<button class="btn sm" data-cmsave="' + e(cm.name) + '">저장</button>' +
           '<span class="form-msg" data-cmmsg="' + e(cm.name) + '" style="margin-left:10px"></span>' +
           '</div>';
@@ -1233,8 +1236,9 @@ document.addEventListener('DOMContentLoaded', function () {
             upd[inp.dataset.f] = r.value;
             note(r.unknown);
           });
-          /* 1·2·3년조 — 칸마다 한 사람, 저장은 쉼표로 이어서 */
-          ['y1', 'y2', 'y3'].forEach(function (k) {
+          /* 상비부는 1·2·3년조, 위원회는 위원 — 칸마다 한 사람,
+           * 저장은 예전처럼 쉼표로 이어서 한 칸에 넣는다 */
+          (SHS.isBoard(name) ? ['members'] : ['y1', 'y2', 'y3']).forEach(function (k) {
             var r = SHSNames.fix(yearValue(card, k), { multi: true, style: 'plain' });
             upd[k] = r.value;
             note(r.unknown);

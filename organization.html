@@ -357,9 +357,12 @@ document.addEventListener('DOMContentLoaded', function () {
         '<table class="tbl" style="margin:10px 0 0">' +
         '<tbody>' +
         '<tr><th style="width:90px">임원</th><td class="left">' + SHS.headTitle(c.name) + ' ' + dt(c.head) + ' / 서기 ' + dt(c.clerk) + ' / 회계 ' + dt(c.treasurer) + '</td></tr>' +
-        '<tr><th style="width:90px">1년조</th><td class="left">' + dl(c.y1) + '</td></tr>' +
-        '<tr><th>2년조</th><td class="left">' + dl(c.y2) + '</td></tr>' +
-        '<tr><th>3년조</th><td class="left">' + dl(c.y3) + '</td></tr>' +
+        /* 위원회는 년조로 나누지 않고 위원 명단만 둔다 */
+        (SHS.isBoard(c.name)
+          ? '<tr><th style="width:90px">위원</th><td class="left">' + dl(c.members) + '</td></tr>'
+          : '<tr><th style="width:90px">1년조</th><td class="left">' + dl(c.y1) + '</td></tr>' +
+            '<tr><th>2년조</th><td class="left">' + dl(c.y2) + '</td></tr>' +
+            '<tr><th>3년조</th><td class="left">' + dl(c.y3) + '</td></tr>') +
         '</tbody></table>' +
         '</div></div>');
     });

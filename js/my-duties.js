@@ -99,10 +99,13 @@ var SHSMyDuties = (function () {
           .forEach(function (p) {
             if (firstWord(c[p[0]]) === user.name && tags.indexOf(p[1]) === -1) tags.push(p[1]);
           });
-        /* 1·2·3년조 명단 (서버가 이미 알려 준 것과 겹치지 않게) */
-        ['y1', 'y2', 'y3'].forEach(function (y, i) {
-          var t = (i + 1) + '년조';
-          if (names(c[y]).indexOf(user.name) !== -1 && tags.indexOf(t) === -1) tags.push(t);
+        /* 상비부는 1·2·3년조, 위원회는 위원 명단
+         * (서버가 이미 알려 준 것과 겹치지 않게) */
+        (SHS.isBoard(c.name)
+          ? [['members', '위원']]
+          : [['y1', '1년조'], ['y2', '2년조'], ['y3', '3년조']]
+        ).forEach(function (p) {
+          if (names(c[p[0]]).indexOf(user.name) !== -1 && tags.indexOf(p[1]) === -1) tags.push(p[1]);
         });
         if (tags.length) mine.push({ name: c.name, tags: tags });
       });
