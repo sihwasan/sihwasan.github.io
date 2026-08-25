@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var sichals = [], sic = null, isOfficer = false, myDuty = '', isAuditor = false;
-  var churches = [], pastors = [], docs = [], minutes = [], reports = [];
+  var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
   var year = new Date().getFullYear();
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return Promise.all([
           c.rpc('my_sichals'),
           c.from('sichal_churches').select('*').eq('sichal', NAME).order('sort').order('id'),
-          c.from('roster').select('name,church,position,category,note')
+          c.from('roster').select('name,church,position,category,note,birth_date,term_until')
             .eq('sichal', NAME).order('category').order('sort'),
           c.from('sichal_docs').select('*').eq('sichal', NAME)
             .order('doc_date', { ascending: false }).order('id', { ascending: false }),
@@ -109,7 +109,10 @@ document.addEventListener('DOMContentLoaded', function () {
           c.from('church_reports').select('*').eq('sichal', NAME)
             .order('year', { ascending: false }).order('church'),
           /* 감사부 임원인지 보려고 함께 받아 둔다 */
-          c.rpc('my_committees').then(function (x) { return x; }, function () { return { data: [] }; })
+          c.rpc('my_committees').then(function (x) { return x; }, function () { return { data: [] }; }),
+          /* 노회 서기에게 낸 기록 (45 를 아직 실행하지 않았어도 그냥 넘어간다) */
+          c.from('sichal_report_submissions').select('*').eq('sichal', NAME)
+            .then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
         var mine = (rs[0] && rs[0].data) || [];
@@ -120,6 +123,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     ((rs[6] && rs[6].data) || []).some(function (m) {
                       return m.committee === '감사헌의부' && m.is_officer;
                     });
+        submits = (rs[7] && rs[7].data) || [];
         churches = (rs[1] && rs[1].data) || [];
         pastors  = (rs[2] && rs[2].data) || [];
         docs     = (rs[3] && rs[3].data) || [];
@@ -206,6 +210,46 @@ document.addEventListener('DOMContentLoaded', function () {
     { k: 'note',    t: '비고' }
   ];
   var openCh = null;   /* 지금 열어 둔 교회 */
+
+  /* 장로 한 분을 노회 명단과 대조한다.
+   * 명단에 장로로 올라 있으면 <총대장로>, 없으면 그냥 <장로>다.
+   * 총대는 남은 임기(총대 자격·정년)도 함께 알려 준다. */
+  function elderOf(raw) {
+    var n = window.SHSNames ? SHSNames.nameOf(raw) : String(raw || '').trim().split(/[\s(]/)[0];
+    var r = pastors.filter(function (x) {
+      return x.name === n && x.category === '장로';
+    })[0];
+    if (!r) return { name: n, title: '장로', term: '' };
+
+    var today = new Date();
+    var parts = [];
+    if (r.term_until) {
+      var left = Math.ceil((new Date(r.term_until + 'T00:00:00') - today) / 86400000);
+      parts.push(left <= 0 ? '총대 자격 만료'
+        : '총대 자격 ' + r.term_until + '까지 (' + left + '일 남음)');
+    } else {
+      parts.push('총대 자격 기간 미정');
+    }
+    var rd = SHS.retireDate(r.birth_date);
+    if (rd) {
+      parts.push(rd <= today ? '정년 경과'
+        : '정년 ' + rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '.');
+    }
+    return { name: n, title: '총대장로', term: parts.join(' · ') };
+  }
+
+  /* 교회에 적힌 장로들을 보기 좋게 늘어놓는다 */
+  function elderList(raw) {
+    var names = String(raw || '').split(',')
+      .map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+    if (!names.length) return '<span style="color:var(--gray-5)">-</span>';
+    return '<div class="eld-list">' + names.map(function (x) {
+      var d = elderOf(x);
+      return '<div class="eld-row"><span class="eld-n">' + e(d.name) + '</span>' +
+        '<span class="eld-t' + (d.title === '총대장로' ? ' on' : '') + '">' + e(d.title) + '</span>' +
+        (d.term ? '<span class="eld-d">' + e(d.term) + '</span>' : '') + '</div>';
+    }).join('') + '</div>';
+  }
 
   function isMyChurch(ch) { return !!myChurch && ch.name === myChurch; }
   function canEditCh(ch) { return isOfficer || isMyChurch(ch); }
@@ -302,6 +346,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         return '<tr><th style="width:120px">' + e(f.t) + '</th><td class="left">' + val + '</td></tr>';
       }).join('') +
+      '<tr><th>장로</th><td class="left">' + elderList(ch.elders) + '</td></tr>' +
       '<tr><th>소속 시찰</th><td class="left">' + e(ch.sichal) + '</td></tr>' +
       '</tbody></table>';
 
@@ -320,6 +365,11 @@ document.addEventListener('DOMContentLoaded', function () {
         '<input type="text" id="cv-url" value="' + e(ch.url || '') + '"></div>' +
         '<div class="field"><label>주소</label>' +
         '<input type="text" id="cv-address" value="' + e(ch.address || '') + '"></div>' +
+        '<div class="field"><label>장로</label>' +
+        '<input type="text" data-names="multi" id="cv-elders" value="' + e(ch.elders || '') + '"></div>' +
+        '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:-8px">' +
+        '노회 명단에 장로로 올라 있는 분은 <strong>총대장로</strong>로 표기되고 남은 임기가 함께 나옵니다. ' +
+        '명단에 없는 분은 <strong>장로</strong>로만 나옵니다.</p>' +
         '<div class="field"><label>비고</label>' +
         '<input type="text" id="cv-note" value="' + e(ch.note || '') + '"></div>' +
         '<button class="btn" id="cv-save">저장</button> ' +
@@ -339,7 +389,7 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('cv-save').addEventListener('click', function () {
         var msg = document.getElementById('cv-msg');
         var d = { updated_at: new Date().toISOString(), updated_by: user.name };
-        ['pastor', 'url', 'address', 'phone', 'note'].forEach(function (k) {
+        ['pastor', 'url', 'address', 'phone', 'elders', 'note'].forEach(function (k) {
           d[k] = document.getElementById('cv-' + k).value.trim() || null;
         });
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
@@ -655,6 +705,99 @@ document.addEventListener('DOMContentLoaded', function () {
     { g: '재정(원)',  k: 'offering_year',    t: '연간 헌금' }
   ];
 
+  /* 노회 서기에게 제출 — 시찰장·서기가 한 해치를 모아 올린다 */
+  function submitOf(y) {
+    return submits.filter(function (x) { return x.year === y; })[0] || null;
+  }
+
+  function submitBox() {
+    var got = submitOf(year);
+    var made = reports.filter(function (r) { return r.year === year; }).length;
+    var all = churches.length;
+
+    var h = '<div class="admin-card" id="rp-sub" style="margin-bottom:16px">' +
+      '<h3 style="margin-top:0">노회 서기에게 제출</h3>';
+
+    if (got) {
+      h += '<div class="dash-ok"><strong>' + year + '년 보고서를 노회 서기에게 제출했습니다.</strong> ' +
+        '<span class="dash-dim">(' + e(String(got.submitted_at).replace('T', ' ').slice(0, 16)) +
+        ' · ' + e(got.submitted_by || '-') + ' · 교회 ' + got.churches + '곳)</span></div>';
+      if (got.churches !== made) {
+        h += '<p style="font-size:0.86rem;color:var(--red);margin-top:10px">' +
+          '제출한 뒤 보고서가 바뀌었습니다. (지금 ' + made + '곳) 다시 제출해 주시기 바랍니다.</p>';
+      }
+    } else {
+      h += '<p style="font-size:0.9rem;color:var(--gray-7);margin:0">' +
+        '관내 <strong>' + all + '곳</strong> 가운데 <strong>' + made + '곳</strong>이 보고서를 냈습니다. ' +
+        '아직 노회에 제출하지 않았습니다.</p>';
+    }
+
+    if (isOfficer) {
+      h += '<div class="inline-form" style="margin-top:12px">' +
+        '<div class="field"><label for="rp-note">함께 드릴 말씀 (없으면 비워 두셔도 됩니다)</label>' +
+        '<input type="text" id="rp-note" value="' + e((got && got.note) || '') + '"></div>' +
+        '<button class="btn" id="rp-submit">' + (got ? '다시 제출' : '노회 서기에게 제출') + '</button>' +
+        (got ? ' <button class="btn ghost" id="rp-unsubmit">제출 취소</button>' : '') +
+        '</div><div class="form-msg" id="rp-submsg"></div>';
+    } else {
+      h += '<p style="font-size:0.82rem;color:var(--gray-5);margin:10px 0 0">' +
+        '노회 제출은 <strong>시찰장·서기</strong>가 합니다.</p>';
+    }
+    return h + '</div>';
+  }
+
+  function bindSubmit() {
+    var go = document.getElementById('rp-submit');
+    if (!go) return;
+    var msg = document.getElementById('rp-submsg');
+
+    function run(fn, args, done) {
+      go.disabled = true;
+      msg.className = 'form-msg'; msg.textContent = '처리 중입니다...';
+      db().then(function (c) { return c.rpc(fn, args); }).then(function (r) {
+        go.disabled = false;
+        if (r && r.error) {
+          msg.className = 'form-msg err';
+          msg.textContent = r.error.message +
+            ' (45 보고서 노회 제출 등록이 필요할 수 있습니다)';
+          return;
+        }
+        done(r && r.data);
+      }, function (x) {
+        go.disabled = false;
+        msg.className = 'form-msg err';
+        msg.textContent = String(x);
+      });
+    }
+
+    go.addEventListener('click', function () {
+      var made = reports.filter(function (r) { return r.year === year; }).length;
+      if (!made) {
+        msg.className = 'form-msg err';
+        msg.textContent = '제출할 보고서가 없습니다. 교회들이 먼저 보고서를 올려야 합니다.';
+        return;
+      }
+      if (!confirm(year + '년 교회상황 보고서 ' + made + '곳을 노회 서기에게 제출합니다.\n\n' +
+                   '보내시겠습니까?')) return;
+      run('submit_sichal_reports',
+          { p_year: year, p_sichal: NAME,
+            p_note: document.getElementById('rp-note').value.trim() },
+          function (n) {
+            SHS.logAction('add', '교회상황 보고서 노회 제출', NAME + ' ' + year + '년 ' + n + '곳');
+            load();
+          });
+    });
+
+    var un = document.getElementById('rp-unsubmit');
+    if (un) un.addEventListener('click', function () {
+      if (!confirm(year + '년 제출을 취소하시겠습니까?')) return;
+      run('unsubmit_sichal_reports', { p_year: year, p_sichal: NAME }, function () {
+        SHS.logAction('delete', '교회상황 보고서 제출 취소', NAME + ' ' + year + '년');
+        load();
+      });
+    });
+  }
+
   function drawReports() {
     var box = document.getElementById('si-body');
     var years = {};
@@ -677,6 +820,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<select id="rp-year">' + yearList.map(function (y) {
         return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + y + '년</option>';
       }).join('') + '</select></div>';
+
+    h += submitBox();
 
     var rows = reports.filter(function (r) {
       return r.year === year && (!mineOnly || r.church === myChurch);
@@ -725,6 +870,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (isOfficer) h += '<div id="rp-form" style="margin-top:16px"></div>';
 
     box.innerHTML = h;
+
+    bindSubmit();
 
     document.getElementById('rp-year').addEventListener('change', function () {
       year = parseInt(this.value, 10);

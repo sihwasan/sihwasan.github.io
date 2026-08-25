@@ -904,6 +904,14 @@ input.np-bad { border-color: var(--red); }
 /* 명단 표의 작은 안내 (정년 경과 등) */
 .ro-hint { font-size: 0.76rem; color: var(--red); margin-top: 3px; }
 
+/* 관내 교회의 장로 — 총대장로와 그냥 장로를 가려 보여 준다 */
+.eld-list { display: flex; flex-direction: column; gap: 5px; }
+.eld-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.eld-n { font-weight: 600; color: var(--ink); }
+.eld-t { font-size: 0.78rem; color: var(--gray-5); border: 1px solid var(--gray-2); padding: 1px 7px; }
+.eld-t.on { color: #fff; background: var(--navy); border-color: var(--navy); }
+.eld-d { font-size: 0.84rem; color: var(--gray-5); }
+
 /* ---------- 대시보드 ----------
  * 로그인해서 가장 오래 머무는 화면이므로 글자를 조금 크게 두었다. */
 .dash-cols {

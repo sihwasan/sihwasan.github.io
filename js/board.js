@@ -79,14 +79,15 @@ var SHSBoard = (function () {
         soft(c.from('church_reports').select('year,sichal,church,updated_at').eq('year', year)),
         soft(c.from('sichal_churches').select('sichal,name,pastor,url,address,phone')),
         soft(c.from('sichals').select('name,area,head,clerk,treasurer').order('sort')),
-        soft(c.rpc('my_sichal_name'))
+        soft(c.rpc('my_sichal_name')),
+        soft(c.from('sichal_report_submissions').select('*').eq('year', year))
       ]);
     }).then(function (rs) {
       drawNoti((rs[0] && rs[0].data) || []);
       drawNotices((rs[1] && rs[1].data) || []);
       drawSchedule((rs[2] && rs[2].data) || []);
       drawDocs((rs[3] && rs[3].data) || [], (rs[4] && rs[4].data) || []);
-      drawReports((rs[5] && rs[5].data) || []);
+      drawReports((rs[5] && rs[5].data) || [], (rs[9] && rs[9].data) || []);
       drawMine((rs[6] && rs[6].data) || [], (rs[7] && rs[7].data) || [],
                (rs[8] && rs[8].data) || '');
     }).catch(function () {});
@@ -241,7 +242,8 @@ var SHSBoard = (function () {
     }
 
     /* ---------- 교회상황 보고서 ---------- */
-    function drawReports(rows) {
+    function drawReports(rows, subs) {
+      subs = subs || [];
       var el = document.getElementById('dash-report');
       var year = new Date().getFullYear();
       var officer = SHSAuth.isOfficer(user);
@@ -268,6 +270,20 @@ var SHSBoard = (function () {
           (keys.length ? ' (' + keys.map(function (k) {
             return esc(k) + ' ' + bySic[k];
           }).join(' · ') + ')' : '') + '</p>';
+
+        /* 시찰이 노회 서기에게 낸 것 */
+        var subMap = {};
+        subs.forEach(function (x) { subMap[x.sichal] = x; });
+        var sicNames = Object.keys(bySic).concat(Object.keys(subMap))
+          .filter(function (x, i, a) { return a.indexOf(x) === i; }).sort();
+        if (sicNames.length) {
+          h += '<p class="dash-sub">시찰 제출 — ' + sicNames.map(function (k) {
+            var x = subMap[k];
+            return esc(k) + ' ' + (x
+              ? '<strong>제출 (' + esc(String(x.submitted_at).slice(0, 10)) + ')</strong>'
+              : '<span class="dash-dim">미제출</span>');
+          }).join(' · ') + '</p>';
+        }
       }
 
       h += '<div class="dash-more">' +

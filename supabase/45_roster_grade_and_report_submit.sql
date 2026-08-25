@@ -13,7 +13,12 @@
 --      덜 끝난 것처럼 보였는데, 이제 제 이름으로 부릅니다.
 --      열람 범위는 예전과 같습니다(정회원 전용 자료는 보이지 않습니다).
 --
---  (3) 시찰 보고서를 노회 서기에게 제출
+--  (3) 관내 교회의 장로
+--      교회마다 장로를 적어 둡니다. 노회 명단에 올라 있으면 <총대장로>로,
+--      명단에 없으면 그냥 <장로>로 보여 주고, 총대는 남은 임기도 함께
+--      알려 줍니다.
+--
+--  (4) 시찰 보고서를 노회 서기에게 제출
 --      각 교회가 시찰에 낸 교회상황 보고서를, 시찰장·서기가 한 해치를
 --      모아 노회 서기에게 제출합니다. 언제 누가 몇 곳을 냈는지 남습니다.
 --
@@ -137,7 +142,16 @@ update public.roster
 
 
 -- ---------------------------------------------------------------------
--- 3. 시찰 보고서를 노회 서기에게 제출
+-- 3. 관내 교회의 장로
+--    교회마다 장로를 적어 둡니다. 이름은 쉼표로 나눕니다.
+--    노회 명단(roster)에 장로로 올라 있는 분은 <총대장로>,
+--    명단에 없는 분은 그냥 <장로>로 보여 줍니다. (화면에서 대조합니다)
+-- ---------------------------------------------------------------------
+alter table public.sichal_churches add column if not exists elders text;
+
+
+-- ---------------------------------------------------------------------
+-- 4. 시찰 보고서를 노회 서기에게 제출
 -- ---------------------------------------------------------------------
 create table if not exists public.sichal_report_submissions (
   id            bigserial primary key,
@@ -237,7 +251,10 @@ grant execute on function public.unsubmit_sichal_reports(integer, text) to authe
 
 
 -- 확인
-select (select count(*) from public.roster
+select (select count(*) from information_schema.columns
+         where table_schema='public' and table_name='sichal_churches'
+           and column_name='elders')                                    as "장로 칸",
+       (select count(*) from public.roster
          where coalesce(position,'') is distinct from coalesce(category,'')) as "직분≠조직분류 (0이어야 정상)",
        (select count(*) from public.roster where role = 'general')           as "일반회원",
        (select count(*) from public.sichal_report_submissions)               as "제출 기록";
