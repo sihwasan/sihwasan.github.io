@@ -25,6 +25,7 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
 <script src="js/my-duties.js"></script>
+<script src="js/date-pick.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var user = SHSAuth.currentUser();
@@ -81,7 +82,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<option' + (p.church === c ? ' selected' : '') + '>' + e(c) + '</option>';
       }).join('') + '</select></div>' +
       '<div class="field"><label>연락처</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
-      '<div class="field"><label>생년월일</label><input type="date" id="q-birth" value="' + e(p.birth_date || '') + '">' +
+      '<div class="field"><label>생년월일</label>' +
+      '<input type="date" id="q-birth" data-birth value="' + e(p.birth_date || '') + '">' +
       '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 회원명단 카드의 남은 임기 표시에 사용됩니다.</span></div>' +
       '<div class="field"><label>교회 주소</label><input type="text" id="q-charr" value="' + e(p.church_addr || '') + '" placeholder="예: 안산시 단원구 ○○로 12"></div>' +
       '<div class="field"><label>자택 주소</label><input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
@@ -152,6 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>';
 
     area.innerHTML = html;
+    SHSDate.attachAll(area);   /* 생년월일 — 손으로 적거나 굴려서 고른다 */
     setupPhoto();
     SHSMyDuties.mount(document.getElementById('duty-area'), p);
 
@@ -319,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function () {
         /* 생년월일·주소·교회 주소는 본인만 수정할 수 있는 항목이므로 별도 저장 */
         return SHSCloud.init().then(function (c) {
           return c.from('profiles').update({
-            birth_date: document.getElementById('q-birth').value || null,
+            birth_date: SHSDate.get(document.getElementById('q-birth')) || null,
             address: document.getElementById('q-addr').value.trim(),
             church_addr: document.getElementById('q-charr').value.trim(),
             updated_at: new Date().toISOString()

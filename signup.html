@@ -43,8 +43,9 @@
     </div>
     <div class="field">
       <label for="reg-birth">생년월일</label>
-      <input type="date" id="reg-birth">
+      <input type="date" id="reg-birth" data-birth>
       <span style="display:block;font-size:0.82rem;color:var(--gray-5);margin-top:5px">
+        손으로 <strong>1955-03-21</strong>처럼 적으셔도 되고, 아래 연·월·일을 굴려 고르셔도 됩니다.<br>
         총회 정년이 <strong>만 70세</strong>이므로, 정회원 자격 확인을 위해 생년월일이 필요합니다.
         적지 않으시면 정회원 등급이 부여되지 않고 승인대기 상태가 됩니다.
       </span>
@@ -100,10 +101,14 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/date-pick.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var e = SHS.esc;
   var msg = document.getElementById('reg-msg');
+
+  /* 생년월일 — 달력 대신 손으로 적거나 연·월·일을 굴려서 고른다 */
+  SHSDate.attachAll(document);
 
   /* 소속 교회는 노회 명단과 대조해야 하므로 목록에서 고르게 한다.
    * 오타로 명단과 어긋나 승인대기로 빠지는 일을 줄인다. */
@@ -153,7 +158,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var name = document.getElementById('reg-name').value.trim();
     var church = churchValue();
-    var birth = document.getElementById('reg-birth').value;
+    var birthEl = document.getElementById('reg-birth');
+    var birth = SHSDate.get(birthEl);
     if (!name || !church) {
       msg.className = 'form-msg err';
       msg.textContent = '성명과 소속 교회를 먼저 입력해 주세요.';
@@ -162,8 +168,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (!birth) {
       msg.className = 'form-msg err';
-      msg.textContent = '생년월일을 입력해 주세요. 총회 정년(만 70세) 확인에 필요합니다.';
-      document.getElementById('reg-birth').focus();
+      msg.textContent = birthEl.value.trim()
+        ? '생년월일을 알아볼 수 없습니다. 1955-03-21 처럼 적어 주세요.'
+        : '생년월일을 입력해 주세요. 총회 정년(만 70세) 확인에 필요합니다.';
+      birthEl.focus();
       return null;
     }
     var adj = SHS.adjustPosition(name, church, document.getElementById('reg-pos').value);

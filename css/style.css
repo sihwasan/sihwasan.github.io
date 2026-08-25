@@ -996,6 +996,14 @@ input.np-bad { border-color: var(--red); }
 /* 명단 표의 작은 안내 (정년 경과 등) */
 .ro-hint { font-size: 0.76rem; color: var(--red); margin-top: 3px; }
 
+/* 생년월일 — 손으로 적는 칸과 연·월·일 고르개 */
+.dp-wrap { display: block; }
+.dp-rows { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+.dp-rows select { width: 100%; }
+.field .dp-rows select { margin: 0; }
+input.dp-bad { border-color: var(--red); }
+.dp-hint { font-size: 0.82rem; color: var(--red); margin-top: 6px; }
+
 /* 관내 교회의 장로 — 총대장로와 그냥 장로를 가려 보여 준다 */
 .eld-list { display: flex; flex-direction: column; gap: 5px; }
 .eld-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
