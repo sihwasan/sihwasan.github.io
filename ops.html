@@ -24,6 +24,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/audit-view.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -47,27 +48,54 @@ document.addEventListener('DOMContentLoaded', function () {
   var isSuper = user.role === 'superadmin';
   var db = null;
 
+  /* 감독(감사 기록)은 예전에 따로 있던 화면이었으나 여기 탭으로 들어왔다.
+   * 열람 권한(canViewAudit)이 있는 분에게만 탭이 보인다. */
+  var canAudit = SHSAuth.canViewAudit(user);
+
   area.innerHTML =
     '<div class="tabs">' +
     '<button class="active" data-tab="ops-alert">시스템 알림</button>' +
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
     '<button data-tab="ops-sched">운영 일정</button>' +
     '<button data-tab="ops-meet">정기노회 일정</button>' +
+    (canAudit ? '<button data-tab="ops-audit">감독 (감사 기록)</button>' : '') +
     '</div>' +
     '<div class="tab-panel active" id="ops-alert"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     '<div class="tab-panel" id="ops-manual"></div>' +
     '<div class="tab-panel" id="ops-sched"></div>' +
-    '<div class="tab-panel" id="ops-meet"></div>';
+    '<div class="tab-panel" id="ops-meet"></div>' +
+    (canAudit ? '<div class="tab-panel" id="ops-audit"></div>' : '');
+
+  var auditReady = false;
+
+  function showTab(id) {
+    var btn = area.querySelector('.tabs button[data-tab="' + id + '"]');
+    if (!btn) return false;
+    area.querySelectorAll('.tabs button').forEach(function (x) { x.classList.remove('active'); });
+    btn.classList.add('active');
+    area.querySelectorAll('.tab-panel').forEach(function (p) {
+      p.classList.toggle('active', p.id === id);
+    });
+    /* 감사 기록은 양이 많으므로 그 탭을 처음 열 때에만 불러온다 */
+    if (id === 'ops-audit' && !auditReady) {
+      auditReady = true;
+      SHSAuditView.mount(document.getElementById('ops-audit'), user);
+    }
+    return true;
+  }
 
   area.querySelectorAll('.tabs button').forEach(function (b) {
-    b.addEventListener('click', function () {
-      area.querySelectorAll('.tabs button').forEach(function (x) { x.classList.remove('active'); });
-      b.classList.add('active');
-      area.querySelectorAll('.tab-panel').forEach(function (p) {
-        p.classList.toggle('active', p.id === b.dataset.tab);
-      });
-    });
+    b.addEventListener('click', function () { showTab(b.dataset.tab); });
   });
+
+  /* 주소 뒤에 #ops-audit 처럼 붙여 오면 그 탭을 바로 연다.
+   * (예전 감독 화면 주소로 들어온 분을 이리로 보내기 위함) */
+  function fromHash() {
+    var id = (location.hash || '').replace(/^#/, '');
+    if (id) showTab(id);
+  }
+  window.addEventListener('hashchange', fromHash);
+  fromHash();
 
   SHSCloud.init().then(function (c) {
     db = c;

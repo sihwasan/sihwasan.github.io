@@ -24,6 +24,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/dashboard.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -152,9 +153,15 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div id="sichal-area"><p style="color:var(--gray-5)">시찰 정보를 불러오는 중...</p></div>';
       html += '<h2>상비부 배정 관리</h2>';
       html += '<div id="committee-area"><p style="color:var(--gray-5)">상비부 정보를 불러오는 중...</p></div>';
+      /* 상비부 대시보드는 예전에 따로 있던 화면이었으나 여기 탭으로 들어왔다.
+       * 그리는 일은 js/dashboard.js 한 곳에 있으므로 상비부 대시보드 화면과
+       * 늘 같은 모습이다. */
+      html += '<h2>상비부 대시보드</h2>';
+      html += '<div id="db-panel"><p style="color:var(--gray-5)">상비부 대시보드를 불러오는 중...</p></div>';
 
       area.innerHTML = html;
       SHS.sectionize(area);
+      SHSDash.mount(document.getElementById('db-panel'), user);
       renderRoster();
       renderElders();
       renderDelegates();

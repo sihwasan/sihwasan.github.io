@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회칙 개정 반영 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<!-- 회칙 개정 반영은 '자료·회칙 관리' 화면의 탭으로 옮겼습니다.
+     예전 주소로 들어오신 분이 헤매지 않도록 그 탭으로 보내 드립니다. -->
+<link rel="canonical" href="https://sihwasan.org/archive-edit.html">
+<script>
+  location.replace('archive-edit.html#tab-rules');
+</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -11,261 +18,17 @@
 <div class="page-head">
   <div class="container">
     <h1>회칙 개정 반영</h1>
-    <div class="crumb">홈 &gt; 임원방 &gt; 회칙 개정 반영</div>
+    <div class="crumb">홈 &gt; 관리자 &gt; 자료·회칙 관리 &gt; 회칙 개정 반영</div>
   </div>
 </div>
 
-<main class="page-body container" style="max-width:960px" id="main">
-  <div id="re-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+<main class="page-body container" id="main">
+  <div class="notice-banner">
+    회칙 개정 반영은 <strong>자료·회칙 관리</strong> 화면의 <strong>회칙 개정 반영</strong> 탭으로 옮겼습니다.
+    잠시 뒤 자동으로 옮겨 드립니다.
+    <a class="btn sm" style="margin-left:10px" href="archive-edit.html#tab-rules">바로 가기</a>
+  </div>
 </main>
 
-<script src="js/auth.js"></script>
-<script src="js/data.js"></script>
-<script src="js/supabase-config.js"></script>
-<script src="js/supabase-auth.js"></script>
-<script src="js/rules.js"></script>
-<script src="js/main.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
- SHS.getUser().then(function (user) {
-  var area = document.getElementById('re-area');
-  var e = SHS.esc;
-  var BOOK = 'presbytery';
-
-  if (!user || !SHSAuth.canManageMembers(user)) {
-    area.innerHTML =
-      '<div class="notice-banner">회칙 개정 반영은 <strong>관리자 등급(노회장·서기·간사)</strong>이 할 수 있습니다.' +
-      (user ? ' 현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 이용할 수 없습니다.'
-            : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
-      '</div>';
-    return;
-  }
-  if (!user.cloud) {
-    area.innerHTML =
-      '<div class="notice-banner">회칙 개정은 서버 로그인(구글 또는 이메일) 후 반영할 수 있습니다. ' +
-      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
-    return;
-  }
-
-  var docs = [], arts = [], curDoc = null;
-
-  function db() { return SHSCloud.init(); }
-
-  function load() {
-    area.innerHTML = '<p style="color:var(--gray-5)">회칙을 불러오는 중...</p>';
-    db().then(function (c) {
-      return Promise.all([
-        c.from('rule_docs').select('*').eq('book', BOOK).order('sort'),
-        c.from('rule_articles').select('*').eq('book', BOOK).order('sort')
-      ]);
-    }).then(function (rs) {
-      if (rs[0].error || rs[1].error) {
-        area.innerHTML = '<div class="notice-banner">회칙을 불러오지 못했습니다: ' +
-          e((rs[0].error || rs[1].error).message) +
-          ' (15 회칙 조문 관리 등록이 필요할 수 있습니다)</div>';
-        return;
-      }
-      docs = rs[0].data || [];
-      arts = rs[1].data || [];
-      if (!docs.length) {
-        area.innerHTML = '<div class="notice-banner">아직 회칙이 등록되지 않았습니다. ' +
-          'supabase/15_rules.sql 을 먼저 실행해 주세요.</div>';
-        return;
-      }
-      if (!curDoc || !docs.filter(function (d) { return d.key === curDoc; }).length) {
-        curDoc = docs[0].key;
-      }
-      draw();
-    });
-  }
-
-  function draw() {
-    var doc = docs.filter(function (d) { return d.key === curDoc; })[0];
-    var mine = arts.filter(function (a) { return a.doc_key === curDoc; });
-
-    var h =
-      '<div class="notice-banner">조문을 고치고 <strong>저장</strong>을 누르면 회칙 페이지에 바로 반영됩니다. ' +
-      '모든 수정은 감사 기록에 남습니다. ' +
-      '<a href="rules-presbytery.html" target="_blank" style="color:var(--navy);text-decoration:underline">회칙 페이지 보기</a></div>' +
-      '<div class="tabs" id="re-tabs">' +
-      docs.map(function (d) {
-        return '<button class="' + (d.key === curDoc ? 'active' : '') + '" data-doc="' + e(d.key) + '">' +
-          e(d.name) + '</button>';
-      }).join('') + '</div>';
-
-    /* 문서 정보 */
-    h += '<div class="admin-card" style="margin-bottom:18px">' +
-      '<h3 style="margin-top:0">문서 정보</h3>' +
-      '<div class="field"><label>문서 이름 (탭에 표시됩니다)</label>' +
-      '<input type="text" id="d-name" value="' + e(doc.name) + '"></div>' +
-      '<div class="field"><label>머리말 (없으면 비워 두세요)</label>' +
-      '<textarea id="d-intro" rows="2">' + e(doc.intro || '') + '</textarea></div>' +
-      '<div class="field"><label>개정 연혁 (없으면 비워 두세요)</label>' +
-      '<textarea id="d-rev" rows="2">' + e(doc.revisions || '') + '</textarea></div>' +
-      '<button class="btn" id="d-save">문서 정보 저장</button>' +
-      '<div class="form-msg" id="d-msg"></div></div>';
-
-    /* 조문 목록 */
-    h += '<h2>조문 (' + mine.length + '개)</h2>' +
-      '<p style="font-size:0.86rem;color:var(--gray-7)">' +
-      '· <strong>장</strong>은 새 장이 시작되는 조문에만 적으시면 됩니다. 같은 장이 이어지면 같은 장 이름을 그대로 두세요.<br>' +
-      '· <strong>내용</strong>에서 <strong>줄을 바꾸면 1, 2, 3 항으로 나뉘어</strong> 표시됩니다.<br>' +
-      '· 순서를 바꾸려면 <strong>위로 / 아래로</strong>를 누르세요.</p>';
-
-    h += '<div id="re-list">';
-    mine.forEach(function (a, i) {
-      h += '<div class="admin-card" style="margin-bottom:14px" data-art="' + a.id + '">' +
-        '<div class="inline-form" style="margin-bottom:6px">' +
-        '<div class="field" style="flex:0 0 220px"><label>장</label>' +
-        '<input type="text" data-f="chapter" value="' + e(a.chapter || '') + '" placeholder="예: 제 1 장 총칙"></div>' +
-        '<div class="field"><label>조 제목</label>' +
-        '<input type="text" data-f="title" value="' + e(a.title || '') + '" placeholder="예: 제1조 (명칭)"></div>' +
-        '</div>' +
-        '<div class="field"><label>내용 (줄을 바꾸면 항이 나뉩니다)</label>' +
-        '<textarea data-f="body" rows="' + Math.min(12, Math.max(2, String(a.body || '').split('\n').length + 1)) + '">' +
-        e(a.body || '') + '</textarea></div>' +
-        '<button class="btn sm" data-save="' + a.id + '">저장</button> ' +
-        '<button class="btn ghost sm" data-up="' + a.id + '"' + (i === 0 ? ' disabled' : '') + '>위로</button> ' +
-        '<button class="btn ghost sm" data-down="' + a.id + '"' + (i === mine.length - 1 ? ' disabled' : '') + '>아래로</button> ' +
-        '<button class="btn ghost sm" data-ins="' + a.id + '">아래에 새 조문</button> ' +
-        '<button class="btn danger sm" data-del="' + a.id + '">삭제</button>' +
-        '<div class="form-msg" data-msg="' + a.id + '"></div>' +
-        '</div>';
-    });
-    h += '</div>';
-    h += '<button class="btn" id="re-add">맨 끝에 새 조문 추가</button>';
-
-    area.innerHTML = h;
-    bind(mine);
-  }
-
-  function bind(mine) {
-    area.querySelectorAll('#re-tabs button').forEach(function (b) {
-      b.addEventListener('click', function () { curDoc = b.dataset.doc; draw(); });
-    });
-
-    /* 문서 정보 저장 */
-    document.getElementById('d-save').addEventListener('click', function () {
-      var msg = document.getElementById('d-msg');
-      var d = {
-        name: document.getElementById('d-name').value.trim(),
-        intro: document.getElementById('d-intro').value.trim() || null,
-        revisions: document.getElementById('d-rev').value.trim() || null,
-        updated_at: new Date().toISOString(), updated_by: user.name
-      };
-      if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '문서 이름을 입력해 주세요.'; return; }
-      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
-      db().then(function (c) {
-        return c.from('rule_docs').update(d).eq('book', BOOK).eq('key', curDoc);
-      }).then(function (r) {
-        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-        SHSCloud.log('update', '회칙 문서 정보 수정', d.name);
-        load();
-      });
-    });
-
-    function card(id) { return area.querySelector('[data-art="' + id + '"]'); }
-    function val(id, f) { return card(id).querySelector('[data-f="' + f + '"]').value; }
-
-    area.querySelectorAll('button[data-save]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var id = b.dataset.save;
-        var msg = area.querySelector('[data-msg="' + id + '"]');
-        var d = {
-          chapter: val(id, 'chapter').trim() || null,
-          title: val(id, 'title').trim() || null,
-          body: val(id, 'body').trim(),
-          updated_at: new Date().toISOString(), updated_by: user.name
-        };
-        if (!d.title && !d.body) {
-          msg.className = 'form-msg err';
-          msg.textContent = '조 제목이나 내용 중 하나는 있어야 합니다.';
-          return;
-        }
-        msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
-        db().then(function (c) {
-          return c.from('rule_articles').update(d).eq('id', id);
-        }).then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-          SHSCloud.log('update', '회칙 조문 수정', (d.title || '(제목 없음)'));
-          msg.className = 'form-msg ok';
-          msg.textContent = '저장되었습니다. 회칙 페이지에 반영되었습니다.';
-        });
-      });
-    });
-
-    /* 순서 바꾸기 : 이웃한 조문과 sort 값을 맞바꾼다 */
-    function swap(id, dir) {
-      var i = -1;
-      mine.forEach(function (a, k) { if (String(a.id) === String(id)) i = k; });
-      var j = i + dir;
-      if (i < 0 || j < 0 || j >= mine.length) return;
-      var A = mine[i], B = mine[j];
-      db().then(function (c) {
-        return Promise.all([
-          c.from('rule_articles').update({ sort: B.sort }).eq('id', A.id),
-          c.from('rule_articles').update({ sort: A.sort }).eq('id', B.id)
-        ]);
-      }).then(function () {
-        SHSCloud.log('update', '회칙 조문 순서 변경', (A.title || '(제목 없음)'));
-        load();
-      });
-    }
-    area.querySelectorAll('button[data-up]').forEach(function (b) {
-      b.addEventListener('click', function () { swap(b.dataset.up, -1); });
-    });
-    area.querySelectorAll('button[data-down]').forEach(function (b) {
-      b.addEventListener('click', function () { swap(b.dataset.down, 1); });
-    });
-
-    /* 새 조문 : 기준 조문 바로 아래에 넣는다 */
-    function addAfter(afterId) {
-      var base = null, next = null;
-      mine.forEach(function (a, k) {
-        if (String(a.id) === String(afterId)) { base = a; next = mine[k + 1] || null; }
-      });
-      var sort;
-      if (!base) sort = (mine.length ? mine[mine.length - 1].sort : 0) + 10;
-      else if (next) sort = (base.sort + next.sort) / 2;
-      else sort = base.sort + 10;
-
-      db().then(function (c) {
-        return c.from('rule_articles').insert({
-          book: BOOK, doc_key: curDoc,
-          chapter: base ? base.chapter : null,
-          title: '', body: '', sort: sort,
-          updated_at: new Date().toISOString(), updated_by: user.name
-        });
-      }).then(function (r) {
-        if (r.error) { alert('추가하지 못했습니다: ' + r.error.message); return; }
-        SHSCloud.log('create', '회칙 조문 추가', curDoc);
-        load();
-      });
-    }
-    area.querySelectorAll('button[data-ins]').forEach(function (b) {
-      b.addEventListener('click', function () { addAfter(b.dataset.ins); });
-    });
-    document.getElementById('re-add').addEventListener('click', function () { addAfter(null); });
-
-    area.querySelectorAll('button[data-del]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var id = b.dataset.del;
-        var t = val(id, 'title') || '(제목 없음)';
-        if (!confirm('"' + t + '" 조문을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
-        db().then(function (c) {
-          return c.from('rule_articles').delete().eq('id', id);
-        }).then(function (r) {
-          if (r.error) { alert(r.error.message); return; }
-          SHSCloud.log('delete', '회칙 조문 삭제', t);
-          load();
-        });
-      });
-    });
-  }
-
-  load();
- });
-});
-</script>
 </body>
 </html>

@@ -63,16 +63,23 @@
   ];
 
   /* 관리자(노회장·서기·간사)에게만 보이는 메뉴.
-   * 홈페이지를 고치는 일은 모두 여기에 모아 둔다. */
-  var ADMIN_NAV = { title: '관리자', href: 'settings.html', sub: [
-    { t: '홈페이지 설정', h: 'settings.html' },
+   * 홈페이지를 고치는 일은 모두 여기에 모아 둔다.
+   *
+   * 예전에는 이 메뉴와 '홈페이지 설정' 화면의 카드가 거의 같은 곳을
+   * 가리켜 두 벌이 되어 있었다. 이제 관리 메뉴는 여기 한 곳에만 두고,
+   * 성격이 이어지는 것은 한 화면의 탭으로 모았다.
+   *   · 상비부 대시보드 → 회원 관리 안의 탭
+   *   · 회칙 개정 반영   → 자료·회칙 관리 안의 탭
+   *   · 감독(감사 기록) → 시스템 운영 안의 탭
+   *   · 직인·도장       → 따로 세운 항목 (예전 '홈페이지 설정' 화면)
+   * 서류 발급은 관리자 일이므로 여기로 들여왔다. */
+  var ADMIN_NAV = { title: '관리자', href: 'manage.html', sub: [
     { t: '사이트 관리', h: 'manage.html' },
     { t: '회원 관리', h: 'admin.html' },
-    { t: '회칙 개정 반영', h: 'rules-edit.html' },
-    { t: '자료실 관리', h: 'archive-edit.html' },
-    { t: '상비부 대시보드', h: 'dashboard.html' },
-    { t: '시스템 운영', h: 'ops.html' },
-    { t: '감독 (감사 기록)', h: 'audit.html' }
+    { t: '서류 발급', h: 'documents.html' },
+    { t: '자료·회칙 관리', h: 'archive-edit.html' },
+    { t: '직인·도장', h: 'settings.html' },
+    { t: '시스템 운영', h: 'ops.html' }
   ]};
 
   /* 상비부 임원에게 내가 맡은 부서 메뉴를 보여준다 */
@@ -114,7 +121,10 @@
     var list = document.querySelector('.gnb-list');
     if (!list || document.getElementById('gnb-admin')) return;
     var here = location.pathname.split('/').pop() || 'index.html';
-    var active = ADMIN_NAV.sub.filter(function (s) { return s.h === here; }).length ? ' active' : '';
+    /* 탭으로 흡수된 예전 주소(감독·회칙 개정 반영)로 들어와도 '관리자'를 켠다 */
+    var MOVED = ['audit.html', 'rules-edit.html'];
+    var active = (ADMIN_NAV.sub.filter(function (s) { return s.h === here; }).length ||
+                  MOVED.indexOf(here) !== -1) ? ' active' : '';
     var li = document.createElement('li');
     li.className = 'gnb-item gnb-admin' + active;
     li.id = 'gnb-admin';
@@ -122,25 +132,6 @@
       ADMIN_NAV.sub.map(function (s) { return '<a href="' + s.h + '">' + s.t + '</a>'; }).join('') +
       '</div>';
     list.appendChild(li);
-    addIssueMenu();
-  }
-
-  /* 관리자에게는 서류발급 메뉴에 직권 발급 화면을 함께 보여준다 */
-  function addIssueMenu() {
-    var links = document.querySelectorAll('.gnb-item > a');
-    for (var i = 0; i < links.length; i++) {
-      if (links[i].getAttribute('href') !== 'request.html') continue;
-      var li = links[i].parentElement;
-      var sub = li.querySelector('.gnb-sub');
-      if (!sub || sub.querySelector('a[href="documents.html"]')) return;
-      var a = document.createElement('a');
-      a.href = 'documents.html';
-      a.textContent = '증명서 직권 발급';
-      sub.appendChild(a);
-      var here = location.pathname.split('/').pop() || 'index.html';
-      if (here === 'documents.html') li.classList.add('active');
-      return;
-    }
   }
 
   /* 화면 표기용 등급 이름
@@ -203,6 +194,52 @@
     });
     html += '</ul></nav>';
     return html;
+  }
+
+  /* 좁은 화면(휴대전화)에서 하위 메뉴 펼치기
+   *
+   * 넓은 화면에서는 메뉴에 마우스를 올리면 하위 메뉴가 나오지만, 휴대전화에는
+   * 올려놓는 동작이 없어 하위 메뉴를 볼 길이 없었다. 그래서 큰 제목을 한 번
+   * 누르면 하위 메뉴가 펼쳐지고, 한 번 더 누르면 그 화면으로 넘어가게 한다.
+   *
+   * 메뉴는 로그인 뒤에 늘어나기도 하므로(관리자·고시부·내 상비부),
+   * 목록 전체에 한 번만 걸어 두고 눌린 자리를 찾아 처리한다. */
+  function setupGnbTap() {
+    var list = document.querySelector('.gnb-list');
+    if (!list || list.dataset.tapReady) return;
+    list.dataset.tapReady = '1';
+
+    function narrow() {
+      return window.matchMedia && window.matchMedia('(max-width: 900px)').matches;
+    }
+
+    list.addEventListener('click', function (ev) {
+      var a = ev.target.closest ? ev.target.closest('.gnb-item > a') : null;
+      if (!a || !list.contains(a)) return;
+      if (!narrow()) return;
+
+      var li = a.parentElement;
+      var sub = li.querySelector('.gnb-sub');
+      if (!sub || !sub.querySelector('a')) return;   /* 하위 메뉴가 없으면 그냥 간다 */
+      if (li.classList.contains('open')) return;     /* 이미 펼쳐져 있으면 그냥 간다 */
+
+      ev.preventDefault();
+      list.querySelectorAll('.gnb-item.open').forEach(function (x) {
+        x.classList.remove('open');
+        var t = x.firstElementChild;
+        if (t && t.tagName === 'A') t.setAttribute('aria-expanded', 'false');
+      });
+      li.classList.add('open');
+      a.setAttribute('aria-expanded', 'true');
+    });
+
+    /* 넓은 화면으로 돌아가면 펼쳐 둔 것을 정리한다 */
+    window.addEventListener('resize', function () {
+      if (narrow()) return;
+      list.querySelectorAll('.gnb-item.open').forEach(function (x) {
+        x.classList.remove('open');
+      });
+    });
   }
 
   function buildFooter() {
@@ -286,6 +323,7 @@
 
     document.body.insertAdjacentHTML('afterbegin', buildTopbar() + buildHeader() + buildGnb());
     document.body.insertAdjacentHTML('beforeend', buildFooter());
+    setupGnbTap();
 
     /* 로그아웃: 이메일 세션과 구글(서버) 세션을 모두 정리한다.
      * 서버 응답이 늦어도 1.5초 후에는 반드시 홈으로 이동한다. */

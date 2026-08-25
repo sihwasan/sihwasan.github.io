@@ -1,0 +1,149 @@
+/* 상비부 대시보드
+ *
+ * 상비부 대시보드는 두 곳에서 쓴다.
+ *   · 상비부 대시보드 화면 (dashboard.html)  — 회원이 본다
+ *   · 회원 관리 화면의 '상비부 대시보드' 탭 — 관리자가 본다
+ * 두 곳이 늘 같은 모습이도록, 그리는 일을 이 파일 한 곳에 두었다.
+ *
+ * mount(자리, 이용자) 로 부르면 그 자리에 대시보드를 그린다.
+ * 권한 확인도 이 안에서 하므로 부르는 쪽에서 따로 볼 필요가 없다.
+ */
+var SHSDash = (function () {
+  'use strict';
+
+  function mount(area, user) {
+    if (!area) return;
+    var e = SHS.esc;
+
+
+    var gate = SHS.memberGate(user, '상비부 대시보드');
+    if (gate) { area.innerHTML = gate; return; }
+    if (!user.cloud) {
+      area.innerHTML = '<div class="notice-banner">상비부 대시보드는 서버 로그인 후 이용할 수 있습니다. ' +
+        '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+      return;
+    }
+
+    function db() { return SHSCloud.init(); }
+    function ymd(d) { return d.toISOString().slice(0, 10); }
+
+    db().then(function (c) {
+      return Promise.all([
+        c.from('committees').select('*').order('sort'),
+        c.from('committee_events').select('*').order('event_date', { ascending: false }).order('id', { ascending: false }),
+        c.rpc('my_committees'),
+        c.from('exam_requests').select('id, status'),
+        c.from('access_requests').select('id, committee, status')
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) {
+        area.innerHTML = '<div class="notice-banner">상비부 정보를 불러오지 못했습니다: ' +
+          e(rs[0].error.message) + ' (20 상비부 대시보드 등록이 필요할 수 있습니다)</div>';
+        return;
+      }
+      var coms = rs[0].data || [];
+      var evs = (rs[1] && rs[1].data) || [];
+      var mine = (rs[2] && rs[2].data) || [];
+      var examPend = ((rs[3] && rs[3].data) || []).filter(function (x) { return x.status === 'pending'; }).length;
+      var accPend = ((rs[4] && rs[4].data) || []).filter(function (x) { return x.status === 'pending'; });
+
+      var mineMap = {};
+      mine.forEach(function (m) { mineMap[m.committee] = m.duty_name; });
+
+      var today = ymd(new Date());
+      var byCom = {};
+      evs.forEach(function (v) { (byCom[v.committee] = byCom[v.committee] || []).push(v); });
+
+      var h = '';
+
+      /* 내가 맡은 상비부 */
+      if (mine.length) {
+        h += '<h2>내가 맡은 상비부</h2><div class="db-grid">';
+        mine.forEach(function (m) {
+          var list = byCom[m.committee] || [];
+          var next = list.filter(function (v) { return v.event_date && v.event_date >= today; })
+                         .sort(function (a, b) { return a.event_date < b.event_date ? -1 : 1; })[0];
+          var todo = list.filter(function (v) { return v.kind === '할일' && !v.done; }).length;
+          var extra = 0;
+          if (m.committee === '고시규칙부') extra = examPend;
+          extra += accPend.filter(function (x) { return x.committee === m.committee; }).length;
+
+          h += '<a class="db-card mine" href="committee.html?c=' + encodeURIComponent(m.committee) + '">' +
+            '<div class="db-role">' + e(m.duty_name) + '</div>' +
+            '<div class="db-name">' + e(m.committee) + '</div>' +
+            '<div class="db-lines">' +
+            (next ? '<div><strong>다음 일정</strong> ' + e(next.event_date) + ' ' + e(next.title) + '</div>'
+                  : '<div style="color:var(--gray-5)">잡힌 일정이 없습니다</div>') +
+            (todo ? '<div><strong>남은 할 일</strong> ' + todo + '건</div>' : '') +
+            (extra ? '<div class="db-alert">처리할 요청 ' + extra + '건</div>' : '') +
+            '</div></a>';
+        });
+        h += '</div>';
+      }
+
+      /* 전체 상비부 */
+      h += '<h2>상비부 활동</h2>' +
+        '<p style="color:var(--gray-5);font-size:0.88rem">노회규칙 제10~12조에 따른 7개 상비부입니다. ' +
+        '부서를 누르시면 그 부서의 일정과 공지를 보실 수 있습니다.</p>' +
+        '<div class="db-grid">';
+      coms.forEach(function (c2) {
+        var list = byCom[c2.name] || [];
+        var next = list.filter(function (v) { return v.event_date && v.event_date >= today; })
+                       .sort(function (a, b) { return a.event_date < b.event_date ? -1 : 1; })[0];
+        var recent = list.filter(function (v) { return v.kind !== '할일'; })[0];
+        h += '<a class="db-card' + (mineMap[c2.name] ? ' mine' : '') + '" href="committee.html?c=' +
+          encodeURIComponent(c2.name) + '">' +
+          '<div class="db-name">' + e(c2.name) + '</div>' +
+          '<div class="db-officer">부장 ' + e((c2.head || '-').split(' ')[0]) +
+          ' · 서기 ' + e((c2.clerk || '-').split(' ')[0]) + '</div>' +
+          '<div class="db-lines">' +
+          (next ? '<div><strong>다음 일정</strong> ' + e(next.event_date) + ' ' + e(next.title) + '</div>' : '') +
+          (recent ? '<div><strong>최근</strong> ' + e(recent.title) + '</div>' : '') +
+          (!next && !recent ? '<div style="color:var(--gray-5)">등록된 활동이 없습니다</div>' : '') +
+          '<div class="db-count">활동 ' + list.length + '건</div>' +
+          '</div></a>';
+      });
+      h += '</div>';
+
+      /* 다가오는 일정 모아 보기 */
+      var upcoming = evs.filter(function (v) { return v.event_date && v.event_date >= today; })
+                        .sort(function (a, b) { return a.event_date < b.event_date ? -1 : 1; })
+                        .slice(0, 12);
+      h += '<h2>다가오는 상비부 일정</h2>';
+      if (!upcoming.length) {
+        h += '<p style="color:var(--gray-5)">잡힌 일정이 없습니다.</p>';
+      } else {
+        h += '<table class="tbl"><thead><tr><th style="width:130px">날짜</th>' +
+          '<th style="width:150px">상비부</th><th>내용</th><th style="width:150px">장소</th></tr></thead><tbody>';
+        upcoming.forEach(function (v) {
+          h += '<tr><td>' + e(v.event_date) + '</td><td>' + e(v.committee) + '</td>' +
+            '<td class="left"><a href="committee.html?c=' + encodeURIComponent(v.committee) +
+            '" style="color:var(--navy);text-decoration:underline">' + e(v.title) + '</a>' +
+            (v.body ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(v.body) + '</div>' : '') +
+            '</td><td>' + e(v.place || '-') + '</td></tr>';
+        });
+        h += '</tbody></table>';
+      }
+
+      /* 최근 공지 */
+      var notices = evs.filter(function (v) { return v.kind === '공지'; }).slice(0, 8);
+      h += '<h2>상비부 공지</h2>';
+      if (!notices.length) {
+        h += '<p style="color:var(--gray-5)">등록된 공지가 없습니다.</p>';
+      } else {
+        h += '<div class="doc-list">' + notices.map(function (v) {
+          return '<div class="doc-item"><div class="d-name">' + e(v.title) + '</div>' +
+            '<div class="d-desc">' + e(v.committee) +
+            (v.created_at ? ' · ' + e(String(v.created_at).slice(0, 10)) : '') +
+            (v.body ? '<br>' + e(v.body) : '') + '</div>' +
+            '<a class="btn sm" href="committee.html?c=' + encodeURIComponent(v.committee) + '">부서로</a></div>';
+        }).join('') + '</div>';
+      }
+
+      area.innerHTML = h;
+      SHS.logAction('view', '상비부 대시보드 열람', '');
+    });
+  }
+
+  return { mount: mount };
+})();

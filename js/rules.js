@@ -106,7 +106,7 @@ var SHSRules = (function () {
       if (user && window.SHSAuth && SHSAuth.canManageMembers(user)) {
         var bar = document.createElement('p');
         bar.style.cssText = 'text-align:right;margin-bottom:14px';
-        bar.innerHTML = '<a class="btn sm" href="rules-edit.html">회칙 개정 반영하기</a>';
+        bar.innerHTML = '<a class="btn sm" href="archive-edit.html#tab-rules">회칙 개정 반영하기</a>';
         tabs.parentNode.insertBefore(bar, tabs);
       }
       return true;
