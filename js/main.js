@@ -159,6 +159,13 @@
     return role;
   }
 
+  /* 알림함 — 상단바에서 '총회 홈페이지' 앞에 둔다.
+   * 확인하지 않은 알림이 있으면 개수를 함께 보여 준다. */
+  function notiLink() {
+    return '<a class="noti-link" href="notifications.html" id="noti-link" title="알림함">알림함' +
+           '<span class="noti-badge hidden" id="noti-count"></span></a>';
+  }
+
   function buildTopbar() {
     var right;
     if (user) {
@@ -172,7 +179,8 @@
     return '<a class="skip-link" href="#main">본문 바로가기</a>' +
       '<div class="topbar"><div class="container">' +
       '<div>대한예수교장로회(합동) 시화산노회</div>' +
-      '<div class="util"><a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' + right + '</div>' +
+      '<div class="util">' + (user ? notiLink() : '') +
+      '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' + right + '</div>' +
       '</div></div>';
   }
 
@@ -367,7 +375,7 @@
 
         var util = document.querySelector('.topbar .util');
         if (util) {
-          util.innerHTML =
+          util.innerHTML = notiLink() +
             '<a href="https://gapck.org" target="_blank" rel="noopener">총회 홈페이지</a>' +
             '<span class="user-name">' + (honorific(p) || p.email) + '</span>' +
             '<span>(' + displayRole(p.role, p.title) + ')</span>' +
@@ -459,8 +467,21 @@
       return c.from('notifications').select('*').is('read_at', null)
         .order('created_at', { ascending: false });
     }).then(function (r) {
-      if (!r || r.error || !r.data || !r.data.length) return;
-      var rows = r.data;
+      var rows = (r && !r.error && r.data) ? r.data : [];
+
+      /* 상단 알림함에 확인하지 않은 개수를 달아 준다 */
+      var dot = document.getElementById('noti-count');
+      if (dot) {
+        dot.textContent = rows.length > 99 ? '99+' : String(rows.length);
+        dot.classList.toggle('hidden', !rows.length);
+        var link = document.getElementById('noti-link');
+        if (link) {
+          link.title = rows.length
+            ? '확인하지 않은 알림이 ' + rows.length + '건 있습니다'
+            : '알림함';
+        }
+      }
+      if (!rows.length) return;
 
       /* 임명·취임 알림은 놓치지 않도록 배너로도 안내한다 */
       var big = rows.filter(function (n) { return n.kind === '임명'; })[0];
