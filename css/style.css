@@ -72,6 +72,7 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .noti-item .n-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .noti-item .n-title { font-weight: 700; color: var(--navy); font-size: 1.02rem; }
 .noti-item .n-date { margin-left: auto; font-size: 0.78rem; color: var(--gray-5); }
+.noti-item .n-from { font-size: 0.84rem; color: var(--gray-5); margin-bottom: 6px; }
 .noti-item .n-body { font-size: 0.92rem; color: var(--gray-7); white-space: pre-wrap; line-height: 1.75; }
 .noti-item .n-kind {
   font-size: 0.72rem; border: 1px solid var(--accent); color: var(--accent); padding: 1px 7px;

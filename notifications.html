@@ -40,6 +40,87 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
+  /* ---------- 전 회원에게 알림 보내기 (관리자만) ----------
+   * 보낸이는 서버가 로그인한 관리자에게서 직접 적는다.
+   * 이 화면에서는 보여 주기만 할 뿐 고칠 수 없다. */
+  var flash = '';        /* 보낸 뒤 알림함을 다시 그려도 남겨 둘 알림말 */
+
+  function sendBox() {
+    if (!SHSAuth.canManageMembers(user)) return '';
+    var who = (user.name || '') + ' ' + (user.title || user.position || '');
+    return '<div class="admin-card" id="nt-send" style="margin-bottom:20px">' +
+      '<h3>전 회원에게 알림 보내기</h3>' +
+      '<p style="color:var(--gray-5);font-size:0.9rem;margin-bottom:16px">' +
+      '승인이 끝난 회원 <strong id="nt-cnt">…</strong>분의 알림함으로 한 번에 갑니다. ' +
+      '(승인대기·정지된 계정은 빠집니다)</p>' +
+      '<div class="inline-form" style="margin-bottom:8px">' +
+      '<div class="field" style="flex:0 0 220px"><label>보낸이</label>' +
+      '<input type="text" value="' + e(who.trim()) + '" disabled></div>' +
+      '<div class="field" style="flex:0 0 120px"><label for="nt-kind">종류</label>' +
+      '<select id="nt-kind"><option>공지</option><option>안내</option>' +
+      '<option>긴급</option><option>회의</option></select></div>' +
+      '<div class="field"><label for="nt-title">제목</label>' +
+      '<input type="text" id="nt-title" maxlength="120"></div>' +
+      '</div>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5);margin:0 0 14px">' +
+      '보낸이는 로그인하신 분으로 정해지며 고칠 수 없습니다.</p>' +
+      '<div class="field"><label for="nt-body">내용</label>' +
+      '<textarea id="nt-body" rows="5"></textarea></div>' +
+      '<p style="margin:0"><button class="btn" id="nt-send-go">전 회원에게 보내기</button>' +
+      '<span id="nt-msg" style="margin-left:12px">' + flash + '</span></p>' +
+      '</div>';
+  }
+
+  function bindSend() {
+    var go = document.getElementById('nt-send-go');
+    if (!go) return;
+    var msg = document.getElementById('nt-msg');
+
+    SHSCloud.init().then(function (c) { return c.rpc('notice_target_count'); })
+      .then(function (r) {
+        var el = document.getElementById('nt-cnt');
+        if (el) el.textContent = (r && !r.error && r.data != null) ? r.data : '전체';
+      }, function () {});
+
+    go.addEventListener('click', function () {
+      var title = document.getElementById('nt-title').value.trim();
+      var body  = document.getElementById('nt-body').value.trim();
+      var kind  = document.getElementById('nt-kind').value;
+      flash = '';
+      if (!title) { msg.innerHTML = '<span style="color:var(--red)">제목을 적어 주세요.</span>'; return; }
+      var cnt = (document.getElementById('nt-cnt') || {}).textContent || '전체';
+      if (!confirm('회원 ' + cnt + '분께 다음 알림을 보냅니다.\n\n[' + kind + '] ' + title +
+                   '\n\n보내시겠습니까?')) return;
+
+      go.disabled = true;
+      msg.textContent = '보내는 중...';
+      SHSCloud.init().then(function (c) {
+        return c.rpc('send_notice_to_all', { p_kind: kind, p_title: title, p_body: body });
+      }).then(function (r) {
+        go.disabled = false;
+        if (r && r.error) {
+          msg.innerHTML = '<span style="color:var(--red)">보내지 못했습니다: ' + e(r.error.message) +
+            '</span>';
+          return;
+        }
+        var n = (r && r.data) || 0;
+        if (!n) {
+          msg.innerHTML = '<span style="color:var(--gray-5)">방금 같은 제목으로 보내셨습니다. ' +
+            '다시 보내시려면 잠시 뒤에 눌러 주세요.</span>';
+          return;
+        }
+        SHS.logAction('add', '전 회원 알림 발송', title + ' (' + n + '명)');
+        /* 알림함을 다시 그리면 이 자리가 새로 만들어지므로 알림말을 넘겨 준다 */
+        flash = '<span style="color:var(--navy)">' + n + '분께 보냈습니다.</span>';
+        msg.innerHTML = flash;
+        load();
+      }, function (x) {
+        go.disabled = false;
+        msg.innerHTML = '<span style="color:var(--red)">보내지 못했습니다: ' + e(String(x)) + '</span>';
+      });
+    });
+  }
+
   function load() {
     SHSCloud.init().then(function (c) {
       return c.from('notifications').select('*').order('created_at', { ascending: false }).limit(100);
@@ -52,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var rows = r.data || [];
       var unread = rows.filter(function (n) { return !n.read_at; });
 
-      var html = '';
+      var html = sendBox();
       if (unread.length) {
         html += '<div class="board-controls"><span style="align-self:center;color:var(--gray-7)">' +
           '읽지 않은 알림 <strong>' + unread.length + '</strong>건</span>' +
@@ -66,12 +147,15 @@ document.addEventListener('DOMContentLoaded', function () {
             '<div class="n-head"><span class="n-kind">' + e(n.kind) + '</span>' +
             '<span class="n-title">' + e(n.title) + '</span>' +
             '<span class="n-date">' + e(String(n.created_at).replace('T', ' ').slice(0, 16)) + '</span></div>' +
+            (n.sent_by_name
+              ? '<div class="n-from">보낸이 ' + e(n.sent_by_name) + '</div>' : '') +
             '<div class="n-body">' + e(n.body || '') + '</div>' +
             (n.read_at ? '' : '<p style="margin:10px 0 0"><button class="btn ghost sm" data-ntread="' + n.id + '">읽음</button></p>') +
             '</div>';
         });
       }
       area.innerHTML = html;
+      bindSend();
 
       function markRead(ids) {
         SHSCloud.init().then(function (c) {
