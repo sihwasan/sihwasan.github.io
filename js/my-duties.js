@@ -99,9 +99,10 @@ var SHSMyDuties = (function () {
           .forEach(function (p) {
             if (firstWord(c[p[0]]) === user.name && tags.indexOf(p[1]) === -1) tags.push(p[1]);
           });
-        /* 1·2·3년조 명단 */
+        /* 1·2·3년조 명단 (서버가 이미 알려 준 것과 겹치지 않게) */
         ['y1', 'y2', 'y3'].forEach(function (y, i) {
-          if (names(c[y]).indexOf(user.name) !== -1) tags.push((i + 1) + '년조');
+          var t = (i + 1) + '년조';
+          if (names(c[y]).indexOf(user.name) !== -1 && tags.indexOf(t) === -1) tags.push(t);
         });
         if (tags.length) mine.push({ name: c.name, tags: tags });
       });

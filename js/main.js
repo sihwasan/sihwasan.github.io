@@ -401,7 +401,8 @@
         }).then(function (r) {
           var list = (r && r.data) || [];
           if (list.length) addCommitteeMenu(list);
-          if (list.filter(function (x) { return x.committee === '고시규칙부'; }).length) addExamMenu();
+          /* 고시부 메뉴는 그 부서 임원에게만 (부원은 해당하지 않는다) */
+          if (list.filter(function (x) { return x.committee === '고시규칙부' && x.is_officer; }).length) addExamMenu();
         }, function () {});
 
         /* 고시부로 따로 지정된 분도 고시부 메뉴를 본다 */

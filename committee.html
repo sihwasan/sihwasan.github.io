@@ -76,11 +76,17 @@ document.addEventListener('DOMContentLoaded', function () {
       com = rs[0].data || { name: NAME };
       evs = (rs[1] && rs[1].data) || [];
       var mine = (rs[2] && rs[2].data) || [];
-      mine.forEach(function (m) { if (m.committee === NAME) { isOfficer = true; myDuty = m.duty_name; } });
+      /* 명단에 이름만 있는 부원과, 쓰기까지 할 수 있는 임원을 구분한다 */
+      mine.forEach(function (m) {
+        if (m.committee !== NAME) return;
+        myDuty = m.duty_name;
+        if (m.is_officer) isOfficer = true;
+      });
       if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '관리자'; }
-      /* 감사부(감사헌의부) 임원이면 다른 부서의 회의록·회계도 감사할 수 있다 */
+      /* 감사부(감사헌의부) 임원이면 다른 부서의 회의록·회계도 감사할 수 있다.
+       * 감사헌의부 부원은 해당하지 않는다. */
       isAuditor = SHSAuth.canManageMembers(user) ||
-                  mine.some(function (m) { return m.committee === '감사헌의부'; });
+                  mine.some(function (m) { return m.committee === '감사헌의부' && m.is_officer; });
       accReqs = (rs[3] && rs[3].data) || [];
       draw();
       SHS.logAction('view', '상비부 열람', NAME);

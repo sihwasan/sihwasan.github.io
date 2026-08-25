@@ -116,7 +116,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '노회 관리자'; }
         /* 감사부(감사헌의부) 임원이면 이 시찰의 회의록·회계를 감사할 수 있다 */
         isAuditor = SHSAuth.canManageMembers(user) ||
-                    ((rs[6] && rs[6].data) || []).some(function (m) { return m.committee === '감사헌의부'; });
+                    ((rs[6] && rs[6].data) || []).some(function (m) {
+                      return m.committee === '감사헌의부' && m.is_officer;
+                    });
         churches = (rs[1] && rs[1].data) || [];
         pastors  = (rs[2] && rs[2].data) || [];
         docs     = (rs[3] && rs[3].data) || [];
