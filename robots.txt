@@ -12,6 +12,7 @@ Disallow: /certificate.html
 Disallow: /mypage.html
 Disallow: /notifications.html
 Disallow: /dashboard.html
+Disallow: /sichal.html
 Disallow: /exam-admin.html
 Disallow: /archive-edit.html
 Disallow: /rules-edit.html

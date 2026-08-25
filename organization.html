@@ -282,6 +282,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '<p><strong>시찰장</strong> ' + dt(s.head || '') + ' / <strong>서기</strong> ' + dt(s.clerk || '') +
         ' / <strong>회계</strong> ' + dt(s.treasurer || '') + '</p>' +
         '<p><strong>소속 교회 (' + chs.length + ')</strong> ' + e(chs.join(', ')) + '</p>' +
+        '<p><a class="btn sm" href="sichal.html?s=' + encodeURIComponent(s.name) + '">' +
+        e(s.name) + ' 화면으로</a></p>' +
         '</div></div>';
     }).join(''));
   }

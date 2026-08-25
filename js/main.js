@@ -27,6 +27,11 @@
       { t: '상비부', h: 'organization.html#committees' },
       { t: '상비부 대시보드', h: 'dashboard.html' }
     ]},
+    { title: '시찰회', href: 'sichal.html?s=%EB%B6%81%EB%B6%80%EC%8B%9C%EC%B0%B0', sub: [
+      { t: '북부시찰', h: 'sichal.html?s=%EB%B6%81%EB%B6%80%EC%8B%9C%EC%B0%B0' },
+      { t: '남부시찰', h: 'sichal.html?s=%EB%82%A8%EB%B6%80%EC%8B%9C%EC%B0%B0' },
+      { t: '상록시찰', h: 'sichal.html?s=%EC%83%81%EB%A1%9D%EC%8B%9C%EC%B0%B0' }
+    ]},
     { title: '회칙', href: 'rules-presbytery.html', sub: [
       { t: '노회 회칙', h: 'rules-presbytery.html' },
       { t: '총회 회칙 안내', h: 'rules-assembly.html' },
@@ -185,8 +190,9 @@
     var here = location.pathname.split('/').pop() || 'index.html';
     var html = '<nav class="gnb" aria-label="주 메뉴"><ul class="gnb-list">';
     NAV.forEach(function (m) {
-      var active = (here === m.href || m.sub.some(function (s) {
-        return s.h.split('#')[0] === here;
+      /* sichal.html?s=북부시찰 처럼 물음표가 붙은 주소도 알아보게 한다 */
+      var active = (here === m.href.split('?')[0] || m.sub.some(function (s) {
+        return s.h.split('#')[0].split('?')[0] === here;
       })) ? ' active' : '';
       html += '<li class="gnb-item' + active + '"><a href="' + m.href + '">' + m.title + '</a><div class="gnb-sub">';
       m.sub.forEach(function (s) { html += '<a href="' + s.h + '">' + s.t + '</a>'; });

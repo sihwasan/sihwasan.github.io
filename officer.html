@@ -85,6 +85,12 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '</tbody></table>';
   }
 
+  /* 교회상황 보고서 (연도별) — 각 교회가 시찰 화면에서 올린 것을 임원이 모아 본다 */
+  html += '<h2>교회상황 보고서</h2>';
+  html += '<p>각 교회가 시찰회 화면에서 올린 해마다의 교회상황 보고서입니다. ' +
+    '연도를 고르면 그 해에 낸 교회와 아직 내지 않은 교회를 함께 보실 수 있습니다.</p>';
+  html += '<div id="cr-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+
   /* 예전에는 여기에 관리 화면으로 가는 카드가 늘어서 있었으나, 같은 곳을
    * 상단 '관리자' 메뉴가 이미 가리키고 있어 길이 두 갈래가 되어 있었다.
    * 이제 관리 화면은 상단 메뉴 한 곳으로만 들어간다. */
@@ -98,6 +104,165 @@ document.addEventListener('DOMContentLoaded', function () {
 
   area.innerHTML = html;
   SHS.sectionize(area);
+  loadChurchReports();
+
+  /* ================= 교회상황 보고서 (연도별) =================
+   * 각 교회는 시찰회 화면에서 올리고, 임원은 여기서 모아 봅니다.
+   * 누가 볼 수 있는지는 데이터베이스가 정하므로(임원·그 시찰 임원·그 교회),
+   * 여기서는 돌아온 것을 그대로 보여 주기만 합니다. */
+  var crRows = [], crChurches = [], crYear = new Date().getFullYear();
+
+  function loadChurchReports() {
+    var box = document.getElementById('cr-area');
+    if (!box) return;
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      box.innerHTML = '<p style="color:var(--gray-5)">서버 로그인 후 교회상황 보고서를 보실 수 있습니다.</p>';
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return Promise.all([
+        c.from('church_reports').select('*').order('year', { ascending: false }).order('church'),
+        c.from('sichal_churches').select('sichal,name,pastor,sort').order('sichal').order('sort')
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) {
+        box.innerHTML = '<p style="color:var(--gray-5)">교회상황 보고서를 불러오지 못했습니다: ' +
+          e(rs[0].error.message) +
+          '<br>Supabase에서 <strong>35_sichal.sql</strong>을 아직 실행하지 않으셨다면 먼저 실행해 주세요.</p>';
+        return;
+      }
+      crRows = rs[0].data || [];
+      crChurches = (rs[1] && rs[1].data) || [];
+      drawChurchReports();
+    }).catch(function (x) {
+      box.innerHTML = '<p style="color:var(--gray-5)">교회상황 보고서를 불러오지 못했습니다: ' +
+        e((x && x.message) || '') + '</p>';
+    });
+  }
+
+  function drawChurchReports() {
+    var box = document.getElementById('cr-area');
+    var years = {};
+    crRows.forEach(function (r) { years[r.year] = 1; });
+    years[crYear] = 1;
+    var yearList = Object.keys(years).map(Number).sort(function (a, b) { return b - a; });
+
+    var mine = crRows.filter(function (r) { return r.year === crYear; });
+    var byChurch = {};
+    mine.forEach(function (r) { byChurch[r.church] = r; });
+
+    var h = '<div class="inline-form" style="margin-bottom:10px">' +
+      '<div class="field" style="flex:0 0 180px"><label>연도</label><select id="cr-year">' +
+      yearList.map(function (y) {
+        return '<option value="' + y + '"' + (y === crYear ? ' selected' : '') + '>' + y + '년</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 200px"><label>&nbsp;</label>' +
+      '<div style="padding-top:8px;color:var(--gray-7);font-size:0.9rem">제출 ' + mine.length + '곳' +
+      (crChurches.length ? ' / 관내 ' + crChurches.length + '곳' : '') + '</div></div>' +
+      '</div>';
+
+    /* 관내 교회 목록이 있으면 그것을 기준으로, 없으면 제출된 것만 늘어놓는다 */
+    var list = crChurches.length
+      ? crChurches.map(function (c) { return { sichal: c.sichal, church: c.name, pastor: c.pastor, r: byChurch[c.name] }; })
+      : mine.map(function (r) { return { sichal: r.sichal, church: r.church, pastor: r.pastor, r: r }; });
+
+    if (!list.length) {
+      box.innerHTML = h + '<p style="color:var(--gray-5)">등록된 교회상황 보고서가 없습니다.</p>';
+      bindCrYear();
+      return;
+    }
+
+    h += '<table class="tbl"><thead><tr><th style="width:110px">시찰</th><th style="width:160px">교회</th>' +
+      '<th style="width:100px">담임</th><th style="width:90px">전체 교인</th>' +
+      '<th style="width:90px">세례교인</th><th style="width:100px">평균 출석</th>' +
+      '<th style="width:90px">제출</th><th style="width:150px">보기</th></tr></thead><tbody>';
+    list.forEach(function (x) {
+      var r = x.r;
+      h += '<tr' + (r ? '' : ' style="opacity:.55"') + '>' +
+        '<td>' + e(x.sichal || '-') + '</td><td>' + e(x.church) + '</td>' +
+        '<td>' + e((r && r.pastor) || x.pastor || '-') + '</td>' +
+        '<td>' + (r && r.members_total != null ? r.members_total : '-') + '</td>' +
+        '<td>' + (r && r.members_baptized != null ? r.members_baptized : '-') + '</td>' +
+        '<td>' + (r && r.worship_avg != null ? r.worship_avg : '-') + '</td>' +
+        '<td>' + (r ? '<span class="role-badge">제출</span>' : '<span style="color:var(--gray-5)">미제출</span>') + '</td>' +
+        '<td>' +
+        (r ? '<button class="btn sm" data-crview="' + r.id + '">내용</button> ' : '') +
+        (r && r.file_path ? '<button class="btn ghost sm" data-crfile="' + r.id + '">첨부</button>' : '') +
+        (!r ? '<span style="color:var(--gray-5)">-</span>' : '') +
+        '</td></tr>';
+    });
+    h += '</tbody></table><div id="cr-view"></div>';
+    box.innerHTML = h;
+    bindCrYear();
+
+    box.querySelectorAll('button[data-crview]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = crRows.filter(function (x) { return String(x.id) === b.dataset.crview; })[0];
+        if (!r) return;
+        document.getElementById('cr-view').innerHTML = crReportView(r);
+        SHS.logAction('view', '교회상황 보고서 열람', r.year + '년 ' + r.church);
+        document.getElementById('cr-view').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    });
+    box.querySelectorAll('button[data-crfile]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = crRows.filter(function (x) { return String(x.id) === b.dataset.crfile; })[0];
+        if (!r) return;
+        SHSCloud.init().then(function (c) {
+          return c.storage.from('church-reports').createSignedUrl(r.file_path, 60);
+        }).then(function (rr) {
+          if (rr.error) { alert('내려받지 못했습니다: ' + rr.error.message); return; }
+          SHSCloud.log('view', '교회상황 보고서 첨부 내려받기', r.year + '년 ' + r.church);
+          window.open(rr.data.signedUrl, '_blank', 'noopener');
+        });
+      });
+    });
+  }
+
+  function bindCrYear() {
+    var sel = document.getElementById('cr-year');
+    if (sel) sel.addEventListener('change', function () {
+      crYear = parseInt(this.value, 10);
+      drawChurchReports();
+    });
+  }
+
+  var CR_FIELDS = [
+    { g: '교인 현황', k: 'members_total',    t: '전체 교인' },
+    { g: '교인 현황', k: 'members_baptized', t: '세례교인' },
+    { g: '교인 현황', k: 'members_new',      t: '새가족 등록' },
+    { g: '직원 현황', k: 'staff_pastors',    t: '교역자' },
+    { g: '직원 현황', k: 'staff_elders',     t: '장로' },
+    { g: '직원 현황', k: 'staff_deacons',    t: '안수집사' },
+    { g: '직원 현황', k: 'staff_kwonsa',     t: '권사' },
+    { g: '예배·교육', k: 'worship_avg',      t: '주일 낮 평균 출석' },
+    { g: '예배·교육', k: 'school_total',     t: '교회학교 학생' },
+    { g: '재정(원)',  k: 'budget_year',      t: '당해 예산' },
+    { g: '재정(원)',  k: 'offering_year',    t: '연간 헌금' }
+  ];
+
+  function crReportView(r) {
+    var h = '<div class="admin-card" style="margin-top:14px"><h3 style="margin-top:0">' +
+      r.year + '년 ' + e(r.church) + ' 교회상황 보고서</h3>' +
+      '<p style="color:var(--gray-5);font-size:0.85rem">' + e(r.sichal || '') +
+      ' · 담임 ' + e(r.pastor || '-') + ' · 제출 ' + e(r.submitted_by || '-') +
+      ' · ' + e(String(r.updated_at || r.created_at || '').slice(0, 10)) + '</p>';
+    var groups = {};
+    CR_FIELDS.forEach(function (f) { (groups[f.g] = groups[f.g] || []).push(f); });
+    Object.keys(groups).forEach(function (g) {
+      h += '<h4 style="margin:14px 0 6px;color:var(--navy)">' + e(g) + '</h4>' +
+        '<table class="tbl" style="margin-bottom:0"><tbody><tr>' +
+        groups[g].map(function (f) { return '<th>' + e(f.t) + '</th>'; }).join('') + '</tr><tr>' +
+        groups[g].map(function (f) {
+          var v = r[f.k];
+          return '<td>' + (v == null ? '-' : Number(v).toLocaleString('ko-KR')) + '</td>';
+        }).join('') + '</tr></tbody></table>';
+    });
+    if (r.dues_paid) h += '<p style="margin-top:12px"><strong>상회비</strong> ' + e(r.dues_paid) + '</p>';
+    if (r.note) h += '<p><strong>특기사항</strong><br><span style="white-space:pre-wrap">' + e(r.note) + '</span></p>';
+    if (r.file_name) h += '<p style="color:var(--gray-5);font-size:0.85rem">첨부 : ' + e(r.file_name) + '</p>';
+    return h + '</div>';
+  }
 
   /* ================= 자료 아카이브 ================= */
   var LEVELS = [

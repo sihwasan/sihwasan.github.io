@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시찰회 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1 id="si-title">시찰회</h1>
+    <div class="crumb">홈 &gt; 시찰회 &gt; <span id="si-crumb">시찰</span></div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="si-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('si-area');
+  var e = SHS.esc;
+
+  /* 주소 뒤 ?s=북부시찰 로 어느 시찰인지 정한다 */
+  var NAME = decodeURIComponent((location.search.match(/[?&]s=([^&]*)/) || [])[1] || '')
+               .replace(/\+/g, ' ');
+  var ACCESS = [
+    { v: 'member',  t: '정회원 전체' },
+    { v: 'sichal',  t: '이 시찰 소속' },
+    { v: 'officer', t: '노회 임원' }
+  ];
+  function accessName(v) {
+    var hit = ACCESS.filter(function (x) { return x.v === v; })[0];
+    return hit ? hit.t : v;
+  }
+
+  var gate = SHS.memberGate(user, '시찰회 화면');
+  if (gate) { area.innerHTML = gate; return; }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">시찰회 화면은 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var sichals = [], sic = null, isOfficer = false, myDuty = '';
+  var churches = [], pastors = [], docs = [], minutes = [], reports = [];
+  var myChurch = user.church || '';
+  var tab = (location.hash || '').replace(/^#/, '') || 'church';
+  var year = new Date().getFullYear();
+
+  function db() { return SHSCloud.init(); }
+  function safeName(s) { return String(s || '').replace(/[^\w.\-가-힣]/g, '_'); }
+
+  /* ---------- 불러오기 ---------- */
+  function load() {
+    db().then(function (c) {
+      return c.from('sichals').select('*').order('sort');
+    }).then(function (r) {
+      if (r.error) {
+        area.innerHTML = '<div class="notice-banner">시찰 정보를 불러오지 못했습니다: ' + e(r.error.message) +
+          '<br><span style="font-size:0.85rem;color:var(--gray-5)">' +
+          'Supabase에서 <strong>35_sichal.sql</strong>을 아직 실행하지 않으셨다면 먼저 실행해 주세요.</span></div>';
+        return;
+      }
+      sichals = r.data || [];
+      if (!sichals.length) {
+        area.innerHTML = '<div class="notice-banner">등록된 시찰이 없습니다. ' +
+          '관리자 → 회원 관리 → 시찰회 관리에서 시찰을 먼저 등록해 주세요.</div>';
+        return;
+      }
+      if (!NAME) NAME = sichals[0].name;
+      sic = sichals.filter(function (s) { return s.name === NAME; })[0];
+      if (!sic) {
+        area.innerHTML = '<div class="notice-banner">"' + e(NAME) + '" 시찰을 찾을 수 없습니다.' +
+          '<div style="margin-top:10px">' + sichals.map(function (s) {
+            return '<a class="btn sm" style="margin-right:6px" href="sichal.html?s=' +
+              encodeURIComponent(s.name) + '">' + e(s.name) + '</a>';
+          }).join('') + '</div></div>';
+        return;
+      }
+      document.getElementById('si-title').textContent = NAME;
+      document.getElementById('si-crumb').textContent = NAME;
+      document.title = NAME + ' - 시화산노회';
+
+      return db().then(function (c) {
+        return Promise.all([
+          c.rpc('my_sichals'),
+          c.from('sichal_churches').select('*').eq('sichal', NAME).order('sort').order('id'),
+          c.from('roster').select('name,church,position,category,note')
+            .eq('sichal', NAME).order('category').order('sort'),
+          c.from('sichal_docs').select('*').eq('sichal', NAME)
+            .order('doc_date', { ascending: false }).order('id', { ascending: false }),
+          c.from('sichal_minutes').select('*').eq('sichal', NAME)
+            .order('met_on', { ascending: false }).order('id', { ascending: false }),
+          c.from('church_reports').select('*').eq('sichal', NAME)
+            .order('year', { ascending: false }).order('church')
+        ]);
+      }).then(function (rs) {
+        var mine = (rs[0] && rs[0].data) || [];
+        mine.forEach(function (m) { if (m.sichal === NAME) { isOfficer = true; myDuty = m.duty_name; } });
+        if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '노회 관리자'; }
+        churches = (rs[1] && rs[1].data) || [];
+        pastors  = (rs[2] && rs[2].data) || [];
+        docs     = (rs[3] && rs[3].data) || [];
+        minutes  = (rs[4] && rs[4].data) || [];
+        reports  = (rs[5] && rs[5].data) || [];
+        draw();
+      });
+    }).catch(function (x) {
+      area.innerHTML = '<div class="notice-banner">시찰회 화면을 불러오지 못했습니다: ' +
+        e((x && x.message) || '') + '</div>';
+    });
+  }
+
+  /* ---------- 화면 얼개 ---------- */
+  function draw() {
+    var h = '';
+
+    h += '<div class="notice-banner">' +
+      (isOfficer
+        ? '<strong>' + e(SHS.honorific(user)) + '</strong>은 이 시찰의 <strong>' + e(myDuty) +
+          '</strong>이시므로 관내 교회·자료·회의록을 등록하고 고치실 수 있습니다.'
+        : '이 시찰의 관내 교회와 자료입니다. 등록·수정은 <strong>시찰장·서기</strong>가 합니다.') +
+      '</div>';
+
+    /* 다른 시찰로 건너가기 */
+    h += '<div class="tabs" style="border-bottom:none;margin-bottom:14px">' +
+      sichals.map(function (s) {
+        return '<button class="' + (s.name === NAME ? 'active' : '') + '" ' +
+          'data-go="' + e(s.name) + '">' + e(s.name) + '</button>';
+      }).join('') + '</div>';
+
+    /* 시찰 개요 */
+    h += '<div class="cm-head"><div class="cm-officers">' +
+      '<span><strong>시찰장</strong> ' + e(sic.head || '-') + '</span>' +
+      '<span><strong>서기</strong> ' + e(sic.clerk || '-') + '</span>' +
+      '<span><strong>회계</strong> ' + e(sic.treasurer || '-') + '</span>' +
+      '</div>' +
+      (sic.area ? '<p class="cm-duty">관할 지역 : ' + e(sic.area) + '</p>' : '') +
+      '</div>';
+
+    h += '<div class="tabs" id="si-tabs">' +
+      '<button class="' + (tab === 'church'  ? 'active' : '') + '" data-t="church">관내 교회 (' + churches.length + ')</button>' +
+      '<button class="' + (tab === 'pastor'  ? 'active' : '') + '" data-t="pastor">목회자 명단 (' + pastors.length + ')</button>' +
+      '<button class="' + (tab === 'doc'     ? 'active' : '') + '" data-t="doc">시찰 자료실 (' + docs.length + ')</button>' +
+      '<button class="' + (tab === 'minutes' ? 'active' : '') + '" data-t="minutes">회의록 (' + minutes.length + ')</button>' +
+      '<button class="' + (tab === 'report'  ? 'active' : '') + '" data-t="report">교회상황 보고서</button>' +
+      '</div><div id="si-body"></div>';
+
+    area.innerHTML = h;
+
+    area.querySelectorAll('button[data-go]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        location.href = 'sichal.html?s=' + encodeURIComponent(b.dataset.go);
+      });
+    });
+    area.querySelectorAll('#si-tabs button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        tab = b.dataset.t;
+        history.replaceState(null, '', location.pathname + location.search + '#' + tab);
+        draw();
+      });
+    });
+
+    if (tab === 'pastor') drawPastors();
+    else if (tab === 'doc') drawDocs();
+    else if (tab === 'minutes') drawMinutes();
+    else if (tab === 'report') drawReports();
+    else drawChurches();
+  }
+
+  /* ================= 관내 교회 ================= */
+  function drawChurches() {
+    var box = document.getElementById('si-body');
+    var h = '';
+
+    if (!churches.length) {
+      h += '<p style="color:var(--gray-5)">등록된 교회가 없습니다.' +
+        (isOfficer ? ' 아래에서 추가해 주세요.' : '') + '</p>';
+    } else {
+      h += '<div class="doc-list">' + churches.map(function (ch, i) {
+        var link = (ch.url || '').trim();
+        if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+        return '<div class="doc-item">' +
+          '<div class="d-name">' +
+          (link
+            ? '<a href="' + e(link) + '" target="_blank" rel="noopener" ' +
+              'style="color:var(--navy);text-decoration:underline">' + e(ch.name) + '</a>'
+            : e(ch.name)) +
+          '</div>' +
+          '<div class="d-desc">' +
+          (ch.pastor ? '담임 ' + e(ch.pastor) + '<br>' : '') +
+          (ch.address ? e(ch.address) + '<br>' : '') +
+          (ch.phone ? '전화 ' + e(ch.phone) + '<br>' : '') +
+          (ch.note ? e(ch.note) : '') +
+          (!link ? '<div style="color:var(--gray-5);font-size:0.8rem">홈페이지가 등록되지 않았습니다.</div>' : '') +
+          '</div>' +
+          (isOfficer
+            ? '<div><button class="btn ghost sm" data-chedit="' + i + '">수정</button> ' +
+              '<button class="btn danger sm" data-chdel="' + i + '">삭제</button></div>'
+            : '') +
+          '</div>';
+      }).join('') + '</div>';
+    }
+
+    if (isOfficer) h += churchForm();
+    box.innerHTML = h;
+    if (isOfficer) bindChurchForm();
+
+    box.querySelectorAll('button[data-chedit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var ch = churches[+b.dataset.chedit];
+        document.getElementById('ch-id').value = ch.id;
+        ['name', 'pastor', 'url', 'address', 'phone', 'note'].forEach(function (k) {
+          document.getElementById('ch-' + k).value = ch[k] || '';
+        });
+        document.getElementById('ch-ftitle').textContent = ch.name + ' 수정';
+        document.getElementById('ch-cancel').classList.remove('hidden');
+        document.getElementById('ch-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    box.querySelectorAll('button[data-chdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var ch = churches[+b.dataset.chdel];
+        if (!confirm('"' + ch.name + '"을(를) 관내 교회 목록에서 지우시겠습니까?')) return;
+        db().then(function (c) {
+          return c.from('sichal_churches').delete().eq('id', ch.id);
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('delete', '관내 교회 삭제', NAME + ' / ' + ch.name);
+          load();
+        });
+      });
+    });
+  }
+
+  function churchForm() {
+    return '<div class="admin-card" style="margin-top:18px">' +
+      '<h3 style="margin-top:0" id="ch-ftitle">관내 교회 추가</h3>' +
+      '<input type="hidden" id="ch-id" value="">' +
+      '<div class="inline-form">' +
+      '<div class="field"><label>교회 이름</label><input type="text" id="ch-name" placeholder="예: 반월교회"></div>' +
+      '<div class="field" style="flex:0 0 150px"><label>담임목사</label><input type="text" id="ch-pastor"></div>' +
+      '<div class="field" style="flex:0 0 170px"><label>연락처</label><input type="text" id="ch-phone" placeholder="031-000-0000"></div>' +
+      '</div>' +
+      '<div class="field"><label>홈페이지 주소 (없으면 비워 두세요)</label>' +
+      '<input type="text" id="ch-url" placeholder="예: https://example.org"></div>' +
+      '<div class="field"><label>주소</label><input type="text" id="ch-address"></div>' +
+      '<div class="field"><label>비고</label><input type="text" id="ch-note"></div>' +
+      '<button class="btn" id="ch-save">저장</button> ' +
+      '<button class="btn ghost hidden" id="ch-cancel">취소</button>' +
+      '<div class="form-msg" id="ch-msg"></div></div>';
+  }
+
+  function bindChurchForm() {
+    document.getElementById('ch-cancel').addEventListener('click', function () {
+      ['id', 'name', 'pastor', 'url', 'address', 'phone', 'note'].forEach(function (k) {
+        document.getElementById('ch-' + k).value = '';
+      });
+      document.getElementById('ch-ftitle').textContent = '관내 교회 추가';
+      this.classList.add('hidden');
+    });
+    document.getElementById('ch-save').addEventListener('click', function () {
+      var msg = document.getElementById('ch-msg');
+      var id = document.getElementById('ch-id').value;
+      var d = { sichal: NAME, updated_at: new Date().toISOString(), updated_by: user.name };
+      ['name', 'pastor', 'url', 'address', 'phone', 'note'].forEach(function (k) {
+        d[k] = document.getElementById('ch-' + k).value.trim() || null;
+      });
+      if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '교회 이름을 입력해 주세요.'; return; }
+      if (!id) d.sort = (churches.length + 1) * 10;
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      db().then(function (c) {
+        return id ? c.from('sichal_churches').update(d).eq('id', id)
+                  : c.from('sichal_churches').insert(d);
+      }).then(function (r) {
+        if (r.error) {
+          msg.className = 'form-msg err';
+          msg.textContent = r.error.code === '23505'
+            ? '같은 이름의 교회가 이미 등록되어 있습니다.' : r.error.message;
+          return;
+        }
+        SHSCloud.log(id ? 'update' : 'create', '관내 교회 ' + (id ? '수정' : '추가'), NAME + ' / ' + d.name);
+        load();
+      });
+    });
+  }
+
+  /* ================= 목회자 명단 ================= */
+  function drawPastors() {
+    var box = document.getElementById('si-body');
+    if (!pastors.length) {
+      box.innerHTML = '<p style="color:var(--gray-5)">이 시찰로 분류된 명단이 없습니다.</p>';
+      return;
+    }
+    var groups = {};
+    pastors.forEach(function (m) { (groups[m.category || '기타'] = groups[m.category || '기타'] || []).push(m); });
+
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다. ' +
+      '명단 자체는 관리자 → 회원 관리 → 노회 명단 관리에서 고칩니다.</p>';
+
+    Object.keys(groups).forEach(function (g) {
+      h += '<h3>' + e(g) + ' (' + groups[g].length + '명)</h3>';
+      h += '<table class="tbl"><thead><tr><th style="width:120px">성명</th>' +
+        '<th style="width:110px">직분</th><th>소속 교회</th><th style="width:160px">비고</th>' +
+        '</tr></thead><tbody>';
+      groups[g].forEach(function (m) {
+        var ch = churches.filter(function (x) { return x.name === m.church; })[0];
+        var link = ch && (ch.url || '').trim();
+        if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
+        h += '<tr><td>' + e(m.name) + '</td><td>' + e(m.position || '-') + '</td>' +
+          '<td>' + (link
+            ? '<a href="' + e(link) + '" target="_blank" rel="noopener" ' +
+              'style="color:var(--navy);text-decoration:underline">' + e(m.church || '-') + '</a>'
+            : e(m.church || '-')) + '</td>' +
+          '<td>' + e(m.note || '-') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    });
+    box.innerHTML = h;
+  }
+
+  /* ================= 시찰 자료실 ================= */
+  var docFile = null;
+
+  function drawDocs() {
+    var box = document.getElementById('si-body');
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      '시찰 서류를 올려 두는 곳입니다. 자료마다 누가 볼 수 있는지 정할 수 있습니다.</p>';
+
+    if (!docs.length) {
+      h += '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>';
+    } else {
+      h += '<table class="tbl"><thead><tr><th style="width:120px">날짜</th><th>제목</th>' +
+        '<th style="width:120px">열람 범위</th><th style="width:170px">자료</th>' +
+        (isOfficer ? '<th style="width:120px">관리</th>' : '') + '</tr></thead><tbody>';
+      docs.forEach(function (d, i) {
+        h += '<tr><td>' + e(d.doc_date || '-') + '</td>' +
+          '<td class="left">' + e(d.title) +
+          (d.description ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(d.description) + '</div>' : '') +
+          '</td>' +
+          '<td><span class="role-badge">' + e(accessName(d.access)) + '</span></td>' +
+          '<td>' +
+          (d.file_path ? '<button class="btn sm" data-dcfile="' + i + '">내려받기</button> ' : '') +
+          (d.link_url ? '<a class="btn ghost sm" href="' + e(d.link_url) + '" target="_blank" rel="noopener">링크</a>' : '') +
+          (!d.file_path && !d.link_url ? '<span style="color:var(--gray-5)">-</span>' : '') +
+          '</td>' +
+          (isOfficer
+            ? '<td><button class="btn ghost sm" data-dcedit="' + i + '">수정</button> ' +
+              '<button class="btn danger sm" data-dcdel="' + i + '">삭제</button></td>'
+            : '') +
+          '</tr>';
+      });
+      h += '</tbody></table>';
+    }
+
+    if (isOfficer) h += docForm();
+    box.innerHTML = h;
+    if (isOfficer) bindDocForm();
+
+    box.querySelectorAll('button[data-dcfile]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = docs[+b.dataset.dcfile];
+        db().then(function (c) {
+          return c.storage.from('sichal-files').createSignedUrl(d.file_path, 60);
+        }).then(function (r) {
+          if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
+          SHSCloud.log('view', '시찰 자료 내려받기', NAME + ' / ' + d.title);
+          window.open(r.data.signedUrl, '_blank', 'noopener');
+        });
+      });
+    });
+    box.querySelectorAll('button[data-dcedit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = docs[+b.dataset.dcedit];
+        document.getElementById('dc-id').value = d.id;
+        document.getElementById('dc-title').value = d.title;
+        document.getElementById('dc-desc').value = d.description || '';
+        document.getElementById('dc-date').value = d.doc_date || '';
+        document.getElementById('dc-access').value = d.access;
+        document.getElementById('dc-link').value = d.link_url || '';
+        document.getElementById('dc-ftitle').textContent = '자료 수정';
+        document.getElementById('dc-cancel').classList.remove('hidden');
+        document.getElementById('dc-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    box.querySelectorAll('button[data-dcdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = docs[+b.dataset.dcdel];
+        if (!confirm('"' + d.title + '" 자료를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+        db().then(function (c) {
+          var pre = d.file_path
+            ? c.storage.from('sichal-files').remove([d.file_path]).catch(function () {})
+            : Promise.resolve();
+          return pre.then(function () { return c.from('sichal_docs').delete().eq('id', d.id); });
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('delete', '시찰 자료 삭제', NAME + ' / ' + d.title);
+          load();
+        });
+      });
+    });
+  }
+
+  function docForm() {
+    return '<div class="admin-card" style="margin-top:18px">' +
+      '<h3 style="margin-top:0" id="dc-ftitle">자료 등록</h3>' +
+      '<input type="hidden" id="dc-id" value="">' +
+      '<div class="inline-form">' +
+      '<div class="field"><label>제목</label><input type="text" id="dc-title"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>날짜</label><input type="date" id="dc-date"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>열람 범위</label><select id="dc-access">' +
+      ACCESS.map(function (a) { return '<option value="' + a.v + '">' + a.t + '</option>'; }).join('') +
+      '</select></div>' +
+      '</div>' +
+      '<div class="field"><label>설명 (선택)</label><input type="text" id="dc-desc"></div>' +
+      '<div class="field"><label>링크 주소 (선택)</label><input type="text" id="dc-link" placeholder="https://..."></div>' +
+      '<div class="field"><label>첨부파일 (선택 · 다시 올리면 예전 파일을 대신합니다)</label>' +
+      '<input type="file" id="dc-file"></div>' +
+      '<button class="btn" id="dc-save">저장</button> ' +
+      '<button class="btn ghost hidden" id="dc-cancel">취소</button>' +
+      '<div class="form-msg" id="dc-msg"></div></div>';
+  }
+
+  function bindDocForm() {
+    SHS.dropZone(document.getElementById('dc-file'), { what: '첨부파일' });
+    document.getElementById('dc-file').addEventListener('change', function () {
+      docFile = this.files[0] || null;
+    });
+    document.getElementById('dc-cancel').addEventListener('click', function () {
+      ['dc-id', 'dc-title', 'dc-desc', 'dc-date', 'dc-link'].forEach(function (id) {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('dc-ftitle').textContent = '자료 등록';
+      docFile = null;
+      this.classList.add('hidden');
+    });
+    document.getElementById('dc-save').addEventListener('click', function () {
+      var msg = document.getElementById('dc-msg');
+      var id = document.getElementById('dc-id').value;
+      var d = {
+        sichal: NAME,
+        title: document.getElementById('dc-title').value.trim(),
+        description: document.getElementById('dc-desc').value.trim() || null,
+        doc_date: document.getElementById('dc-date').value || null,
+        access: document.getElementById('dc-access').value,
+        link_url: document.getElementById('dc-link').value.trim() || null,
+        updated_at: new Date().toISOString(),
+        updated_by: user.name
+      };
+      if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
+      if (!id) d.created_by = user.name;
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+
+      db().then(function (c) {
+        var pre = Promise.resolve(null);
+        if (docFile) {
+          var path = safeName(NAME) + '/doc-' + Date.now() + '-' + safeName(docFile.name);
+          pre = c.storage.from('sichal-files').upload(path, docFile).then(function (r) {
+            if (r.error) throw r.error;
+            return { file_path: path, file_name: docFile.name };
+          });
+        }
+        return pre.then(function (f) {
+          if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
+          return id ? c.from('sichal_docs').update(d).eq('id', id)
+                    : c.from('sichal_docs').insert(d);
+        });
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        SHSCloud.log(id ? 'update' : 'create', '시찰 자료 ' + (id ? '수정' : '등록'), NAME + ' / ' + d.title);
+        docFile = null;
+        load();
+      }).catch(function (x) {
+        msg.className = 'form-msg err';
+        msg.textContent = '저장 실패: ' + ((x && x.message) || x);
+      });
+    });
+  }
+
+  /* ================= 회의록 ================= */
+  var minFile = null;
+
+  function drawMinutes() {
+    var box = document.getElementById('si-body');
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      '시찰회 회의를 기록하고 보관하는 곳입니다. 회의 내용을 화면에 적어 두고, ' +
+      '정리된 문서를 함께 올려 두실 수 있습니다.</p>';
+
+    if (!minutes.length) {
+      h += '<p style="color:var(--gray-5)">등록된 회의록이 없습니다.</p>';
+    } else {
+      h += '<div class="doc-list">' + minutes.map(function (m, i) {
+        return '<div class="doc-item">' +
+          '<div class="d-name">' + e(m.title) + '</div>' +
+          '<div class="d-desc">' +
+          (m.met_on ? '<strong>' + e(m.met_on) + '</strong>' : '') +
+          (m.place ? ' · ' + e(m.place) : '') +
+          '<div style="margin-top:4px"><span class="role-badge">' + e(accessName(m.access)) + '</span></div>' +
+          (m.attendees ? '<div style="margin-top:6px">참석 : ' + e(m.attendees) + '</div>' : '') +
+          '</div>' +
+          '<div>' +
+          '<button class="btn sm" data-mnview="' + i + '">회의록 보기</button> ' +
+          (m.file_path ? '<button class="btn ghost sm" data-mnfile="' + i + '">첨부 내려받기</button> ' : '') +
+          (isOfficer
+            ? '<button class="btn ghost sm" data-mnedit="' + i + '">수정</button> ' +
+              '<button class="btn danger sm" data-mndel="' + i + '">삭제</button>'
+            : '') +
+          '</div></div>';
+      }).join('') + '</div>';
+      h += '<div id="mn-view" style="margin-top:16px"></div>';
+    }
+
+    if (isOfficer) h += minutesForm();
+    box.innerHTML = h;
+    if (isOfficer) bindMinutesForm();
+
+    box.querySelectorAll('button[data-mnview]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var m = minutes[+b.dataset.mnview];
+        document.getElementById('mn-view').innerHTML =
+          '<div class="admin-card"><h3 style="margin-top:0">' + e(m.title) + '</h3>' +
+          '<p style="color:var(--gray-5);font-size:0.85rem">' +
+          e(m.met_on || '') + (m.place ? ' · ' + e(m.place) : '') + '</p>' +
+          (m.attendees ? '<p><strong>참석</strong> ' + e(m.attendees) + '</p>' : '') +
+          '<div style="white-space:pre-wrap;line-height:1.8">' + e(m.body || '(내용이 없습니다)') + '</div>' +
+          '</div>';
+        SHS.logAction('view', '시찰 회의록 열람', NAME + ' / ' + m.title);
+        document.getElementById('mn-view').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    });
+    box.querySelectorAll('button[data-mnfile]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var m = minutes[+b.dataset.mnfile];
+        db().then(function (c) {
+          return c.storage.from('sichal-files').createSignedUrl(m.file_path, 60);
+        }).then(function (r) {
+          if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
+          SHSCloud.log('view', '시찰 회의록 첨부 내려받기', NAME + ' / ' + m.title);
+          window.open(r.data.signedUrl, '_blank', 'noopener');
+        });
+      });
+    });
+    box.querySelectorAll('button[data-mnedit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var m = minutes[+b.dataset.mnedit];
+        document.getElementById('mn-id').value = m.id;
+        document.getElementById('mn-title').value = m.title;
+        document.getElementById('mn-date').value = m.met_on || '';
+        document.getElementById('mn-place').value = m.place || '';
+        document.getElementById('mn-att').value = m.attendees || '';
+        document.getElementById('mn-body').value = m.body || '';
+        document.getElementById('mn-access').value = m.access;
+        document.getElementById('mn-ftitle').textContent = '회의록 수정';
+        document.getElementById('mn-cancel').classList.remove('hidden');
+        document.getElementById('mn-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    box.querySelectorAll('button[data-mndel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var m = minutes[+b.dataset.mndel];
+        if (!confirm('"' + m.title + '" 회의록을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+        db().then(function (c) {
+          var pre = m.file_path
+            ? c.storage.from('sichal-files').remove([m.file_path]).catch(function () {})
+            : Promise.resolve();
+          return pre.then(function () { return c.from('sichal_minutes').delete().eq('id', m.id); });
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('delete', '시찰 회의록 삭제', NAME + ' / ' + m.title);
+          load();
+        });
+      });
+    });
+  }
+
+  function minutesForm() {
+    return '<div class="admin-card" style="margin-top:18px">' +
+      '<h3 style="margin-top:0" id="mn-ftitle">회의록 등록</h3>' +
+      '<input type="hidden" id="mn-id" value="">' +
+      '<div class="inline-form">' +
+      '<div class="field"><label>회의 이름</label>' +
+      '<input type="text" id="mn-title" placeholder="예: 제19회기 제2차 시찰회"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>회의 날짜</label><input type="date" id="mn-date"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>열람 범위</label><select id="mn-access">' +
+      ACCESS.map(function (a) {
+        return '<option value="' + a.v + '"' + (a.v === 'sichal' ? ' selected' : '') + '>' + a.t + '</option>';
+      }).join('') +
+      '</select></div>' +
+      '</div>' +
+      '<div class="field"><label>장소</label><input type="text" id="mn-place"></div>' +
+      '<div class="field"><label>참석자</label>' +
+      '<input type="text" id="mn-att" placeholder="쉼표로 나누어 적어 주세요"></div>' +
+      '<div class="field"><label>회의 내용</label><textarea id="mn-body" rows="8" ' +
+      'placeholder="안건과 결의 사항을 적어 주세요. 줄바꿈은 그대로 보입니다."></textarea></div>' +
+      '<div class="field"><label>첨부파일 (선택 · 정리된 회의록 문서)</label>' +
+      '<input type="file" id="mn-file"></div>' +
+      '<button class="btn" id="mn-save">저장</button> ' +
+      '<button class="btn ghost hidden" id="mn-cancel">취소</button>' +
+      '<div class="form-msg" id="mn-msg"></div></div>';
+  }
+
+  function bindMinutesForm() {
+    SHS.dropZone(document.getElementById('mn-file'), { what: '회의록 문서' });
+    document.getElementById('mn-file').addEventListener('change', function () {
+      minFile = this.files[0] || null;
+    });
+    document.getElementById('mn-cancel').addEventListener('click', function () {
+      ['mn-id', 'mn-title', 'mn-date', 'mn-place', 'mn-att', 'mn-body'].forEach(function (id) {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('mn-ftitle').textContent = '회의록 등록';
+      minFile = null;
+      this.classList.add('hidden');
+    });
+    document.getElementById('mn-save').addEventListener('click', function () {
+      var msg = document.getElementById('mn-msg');
+      var id = document.getElementById('mn-id').value;
+      var d = {
+        sichal: NAME,
+        title: document.getElementById('mn-title').value.trim(),
+        met_on: document.getElementById('mn-date').value || null,
+        place: document.getElementById('mn-place').value.trim() || null,
+        attendees: document.getElementById('mn-att').value.trim() || null,
+        body: document.getElementById('mn-body').value.trim() || null,
+        access: document.getElementById('mn-access').value,
+        updated_at: new Date().toISOString(),
+        updated_by: user.name
+      };
+      if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '회의 이름을 입력해 주세요.'; return; }
+      if (!id) d.created_by = user.name;
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+
+      db().then(function (c) {
+        var pre = Promise.resolve(null);
+        if (minFile) {
+          var path = safeName(NAME) + '/min-' + Date.now() + '-' + safeName(minFile.name);
+          pre = c.storage.from('sichal-files').upload(path, minFile).then(function (r) {
+            if (r.error) throw r.error;
+            return { file_path: path, file_name: minFile.name };
+          });
+        }
+        return pre.then(function (f) {
+          if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
+          return id ? c.from('sichal_minutes').update(d).eq('id', id)
+                    : c.from('sichal_minutes').insert(d);
+        });
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        SHSCloud.log(id ? 'update' : 'create', '시찰 회의록 ' + (id ? '수정' : '등록'), NAME + ' / ' + d.title);
+        minFile = null;
+        load();
+      }).catch(function (x) {
+        msg.className = 'form-msg err';
+        msg.textContent = '저장 실패: ' + ((x && x.message) || x);
+      });
+    });
+  }
+
+  /* ================= 교회상황 보고서 ================= */
+  var repFile = null;
+
+  /* 보고서에 적는 항목. 화면과 저장을 한 곳에서 맞춘다. */
+  var FIELDS = [
+    { g: '교인 현황', k: 'members_total',    t: '전체 교인' },
+    { g: '교인 현황', k: 'members_baptized', t: '세례교인' },
+    { g: '교인 현황', k: 'members_new',      t: '새가족 등록' },
+    { g: '직원 현황', k: 'staff_pastors',    t: '교역자' },
+    { g: '직원 현황', k: 'staff_elders',     t: '장로' },
+    { g: '직원 현황', k: 'staff_deacons',    t: '안수집사' },
+    { g: '직원 현황', k: 'staff_kwonsa',     t: '권사' },
+    { g: '예배·교육', k: 'worship_avg',      t: '주일 낮 평균 출석' },
+    { g: '예배·교육', k: 'school_total',     t: '교회학교 학생' },
+    { g: '재정(원)',  k: 'budget_year',      t: '당해 예산' },
+    { g: '재정(원)',  k: 'offering_year',    t: '연간 헌금' }
+  ];
+
+  function drawReports() {
+    var box = document.getElementById('si-body');
+    var years = {};
+    reports.forEach(function (r) { years[r.year] = 1; });
+    years[year] = 1;
+    var yearList = Object.keys(years).map(Number).sort(function (a, b) { return b - a; });
+
+    var mineOnly = !isOfficer;
+    var canWriteFor = isOfficer
+      ? churches.map(function (c) { return c.name; })
+      : (myChurch ? [myChurch] : []);
+
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      (isOfficer
+        ? '관내 교회의 해마다의 상황 보고서입니다. 시찰장·서기는 교회를 골라 대신 올려 드릴 수 있습니다.'
+        : '자기 교회의 상황 보고서를 올리는 곳입니다. 올린 보고서는 노회 임원방에서도 열람합니다.') +
+      '</p>';
+
+    h += '<div class="field" style="max-width:200px"><label>연도</label>' +
+      '<select id="rp-year">' + yearList.map(function (y) {
+        return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + y + '년</option>';
+      }).join('') + '</select></div>';
+
+    var rows = reports.filter(function (r) {
+      return r.year === year && (!mineOnly || r.church === myChurch);
+    });
+
+    if (isOfficer) {
+      /* 관내 교회를 모두 늘어놓고, 낸 곳과 안 낸 곳을 함께 보여 준다 */
+      h += '<table class="tbl"><thead><tr><th style="width:170px">교회</th><th style="width:110px">담임</th>' +
+        '<th style="width:100px">전체 교인</th><th style="width:100px">세례교인</th>' +
+        '<th style="width:110px">평균 출석</th><th style="width:110px">제출</th>' +
+        '<th style="width:190px">관리</th></tr></thead><tbody>';
+      churches.forEach(function (ch) {
+        var r = rows.filter(function (x) { return x.church === ch.name; })[0];
+        h += '<tr' + (r ? '' : ' style="opacity:.6"') + '>' +
+          '<td>' + e(ch.name) + '</td><td>' + e(ch.pastor || '-') + '</td>' +
+          '<td>' + (r && r.members_total != null ? r.members_total : '-') + '</td>' +
+          '<td>' + (r && r.members_baptized != null ? r.members_baptized : '-') + '</td>' +
+          '<td>' + (r && r.worship_avg != null ? r.worship_avg : '-') + '</td>' +
+          '<td>' + (r ? '<span class="role-badge">제출</span>' : '<span style="color:var(--gray-5)">미제출</span>') + '</td>' +
+          '<td>' +
+          (r ? '<button class="btn sm" data-rpview="' + r.id + '">보기</button> ' : '') +
+          (r && r.file_path ? '<button class="btn ghost sm" data-rpfile="' + r.id + '">첨부</button> ' : '') +
+          '<button class="btn ghost sm" data-rpedit="' + e(ch.name) + '">' + (r ? '수정' : '작성') + '</button>' +
+          (r ? ' <button class="btn danger sm" data-rpdel="' + r.id + '">삭제</button>' : '') +
+          '</td></tr>';
+      });
+      h += '</tbody></table>';
+    } else if (!canWriteFor.length) {
+      h += '<div class="notice-banner">가입 정보에 소속 교회가 없어 보고서를 올릴 수 없습니다. ' +
+        '마이페이지에서 소속 교회를 먼저 채워 주세요.</div>';
+    } else {
+      var mine = rows[0];
+      h += '<div class="notice-banner"><strong>' + e(myChurch) + '</strong>의 ' + year + '년 보고서 ' +
+        (mine ? '— 이미 제출하셨습니다. 아래에서 고쳐 다시 저장하실 수 있습니다.' : '— 아직 제출하지 않으셨습니다.') +
+        '</div>';
+      if (mine) {
+        h += reportView(mine);
+        h += '<div style="margin:10px 0">' +
+          (mine.file_path ? '<button class="btn ghost sm" data-rpfile="' + mine.id + '">첨부 내려받기</button> ' : '') +
+          '<button class="btn danger sm" data-rpdel="' + mine.id + '">삭제</button></div>';
+      }
+      h += '<div id="rp-form"></div>';
+    }
+
+    h += '<div id="rp-view" style="margin-top:16px"></div>';
+    if (isOfficer) h += '<div id="rp-form" style="margin-top:16px"></div>';
+
+    box.innerHTML = h;
+
+    document.getElementById('rp-year').addEventListener('change', function () {
+      year = parseInt(this.value, 10);
+      drawReports();
+    });
+
+    if (!isOfficer && canWriteFor.length) openReportForm(myChurch);
+
+    box.querySelectorAll('button[data-rpview]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = reports.filter(function (x) { return String(x.id) === b.dataset.rpview; })[0];
+        if (!r) return;
+        document.getElementById('rp-view').innerHTML = reportView(r);
+        SHS.logAction('view', '교회상황 보고서 열람', r.year + '년 ' + r.church);
+        document.getElementById('rp-view').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    });
+    box.querySelectorAll('button[data-rpfile]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = reports.filter(function (x) { return String(x.id) === b.dataset.rpfile; })[0];
+        if (!r) return;
+        db().then(function (c) {
+          return c.storage.from('church-reports').createSignedUrl(r.file_path, 60);
+        }).then(function (rr) {
+          if (rr.error) { alert('내려받지 못했습니다: ' + rr.error.message); return; }
+          SHSCloud.log('view', '교회상황 보고서 첨부 내려받기', r.year + '년 ' + r.church);
+          window.open(rr.data.signedUrl, '_blank', 'noopener');
+        });
+      });
+    });
+    box.querySelectorAll('button[data-rpedit]').forEach(function (b) {
+      b.addEventListener('click', function () { openReportForm(b.dataset.rpedit); });
+    });
+    box.querySelectorAll('button[data-rpdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = reports.filter(function (x) { return String(x.id) === b.dataset.rpdel; })[0];
+        if (!r) return;
+        if (!confirm(r.year + '년 ' + r.church + ' 보고서를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+        db().then(function (c) {
+          var pre = r.file_path
+            ? c.storage.from('church-reports').remove([r.file_path]).catch(function () {})
+            : Promise.resolve();
+          return pre.then(function () { return c.from('church_reports').delete().eq('id', r.id); });
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('delete', '교회상황 보고서 삭제', r.year + '년 ' + r.church);
+          load();
+        });
+      });
+    });
+  }
+
+  function reportView(r) {
+    var h = '<div class="admin-card"><h3 style="margin-top:0">' +
+      r.year + '년 ' + e(r.church) + ' 교회상황 보고서</h3>' +
+      '<p style="color:var(--gray-5);font-size:0.85rem">담임 ' + e(r.pastor || '-') +
+      ' · 제출 ' + e(r.submitted_by || '-') +
+      ' · ' + e(String(r.updated_at || r.created_at || '').slice(0, 10)) + '</p>';
+    var groups = {};
+    FIELDS.forEach(function (f) { (groups[f.g] = groups[f.g] || []).push(f); });
+    Object.keys(groups).forEach(function (g) {
+      h += '<h4 style="margin:14px 0 6px;color:var(--navy)">' + e(g) + '</h4>' +
+        '<table class="tbl" style="margin-bottom:0"><tbody><tr>' +
+        groups[g].map(function (f) { return '<th>' + e(f.t) + '</th>'; }).join('') + '</tr><tr>' +
+        groups[g].map(function (f) {
+          var v = r[f.k];
+          return '<td>' + (v == null ? '-' : Number(v).toLocaleString('ko-KR')) + '</td>';
+        }).join('') + '</tr></tbody></table>';
+    });
+    if (r.dues_paid) h += '<p style="margin-top:12px"><strong>상회비</strong> ' + e(r.dues_paid) + '</p>';
+    if (r.note) h += '<p><strong>특기사항</strong><br><span style="white-space:pre-wrap">' + e(r.note) + '</span></p>';
+    if (r.file_name) h += '<p style="color:var(--gray-5);font-size:0.85rem">첨부 : ' + e(r.file_name) + '</p>';
+    return h + '</div>';
+  }
+
+  function openReportForm(church) {
+    var box = document.getElementById('rp-form');
+    if (!box) return;
+    var cur = reports.filter(function (x) {
+      return x.year === year && x.church === church;
+    })[0] || {};
+    var ch = churches.filter(function (x) { return x.name === church; })[0] || {};
+
+    var groups = {};
+    FIELDS.forEach(function (f) { (groups[f.g] = groups[f.g] || []).push(f); });
+
+    var h = '<div class="admin-card"><h3 style="margin-top:0" id="rp-ftitle">' +
+      year + '년 ' + e(church) + ' 교회상황 보고서 ' + (cur.id ? '수정' : '작성') + '</h3>' +
+      '<input type="hidden" id="rp-id" value="' + (cur.id || '') + '">' +
+      '<input type="hidden" id="rp-church" value="' + e(church) + '">' +
+      '<div class="field" style="max-width:260px"><label>담임목사</label>' +
+      '<input type="text" id="rp-pastor" value="' + e(cur.pastor || ch.pastor || '') + '"></div>';
+
+    Object.keys(groups).forEach(function (g) {
+      h += '<h4 style="margin:14px 0 6px;color:var(--navy)">' + e(g) + '</h4><div class="inline-form">' +
+        groups[g].map(function (f) {
+          return '<div class="field" style="flex:0 0 150px"><label>' + e(f.t) + '</label>' +
+            '<input type="number" min="0" id="rp-' + f.k + '" value="' +
+            (cur[f.k] == null ? '' : cur[f.k]) + '"></div>';
+        }).join('') + '</div>';
+    });
+
+    h += '<div class="field"><label>상회비 납부 상황</label>' +
+      '<input type="text" id="rp-dues" value="' + e(cur.dues_paid || '') + '" placeholder="예: 완납 / 3분기까지 납부"></div>' +
+      '<div class="field"><label>특기사항</label><textarea id="rp-note" rows="4">' +
+      e(cur.note || '') + '</textarea></div>' +
+      '<div class="field"><label>보고서 원본 파일 (선택 · 한글·PDF 등)' +
+      (cur.file_name ? ' — 지금 올려 둔 파일 : ' + e(cur.file_name) : '') + '</label>' +
+      '<input type="file" id="rp-file"></div>' +
+      '<button class="btn" id="rp-save">저장</button>' +
+      '<div class="form-msg" id="rp-msg"></div></div>';
+
+    box.innerHTML = h;
+    SHS.dropZone(document.getElementById('rp-file'), { what: '보고서 파일' });
+    document.getElementById('rp-file').addEventListener('change', function () {
+      repFile = this.files[0] || null;
+    });
+    document.getElementById('rp-save').addEventListener('click', saveReport);
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function saveReport() {
+    var msg = document.getElementById('rp-msg');
+    var id = document.getElementById('rp-id').value;
+    var church = document.getElementById('rp-church').value;
+    var d = {
+      year: year, sichal: NAME, church: church,
+      pastor: document.getElementById('rp-pastor').value.trim() || null,
+      dues_paid: document.getElementById('rp-dues').value.trim() || null,
+      note: document.getElementById('rp-note').value.trim() || null,
+      submitted_by: user.name,
+      updated_at: new Date().toISOString()
+    };
+    FIELDS.forEach(function (f) {
+      var v = document.getElementById('rp-' + f.k).value.trim();
+      d[f.k] = v === '' ? null : parseInt(v, 10);
+    });
+    if (!id) d.user_id = user.id;
+
+    msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+    db().then(function (c) {
+      var pre = Promise.resolve(null);
+      if (repFile) {
+        var path = year + '/' + safeName(NAME) + '/' + safeName(church) +
+                   '/' + Date.now() + '-' + safeName(repFile.name);
+        pre = c.storage.from('church-reports').upload(path, repFile).then(function (r) {
+          if (r.error) throw r.error;
+          return { file_path: path, file_name: repFile.name };
+        });
+      }
+      return pre.then(function (f) {
+        if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
+        return id ? c.from('church_reports').update(d).eq('id', id)
+                  : c.from('church_reports').insert(d);
+      });
+    }).then(function (r) {
+      if (r.error) {
+        msg.className = 'form-msg err';
+        msg.textContent = r.error.code === '23505'
+          ? '그 해의 보고서가 이미 있습니다. 화면을 새로 고친 뒤 수정으로 저장해 주세요.'
+          : r.error.message;
+        return;
+      }
+      SHSCloud.log(id ? 'update' : 'create', '교회상황 보고서 ' + (id ? '수정' : '제출'),
+        year + '년 ' + church);
+      repFile = null;
+      load();
+    }).catch(function (x) {
+      msg.className = 'form-msg err';
+      msg.textContent = '저장 실패: ' + ((x && x.message) || x);
+    });
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>
