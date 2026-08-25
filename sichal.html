@@ -25,6 +25,9 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/audit-mark.js"></script>
+<script src="js/minutes-box.js"></script>
+<script src="js/ledger.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -52,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  var sichals = [], sic = null, isOfficer = false, myDuty = '';
+  var sichals = [], sic = null, isOfficer = false, myDuty = '', isAuditor = false;
   var churches = [], pastors = [], docs = [], minutes = [], reports = [];
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
@@ -103,12 +106,17 @@ document.addEventListener('DOMContentLoaded', function () {
           c.from('sichal_minutes').select('*').eq('sichal', NAME)
             .order('met_on', { ascending: false }).order('id', { ascending: false }),
           c.from('church_reports').select('*').eq('sichal', NAME)
-            .order('year', { ascending: false }).order('church')
+            .order('year', { ascending: false }).order('church'),
+          /* 감사부 임원인지 보려고 함께 받아 둔다 */
+          c.rpc('my_committees').then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
         var mine = (rs[0] && rs[0].data) || [];
         mine.forEach(function (m) { if (m.sichal === NAME) { isOfficer = true; myDuty = m.duty_name; } });
         if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '노회 관리자'; }
+        /* 감사부(감사헌의부) 임원이면 이 시찰의 회의록·회계를 감사할 수 있다 */
+        isAuditor = SHSAuth.canManageMembers(user) ||
+                    ((rs[6] && rs[6].data) || []).some(function (m) { return m.committee === '감사헌의부'; });
         churches = (rs[1] && rs[1].data) || [];
         pastors  = (rs[2] && rs[2].data) || [];
         docs     = (rs[3] && rs[3].data) || [];
@@ -154,6 +162,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="' + (tab === 'pastor'  ? 'active' : '') + '" data-t="pastor">목회자 명단 (' + pastors.length + ')</button>' +
       '<button class="' + (tab === 'doc'     ? 'active' : '') + '" data-t="doc">시찰 자료실 (' + docs.length + ')</button>' +
       '<button class="' + (tab === 'minutes' ? 'active' : '') + '" data-t="minutes">회의록 (' + minutes.length + ')</button>' +
+      '<button class="' + (tab === 'ledger'  ? 'active' : '') + '" data-t="ledger">회계 장부</button>' +
       '<button class="' + (tab === 'report'  ? 'active' : '') + '" data-t="report">교회상황 보고서</button>' +
       '</div><div id="si-body"></div>';
 
@@ -175,6 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tab === 'pastor') drawPastors();
     else if (tab === 'doc') drawDocs();
     else if (tab === 'minutes') drawMinutes();
+    else if (tab === 'ledger') drawLedger();
     else if (tab === 'report') drawReports();
     else drawChurches();
   }
@@ -489,182 +499,21 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  /* ================= 회의록 ================= */
-  var minFile = null;
-
+  /* ================= 회의록 =================
+   * 상비부와 똑같은 모양이므로 공용 모듈이 그린다. (js/minutes-box.js)
+   * 감사 칸도 그 안에서 함께 붙는다. */
   function drawMinutes() {
-    var box = document.getElementById('si-body');
-    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-      '시찰회 회의를 기록하고 보관하는 곳입니다. 회의 내용을 화면에 적어 두고, ' +
-      '정리된 문서를 함께 올려 두실 수 있습니다.</p>';
-
-    if (!minutes.length) {
-      h += '<p style="color:var(--gray-5)">등록된 회의록이 없습니다.</p>';
-    } else {
-      h += '<div class="doc-list">' + minutes.map(function (m, i) {
-        return '<div class="doc-item">' +
-          '<div class="d-name">' + e(m.title) + '</div>' +
-          '<div class="d-desc">' +
-          (m.met_on ? '<strong>' + e(m.met_on) + '</strong>' : '') +
-          (m.place ? ' · ' + e(m.place) : '') +
-          '<div style="margin-top:4px"><span class="role-badge">' + e(accessName(m.access)) + '</span></div>' +
-          (m.attendees ? '<div style="margin-top:6px">참석 : ' + e(m.attendees) + '</div>' : '') +
-          '</div>' +
-          '<div>' +
-          '<button class="btn sm" data-mnview="' + i + '">회의록 보기</button> ' +
-          (m.file_path ? '<button class="btn ghost sm" data-mnfile="' + i + '">첨부 내려받기</button> ' : '') +
-          (isOfficer
-            ? '<button class="btn ghost sm" data-mnedit="' + i + '">수정</button> ' +
-              '<button class="btn danger sm" data-mndel="' + i + '">삭제</button>'
-            : '') +
-          '</div></div>';
-      }).join('') + '</div>';
-      h += '<div id="mn-view" style="margin-top:16px"></div>';
-    }
-
-    if (isOfficer) h += minutesForm();
-    box.innerHTML = h;
-    if (isOfficer) bindMinutesForm();
-
-    box.querySelectorAll('button[data-mnview]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var m = minutes[+b.dataset.mnview];
-        document.getElementById('mn-view').innerHTML =
-          '<div class="admin-card"><h3 style="margin-top:0">' + e(m.title) + '</h3>' +
-          '<p style="color:var(--gray-5);font-size:0.85rem">' +
-          e(m.met_on || '') + (m.place ? ' · ' + e(m.place) : '') + '</p>' +
-          (m.attendees ? '<p><strong>참석</strong> ' + e(m.attendees) + '</p>' : '') +
-          '<div style="white-space:pre-wrap;line-height:1.8">' + e(m.body || '(내용이 없습니다)') + '</div>' +
-          '</div>';
-        SHS.logAction('view', '시찰 회의록 열람', NAME + ' / ' + m.title);
-        document.getElementById('mn-view').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      });
-    });
-    box.querySelectorAll('button[data-mnfile]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var m = minutes[+b.dataset.mnfile];
-        db().then(function (c) {
-          return c.storage.from('sichal-files').createSignedUrl(m.file_path, 60);
-        }).then(function (r) {
-          if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
-          SHSCloud.log('view', '시찰 회의록 첨부 내려받기', NAME + ' / ' + m.title);
-          window.open(r.data.signedUrl, '_blank', 'noopener');
-        });
-      });
-    });
-    box.querySelectorAll('button[data-mnedit]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var m = minutes[+b.dataset.mnedit];
-        document.getElementById('mn-id').value = m.id;
-        document.getElementById('mn-title').value = m.title;
-        document.getElementById('mn-date').value = m.met_on || '';
-        document.getElementById('mn-place').value = m.place || '';
-        document.getElementById('mn-att').value = m.attendees || '';
-        document.getElementById('mn-body').value = m.body || '';
-        document.getElementById('mn-access').value = m.access;
-        document.getElementById('mn-ftitle').textContent = '회의록 수정';
-        document.getElementById('mn-cancel').classList.remove('hidden');
-        document.getElementById('mn-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
-    });
-    box.querySelectorAll('button[data-mndel]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var m = minutes[+b.dataset.mndel];
-        if (!confirm('"' + m.title + '" 회의록을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
-        db().then(function (c) {
-          var pre = m.file_path
-            ? c.storage.from('sichal-files').remove([m.file_path]).catch(function () {})
-            : Promise.resolve();
-          return pre.then(function () { return c.from('sichal_minutes').delete().eq('id', m.id); });
-        }).then(function (r) {
-          if (r.error) { alert(r.error.message); return; }
-          SHSCloud.log('delete', '시찰 회의록 삭제', NAME + ' / ' + m.title);
-          load();
-        });
-      });
+    SHSMinutesBox.mount(document.getElementById('si-body'), {
+      kind: 'sichal', owner: NAME, user: user,
+      canEdit: isOfficer, isAuditor: isAuditor
     });
   }
 
-  function minutesForm() {
-    return '<div class="admin-card" style="margin-top:18px">' +
-      '<h3 style="margin-top:0" id="mn-ftitle">회의록 등록</h3>' +
-      '<input type="hidden" id="mn-id" value="">' +
-      '<div class="inline-form">' +
-      '<div class="field"><label>회의 이름</label>' +
-      '<input type="text" id="mn-title" placeholder="예: 제19회기 제2차 시찰회"></div>' +
-      '<div class="field" style="flex:0 0 160px"><label>회의 날짜</label><input type="date" id="mn-date"></div>' +
-      '<div class="field" style="flex:0 0 160px"><label>열람 범위</label><select id="mn-access">' +
-      ACCESS.map(function (a) {
-        return '<option value="' + a.v + '"' + (a.v === 'sichal' ? ' selected' : '') + '>' + a.t + '</option>';
-      }).join('') +
-      '</select></div>' +
-      '</div>' +
-      '<div class="field"><label>장소</label><input type="text" id="mn-place"></div>' +
-      '<div class="field"><label>참석자</label>' +
-      '<input type="text" id="mn-att" placeholder="쉼표로 나누어 적어 주세요"></div>' +
-      '<div class="field"><label>회의 내용</label><textarea id="mn-body" rows="8" ' +
-      'placeholder="안건과 결의 사항을 적어 주세요. 줄바꿈은 그대로 보입니다."></textarea></div>' +
-      '<div class="field"><label>첨부파일 (선택 · 정리된 회의록 문서)</label>' +
-      '<input type="file" id="mn-file"></div>' +
-      '<button class="btn" id="mn-save">저장</button> ' +
-      '<button class="btn ghost hidden" id="mn-cancel">취소</button>' +
-      '<div class="form-msg" id="mn-msg"></div></div>';
-  }
-
-  function bindMinutesForm() {
-    SHS.dropZone(document.getElementById('mn-file'), { what: '회의록 문서' });
-    document.getElementById('mn-file').addEventListener('change', function () {
-      minFile = this.files[0] || null;
-    });
-    document.getElementById('mn-cancel').addEventListener('click', function () {
-      ['mn-id', 'mn-title', 'mn-date', 'mn-place', 'mn-att', 'mn-body'].forEach(function (id) {
-        document.getElementById(id).value = '';
-      });
-      document.getElementById('mn-ftitle').textContent = '회의록 등록';
-      minFile = null;
-      this.classList.add('hidden');
-    });
-    document.getElementById('mn-save').addEventListener('click', function () {
-      var msg = document.getElementById('mn-msg');
-      var id = document.getElementById('mn-id').value;
-      var d = {
-        sichal: NAME,
-        title: document.getElementById('mn-title').value.trim(),
-        met_on: document.getElementById('mn-date').value || null,
-        place: document.getElementById('mn-place').value.trim() || null,
-        attendees: document.getElementById('mn-att').value.trim() || null,
-        body: document.getElementById('mn-body').value.trim() || null,
-        access: document.getElementById('mn-access').value,
-        updated_at: new Date().toISOString(),
-        updated_by: user.name
-      };
-      if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '회의 이름을 입력해 주세요.'; return; }
-      if (!id) d.created_by = user.name;
-      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
-
-      db().then(function (c) {
-        var pre = Promise.resolve(null);
-        if (minFile) {
-          var path = safeName(NAME) + '/min-' + Date.now() + '-' + safeName(minFile.name);
-          pre = c.storage.from('sichal-files').upload(path, minFile).then(function (r) {
-            if (r.error) throw r.error;
-            return { file_path: path, file_name: minFile.name };
-          });
-        }
-        return pre.then(function (f) {
-          if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
-          return id ? c.from('sichal_minutes').update(d).eq('id', id)
-                    : c.from('sichal_minutes').insert(d);
-        });
-      }).then(function (r) {
-        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-        SHSCloud.log(id ? 'update' : 'create', '시찰 회의록 ' + (id ? '수정' : '등록'), NAME + ' / ' + d.title);
-        minFile = null;
-        load();
-      }).catch(function (x) {
-        msg.className = 'form-msg err';
-        msg.textContent = '저장 실패: ' + ((x && x.message) || x);
-      });
+  /* ================= 회계 장부 ================= */
+  function drawLedger() {
+    SHSLedger.mount(document.getElementById('si-body'), {
+      kind: 'sichal', owner: NAME, user: user,
+      canEdit: isOfficer, isAuditor: isAuditor
     });
   }
 

@@ -50,7 +50,8 @@ document.addEventListener('DOMContentLoaded', function () {
    * 이 화면은 직인·도장만 맡는다. */
   area.innerHTML =
     '<div class="notice-banner"><strong>' + e(SHS.honorific(user)) + '</strong>, ' +
-    '증명서에 찍을 직인과 도장을 여기서 등록·교체하실 수 있습니다. ' +
+    '증명서에 찍을 직인과 도장, 감사필에 찍을 감사부 도장·사인을 ' +
+    '여기서 등록·교체하실 수 있습니다. ' +
     '모든 변경은 감사 기록에 남습니다.<br>' +
     '<span style="font-size:0.85rem;color:var(--gray-5)">' +
     '예전에 이 화면에 있던 관리 메뉴는 상단 <strong>관리자</strong> 메뉴로 옮겼습니다.</span></div>' +
@@ -73,16 +74,21 @@ document.addEventListener('DOMContentLoaded', function () {
       var html = '<h2>직인·도장 관리</h2>' +
         '<div class="notice-banner">직인 이미지는 <strong>비공개 저장소</strong>에 보관되며 관리자만 열람할 수 있습니다. ' +
         '등록·교체·열람 기록은 모두 감사 기록에 남습니다. ' +
-        '배경이 없는 <strong>PNG 파일</strong>(투명 배경)로 올리시면 서류에 깔끔하게 찍힙니다.</div>';
+        '배경이 없는 <strong>PNG 파일</strong>(투명 배경)로 올리시면 서류에 깔끔하게 찍힙니다.<br>' +
+        '<span style="font-size:0.85rem;color:var(--gray-5)">' +
+        '<strong>감사부장·감사부 서기</strong> 도장은 봄·가을 감사에서 회의록과 회계 장부에 ' +
+        '감사필을 찍을 때 쓰입니다. 도장 대신 사인 그림을 올리셔도 됩니다.</span></div>';
 
       /* 항목별 이름란 안내
        * 임원은 회기마다 바뀌므로 사람 이름을 예시로 두지 않는다.
        * 노회 직인은 기관 직인이므로 명의가 노회 자체이다. */
       var HOLDER = {
-        '노회직인': { label: '직인 명의', value: '시화산노회', ph: '시화산노회' },
-        '노회장':   { label: '도장 주인 이름', ph: '' },
-        '서기':     { label: '도장 주인 이름', ph: '' },
-        '회록서기': { label: '도장 주인 이름', ph: '' }
+        '노회직인':   { label: '직인 명의', value: '시화산노회', ph: '시화산노회' },
+        '노회장':     { label: '도장 주인 이름', ph: '' },
+        '서기':       { label: '도장 주인 이름', ph: '' },
+        '회록서기':   { label: '도장 주인 이름', ph: '' },
+        '감사부장':   { label: '감사부장 이름', ph: '' },
+        '감사부서기': { label: '감사부 서기 이름', ph: '' }
       };
 
       html += '<div class="doc-list">';

@@ -858,6 +858,52 @@ td.sat .cal-d { color: #2a4d8f; }
   .cert-sheet { border: 2px solid #000; margin: 0 auto; }
 }
 
+/* ---------- 감사필 · 회계 장부 ---------- */
+.audit-box {
+  border: 1px solid var(--gray-2); border-left: 3px solid var(--gray-3);
+  padding: 14px 18px; margin-top: 16px; background: var(--gray-1);
+}
+.audit-box.done { border-left-color: var(--navy); background: #f7f9fc; }
+.audit-head { font-size: 0.92rem; color: var(--gray-7); margin-bottom: 8px; }
+.audit-box.done .audit-head { color: var(--navy); font-weight: 500; }
+.audit-note { font-size: 0.82rem; color: var(--gray-5); line-height: 1.7; margin-top: 6px; }
+.audit-opinion {
+  font-size: 0.9rem; color: var(--gray-7); margin-top: 8px;
+  padding: 8px 12px; background: #fff; border: 1px solid var(--gray-2);
+}
+.audit-stamp {
+  display: inline-block; border: 2px solid var(--red); color: var(--red);
+  font-weight: 700; font-size: 0.85rem; padding: 1px 10px; letter-spacing: 2px;
+}
+.audit-stamp.sm { font-size: 0.7rem; padding: 0 6px; border-width: 1px; letter-spacing: 1px; }
+.audit-signs { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 10px; }
+.audit-sign {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.88rem; color: var(--gray-7);
+}
+.audit-sign img { width: 42px; height: 42px; object-fit: contain; mix-blend-mode: multiply; }
+
+.ledger-sum {
+  display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 18px;
+  border: 1px solid var(--gray-2);
+}
+.ledger-sum > div {
+  flex: 1 1 25%; min-width: 130px; padding: 14px 18px;
+  border-right: 1px solid var(--gray-2);
+}
+.ledger-sum > div:last-child { border-right: none; }
+.ledger-sum span { display: block; font-size: 0.8rem; color: var(--gray-5); margin-bottom: 4px; }
+.ledger-sum strong { font-size: 1.1rem; color: var(--navy); }
+.ledger-sum strong.inc { color: #1a6d3a; }
+.ledger-sum strong.out { color: var(--red); }
+.ledger-sum .left { background: var(--gray-1); }
+.tbl td.lg-inc { color: #1a6d3a; }
+.tbl td.lg-out { color: var(--red); }
+
+@media (max-width: 700px) {
+  .ledger-sum > div { flex: 1 1 50%; border-bottom: 1px solid var(--gray-2); }
+}
+
 /* ---------- 총회자료실 ---------- */
 .lib-updated { font-size: 0.78rem; color: var(--gray-5); margin: -6px 0 18px; }
 .lib-note { font-size: 0.85rem; color: var(--gray-7); margin: -8px 0 14px; }

@@ -24,6 +24,9 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js"></script>
+<script src="js/audit-mark.js"></script>
+<script src="js/minutes-box.js"></script>
+<script src="js/ledger.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -44,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  var com = null, evs = [], isOfficer = false, myDuty = '';
+  var com = null, evs = [], isOfficer = false, myDuty = '', isAuditor = false;
   var accReqs = [];
   var view = new Date(); view.setDate(1);
   var tab = 'cal';
@@ -75,6 +78,9 @@ document.addEventListener('DOMContentLoaded', function () {
       var mine = (rs[2] && rs[2].data) || [];
       mine.forEach(function (m) { if (m.committee === NAME) { isOfficer = true; myDuty = m.duty_name; } });
       if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '관리자'; }
+      /* 감사부(감사헌의부) 임원이면 다른 부서의 회의록·회계도 감사할 수 있다 */
+      isAuditor = SHSAuth.canManageMembers(user) ||
+                  mine.some(function (m) { return m.committee === '감사헌의부'; });
       accReqs = (rs[3] && rs[3].data) || [];
       draw();
       SHS.logAction('view', '상비부 열람', NAME);
@@ -105,6 +111,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="' + (tab === 'cal' ? 'active' : '') + '" data-t="cal">일정 달력</button>' +
       '<button class="' + (tab === 'list' ? 'active' : '') + '" data-t="list">활동 내역</button>' +
       '<button class="' + (tab === 'mem' ? 'active' : '') + '" data-t="mem">부원 명단</button>' +
+      '<button class="' + (tab === 'min' ? 'active' : '') + '" data-t="min">회의록</button>' +
+      '<button class="' + (tab === 'lg' ? 'active' : '') + '" data-t="lg">회계 장부</button>' +
       (NAME === '고시규칙부'
         ? '<button class="' + (tab === 'exam' ? 'active' : '') + '" data-t="exam">모의고사</button>'
         : '') +
@@ -120,6 +128,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (tab === 'cal') drawCal();
     else if (tab === 'list') drawList();
     else if (tab === 'mem') drawMem();
+    else if (tab === 'min') drawMinutes();
+    else if (tab === 'lg') drawLedger();
     else if (tab === 'exam') drawExam();
     else drawAcc();
   }
@@ -351,6 +361,22 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 부원 명단 ---------- */
+  /* 회의록·회계 장부는 시찰과 똑같은 모양이므로 공용 모듈이 그린다.
+   * (js/minutes-box.js · js/ledger.js) */
+  function drawMinutes() {
+    SHSMinutesBox.mount(document.getElementById('cm-body'), {
+      kind: 'committee', owner: NAME, user: user,
+      canEdit: isOfficer, isAuditor: isAuditor
+    });
+  }
+
+  function drawLedger() {
+    SHSLedger.mount(document.getElementById('cm-body'), {
+      kind: 'committee', owner: NAME, user: user,
+      canEdit: isOfficer, isAuditor: isAuditor
+    });
+  }
+
   function drawMem() {
     var box = document.getElementById('cm-body');
     function row(label, s) {
