@@ -858,6 +858,25 @@ td.sat .cal-d { color: #2a4d8f; }
   .cert-sheet { border: 2px solid #000; margin: 0 auto; }
 }
 
+/* ---------- 회의록 (개회 예배 · 결의 사항) ---------- */
+.mn-sub {
+  margin: 20px 0 8px; padding-bottom: 6px; color: var(--navy);
+  font-size: 0.95rem; border-bottom: 1px solid var(--gray-2);
+}
+.mn-sub:first-child { margin-top: 0; }
+.mn-worship {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0; border: 1px solid var(--gray-2); margin-bottom: 4px;
+}
+.mn-worship > div {
+  padding: 10px 14px; font-size: 0.92rem; color: var(--gray-7);
+  border-right: 1px solid var(--gray-2); border-bottom: 1px solid var(--gray-2);
+}
+.mn-worship > div span {
+  display: inline-block; min-width: 52px; color: var(--navy);
+  font-size: 0.82rem; font-weight: 500;
+}
+
 /* ---------- 내가 맡은 일 ---------- */
 .duty-card { border: 1px solid var(--gray-2); }
 .duty-row { display: flex; border-bottom: 1px solid var(--gray-2); }

@@ -33,8 +33,27 @@ var SHSMinutesBox = (function () {
     }
   };
 
+  /* 개회 예배 항목. 양식과 열람 화면이 이 하나를 함께 본다. */
+  var WORSHIP = [
+    { k: 'prayer',    t: '기도' },
+    { k: 'scripture', t: '성경' },
+    { k: 'hymn',      t: '찬송' },
+    { k: 'preacher',  t: '설교자' },
+    { k: 'sermon',    t: '제목' }
+  ];
+
   function esc(s) { return SHS.esc(s); }
   function safeName(s) { return String(s || '').replace(/[^\w.\-가-힣]/g, '_'); }
+
+  /* 적어 둔 것이 하나라도 있을 때에만 개회 예배 칸을 보여 준다 */
+  function worshipBox(m) {
+    var got = WORSHIP.filter(function (w) { return m[w.k]; });
+    if (!got.length) return '';
+    return '<h4 class="mn-sub">개회 예배</h4>' +
+      '<div class="mn-worship">' + got.map(function (w) {
+        return '<div><span>' + esc(w.t) + '</span>' + esc(m[w.k]) + '</div>';
+      }).join('') + '</div>';
+  }
 
   function mount(box, opts) {
     if (!box) return;
@@ -84,6 +103,9 @@ var SHSMinutesBox = (function () {
             (m.met_on ? '<strong>' + esc(m.met_on) + '</strong>' : '') +
             (m.place ? ' · ' + esc(m.place) : '') +
             '<div style="margin-top:4px"><span class="role-badge">' + esc(accessName(m.access)) + '</span></div>' +
+            (m.sermon || m.preacher
+              ? '<div style="margin-top:6px">설교 : ' +
+                esc([m.sermon, m.preacher].filter(Boolean).join(' · ')) + '</div>' : '') +
             (m.attendees ? '<div style="margin-top:6px">참석 : ' + esc(m.attendees) + '</div>' : '') +
             '</div>' +
             '<div>' +
@@ -114,8 +136,10 @@ var SHSMinutesBox = (function () {
             '<p style="color:var(--gray-5);font-size:0.85rem">' +
             esc(m.met_on || '') + (m.place ? ' · ' + esc(m.place) : '') + '</p>' +
             (m.attendees ? '<p><strong>참석</strong> ' + esc(m.attendees) + '</p>' : '') +
+            worshipBox(m) +
+            '<h4 class="mn-sub">결의 사항</h4>' +
             '<div style="white-space:pre-wrap;line-height:1.8">' +
-            esc(m.body || '(내용이 없습니다)') + '</div>' +
+            esc(m.body || '(적어 두신 결의 사항이 없습니다)') + '</div>' +
             SHSAuditMark.panel(m, { isAuditor: opts.isAuditor }) +
             '</div>';
           SHSAuditMark.bind(v, { kind: cfg.table, label: opts.owner + ' 회의록', after: load });
@@ -144,6 +168,9 @@ var SHSMinutesBox = (function () {
           document.getElementById('mn-date').value = m.met_on || '';
           document.getElementById('mn-place').value = m.place || '';
           document.getElementById('mn-att').value = m.attendees || '';
+          WORSHIP.forEach(function (w) {
+            document.getElementById('mn-' + w.k).value = m[w.k] || '';
+          });
           document.getElementById('mn-body').value = m.body || '';
           document.getElementById('mn-access').value = m.access;
           document.getElementById('mn-ftitle').textContent = '회의록 수정';
@@ -185,7 +212,26 @@ var SHSMinutesBox = (function () {
         '<div class="field"><label>장소</label><input type="text" id="mn-place"></div>' +
         '<div class="field"><label>참석자</label>' +
         '<input type="text" id="mn-att" placeholder="쉼표로 나누어 적어 주세요"></div>' +
-        '<div class="field"><label>회의 내용</label><textarea id="mn-body" rows="8" ' +
+
+        /* 개회 예배 — 회의는 예배로 시작하므로 함께 적어 둔다 */
+        '<h4 class="mn-sub">개회 예배</h4>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 200px"><label>기도</label>' +
+        '<input type="text" id="mn-prayer" placeholder="예: 김종수 목사"></div>' +
+        '<div class="field" style="flex:0 0 220px"><label>성경</label>' +
+        '<input type="text" id="mn-scripture" placeholder="예: 시편 133편 1-3절"></div>' +
+        '<div class="field" style="flex:0 0 200px"><label>찬송</label>' +
+        '<input type="text" id="mn-hymn" placeholder="예: 찬송가 391장"></div>' +
+        '</div>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 200px"><label>설교자</label>' +
+        '<input type="text" id="mn-preacher" placeholder="예: 박흥열 목사"></div>' +
+        '<div class="field"><label>제목</label>' +
+        '<input type="text" id="mn-sermon" placeholder="예: 하나 됨을 이루고"></div>' +
+        '</div>' +
+
+        '<h4 class="mn-sub">결의 사항</h4>' +
+        '<div class="field"><textarea id="mn-body" rows="8" ' +
         'placeholder="안건과 결의 사항을 적어 주세요. 줄바꿈은 그대로 보입니다."></textarea></div>' +
         '<div class="field"><label>첨부파일 (선택 · 정리된 회의록 문서)</label>' +
         '<input type="file" id="mn-file"></div>' +
@@ -200,9 +246,9 @@ var SHSMinutesBox = (function () {
         file = this.files[0] || null;
       });
       document.getElementById('mn-cancel').addEventListener('click', function () {
-        ['mn-id', 'mn-title', 'mn-date', 'mn-place', 'mn-att', 'mn-body'].forEach(function (id) {
-          document.getElementById(id).value = '';
-        });
+        ['mn-id', 'mn-title', 'mn-date', 'mn-place', 'mn-att', 'mn-body']
+          .concat(WORSHIP.map(function (w) { return 'mn-' + w.k; }))
+          .forEach(function (id) { document.getElementById(id).value = ''; });
         document.getElementById('mn-ftitle').textContent = '회의록 등록';
         file = null;
         this.classList.add('hidden');
@@ -215,6 +261,11 @@ var SHSMinutesBox = (function () {
           met_on: document.getElementById('mn-date').value || null,
           place: document.getElementById('mn-place').value.trim() || null,
           attendees: document.getElementById('mn-att').value.trim() || null,
+          prayer: document.getElementById('mn-prayer').value.trim() || null,
+          scripture: document.getElementById('mn-scripture').value.trim() || null,
+          hymn: document.getElementById('mn-hymn').value.trim() || null,
+          preacher: document.getElementById('mn-preacher').value.trim() || null,
+          sermon: document.getElementById('mn-sermon').value.trim() || null,
           body: document.getElementById('mn-body').value.trim() || null,
           access: document.getElementById('mn-access').value,
           updated_at: new Date().toISOString(),
