@@ -501,14 +501,14 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .db-card:hover { border-color: var(--gray-5); border-top-color: var(--navy); }
 .db-card.mine { border-top-color: var(--navy); background: var(--gray-1); }
 .db-role {
-  display: inline-block; font-size: 0.74rem; color: #fff; background: var(--navy);
+  display: inline-block; font-size: 0.8rem; color: #fff; background: var(--navy);
   padding: 1px 8px; margin-bottom: 7px;
 }
-.db-name { font-size: 1.06rem; font-weight: 700; color: var(--navy); margin-bottom: 5px; }
-.db-officer { font-size: 0.82rem; color: var(--gray-5); margin-bottom: 9px; }
-.db-lines { font-size: 0.86rem; color: var(--gray-7); line-height: 1.75; }
+.db-name { font-size: 1.16rem; font-weight: 700; color: var(--navy); margin-bottom: 5px; }
+.db-officer { font-size: 0.9rem; color: var(--gray-5); margin-bottom: 9px; }
+.db-lines { font-size: 0.94rem; color: var(--gray-7); line-height: 1.75; }
 .db-lines strong { color: var(--navy); margin-right: 5px; }
-.db-count { font-size: 0.78rem; color: var(--gray-5); margin-top: 6px; }
+.db-count { font-size: 0.86rem; color: var(--gray-5); margin-top: 6px; }
 .db-alert { color: var(--red, #b8352e); font-weight: 600; }
 
 .cm-head { border: 1px solid var(--gray-2); padding: 18px 22px; margin-bottom: 20px; }
@@ -886,33 +886,75 @@ td.sat .cal-d { color: #2a4d8f; }
 .np-item .np-p { font-size: 0.8rem; color: var(--gray-5); min-width: 58px; }
 .np-item .np-c { font-size: 0.86rem; color: var(--gray-7); }
 
-/* ---------- 대시보드 ---------- */
+/* ---------- 대시보드 ----------
+ * 로그인해서 가장 오래 머무는 화면이므로 글자를 조금 크게 두었다. */
 .dash-cols {
   display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-bottom: 26px;
 }
 .dash-h {
-  color: var(--navy); font-size: 1rem; margin: 0 0 12px;
+  color: var(--navy); font-size: 1.14rem; margin: 0 0 12px;
   padding-bottom: 8px; border-bottom: 2px solid var(--navy);
 }
-.dash-none { color: var(--gray-5); font-size: 0.9rem; margin: 6px 0; }
-.dash-sub { font-size: 0.86rem; color: var(--gray-7); margin: 10px 0 0; }
-.dash-dim { color: var(--gray-5); font-size: 0.85rem; }
-.dash-more { margin-top: 10px; font-size: 0.86rem; color: var(--gray-5); }
+.dash-none { color: var(--gray-5); font-size: 0.98rem; margin: 6px 0; }
+.dash-sub { font-size: 0.94rem; color: var(--gray-7); margin: 10px 0 0; }
+.dash-dim { color: var(--gray-5); font-size: 0.92rem; }
+.dash-more { margin-top: 10px; font-size: 0.94rem; color: var(--gray-5); }
 .dash-more a { color: var(--navy); text-decoration: underline; }
 .dash-alert {
   border: 1px solid var(--red); border-left: 3px solid var(--red);
-  background: #fdf6f6; padding: 11px 14px; font-size: 0.9rem; color: var(--gray-7);
+  background: #fdf6f6; padding: 11px 14px; font-size: 0.98rem; color: var(--gray-7);
 }
 .dash-alert a { color: var(--red); text-decoration: underline; font-weight: 500; }
 .dash-ok {
   border: 1px solid var(--gray-2); border-left: 3px solid var(--navy);
-  background: var(--gray-1); padding: 11px 14px; font-size: 0.9rem; color: var(--gray-7);
+  background: var(--gray-1); padding: 11px 14px; font-size: 0.98rem; color: var(--gray-7);
 }
-.dash-tbl { font-size: 0.88rem; margin-bottom: 0; }
+.dash-tbl { font-size: 0.96rem; margin-bottom: 0; }
 #dash-com .db-grid { margin-bottom: 22px; }
+
+/* 대시보드 안의 공지·일정 글자도 함께 키운다 */
+.dash-cols .notice-list li a { font-size: 1.02rem; }
+.dash-cols .notice-list .date { font-size: 0.9rem; }
+.dash-cols .schedule-item .t { font-size: 0.98rem; }
+#dash-noti .noti-card-head .n-label { font-size: 1.1rem; }
+#dash-noti .noti-card-head .n-sub { font-size: 0.94rem; }
+#dash-noti .noti-card-list .n-t { font-size: 1rem; }
+#dash-noti .noti-card-head .more { font-size: 0.9rem; }
+
+/* 나의 교회 · 나의 시찰 상자 */
+.dash-box { border: 1px solid var(--gray-2); border-top: 3px solid var(--navy);
+  background: #fff; padding: 18px 20px; }
+.dash-box-t { font-size: 1.2rem; font-weight: 700; color: var(--navy); }
+.dash-box-s { font-size: 0.96rem; color: var(--gray-5); margin-top: 4px; }
+.dash-kv { margin: 14px 0 0; font-size: 0.98rem; }
+.dash-kv > div { display: flex; gap: 12px; padding: 6px 0; border-top: 1px solid var(--gray-1); }
+.dash-kv dt { flex-shrink: 0; width: 78px; color: var(--gray-5); }
+.dash-kv dd { margin: 0; color: var(--gray-7); word-break: break-all; }
+.dash-kv a { color: var(--navy); text-decoration: underline; }
+
+/* 내가 맡은 상비부 옆에 나란히 놓는 일정·공지.
+ * 칸이 좁으므로 표 대신 한 줄씩 늘어놓는다. */
+.dash-com-cols > section > h2 {
+  font-size: 1.14rem; color: var(--navy); font-weight: 700;
+  border: none; border-bottom: 2px solid var(--navy); border-left: none;
+  padding: 0 0 8px; margin: 0 0 12px;
+}
+.dash-com-cols > section > h2 ~ h2 { margin-top: 26px; }
+.dash-com-cols .db-grid { grid-template-columns: 1fr; margin-bottom: 0; }
+.dc-list { border-top: 1px solid var(--gray-1); }
+.dc-item {
+  display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline;
+  padding: 9px 2px; border-bottom: 1px solid var(--gray-1); color: inherit;
+}
+.dc-item:hover { background: var(--gray-1); }
+.dc-d { font-size: 0.9rem; font-weight: 700; color: var(--navy); flex-shrink: 0; }
+.dc-c { font-size: 0.86rem; color: var(--gray-5); flex-shrink: 0; }
+.dc-t { flex: 1 1 100%; font-size: 0.98rem; color: var(--ink); }
+.dc-b { display: block; font-size: 0.88rem; color: var(--gray-5); margin-top: 2px; }
 
 @media (max-width: 900px) {
   .dash-cols { grid-template-columns: 1fr; gap: 20px; }
+  .dash-com-cols > section > h2 ~ h2 { margin-top: 22px; }
 }
 
 /* ---------- 관내 교회 카드 ---------- */

@@ -45,6 +45,12 @@ var SHSBoard = (function () {
       '<section aria-label="노회 일정"><h3 class="dash-h">노회 일정</h3>' +
       '<div id="dash-sched"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>' +
+      '<div class="dash-cols">' +
+      '<section aria-label="나의 교회"><h3 class="dash-h">나의 교회</h3>' +
+      '<div id="dash-church"><p class="dash-none">불러오는 중...</p></div></section>' +
+      '<section aria-label="나의 시찰"><h3 class="dash-h">나의 시찰</h3>' +
+      '<div id="dash-sichal"><p class="dash-none">불러오는 중...</p></div></section>' +
+      '</div>' +
       '<div id="dash-com"></div>' +
       '<div class="dash-cols">' +
       '<section aria-label="신청서류 발급 현황"><h3 class="dash-h">신청서류 발급 현황</h3>' +
@@ -70,7 +76,10 @@ var SHSBoard = (function () {
         soft(c.from('doc_requests').select('*').order('id', { ascending: false }).limit(50)),
         soft(c.from('doc_issues').select('id,doc_no,doc_type,issued_on,void_yn,request_id')
               .order('id', { ascending: false }).limit(50)),
-        soft(c.from('church_reports').select('year,sichal,church,updated_at').eq('year', year))
+        soft(c.from('church_reports').select('year,sichal,church,updated_at').eq('year', year)),
+        soft(c.from('sichal_churches').select('sichal,name,pastor,url,address,phone')),
+        soft(c.from('sichals').select('name,area,head,clerk,treasurer').order('sort')),
+        soft(c.rpc('my_sichal_name'))
       ]);
     }).then(function (rs) {
       drawNoti((rs[0] && rs[0].data) || []);
@@ -78,7 +87,70 @@ var SHSBoard = (function () {
       drawSchedule((rs[2] && rs[2].data) || []);
       drawDocs((rs[3] && rs[3].data) || [], (rs[4] && rs[4].data) || []);
       drawReports((rs[5] && rs[5].data) || []);
+      drawMine((rs[6] && rs[6].data) || [], (rs[7] && rs[7].data) || [],
+               (rs[8] && rs[8].data) || '');
     }).catch(function () {});
+
+    /* ---------- 나의 교회 · 나의 시찰 ----------
+     * 내 교회와 내 시찰이 어디인지, 누가 임원인지 한자리에서 보여 준다.
+     * 교회는 노회 명단이 아니라 관내 교회(sichal_churches)에서 찾는다. */
+    function drawMine(churches, sichals, sicName) {
+      var myChurch = user.church || '';
+      var row = churches.filter(function (x) { return x.name === myChurch; })[0] || null;
+      var sic = String(sicName || (row && row.sichal) || '');
+      var link = 'sichal.html?s=' + encodeURIComponent(sic);
+
+      /* 나의 교회 */
+      var el = document.getElementById('dash-church');
+      var h = '';
+      if (!myChurch) {
+        h = '<p class="dash-none">가입 정보에 소속 교회가 없습니다. ' +
+            '<a href="mypage.html">내 정보</a>에서 등록해 주세요.</p>';
+      } else {
+        h = '<div class="dash-box">' +
+          '<div class="dash-box-t">' + esc(myChurch) + '</div>' +
+          '<div class="dash-box-s">' +
+          (sic ? esc(sic) : '시찰 미지정') +
+          (row && row.pastor ? ' · 담임 ' + esc(row.pastor) : '') + '</div>' +
+          (row
+            ? '<dl class="dash-kv">' +
+              (row.address ? '<div><dt>주소</dt><dd>' + esc(row.address) + '</dd></div>' : '') +
+              (row.phone ? '<div><dt>전화</dt><dd><a href="tel:' + esc(row.phone) + '">' +
+                            esc(row.phone) + '</a></dd></div>' : '') +
+              (row.url ? '<div><dt>홈페이지</dt><dd><a href="' + esc(row.url) +
+                          '" target="_blank" rel="noopener">' + esc(row.url) + '</a></dd></div>' : '') +
+              '</dl>' +
+              (!row.address && !row.phone && !row.url
+                ? '<p class="dash-none">주소·연락처·홈페이지가 아직 비어 있습니다.</p>' : '')
+            : '<p class="dash-none">관내 교회 명단에 이 교회가 아직 없습니다. ' +
+              '노회 사무실로 알려 주시기 바랍니다.</p>');
+        h += '</div><div class="dash-more">' +
+          (sic ? '<a href="' + link + '#church">교회 정보 보기·고치기</a>' : '') + '</div>';
+      }
+      el.innerHTML = h;
+
+      /* 나의 시찰 */
+      el = document.getElementById('dash-sichal');
+      var s2 = sichals.filter(function (x) { return x.name === sic; })[0] || null;
+      if (!sic) {
+        el.innerHTML = '<p class="dash-none">속한 시찰을 알 수 없습니다. ' +
+          '노회 사무실(031-486-9993)로 알려 주시기 바랍니다.</p>';
+        return;
+      }
+      var cnt = churches.filter(function (x) { return x.sichal === sic; }).length;
+      el.innerHTML = '<div class="dash-box">' +
+        '<div class="dash-box-t">' + esc(sic) + '</div>' +
+        (s2 && s2.area ? '<div class="dash-box-s">' + esc(s2.area) + '</div>' : '') +
+        '<dl class="dash-kv">' +
+        '<div><dt>시찰장</dt><dd>' + esc((s2 && s2.head) || '-') + '</dd></div>' +
+        '<div><dt>서기</dt><dd>' + esc((s2 && s2.clerk) || '-') + '</dd></div>' +
+        '<div><dt>회계</dt><dd>' + esc((s2 && s2.treasurer) || '-') + '</dd></div>' +
+        '<div><dt>관내 교회</dt><dd>' + cnt + '곳</dd></div>' +
+        '</dl></div>' +
+        '<div class="dash-more"><a href="' + link + '#church">시찰 화면으로</a>' +
+        ' · <a href="' + link + '#doc">자료실</a>' +
+        ' · <a href="' + link + '#minutes">회의록</a></div>';
+    }
 
     /* ---------- 나의 알림 ---------- */
     function drawNoti(rows) {

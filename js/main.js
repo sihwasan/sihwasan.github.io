@@ -100,24 +100,6 @@
     list.insertBefore(li, list.firstChild);
   }
 
-  /* 상비부 임원에게 내가 맡은 부서 메뉴를 보여준다 */
-  function addCommitteeMenu(list) {
-    var ul = document.querySelector('.gnb-list');
-    if (!ul || document.getElementById('gnb-com')) return;
-    var li = document.createElement('li');
-    li.className = 'gnb-item gnb-admin';
-    li.id = 'gnb-com';
-    li.innerHTML = '<a href="dashboard.html">내 상비부</a><div class="gnb-sub">' +
-      list.map(function (m) {
-        return '<a href="committee.html?c=' + encodeURIComponent(m.committee) + '">' +
-          m.committee + ' (' + m.duty_name + ')</a>';
-      }).join('') +
-      '<a href="dashboard.html">상비부 대시보드</a></div>';
-    var exam = document.getElementById('gnb-exam');
-    var admin = document.getElementById('gnb-admin');
-    ul.insertBefore(li, exam || admin || null);
-  }
-
   /* 고시부 부장·서기에게만 보이는 메뉴 */
   function addExamMenu() {
     var list = document.querySelector('.gnb-list');
@@ -229,7 +211,7 @@
    * 올려놓는 동작이 없어 하위 메뉴를 볼 길이 없었다. 그래서 큰 제목을 한 번
    * 누르면 하위 메뉴가 펼쳐지고, 한 번 더 누르면 그 화면으로 넘어가게 한다.
    *
-   * 메뉴는 로그인 뒤에 늘어나기도 하므로(관리자·고시부·내 상비부),
+   * 메뉴는 로그인 뒤에 늘어나기도 하므로(대시보드·고시부·관리자),
    * 목록 전체에 한 번만 걸어 두고 눌린 자리를 찾아 처리한다. */
   function setupGnbTap() {
     var list = document.querySelector('.gnb-list');
@@ -419,12 +401,11 @@
         /* 관리자에게 관리자 메뉴를 붙인다 */
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) addAdminMenu();
 
-        /* 상비부 임원이면 내 부서 메뉴를 붙인다 */
+        /* 내가 맡은 상비부는 대시보드에서 본다. 상단 메뉴에 따로 두지 않는다. */
         SHSCloud.init().then(function (c) {
           return c.rpc('my_committees');
         }).then(function (r) {
           var list = (r && r.data) || [];
-          if (list.length) addCommitteeMenu(list);
           /* 고시부 메뉴는 그 부서 임원에게만 (부원은 해당하지 않는다) */
           if (list.filter(function (x) { return x.committee === '고시규칙부' && x.is_officer; }).length) addExamMenu();
         }, function () {});
