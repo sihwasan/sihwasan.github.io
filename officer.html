@@ -287,7 +287,14 @@ document.addEventListener('DOMContentLoaded', function () {
     html2 += '<p id="oa-desc" style="color:var(--gray-5);font-size:0.88rem"></p>';
     html2 += '<div id="oa-form"></div>';
     html2 += '<div id="oa-list"></div>';
+    /* 자료실에 있던 임원 전용 자료를 이곳에서 본다 */
+    html2 += '<h3 style="margin-top:34px">노회 문서</h3>';
+    html2 += '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      '역대 회의록·결의서·공문·회계 등 임원만 볼 수 있는 자료입니다. ' +
+      '자료를 더하거나 고치는 일은 <a href="archive-edit.html" style="color:var(--navy);text-decoration:underline">자료 관리</a>에서 합니다.</p>';
+    html2 += '<div id="oa-docs"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
     oaBox().innerHTML = html2;
+    loadOfficerDocs();
 
     if (!visible.length) {
       oaBox().innerHTML = '<div class="notice-banner">열람 가능한 자료 등급이 없습니다.</div>';
@@ -375,6 +382,126 @@ document.addEventListener('DOMContentLoaded', function () {
     }).catch(function (err) {
       msg.className = 'form-msg err';
       msg.textContent = '저장 실패: ' + (err.message || err);
+    });
+  }
+
+  /* ---------- 노회 문서 (자료실의 임원·관리자 전용 자료) ---------- */
+  var DOC_ORDER = ['회의록', '결의사항', '임원회의록', '발송 공문', '접수 공문',
+                   '회계', '증명서 발급대장', '대외비 문서'];
+  var LEVEL_NAME = {
+    officer: '노회 임원', admin: '노회 관리자(노회장·서기·간사)'
+  };
+
+  function canOpenDoc(a) {
+    if (a === 'admin') return SHSAuth.canManageMembers(user);
+    return SHSAuth.isOfficer(user);
+  }
+
+  function saveBlob(blob, name) {
+    var u = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = u; a.download = name || '자료';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(u); }, 30000);
+  }
+
+  /* 보관소는 로그인 증표로 등급을 확인한 뒤에 내어 준다 */
+  function fetchDoc(d, btn) {
+    var was = btn.textContent;
+    btn.textContent = '받는 중...'; btn.disabled = true;
+    function done() { btn.textContent = was; btn.disabled = false; }
+    SHSCloud.init().then(function (c) {
+      return c.auth.getSession();
+    }).then(function (r) {
+      var t = r && r.data && r.data.session && r.data.session.access_token;
+      return fetch(d.file_path, t ? { headers: { Authorization: 'Bearer ' + t } } : {});
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.json().catch(function () { return {}; }).then(function (j) {
+          throw new Error(j.error || ('내려받지 못했습니다. (' + res.status + ')'));
+        });
+      }
+      return res.blob();
+    }).then(function (blob) {
+      saveBlob(blob, d.file_name || d.title);
+      SHS.logAction('view', '임원 자료 내려받기', '[' + d.section + '] ' + d.title);
+      done();
+    }).catch(function (err) { alert(err.message); done(); });
+  }
+
+  function loadOfficerDocs() {
+    var box = document.getElementById('oa-docs');
+    if (!box) return;
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      box.innerHTML = '<div class="notice-banner">노회 문서는 서버 계정(구글 또는 이메일)으로 ' +
+        '로그인하신 뒤에 보실 수 있습니다.</div>';
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return c.from('archive_items').select('*')
+        .in('access', ['officer', 'admin'])
+        .order('sort', { ascending: false }).order('id', { ascending: false });
+    }).then(function (r) {
+      var rows = ((r && r.data) || []).filter(function (a) { return canOpenDoc(a.access); });
+      if (!rows.length) {
+        box.innerHTML = '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>';
+        return;
+      }
+      var secs = [];
+      DOC_ORDER.forEach(function (k) { if (rows.some(function (a) { return a.section === k; })) secs.push(k); });
+      rows.forEach(function (a) { if (secs.indexOf(a.section) === -1) secs.push(a.section); });
+
+      var h = '';
+      secs.forEach(function (sec) {
+        var list = rows.filter(function (a) { return a.section === sec; });
+        var admin = list.every(function (a) { return a.access === 'admin'; });
+        h += '<h4 style="margin:22px 0 6px;color:var(--navy)">' + e(sec) +
+          ' <span style="font-weight:400;color:var(--gray-5);font-size:0.85rem">' + list.length + '건</span></h4>';
+        h += '<p class="sec-level">이 분류의 자료는 <strong>' +
+          (admin ? LEVEL_NAME.admin : LEVEL_NAME.officer) + '</strong>만 열람할 수 있습니다.</p>';
+        if (list.length > 12) {
+          h += '<div class="board-controls" style="margin-bottom:10px">' +
+            '<input type="text" data-odq="' + e(sec) + '" placeholder="제목 검색"></div>';
+        }
+        h += '<table class="tbl" data-odtable="' + e(sec) + '">' +
+          '<thead><tr><th style="width:70px">번호</th><th>제목</th>' +
+          '<th style="width:110px">등록일</th><th style="width:110px">열람</th></tr></thead><tbody>';
+        list.forEach(function (a, i) {
+          h += '<tr data-odname="' + e(a.title || '') + '"><td>' + (list.length - i) + '</td>' +
+            '<td class="left">' + e(a.title) +
+            (a.access === 'admin' ? ' <span class="badge-locked">관리자</span>' : '') +
+            (a.description ? '<div style="font-size:0.82rem;color:var(--gray-5);margin-top:2px">' +
+              e(a.description) + '</div>' : '') + '</td>' +
+            '<td>' + e(a.doc_date || '') + '</td>' +
+            '<td>' + (a.file_path
+              ? '<button class="btn ghost sm" data-odfile="' + a.id + '">내려받기</button>'
+              : (a.link_url
+                  ? '<a href="' + e(a.link_url) + '" target="_blank" rel="noopener" style="color:var(--navy);text-decoration:underline">바로가기</a>'
+                  : '열람 가능')) + '</td></tr>';
+        });
+        h += '</tbody></table>';
+      });
+      box.innerHTML = h;
+      SHS.logAction('view', '노회 문서 열람', '임원 자료실에서 ' + rows.length + '건 목록 열람');
+
+      box.querySelectorAll('button[data-odfile]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var d = rows.filter(function (x) { return String(x.id) === b.dataset.odfile; })[0];
+          if (d) fetchDoc(d, b);
+        });
+      });
+      box.querySelectorAll('input[data-odq]').forEach(function (inp) {
+        inp.addEventListener('input', function () {
+          var q = inp.value.trim();
+          var tb = box.querySelector('table[data-odtable="' + inp.dataset.odq + '"]');
+          if (!tb) return;
+          tb.querySelectorAll('tbody tr').forEach(function (tr) {
+            tr.hidden = !!q && (tr.dataset.odname || '').indexOf(q) === -1;
+          });
+        });
+      });
+    }).catch(function (err) {
+      box.innerHTML = '<div class="notice-banner">불러오지 못했습니다: ' + e(err.message || err) + '</div>';
     });
   }
 

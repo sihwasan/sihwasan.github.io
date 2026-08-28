@@ -61,6 +61,32 @@ document.addEventListener('DOMContentLoaded', function () {
     { key: '대외비 문서', desc: '노회 밖으로 내보내지 않는 문서입니다. 관리자만 볼 수 있습니다.' }
   ];
 
+  /* 열람 등급 이름과 엄한 정도 (숫자가 클수록 좁다) */
+  var LEVEL_NAME = {
+    member: '정회원(노회 소속 목사·총대 장로)',
+    officer: '노회 임원',
+    admin: '노회 관리자(노회장·서기·간사)'
+  };
+  var LEVEL_RANK = { public: 0, member: 1, officer: 2, admin: 3 };
+
+  /* 이 분류의 자료를 누가 볼 수 있는지 한 줄로 알려 준다.
+   * 자료마다 등급이 다르면 가장 좁은 등급을 기준으로 적는다. */
+  function levelNote(list) {
+    if (!list.length) return '';
+    var top = null, all = true;
+    list.forEach(function (a) {
+      var lv = a.access || 'public';
+      if (lv === 'public') { all = false; return; }
+      if (!top || LEVEL_RANK[lv] > LEVEL_RANK[top]) top = lv;
+    });
+    if (!top) return '';
+    list.forEach(function (a) { if ((a.access || 'public') !== top) all = false; });
+    return '<p class="sec-level">' +
+      (all ? '이 분류의 자료는 <strong>' + LEVEL_NAME[top] + '</strong>만 열람할 수 있습니다.'
+           : '이 분류에는 <strong>' + LEVEL_NAME[top] + '</strong>만 열람할 수 있는 자료가 있습니다.') +
+      '</p>';
+  }
+
   function accessLabel(a) {
     if (a === 'admin') return '관리자';
     if (a === 'officer') return '임원';
@@ -242,8 +268,8 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 화면 그리기 ---------- */
   function draw(items, resolutions) {
     var html = '<div class="notice-banner">자료실의 일부 자료는 <strong>정회원(노회 소속 목사·총대 장로)</strong> ' +
-      '로그인 후 열람할 수 있습니다. 임원회 내부 자료는 <a href="officer.html"><strong>임원방</strong></a>에서 ' +
-      '열람하시기 바랍니다.' +
+      '로그인 후 열람할 수 있습니다. 회의록·결의서·공문·회계 등 <strong>임원 전용 자료</strong>는 ' +
+      '<a href="officer.html"><strong>임원방 → 임원 자료실</strong></a>에 있습니다.' +
       (canManage ? ' <a class="btn sm" style="margin-left:10px" href="archive-edit.html">자료 관리</a>' : '') +
       '</div>';
 
@@ -252,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (s.key === '결의사항') {
         html += resolutionsHtml(resolutions);
         if (list.length) {
-          html += '<h3 style="margin-top:22px">관련 자료</h3>' + itemRows(list, s.key);
+          html += '<h3 style="margin-top:22px">관련 자료</h3>' + levelNote(list) + itemRows(list, s.key);
         }
         return;
       }
@@ -262,7 +288,8 @@ document.addEventListener('DOMContentLoaded', function () {
        * 관리자만 볼 수 있으므로, 그 아래 사람에게는 목록 자체를 보이지 않는다. */
       if (list.length && !list.some(function (a) { return canOpen(a.access); })) return;
       html += '<h2>' + e(s.key) + '</h2>' +
-        '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>';
+        '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>' +
+        levelNote(list);
       /* 고시 분류는 올려 둔 자료가 없으면 목록을 비우고 모의고사 안내만 보인다 */
       if (s.key !== '고시' || list.length) html += itemRows(list, s.key);
       if (s.key === '서식') html += formsHtml();
@@ -375,6 +402,11 @@ document.addEventListener('DOMContentLoaded', function () {
     ]);
   }).then(function (rs) {
     var items = (rs[0] && rs[0].data && rs[0].data.length) ? rs[0].data : fallbackItems();
+    /* 임원·관리자 전용 자료는 임원방의 임원 자료실에서 본다.
+     * 자료를 두 곳에 나누어 두지 않고, 보여 주는 자리만 나눈다. */
+    items = items.filter(function (a) {
+      return a.access !== 'officer' && a.access !== 'admin';
+    });
     var res = (rs[1] && rs[1].data && rs[1].data.length) ? rs[1].data : fallbackResolutions();
     draw(items, res);
   }).catch(function () {

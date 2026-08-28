@@ -1639,3 +1639,11 @@ input.dp-bad { border-color: var(--red); }
 .dropzone.sm .dz-guide strong { font-size: 0.82rem; }
 .dropzone.sm .dz-guide span { font-size: 0.74rem; }
 .dropzone.sm .dz-item { font-size: 0.78rem; }
+
+/* 분류마다 누가 볼 수 있는지 알려 주는 한 줄 */
+.sec-level {
+  display: inline-block; font-size: 0.84rem; color: var(--gray-7);
+  background: var(--gray-1); border-left: 3px solid var(--navy);
+  padding: 7px 12px; border-radius: 0 6px 6px 0; margin: 0 0 14px;
+}
+.sec-level strong { color: var(--navy); font-weight: 500; }
