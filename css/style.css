@@ -1603,3 +1603,6 @@ input.dp-bad { border-color: var(--red); }
   .lb-nav.prev { left: 6px; }
   .lb-nav.next { right: 6px; }
 }
+
+/* 사진 올릴 때 고른 앨범을 한 줄로 알려 준다 */
+.field-hint { font-size: 0.8rem; color: var(--gray-5); margin-top: 6px; line-height: 1.5; }

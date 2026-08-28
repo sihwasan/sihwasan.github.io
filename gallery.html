@@ -100,14 +100,23 @@
       <input type="url" id="up-link" placeholder="https://www.instagram.com/… 또는 https://youtu.be/…">
     </div>
     <div class="field">
-      <label>제목 (선택)</label>
-      <input type="text" id="up-title" placeholder="예: 제19회 정기노회 개회예배">
+      <label>어느 앨범에 넣을까요?</label>
+      <select id="up-album"></select>
+      <div class="field-hint" id="up-album-hint"></div>
     </div>
-    <div class="inline-form" style="margin-bottom:16px">
-      <div class="field"><label>날짜</label><input type="date" id="up-date"></div>
-      <div class="field"><label>카테고리</label>
-        <input type="text" id="up-cat" list="up-cat-list" placeholder="고르거나 직접 입력" autocomplete="off" maxlength="30">
-        <datalist id="up-cat-list"></datalist>
+
+    <!-- 새 앨범을 만들 때만 쓴다 -->
+    <div id="up-new">
+      <div class="field">
+        <label>새 앨범 이름</label>
+        <input type="text" id="up-title" placeholder="예: 제20회 정기노회">
+      </div>
+      <div class="inline-form" style="margin-bottom:16px">
+        <div class="field"><label>날짜</label><input type="date" id="up-date"></div>
+        <div class="field"><label>카테고리</label>
+          <input type="text" id="up-cat" list="up-cat-list" placeholder="고르거나 직접 입력" autocomplete="off" maxlength="30">
+          <datalist id="up-cat-list"></datalist>
+        </div>
       </div>
     </div>
     <div class="field">
@@ -423,8 +432,37 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (!user.cloud) { alert('사진 올리기는 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.'); return; }
     document.getElementById('up-date').value = new Date().toISOString().slice(0, 10);
+    fillAlbumPicker();
     openM('up-mdl');
   });
+
+  /* ---------- 어느 앨범에 넣을지 고르기 ----------
+   * 이미 있는 앨범을 고르면 그 회기 사진 뒤에 이어 붙는다.
+   * 앨범은 제목으로 묶이므로 이름·날짜·분류를 그 앨범 것으로 그대로 쓴다. */
+  function fillAlbumPicker() {
+    var sel = document.getElementById('up-album');
+    var keep = sel.value;
+    sel.innerHTML = '<option value="">+ 새 앨범 만들기</option>' +
+      albums.map(function (a) {
+        return '<option value="' + e(a.title) + '">' + e(a.title) +
+          ' (' + a.photos.length + '장)</option>';
+      }).join('');
+    if (keep && albums.some(function (a) { return a.title === keep; })) sel.value = keep;
+    syncAlbumPicker();
+  }
+
+  function syncAlbumPicker() {
+    var sel = document.getElementById('up-album');
+    var box = document.getElementById('up-new');
+    var hint = document.getElementById('up-album-hint');
+    var a = albums.filter(function (x) { return x.title === sel.value; })[0];
+    box.style.display = a ? 'none' : '';
+    hint.textContent = a
+      ? dateText(a.taken) + (a.category ? ' · ' + a.category : '') +
+        ' — 이 앨범의 사진 ' + a.photos.length + '장 뒤에 이어 붙습니다.'
+      : '새 앨범은 아래에 적은 이름으로 만들어집니다.';
+  }
+  document.getElementById('up-album').addEventListener('change', syncAlbumPicker);
 
   var lb = document.getElementById('lightbox');
   document.getElementById('lb-close').addEventListener('click', function () { lb.classList.remove('open'); });
@@ -486,17 +524,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.getElementById('up-send').addEventListener('click', function () {
     var msg = document.getElementById('up-msg');
+    var into = albums.filter(function (x) {
+      return x.title === document.getElementById('up-album').value;
+    })[0];
     var title = document.getElementById('up-title').value.trim();
     var taken = document.getElementById('up-date').value;
     var cat = (document.getElementById('up-cat').value || '').trim().replace(/\s+/g, ' ');
     if (!cat) cat = '기타';
     if (cat.length > 30) cat = cat.slice(0, 30);
+    /* 이미 있는 앨범을 골랐으면 이름·날짜·분류를 그 앨범 것으로 맞춘다 */
+    var sort = 0;
+    if (into) {
+      title = into.title;
+      taken = into.taken;
+      cat = into.category;
+      into.photos.forEach(function (p) { if ((p.sort || 0) > sort) sort = p.sort || 0; });
+    }
     var caption = document.getElementById('up-caption').value.trim();
     var link = document.getElementById('up-link').value.trim();
 
     if (!picked.length && !link) {
       msg.className = 'form-msg err';
       msg.textContent = '사진을 선택하거나 링크를 입력해 주세요.';
+      return;
+    }
+    if (!into && !title) {
+      msg.className = 'form-msg err';
+      msg.textContent = '새 앨범 이름을 적거나, 넣을 앨범을 골라 주세요.';
       return;
     }
     msg.className = 'form-msg';
@@ -514,7 +568,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 title: title || '노회 소식', taken: taken, category: cat, caption: caption,
                 link_url: link || null,
                 image_url: u.full, thumb_url: u.thumb,
-                author_id: user.id, author_name: user.name, sort: 0
+                author_id: user.id, author_name: user.name, sort: sort + i + 1
               });
             });
           }).then(function (r3) { if (r3.error) throw r3.error; });
@@ -526,7 +580,7 @@ document.addEventListener('DOMContentLoaded', function () {
           return c.from('gallery_items').insert({
             title: title || '노회 소식', taken: taken, category: cat, caption: caption,
             link_url: link, image_url: link, thumb_url: link,
-            author_id: user.id, author_name: user.name, sort: 0
+            author_id: user.id, author_name: user.name, sort: sort + 1
           });
         }).then(function (r) { if (r.error) throw r.error; });
       });
