@@ -46,19 +46,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 분류. 순서대로 위쪽 띠에 나타난다. */
   var SECTIONS = [
-    { key: '회의록',   desc: '역대 정기노회 회의록입니다.' },
-    { key: '회의자료', desc: '정기노회 회의순서, 각 부 보고서 등 회의에 쓰인 자료입니다.' },
+    { key: '회의자료', desc: '정기노회 회의순서(노회 책자)와 각 부 보고서 등 회의에 쓰인 자료입니다.' },
     { key: '결의사항', desc: '정기노회와 임원회에서 결의한 내용입니다.' },
     { key: '규칙',     desc: '노회규칙 전문입니다.' },
     { key: '내규',     desc: '각 위원회와 부서의 내규입니다.' },
     { key: '서식',     desc: '노회에 올리는 각종 청원 서식입니다.' },
-    { key: '고시',     desc: '목사·장로·전도사·목사후보생 고시 모의고사입니다.' }
+    { key: '고시',     desc: '목사·장로·전도사·목사후보생 고시 모의고사입니다.' },
+    { key: '회의록',   desc: '역대 정기노회·임시노회의 회의록과 회의결의서입니다.' },
+    { key: '임원회의록', desc: '임원회 회의록입니다.' },
+    { key: '공문',     desc: '노회와 각 부서가 보낸 공문입니다.' },
+    { key: '회계',     desc: '노회 예산·결산·상회비·감사 자료와 지출결의서입니다.' },
+    { key: '증명서 발급대장', desc: '발급한 증명서 원본과 발급 대장입니다. 개인정보가 들어 있어 관리자만 볼 수 있습니다.' }
   ];
 
   function accessLabel(a) {
-    return a === 'officer' ? '임원' : (a === 'member' ? '정회원' : '');
+    if (a === 'admin') return '관리자';
+    if (a === 'officer') return '임원';
+    if (a === 'member') return '정회원';
+    return '';
   }
   function canOpen(a) {
+    if (a === 'admin') return canManage;
     if (a === 'officer') return isOfficer;
     if (a === 'member') return isMember;
     return true;
@@ -85,8 +93,9 @@ document.addEventListener('DOMContentLoaded', function () {
                       : '<a href="login.html" style="color:var(--navy);text-decoration:underline">로그인</a>';
       }
       var note = ok ? e(a.description || '')
+                    : (a.access === 'admin' ? '노회 서기·간사 등 관리자만 열람할 수 있습니다.'
                     : (a.access === 'officer' ? '노회 임원만 열람할 수 있습니다.'
-                                              : '정회원 로그인 후 열람할 수 있습니다.');
+                                              : '정회원 로그인 후 열람할 수 있습니다.'));
       h += '<tr><td>' + (list.length - i) + '</td>' +
         '<td class="left">' + title + badge +
         '<div style="font-size:0.82rem;color:var(--gray-5);margin-top:2px">' + note + '</div></td>' +
@@ -238,6 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         return;
       }
+      if (!list.length && s.key !== '고시' && s.key !== '서식') return;
       html += '<h2>' + e(s.key) + '</h2>' +
         '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>';
       /* 고시 분류는 올려 둔 자료가 없으면 목록을 비우고 모의고사 안내만 보인다 */

@@ -81,11 +81,13 @@ document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('ae-area');
   var e = SHS.esc;
 
-  var SECTIONS = ['회의록', '회의자료', '결의사항', '규칙', '내규', '서식'];
+  var SECTIONS = ['회의자료', '결의사항', '규칙', '내규', '서식', '고시',
+                  '회의록', '임원회의록', '공문', '회계', '증명서 발급대장'];
   var ACCESS = [
     { v: 'public',  t: '공개 (누구나)' },
     { v: 'member',  t: '정회원' },
-    { v: 'officer', t: '임원' }
+    { v: 'officer', t: '임원' },
+    { v: 'admin',   t: '관리자만' }
   ];
 
   if (!user || !SHSAuth.canManageMembers(user)) {

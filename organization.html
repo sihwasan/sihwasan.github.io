@@ -28,6 +28,7 @@
     <button data-tab="members">회원명단</button>
     <button data-tab="sichal">시찰회</button>
     <button data-tab="committees">상비부</button>
+    <button data-tab="addrbook" id="tab-addrbook" hidden>주소록</button>
   </div>
 
   <!-- 임원 -->
@@ -98,6 +99,17 @@
     </table>
   </div>
 
+  <!-- 주소록 (임원 이상) -->
+  <div class="tab-panel" id="addrbook">
+    <h2>노회 주소록</h2>
+    <p>노회 주소록의 주소를 회원명단에 맞추어 정리한 것입니다.
+       개인정보이므로 <strong>노회 임원</strong>만 열람할 수 있으며, 열람 기록이 남습니다.</p>
+    <div class="board-controls" style="margin-bottom:14px">
+      <input type="text" id="ab-q" placeholder="이름·교회·지역 검색">
+    </div>
+    <div id="addrbook-body"></div>
+  </div>
+
   <!-- 시찰회 -->
   <div class="tab-panel" id="sichal">
     <h2>시찰회</h2>
@@ -126,6 +138,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 노회 임원은 공개, 회원명단·시찰회·상비부는 정회원 전용 */
   var canSee = SHS.isActiveMember(user);
+  /* 주소는 개인정보이므로 임원 이상만 본다 */
+  var canSeeAddr = SHSAuth.isOfficer(user);
   if (canSee) {
     SHS.logAction('view', '회원명단 열람', '조직 페이지에서 실명 명단을 열람함');
   } else {
@@ -337,6 +351,54 @@ document.addEventListener('DOMContentLoaded', function () {
   renderSichals(SHSData.sichals);
 
   /* 서버 명단을 분류별로 묶어 화면이 쓰는 모양으로 바꾼다 */
+  /* ---------- 주소록 (임원 이상) ---------- */
+  var ORDER_CAT = ['목사', '부목사', '원로목사', '은퇴목사', '무임목사', '장로', '직원'];
+  var addrRows = [];
+
+  function drawAddrBook() {
+    var box = document.getElementById('addrbook-body');
+    if (!box) return;
+    var q = (document.getElementById('ab-q').value || '').trim();
+    var list = addrRows.filter(function (r) {
+      if (!q) return true;
+      return ((r.name || '') + (r.church || '') + (r.address || '') + (r.category || ''))
+        .indexOf(q) !== -1;
+    });
+    if (!list.length) {
+      box.innerHTML = '<p style="color:var(--gray-5)">해당하는 분이 없습니다.</p>';
+      return;
+    }
+    var h = '<table class="tbl"><thead><tr><th style="width:70px">구분</th>' +
+      '<th style="width:100px">성명</th><th style="width:150px">교회</th>' +
+      '<th style="width:80px">우편번호</th><th>주소</th></tr></thead><tbody>';
+    list.forEach(function (r) {
+      h += '<tr><td>' + e(r.category || '') + '</td><td>' + e(r.name) + '</td>' +
+        '<td class="left">' + e(r.church || '') + '</td>' +
+        '<td>' + e(r.postcode || '') + '</td>' +
+        '<td class="left">' + (r.address ? e(r.address)
+          : '<span style="color:var(--gray-5)">주소록에 없음</span>') + '</td></tr>';
+    });
+    box.innerHTML = h + '</tbody></table>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5);margin-top:10px">전체 ' +
+      addrRows.length + '명 가운데 주소가 있는 분은 ' +
+      addrRows.filter(function (r) { return r.address; }).length + '명입니다. ' +
+      '빠진 주소는 <a href="manage.html" style="color:var(--navy);text-decoration:underline">명단 관리</a>에서 채워 주세요.</p>';
+  }
+
+  function renderAddrBook(rows) {
+    addrRows = (rows || []).slice().sort(function (a, b) {
+      var d = ORDER_CAT.indexOf(a.category) - ORDER_CAT.indexOf(b.category);
+      if (d !== 0) return d;
+      return (a.sort || 0) - (b.sort || 0) || (a.id > b.id ? 1 : -1);
+    });
+    var tab = document.getElementById('tab-addrbook');
+    if (tab) tab.hidden = false;
+    drawAddrBook();
+    var q = document.getElementById('ab-q');
+    if (q && !q.dataset.on) { q.dataset.on = '1'; q.addEventListener('input', drawAddrBook); }
+    SHS.logAction('view', '주소록 열람', '조직 페이지에서 노회 주소록을 열람함');
+  }
+
   function groupRoster(rows) {
     var D = { seniorPastors: [], retiredPastors: [], pastors: [], assocPastors: [],
               pastorsWithoutCharge: [], elders: {}, staff: [] };
@@ -498,6 +560,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var roster = (rs[1] && rs[1].data) || [];
       /* 분류가 하나도 채워지지 않았으면 아직 옮기기 전이므로 건드리지 않는다 */
+      if (canSeeAddr) renderAddrBook(roster);
       if (roster.filter(function (r) { return r.category; }).length) {
         renderRoster(groupRoster(roster.filter(function (r) { return r.category; })));
       }
