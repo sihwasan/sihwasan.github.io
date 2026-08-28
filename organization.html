@@ -103,7 +103,8 @@
   <div class="tab-panel" id="addrbook">
     <h2>노회 주소록</h2>
     <p>노회 주소록의 주소를 회원명단에 맞추어 정리한 것입니다.
-       개인정보이므로 <strong>노회 임원</strong>만 열람할 수 있으며, 열람 기록이 남습니다.</p>
+       <strong>정회원</strong>만 열람할 수 있으며, 열람 기록이 남습니다.
+       노회 밖으로 옮기거나 다른 곳에 쓰지 말아 주시기 바랍니다.</p>
     <div class="board-controls" style="margin-bottom:14px">
       <input type="text" id="ab-q" placeholder="이름·교회·지역 검색">
     </div>
@@ -138,8 +139,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 노회 임원은 공개, 회원명단·시찰회·상비부는 정회원 전용 */
   var canSee = SHS.isActiveMember(user);
-  /* 주소는 개인정보이므로 임원 이상만 본다 */
-  var canSeeAddr = SHSAuth.isOfficer(user);
+  /* 주소록은 노회 책자의 시찰별 주소록과 같은 수준으로 정회원에게 연다 */
+  var canSeeAddr = canSee;
   if (canSee) {
     SHS.logAction('view', '회원명단 열람', '조직 페이지에서 실명 명단을 열람함');
   } else {

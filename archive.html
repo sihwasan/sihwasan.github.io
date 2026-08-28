@@ -72,9 +72,16 @@ document.addEventListener('DOMContentLoaded', function () {
     return true;
   }
 
-  function itemRows(list) {
+  function itemRows(list, key) {
     if (!list.length) return '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>';
-    var h = '<table class="tbl"><thead><tr><th style="width:70px">번호</th><th>제목</th>' +
+    var h = '';
+    if (list.length > 12 && key) {
+      h += '<div class="board-controls" style="margin-bottom:12px">' +
+        '<span style="color:var(--gray-7);font-size:0.88rem">전체 ' + list.length + '건</span>' +
+        '<input type="text" data-arq="' + e(key) + '" placeholder="제목 검색"></div>';
+    }
+    h += '<table class="tbl" data-artable="' + e(key || '') + '">' +
+      '<thead><tr><th style="width:70px">번호</th><th>제목</th>' +
       '<th style="width:110px">등록일</th><th style="width:110px">열람</th></tr></thead><tbody>';
     list.forEach(function (a, i) {
       var ok = canOpen(a.access);
@@ -96,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     : (a.access === 'admin' ? '노회 서기·간사 등 관리자만 열람할 수 있습니다.'
                     : (a.access === 'officer' ? '노회 임원만 열람할 수 있습니다.'
                                               : '정회원 로그인 후 열람할 수 있습니다.'));
-      h += '<tr><td>' + (list.length - i) + '</td>' +
+      h += '<tr data-arname="' + e((a.title || '') + ' ' + (a.description || '')) + '"><td>' + (list.length - i) + '</td>' +
         '<td class="left">' + title + badge +
         '<div style="font-size:0.82rem;color:var(--gray-5);margin-top:2px">' + note + '</div></td>' +
         '<td>' + e(a.doc_date || '') + '</td><td>' + status + '</td></tr>';
@@ -243,15 +250,19 @@ document.addEventListener('DOMContentLoaded', function () {
       if (s.key === '결의사항') {
         html += resolutionsHtml(resolutions);
         if (list.length) {
-          html += '<h3 style="margin-top:22px">관련 자료</h3>' + itemRows(list);
+          html += '<h3 style="margin-top:22px">관련 자료</h3>' + itemRows(list, s.key);
         }
         return;
       }
       if (!list.length && s.key !== '고시' && s.key !== '서식') return;
+      /* 관리자 전용 자료만 있는 분류는, 볼 수 없는 사람에게는 제목도 내지 않는다.
+       * 발급한 증명서에는 사람 이름이 들어 있기 때문이다. */
+      if (list.length && !canManage &&
+          list.every(function (a) { return a.access === 'admin'; })) return;
       html += '<h2>' + e(s.key) + '</h2>' +
         '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>';
       /* 고시 분류는 올려 둔 자료가 없으면 목록을 비우고 모의고사 안내만 보인다 */
-      if (s.key !== '고시' || list.length) html += itemRows(list);
+      if (s.key !== '고시' || list.length) html += itemRows(list, s.key);
       if (s.key === '서식') html += formsHtml();
       if (s.key === '고시') html += examHtml();
     });
@@ -260,17 +271,65 @@ document.addEventListener('DOMContentLoaded', function () {
     SHS.sectionize(area);
     bindForms();
 
+    /* 분류별 제목 검색 */
+    area.querySelectorAll('input[data-arq]').forEach(function (inp) {
+      inp.addEventListener('input', function () {
+        var q = inp.value.trim();
+        var tb = area.querySelector('table[data-artable="' + inp.dataset.arq + '"]');
+        if (!tb) return;
+        tb.querySelectorAll('tbody tr').forEach(function (tr) {
+          tr.hidden = !!q && (tr.dataset.arname || '').indexOf(q) === -1;
+        });
+      });
+    });
+
     if (isMember) {
       drawResolutions(resolutions);
       var q = document.getElementById('rs-q');
       if (q) q.addEventListener('input', function () { drawResolutions(resolutions); });
     }
 
-    /* 첨부파일 내려받기 */
+    /* 첨부파일 내려받기
+     * 자료는 두 곳에 나뉘어 있다.
+     *   - 노회 자료 보관소(Cloudflare) : file_path 가 주소(https://…)로 되어 있다.
+     *     보관소가 로그인 증표를 보고 등급을 확인한 뒤 내어 준다.
+     *   - 예전 방식(Supabase)          : file_path 가 파일 이름으로 되어 있다. */
+    function saveBlob(blob, name) {
+      var u = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = u; a.download = name || '자료';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 30000);
+    }
+
+    function fromStore(a, btn) {
+      var was = btn.textContent;
+      btn.textContent = '받는 중...'; btn.disabled = true;
+      function done() { btn.textContent = was; btn.disabled = false; }
+      SHSCloud.init().then(function (c) {
+        return c.auth.getSession();
+      }).then(function (r) {
+        var t = r && r.data && r.data.session && r.data.session.access_token;
+        return fetch(a.file_path, t ? { headers: { Authorization: 'Bearer ' + t } } : {});
+      }).then(function (res) {
+        if (!res.ok) {
+          return res.json().catch(function () { return {}; }).then(function (j) {
+            throw new Error(j.error || ('내려받지 못했습니다. (' + res.status + ')'));
+          });
+        }
+        return res.blob();
+      }).then(function (blob) {
+        saveBlob(blob, a.file_name || a.title);
+        SHS.logAction('view', '자료 내려받기', '[' + a.section + '] ' + a.title);
+        done();
+      }).catch(function (err) { alert(err.message); done(); });
+    }
+
     area.querySelectorAll('button[data-arfile]').forEach(function (b) {
       b.addEventListener('click', function () {
         var a = items.filter(function (x) { return String(x.id) === b.dataset.arfile; })[0];
         if (!a) return;
+        if (/^https?:/.test(a.file_path || '')) { fromStore(a, b); return; }
         SHSCloud.init().then(function (c) {
           return c.storage.from('archive-files').createSignedUrl(a.file_path, 60);
         }).then(function (r) {

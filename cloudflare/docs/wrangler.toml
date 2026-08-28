@@ -1,0 +1,17 @@
+name = "sihwasan-docs"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# 자료실 문서를 담아 둘 R2 보관함
+[[r2_buckets]]
+binding = "DOCS"
+bucket_name = "sihwasan-docs"
+
+# 내려받는 사람이 어떤 등급인지 확인할 때 쓰는 주소.
+# anon 키는 홈페이지에 이미 공개되어 있는 값이므로 비밀이 아니다.
+[vars]
+SUPABASE_URL = "https://ltbhgwozkffenahqdzfj.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Ymhnd296a2ZmZW5haHFkemZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDk0MDYsImV4cCI6MjEwMTkyNTQwNn0.nSptHsi7nTCWTiyTe_Kl9xpxyHJ3pkhRGoZLI1BdsnI"
+
+[observability]
+enabled = true
