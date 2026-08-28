@@ -10,7 +10,7 @@
 <meta property="og:title" content="갤러리 - 시화산노회">
 <meta property="og:description" content="시화산노회 갤러리 — 노회 행사 사진입니다.">
 <meta property="og:url" content="https://sihwasan.org/gallery.html">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=20260828">
 </head>
 <body>
 
@@ -44,11 +44,10 @@
 
   <!-- 회기별 앨범 -->
   <section class="alb-sec">
-    <h3>회기별 앨범</h3>
-    <p class="alb-lead">정기노회와 임시노회의 사진을 회기별로 모았습니다.</p>
-    <div class="alb-filter" id="alb-filter"></div>
+    <h2>회기별 앨범</h2>
+    <div class="tabs alb-tabs" id="alb-filter"></div>
     <div class="alb-grid" id="alb-grid">
-      <p style="color:var(--gray-5)">불러오는 중...</p>
+      <p class="alb-empty">불러오는 중...</p>
     </div>
   </section>
 </main>
@@ -216,7 +215,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var cats = ['전체'].concat(Object.keys(n).sort(function (x, y) { return n[y] - n[x]; }));
     if (cats.indexOf(albCat) === -1) albCat = '전체';
     bar.innerHTML = cats.map(function (c) {
-      return '<button data-cat="' + e(c) + '"' + (c === albCat ? ' class="on"' : '') + '>' + e(c) + '</button>';
+      return '<button data-cat="' + e(c) + '"' + (c === albCat ? ' class="active"' : '') + '>' +
+        e(c) + (c === '전체' ? '' : ' <span class="tab-n">' + n[c] + '</span>') + '</button>';
     }).join('');
     bar.querySelectorAll('button[data-cat]').forEach(function (b) {
       b.addEventListener('click', function () { albCat = b.dataset.cat; renderAlbums(); });
@@ -224,20 +224,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var list = albums.filter(function (a) { return albCat === '전체' || a.category === albCat; });
     if (!list.length) {
-      box.innerHTML = '<p style="color:var(--gray-5)">아직 앨범이 없습니다.</p>';
+      box.innerHTML = '<p class="alb-empty">아직 앨범이 없습니다.</p>';
       return;
     }
     box.innerHTML = list.map(function (a) {
-      var cover = a.photos[0];
+      var cand = a.photos.slice(0, 4).map(function (p) { return p.thumb_url || p.image_url; });
       return '<button class="alb-card" data-alb="' + e(a.title) + '">' +
-        '<div class="alb-cover"><img loading="lazy" src="' + e(cover.thumb_url || cover.image_url) + '" alt="">' +
-        '<span class="n">' + a.photos.length + '장</span></div>' +
-        '<div class="alb-meta"><div class="t">' + e(a.title) + '</div>' +
-        '<div class="d">' + e(dateText(a.taken)) + (a.category ? ' · ' + e(a.category) : '') + '</div></div>' +
+        '<img loading="lazy" src="' + e(cand[0]) + '" alt="" data-cand="' + e(cand.join('|')) + '">' +
+        '<span class="alb-cap"><span class="t">' + e(a.title) + '</span>' +
+        '<span class="d">' + e(dateText(a.taken)) + ' · 사진 ' + a.photos.length + '장</span></span>' +
         '</button>';
     }).join('');
     box.querySelectorAll('button[data-alb]').forEach(function (b) {
       b.addEventListener('click', function () { openAlbum(b.dataset.alb); });
+    });
+    /* 앨범 겉그림은 가로로 넓은 사진이 보기 좋다.
+     * 첫 장이 세로이거나 모양을 오려 낸 사진이면 다음 장으로 바꾼다. */
+    box.querySelectorAll('img[data-cand]').forEach(function (im) {
+      var list2 = im.dataset.cand.split('|');
+      var at = 0;
+      im.addEventListener('load', function () {
+        if (!im.naturalWidth) return;
+        if (im.naturalWidth / im.naturalHeight >= 1.15) return;
+        at++;
+        if (at < list2.length) im.src = list2[at];
+      });
     });
   }
 

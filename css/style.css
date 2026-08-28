@@ -290,7 +290,7 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 }
 .page-head h1 { font-family: 'Noto Serif KR', serif; font-size: 1.9rem; font-weight: 700; }
 .page-head .crumb { font-size: 0.82rem; color: #aebdd6; margin-top: 8px; }
-.page-body { padding: 44px 0 70px; }
+.page-body { padding: 44px 20px 70px; }
 .page-body h2 {
   position: relative;
   font-size: 1.32rem; color: var(--navy);
@@ -1532,57 +1532,74 @@ input.dp-bad { border-color: var(--red); }
 }
 @media print { .ai-bar { display: none !important; } }
 
-/* ---------- 회기별 앨범 ---------- */
-.alb-sec { margin-top: 54px; }
-.alb-sec h3 {
-  font-family: 'Noto Serif KR', serif; font-size: 1.35rem; color: var(--ink);
-  border: none; padding: 0; margin: 0 0 6px;
+/* ---------- 회기별 앨범 ----------
+ * 앨범 한 권은 사진 한 장으로 나타낸다. 이름과 날짜는 사진 아래쪽에
+ * 얹어서, 칸마다 글상자가 따로 붙어 어수선해지지 않게 한다. */
+.alb-sec { margin-bottom: 10px; }
+.alb-tabs { margin-bottom: 24px; }
+.alb-tabs .tab-n {
+  display: inline-block; margin-left: 5px; font-size: 0.78rem;
+  color: var(--gray-5); font-weight: 400;
 }
-.alb-sec .alb-lead { color: var(--gray-5); font-size: 0.9rem; margin-bottom: 18px; }
-.alb-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
-.alb-filter button {
-  border: 1px solid var(--gray-2); background: var(--white); color: var(--gray-7);
-  border-radius: 999px; padding: 7px 16px; font-size: 0.86rem;
-}
-.alb-filter button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.alb-tabs button.active .tab-n { color: var(--navy); }
+.alb-empty { color: var(--gray-5); }
+
 .alb-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 16px;
 }
 .alb-card {
-  border: 1px solid var(--gray-2); border-radius: 12px; overflow: hidden;
-  background: var(--white); text-align: left; padding: 0; width: 100%;
+  position: relative; display: block; width: 100%; padding: 0; border: none;
+  border-radius: 10px; overflow: hidden; background: var(--gray-1);
+  aspect-ratio: 4 / 3; text-align: left;
 }
-.alb-card:hover { border-color: var(--navy-light); }
-.alb-cover { position: relative; aspect-ratio: 4/3; background: var(--gray-1); }
-.alb-cover img { width: 100%; height: 100%; object-fit: cover; }
-.alb-cover .n {
-  position: absolute; right: 8px; bottom: 8px; color: #fff; font-size: 0.76rem;
-  background: rgba(15,20,30,0.66); border-radius: 999px; padding: 3px 10px;
+.alb-card img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.4s ease;
 }
-.alb-meta { padding: 11px 13px 13px; }
-.alb-meta .t { font-size: 0.92rem; font-weight: 500; color: var(--ink); }
-.alb-meta .d { font-size: 0.79rem; color: var(--gray-5); margin-top: 3px; }
+.alb-card:hover img { transform: scale(1.045); }
+.alb-card:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.alb-cap {
+  position: absolute; left: 0; right: 0; bottom: 0; color: #fff;
+  padding: 40px 14px 13px; pointer-events: none;
+  background: linear-gradient(to top, rgba(8,14,26,0.82), rgba(8,14,26,0.30) 55%, rgba(8,14,26,0));
+}
+.alb-cap .t { display: block; font-size: 0.95rem; font-weight: 500; line-height: 1.35; }
+.alb-cap .d { display: block; font-size: 0.78rem; opacity: 0.82; margin-top: 3px; }
+
+/* 앨범 한 권을 펼친 화면 */
+.alb-head { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--gray-2); }
+.alb-head h2 { margin-bottom: 4px; }
+.alb-head .d { color: var(--gray-5); font-size: 0.85rem; }
 .alb-photos {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px;
 }
 .alb-photos img {
-  width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px;
+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 6px;
   background: var(--gray-1); cursor: zoom-in;
 }
-.alb-head { margin-bottom: 14px; }
-.alb-head .d { color: var(--gray-5); font-size: 0.85rem; }
+.alb-photos img:hover { opacity: 0.88; }
+
+/* 사진 크게 보기: 좌우로 넘긴다 */
 .lb-nav {
   position: absolute; top: 50%; transform: translateY(-50%);
-  background: rgba(255,255,255,0.16); border: none; color: #fff;
-  width: 44px; height: 44px; border-radius: 50%; font-size: 1.6rem; line-height: 1;
+  background: rgba(255,255,255,0.14); border: none; color: #fff;
+  width: 46px; height: 46px; border-radius: 50%; font-size: 1.7rem; line-height: 1;
 }
-.lb-nav.prev { left: 16px; }
-.lb-nav.next { right: 16px; }
+.lb-nav:hover { background: rgba(255,255,255,0.26); }
+.lb-nav.prev { left: 18px; }
+.lb-nav.next { right: 18px; }
 .lb-cap {
-  position: absolute; left: 0; right: 0; bottom: 18px; text-align: center;
-  color: #fff; font-size: 0.85rem; opacity: 0.85;
+  position: absolute; left: 0; right: 0; bottom: 20px; text-align: center;
+  color: #fff; font-size: 0.85rem; opacity: 0.8;
 }
 @media (max-width: 700px) {
-  .alb-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-  .alb-photos { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
+  .alb-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .alb-cap { padding: 30px 10px 10px; }
+  .alb-cap .t { font-size: 0.85rem; }
+  .alb-cap .d { font-size: 0.72rem; }
+  .alb-photos { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .alb-tabs button { padding: 10px 13px; font-size: 0.88rem; }
+  .lb-nav { width: 38px; height: 38px; font-size: 1.4rem; }
+  .lb-nav.prev { left: 6px; }
+  .lb-nav.next { right: 6px; }
 }
