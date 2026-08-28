@@ -1531,3 +1531,58 @@ input.dp-bad { border-color: var(--red); }
   .ai-panel { max-height: 70vh; }
 }
 @media print { .ai-bar { display: none !important; } }
+
+/* ---------- 회기별 앨범 ---------- */
+.alb-sec { margin-top: 54px; }
+.alb-sec h3 {
+  font-family: 'Noto Serif KR', serif; font-size: 1.35rem; color: var(--ink);
+  border: none; padding: 0; margin: 0 0 6px;
+}
+.alb-sec .alb-lead { color: var(--gray-5); font-size: 0.9rem; margin-bottom: 18px; }
+.alb-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.alb-filter button {
+  border: 1px solid var(--gray-2); background: var(--white); color: var(--gray-7);
+  border-radius: 999px; padding: 7px 16px; font-size: 0.86rem;
+}
+.alb-filter button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.alb-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 18px;
+}
+.alb-card {
+  border: 1px solid var(--gray-2); border-radius: 12px; overflow: hidden;
+  background: var(--white); text-align: left; padding: 0; width: 100%;
+}
+.alb-card:hover { border-color: var(--navy-light); }
+.alb-cover { position: relative; aspect-ratio: 4/3; background: var(--gray-1); }
+.alb-cover img { width: 100%; height: 100%; object-fit: cover; }
+.alb-cover .n {
+  position: absolute; right: 8px; bottom: 8px; color: #fff; font-size: 0.76rem;
+  background: rgba(15,20,30,0.66); border-radius: 999px; padding: 3px 10px;
+}
+.alb-meta { padding: 11px 13px 13px; }
+.alb-meta .t { font-size: 0.92rem; font-weight: 500; color: var(--ink); }
+.alb-meta .d { font-size: 0.79rem; color: var(--gray-5); margin-top: 3px; }
+.alb-photos {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px;
+}
+.alb-photos img {
+  width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px;
+  background: var(--gray-1); cursor: zoom-in;
+}
+.alb-head { margin-bottom: 14px; }
+.alb-head .d { color: var(--gray-5); font-size: 0.85rem; }
+.lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(255,255,255,0.16); border: none; color: #fff;
+  width: 44px; height: 44px; border-radius: 50%; font-size: 1.6rem; line-height: 1;
+}
+.lb-nav.prev { left: 16px; }
+.lb-nav.next { right: 16px; }
+.lb-cap {
+  position: absolute; left: 0; right: 0; bottom: 18px; text-align: center;
+  color: #fff; font-size: 0.85rem; opacity: 0.85;
+}
+@media (max-width: 700px) {
+  .alb-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .alb-photos { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
+}

@@ -41,7 +41,29 @@
     <button class="btn-round" id="nw-more">소식 더 보기</button>
     <button class="btn-round solid" id="nw-add">+ 사진 올리기</button>
   </div>
+
+  <!-- 회기별 앨범 -->
+  <section class="alb-sec">
+    <h3>회기별 앨범</h3>
+    <p class="alb-lead">정기노회와 임시노회의 사진을 회기별로 모았습니다.</p>
+    <div class="alb-filter" id="alb-filter"></div>
+    <div class="alb-grid" id="alb-grid">
+      <p style="color:var(--gray-5)">불러오는 중...</p>
+    </div>
+  </section>
 </main>
+
+<!-- 앨범 한 권 -->
+<div class="mdl" id="alb-mdl">
+  <div class="mdl-box wide">
+    <button class="mdl-close" id="alb-close">&times;</button>
+    <div class="alb-head">
+      <h2 id="alb-title"></h2>
+      <div class="d" id="alb-sub"></div>
+    </div>
+    <div class="alb-photos" id="alb-photos"></div>
+  </div>
+</div>
 
 <!-- 소식 피드 -->
 <div class="mdl" id="feed-mdl">
@@ -100,7 +122,10 @@
 
 <div class="lightbox" id="lightbox">
   <button class="lb-close" id="lb-close" aria-label="닫기">&times;</button>
+  <button class="lb-nav prev" id="lb-prev" aria-label="이전 사진">&#8249;</button>
   <img id="lb-img" src="" alt="">
+  <button class="lb-nav next" id="lb-next" aria-label="다음 사진">&#8250;</button>
+  <div class="lb-cap" id="lb-cap"></div>
 </div>
 
 <script src="js/auth.js"></script>
@@ -121,6 +146,18 @@ document.addEventListener('DOMContentLoaded', function () {
   var likeSet = {};      /* 내가 누른 좋아요 */
   var likeCount = {};
   var comments = {};
+  var albums = [];       /* 회기별 앨범 */
+  var albCat = '전체';
+  var feedShown = 30;    /* 소식 피드는 나눠서 보여 준다 */
+
+  /* 2018-04-01 처럼 적어 둔 날짜를 우리말로 바꾼다.
+   * 오래된 회기는 날짜가 남아 있지 않아 1일로 적어 두었으므로 월까지만 보여 준다. */
+  function dateText(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+    if (!m) return s || '';
+    var y = m[1], mo = +m[2], d = +m[3];
+    return d === 1 ? y + '년 ' + mo + '월' : y + '년 ' + mo + '월 ' + d + '일';
+  }
 
   /* ---------- 슬라이드 ---------- */
   function renderSlide() {
@@ -137,10 +174,9 @@ document.addEventListener('DOMContentLoaded', function () {
     slide.innerHTML =
       '<img src="' + e(it.image_url) + '" alt="' + e(it.title || '') + '">' +
       '<div class="news-cap"><div class="t">' + e(it.title || '노회 소식') + '</div>' +
-      '<div class="d">' + e(it.taken || '') + (it.category ? ' · ' + e(it.category) : '') + '</div></div>';
+      '<div class="d">' + e(dateText(it.taken)) + (it.category ? ' · ' + e(it.category) : '') + '</div></div>';
     slide.querySelector('img').addEventListener('click', function () {
-      document.getElementById('lb-img').src = it.image_url;
-      document.getElementById('lightbox').classList.add('open');
+      openLb(items, idx);
     });
     dots.innerHTML = items.slice(0, 12).map(function (x, i) {
       return '<span class="' + (i === idx ? 'on' : '') + '" data-dot="' + i + '"></span>';
@@ -152,6 +188,92 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('nw-prev').addEventListener('click', function () { idx--; renderSlide(); });
   document.getElementById('nw-next').addEventListener('click', function () { idx++; renderSlide(); });
 
+  /* ---------- 회기별 앨범 ---------- */
+  /* 제목이 같은 사진을 한 권으로 묶는다 (예: 제19회 정기노회) */
+  function buildAlbums() {
+    var by = {};
+    items.forEach(function (it) {
+      var k = it.title || '노회 소식';
+      if (!by[k]) by[k] = { title: k, taken: it.taken || '', category: it.category || '', photos: [] };
+      by[k].photos.push(it);
+      if ((it.taken || '') > by[k].taken) by[k].taken = it.taken;
+    });
+    albums = Object.keys(by).map(function (k) { return by[k]; });
+    albums.forEach(function (a) {
+      a.photos.sort(function (x, y) { return (x.sort || 0) - (y.sort || 0) || (x.id > y.id ? 1 : -1); });
+    });
+    albums.sort(function (a, b) { return a.taken < b.taken ? 1 : a.taken > b.taken ? -1 : 0; });
+  }
+
+  function renderAlbums() {
+    var box = document.getElementById('alb-grid');
+    var bar = document.getElementById('alb-filter');
+    /* 사진이 많은 분류부터 보여 준다 */
+    var n = {};
+    albums.forEach(function (a) {
+      if (a.category) n[a.category] = (n[a.category] || 0) + a.photos.length;
+    });
+    var cats = ['전체'].concat(Object.keys(n).sort(function (x, y) { return n[y] - n[x]; }));
+    if (cats.indexOf(albCat) === -1) albCat = '전체';
+    bar.innerHTML = cats.map(function (c) {
+      return '<button data-cat="' + e(c) + '"' + (c === albCat ? ' class="on"' : '') + '>' + e(c) + '</button>';
+    }).join('');
+    bar.querySelectorAll('button[data-cat]').forEach(function (b) {
+      b.addEventListener('click', function () { albCat = b.dataset.cat; renderAlbums(); });
+    });
+
+    var list = albums.filter(function (a) { return albCat === '전체' || a.category === albCat; });
+    if (!list.length) {
+      box.innerHTML = '<p style="color:var(--gray-5)">아직 앨범이 없습니다.</p>';
+      return;
+    }
+    box.innerHTML = list.map(function (a) {
+      var cover = a.photos[0];
+      return '<button class="alb-card" data-alb="' + e(a.title) + '">' +
+        '<div class="alb-cover"><img loading="lazy" src="' + e(cover.thumb_url || cover.image_url) + '" alt="">' +
+        '<span class="n">' + a.photos.length + '장</span></div>' +
+        '<div class="alb-meta"><div class="t">' + e(a.title) + '</div>' +
+        '<div class="d">' + e(dateText(a.taken)) + (a.category ? ' · ' + e(a.category) : '') + '</div></div>' +
+        '</button>';
+    }).join('');
+    box.querySelectorAll('button[data-alb]').forEach(function (b) {
+      b.addEventListener('click', function () { openAlbum(b.dataset.alb); });
+    });
+  }
+
+  function openAlbum(title) {
+    var a = albums.filter(function (x) { return x.title === title; })[0];
+    if (!a) return;
+    document.getElementById('alb-title').textContent = a.title;
+    document.getElementById('alb-sub').textContent =
+      dateText(a.taken) + (a.category ? ' · ' + a.category : '') + ' · 사진 ' + a.photos.length + '장';
+    var box = document.getElementById('alb-photos');
+    box.innerHTML = a.photos.map(function (p, i) {
+      return '<img loading="lazy" data-i="' + i + '" src="' + e(p.thumb_url || p.image_url) + '" alt="">';
+    }).join('');
+    box.querySelectorAll('img[data-i]').forEach(function (im) {
+      im.addEventListener('click', function () { openLb(a.photos, +im.dataset.i); });
+    });
+    openM('alb-mdl');
+  }
+
+  /* ---------- 큰 사진 보기 ---------- */
+  var lbList = [], lbIdx = 0;
+  function showLb() {
+    if (!lbList.length) return;
+    if (lbIdx < 0) lbIdx = lbList.length - 1;
+    if (lbIdx >= lbList.length) lbIdx = 0;
+    var p = lbList[lbIdx];
+    document.getElementById('lb-img').src = p.image_url;
+    document.getElementById('lb-cap').textContent =
+      (p.title || '') + ' · ' + (lbIdx + 1) + ' / ' + lbList.length;
+  }
+  function openLb(list, i) {
+    lbList = list || []; lbIdx = i || 0;
+    showLb();
+    document.getElementById('lightbox').classList.add('open');
+  }
+
   /* ---------- 피드 ---------- */
   function feedCard(it) {
     var initial = (it.author_name || '노회').charAt(0);
@@ -161,7 +283,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return '<div class="feed-card" data-fid="' + it.id + '">' +
       '<div class="feed-top"><div class="feed-av">' + e(initial) + '</div>' +
       '<div class="feed-who">' + e(it.author_name || '노회') +
-      '<div class="d">' + e(it.taken || String(it.created_at || '').slice(0, 10)) +
+      '<div class="d">' + e(dateText(it.taken) || String(it.created_at || '').slice(0, 10)) +
       (it.category ? ' · ' + e(it.category) : '') + '</div></div>' +
       ((mine || canManage) ? '<button class="feed-del" data-fdel="' + it.id + '" data-ffull="' + e(it.image_url || '') + '" data-fthumb="' + e(it.thumb_url || '') + '">삭제</button>' : '') +
       '</div>' +
@@ -189,7 +311,15 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderFeed() {
     var box = document.getElementById('feed-list');
     if (!items.length) { box.innerHTML = '<p style="color:var(--gray-5)">등록된 소식이 없습니다.</p>'; return; }
-    box.innerHTML = items.map(feedCard).join('');
+    var shown = items.slice(0, feedShown);
+    box.innerHTML = shown.map(feedCard).join('') +
+      (items.length > shown.length
+        ? '<div style="text-align:center;margin:6px 0 10px">' +
+          '<button class="btn-round" id="feed-more">더 보기 (' +
+          (items.length - shown.length) + '장 남음)</button></div>'
+        : '');
+    var more = document.getElementById('feed-more');
+    if (more) more.addEventListener('click', function () { feedShown += 30; renderFeed(); });
     bindFeed();
   }
 
@@ -264,10 +394,11 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 모달 ---------- */
   function openM(id) { document.getElementById(id).classList.add('open'); }
   function closeM(id) { document.getElementById(id).classList.remove('open'); }
-  document.getElementById('nw-more').addEventListener('click', function () { renderFeed(); openM('feed-mdl'); });
+  document.getElementById('nw-more').addEventListener('click', function () { feedShown = 30; renderFeed(); openM('feed-mdl'); });
   document.getElementById('feed-close').addEventListener('click', function () { closeM('feed-mdl'); });
   document.getElementById('up-close').addEventListener('click', function () { closeM('up-mdl'); });
-  ['feed-mdl', 'up-mdl'].forEach(function (id) {
+  document.getElementById('alb-close').addEventListener('click', function () { closeM('alb-mdl'); });
+  ['feed-mdl', 'up-mdl', 'alb-mdl'].forEach(function (id) {
     document.getElementById(id).addEventListener('click', function (ev) {
       if (ev.target.id === id) closeM(id);
     });
@@ -286,7 +417,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var lb = document.getElementById('lightbox');
   document.getElementById('lb-close').addEventListener('click', function () { lb.classList.remove('open'); });
+  document.getElementById('lb-prev').addEventListener('click', function () { lbIdx--; showLb(); });
+  document.getElementById('lb-next').addEventListener('click', function () { lbIdx++; showLb(); });
   lb.addEventListener('click', function (ev) { if (ev.target === lb) lb.classList.remove('open'); });
+  document.addEventListener('keydown', function (ev) {
+    if (!lb.classList.contains('open')) return;
+    if (ev.key === 'Escape') lb.classList.remove('open');
+    if (ev.key === 'ArrowLeft') { lbIdx--; showLb(); }
+    if (ev.key === 'ArrowRight') { lbIdx++; showLb(); }
+  });
 
   /* ---------- 업로드 ---------- */
   var picked = [];
@@ -436,7 +575,9 @@ document.addEventListener('DOMContentLoaded', function () {
       items = SHSData.gallery.map(function (g, i) {
         return { id: 'local' + i, title: g.title, taken: g.date, image_url: g.img, thumb_url: g.thumb };
       });
+      buildAlbums();
       renderSlide();
+      renderAlbums();
       return;
     }
     SHSCloud.init().then(function (c) {
@@ -462,13 +603,17 @@ document.addEventListener('DOMContentLoaded', function () {
       ((rs[2] && rs[2].data) || []).forEach(function (c2) {
         (comments[c2.item_id] = comments[c2.item_id] || []).push(c2);
       });
+      buildAlbums();
       renderSlide();
+      renderAlbums();
       if (keepFeed && document.getElementById('feed-mdl').classList.contains('open')) renderFeed();
     }).catch(function () {
       items = SHSData.gallery.map(function (g, i) {
         return { id: 'local' + i, title: g.title, taken: g.date, image_url: g.img, thumb_url: g.thumb };
       });
+      buildAlbums();
       renderSlide();
+      renderAlbums();
     });
   }
 
