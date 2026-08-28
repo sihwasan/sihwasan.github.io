@@ -4,7 +4,10 @@
  * 내려받는 사람의 등급을 확인한 뒤에만 내어 준다.
  *
  * 하는 일
- *   GET /f/공개등급/분류/이름.hwp    자료 내려주기
+ *   GET    /f/공개등급/분류/이름.hwp   자료 내려주기
+ *   PUT    /f/공개등급/분류/이름.hwp   자료 올리기 (관리자)
+ *   DELETE /f/공개등급/분류/이름.hwp   자료 지우기 (관리자)
+ *   POST   /move                      등급이 바뀌면 자리를 옮긴다 (관리자)
  *
  * 열람 등급은 파일 이름 맨 앞 칸에 적어 둔다.
  *   public   누구나
@@ -37,7 +40,7 @@ function cors(origin) {
   const allow = ALLOW_ORIGINS.includes(origin) ? origin : ALLOW_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, DELETE, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
@@ -91,6 +94,10 @@ const LEVEL_NAME = {
   member: '정회원', officer: '노회 임원', admin: '노회 관리자(서기·간사·노회장)'
 };
 
+/* 자료를 올리고 지울 수 있는 사람 */
+const MANAGERS = ['president', 'clerk', 'staff', 'superadmin'];
+const MAX_BYTES = 40 * 1024 * 1024;      /* 자료 하나에 40MB까지 */
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -100,9 +107,25 @@ export default {
     if (url.pathname === '/' || url.pathname === '/health') {
       return reply({ ok: true, service: '시화산노회 자료 보관소' }, 200, origin);
     }
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return reply({ error: '허용되지 않는 요청입니다.' }, 405, origin);
+    /* ---------- 자리 옮기기 : 열람 등급이 바뀌었을 때 ---------- */
+    if (url.pathname === '/move' && request.method === 'POST') {
+      const me = await whoIs(request, env);
+      if (!me) return reply({ error: '로그인이 확인되지 않았습니다.' }, 401, origin);
+      if (MANAGERS.indexOf(me.role) === -1) {
+        return reply({ error: '자료를 옮길 권한이 없습니다.' }, 403, origin);
+      }
+      const body = await request.json().catch(function () { return {}; });
+      const from = String(body.from || ''), to = String(body.to || '');
+      if (!KEY_RE.test(from) || !KEY_RE.test(to)) {
+        return reply({ error: '자료 이름 형식이 올바르지 않습니다.' }, 400, origin);
+      }
+      const obj = await env.DOCS.get(from);
+      if (!obj) return reply({ error: '옮길 자료를 찾을 수 없습니다.' }, 404, origin);
+      await env.DOCS.put(to, obj.body, { httpMetadata: obj.httpMetadata });
+      await env.DOCS.delete(from);
+      return reply({ ok: true, key: to, url: url.origin + '/f/' + to }, 200, origin);
     }
+
     if (!url.pathname.startsWith('/f/')) {
       return reply({ error: '없는 주소입니다.' }, 404, origin);
     }
@@ -114,7 +137,7 @@ export default {
     const level = key.split('/')[0];
 
     let me = null;
-    if (level !== 'public') {
+    if (level !== 'public' && request.method !== 'PUT' && request.method !== 'DELETE') {
       me = await whoIs(request, env);
       if (!me) {
         return reply({ error: '로그인이 확인되지 않았습니다.' }, 401, origin);
@@ -122,6 +145,28 @@ export default {
       if (!allowed(level, me.role)) {
         return reply({ error: '이 자료는 ' + (LEVEL_NAME[level] || level) + '만 열람할 수 있습니다.' }, 403, origin);
       }
+    }
+
+    /* ---------- 올리기·지우기 : 관리자 ---------- */
+    if (request.method === 'PUT' || request.method === 'DELETE') {
+      const who = me || await whoIs(request, env);
+      if (!who) return reply({ error: '로그인이 확인되지 않았습니다.' }, 401, origin);
+      if (MANAGERS.indexOf(who.role) === -1) {
+        return reply({ error: '자료를 올리거나 지울 권한이 없습니다.' }, 403, origin);
+      }
+      if (request.method === 'DELETE') {
+        await env.DOCS.delete(key);
+        return reply({ ok: true }, 200, origin);
+      }
+      const len = Number(request.headers.get('Content-Length') || 0);
+      if (len > MAX_BYTES) {
+        return reply({ error: '자료 하나는 40MB까지 올릴 수 있습니다.' }, 413, origin);
+      }
+      await env.DOCS.put(key, request.body, {
+        httpMetadata: { contentType: request.headers.get('Content-Type') || 'application/octet-stream' },
+        customMetadata: { uploader: who.id, role: who.role }
+      });
+      return reply({ ok: true, key: key, url: url.origin + '/f/' + key }, 201, origin);
     }
 
     const obj = await env.DOCS.get(key);

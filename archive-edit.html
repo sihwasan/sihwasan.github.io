@@ -83,6 +83,76 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var SECTIONS = ['회의자료', '결의사항', '규칙', '내규', '서식', '고시',
                   '회의록', '임원회의록', '공문', '회계', '증명서 발급대장'];
+
+  /* 분류마다 보관소에서 쓰는 영문 이름 */
+  var SLUG = {
+    '회의자료': 'hoeui-jaryo', '결의사항': 'gyeorui', '규칙': 'gyuchik', '내규': 'naegyu',
+    '서식': 'seosik', '고시': 'gosi', '회의록': 'hoeuirok',
+    '임원회의록': 'imwon-hoeuirok', '공문': 'gongmun', '회계': 'hoegye',
+    '증명서 발급대장': 'jeungmyeongseo'
+  };
+  var STORE = 'https://sihwasan-docs.sihwasan.workers.dev';
+
+  /* 로그인 증표 (보관소가 등급을 확인할 때 쓴다) */
+  function token() {
+    return SHSCloud.init().then(function (c) {
+      return c.auth.getSession().then(function (r) {
+        return (r && r.data && r.data.session && r.data.session.access_token) || null;
+      });
+    });
+  }
+
+  function keyFor(access, section, name) {
+    var ext = (String(name).match(/\.[A-Za-z0-9]{1,8}$/) || ['.dat'])[0].toLowerCase();
+    var stamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+    return access + '/' + (SLUG[section] || 'gita') + '/' +
+           stamp + '-' + Math.floor(Math.random() * 1e6) + ext;
+  }
+
+  /* 보관소에 자료를 올린다. 올린 주소를 돌려준다. */
+  function putFile(file, access, section) {
+    var key = keyFor(access, section, file.name);
+    return token().then(function (t) {
+      if (!t) throw new Error('로그인이 확인되지 않았습니다.');
+      return fetch(STORE + '/f/' + key, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + t, 'Content-Type': file.type || 'application/octet-stream' },
+        body: file
+      });
+    }).then(function (r) {
+      if (r.ok) return STORE + '/f/' + key;
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        throw new Error(j.error || ('자료를 올리지 못했습니다. (' + r.status + ')'));
+      });
+    });
+  }
+
+  /* 보관소의 자료를 지운다. 우리 보관소 것이 아니면 아무 일도 하지 않는다. */
+  function removeFile(fp) {
+    if (!fp || String(fp).indexOf(STORE + '/f/') !== 0) return Promise.resolve(false);
+    return token().then(function (t) {
+      if (!t) return false;
+      return fetch(fp, { method: 'DELETE', headers: { Authorization: 'Bearer ' + t } })
+        .then(function (r) { return r.ok; });
+    }).catch(function () { return false; });
+  }
+
+  /* 열람 등급이 바뀌면 보관소 안에서도 자리를 옮긴다 */
+  function moveFile(fp, access, section) {
+    if (!fp || String(fp).indexOf(STORE + '/f/') !== 0) return Promise.resolve(fp);
+    var from = fp.slice((STORE + '/f/').length);
+    var parts = from.split('/');
+    var to = access + '/' + (SLUG[section] || parts[1]) + '/' + parts[2];
+    if (to === from) return Promise.resolve(fp);
+    return token().then(function (t) {
+      if (!t) return fp;
+      return fetch(STORE + '/move', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: from, to: to })
+      }).then(function (r) { return r.ok ? STORE + '/f/' + to : fp; });
+    }).catch(function () { return fp; });
+  }
   var ACCESS = [
     { v: 'public',  t: '공개 (누구나)' },
     { v: 'member',  t: '정회원' },
@@ -212,10 +282,8 @@ document.addEventListener('DOMContentLoaded', function () {
       db().then(function (c) {
         var pre = Promise.resolve(null);
         if (newFile) {
-          var path = 'archive/' + Date.now() + '-' + newFile.name.replace(/[^\w.\-가-힣]/g, '_');
-          pre = c.storage.from('archive-files').upload(path, newFile).then(function (r) {
-            if (r.error) throw r.error;
-            return { file_path: path, file_name: newFile.name };
+          pre = putFile(newFile, d.access, d.section).then(function (url) {
+            return { file_path: url, file_name: newFile.name };
           });
         }
         return pre.then(function (f) {
@@ -246,8 +314,12 @@ document.addEventListener('DOMContentLoaded', function () {
         };
         if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목은 비울 수 없습니다.'; return; }
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+        var cur = items.filter(function (x) { return String(x.id) === b.dataset.asave; })[0];
         db().then(function (c) {
-          return c.from('archive_items').update(d).eq('id', b.dataset.asave);
+          return moveFile(cur && cur.file_path, d.access, d.section).then(function (fp) {
+            if (fp && cur && fp !== cur.file_path) d.file_path = fp;
+            return c.from('archive_items').update(d).eq('id', b.dataset.asave);
+          });
         }).then(function (res) {
           if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
           SHSCloud.log('update', '자료실 자료 수정', '[' + d.section + '] ' + d.title);
@@ -263,9 +335,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!confirm('"' + b.dataset.at + '" 자료를 삭제하시겠습니까?')) return;
         var a = items.filter(function (x) { return String(x.id) === b.dataset.adel; })[0];
         db().then(function (c) {
-          var pre = (a && a.file_path)
-            ? c.storage.from('archive-files').remove([a.file_path]).catch(function () {})
-            : Promise.resolve();
+          var fp = a && a.file_path;
+          var pre = !fp ? Promise.resolve()
+            : (String(fp).indexOf(STORE) === 0
+                ? removeFile(fp)
+                : c.storage.from('archive-files').remove([fp]).catch(function () {}));
           return pre.then(function () { return c.from('archive_items').delete().eq('id', b.dataset.adel); });
         }).then(function (res) {
           if (res.error) { alert(res.error.message); return; }

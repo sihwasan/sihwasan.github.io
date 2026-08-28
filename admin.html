@@ -453,7 +453,8 @@ document.addEventListener('DOMContentLoaded', function () {
       /* 명단 표 (그 자리에서 고칠 수 있다) */
       html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th><th style="width:110px">성명</th>' +
         '<th>소속 교회</th><th style="width:130px">직분</th><th style="width:150px">생년월일</th>' +
-        '<th style="width:120px">시찰</th><th style="width:120px">비고</th>' +
+        '<th style="width:120px">시찰</th><th style="width:130px">연락처</th>' +
+        '<th style="width:120px">비고</th>' +
         '<th style="width:150px">부여 등급</th><th style="width:120px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
         var old70 = overAge(m.birth_date);
@@ -467,11 +468,22 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><input type="date" data-rf="birth_date" value="' + e(m.birth_date || '') + '">' +
           (old70 ? '<div class="ro-hint">정년 경과</div>' : '') + '</td>' +
           '<td><select data-rf="sichal">' + sichalOptions(m.sichal || '') + '</select></td>' +
+          '<td><input type="text" data-rf="phone" value="' + e(m.phone || '') + '" placeholder="010-0000-0000"></td>' +
           '<td><input type="text" data-rf="note" value="' + e(m.note || '') + '" placeholder="추대일 등"></td>' +
           '<td><select data-rf="grade">' + gradeOptions(rosterGrade(m)) + '</select></td>' +
           '<td><button class="btn sm" data-rosave="' + m.id + '">저장</button> ' +
           '<button class="btn danger sm" data-rodel="' + m.id + '" data-roname="' + e(m.name) + '">삭제</button></td>' +
-          '</tr>';
+          '</tr>' +
+          /* 주소는 길어서 아랫줄에 따로 펼쳐 둔다. 저장은 윗줄 저장 단추가 함께 한다. */
+          '<tr class="ro-sub" data-rosub="' + m.id + '"><td></td>' +
+          '<td colspan="8"><div class="ro-addr">' +
+          '<label>우편번호<input type="text" data-rf="postcode" value="' + e(m.postcode || '') +
+          '" placeholder="00000" maxlength="7"></label>' +
+          '<label class="wide">주소<input type="text" data-rf="address" value="' + e(m.address || '') +
+          '" placeholder="회원 주소"></label>' +
+          '<label class="wide">교회 주소<input type="text" data-rf="church_addr" value="' + e(m.church_addr || '') +
+          '" placeholder="교회 주소 (증명서에 쓰입니다)"></label>' +
+          '</div></td></tr>';
       });
       html += '</tbody></table>';
       html += '<div class="form-msg' + (rosterFlash ? ' ok' : '') + '" id="ro-rowmsg">' +
@@ -511,11 +523,14 @@ document.addEventListener('DOMContentLoaded', function () {
         var q = (qBox.value || '').trim();
         var c = fCat.value, g = fGrade.value;
         var shown = 0, n = 0;
-        box.querySelectorAll('#ro-tbl tbody tr').forEach(function (tr) {
+        box.querySelectorAll('#ro-tbl tbody tr[data-ro]').forEach(function (tr) {
           var ok = (!q || (tr.dataset.find || '').indexOf(q) !== -1)
                 && (!c || tr.dataset.cat === c)
                 && (!g || tr.dataset.grade === g);
           tr.classList.toggle('hidden', !ok);
+          /* 주소가 담긴 아랫줄도 같이 숨기거나 보인다 */
+          var sub = box.querySelector('#ro-tbl tr[data-rosub="' + tr.dataset.ro + '"]');
+          if (sub) sub.classList.toggle('hidden', !ok);
           if (ok) { shown++; tr.querySelector('.ro-no').textContent = ++n; }
         });
         var el = document.getElementById('ro-count');
@@ -595,8 +610,14 @@ document.addEventListener('DOMContentLoaded', function () {
       box.querySelectorAll('button[data-rosave]').forEach(function (b) {
         b.addEventListener('click', function () {
           var tr = b.closest('tr');
+          var sub = tr.parentNode.querySelector('tr[data-rosub="' + b.dataset.rosave + '"]');
           var msg = document.getElementById('ro-rowmsg');
-          function v(f) { return tr.querySelector('[data-rf="' + f + '"]').value.trim(); }
+          /* 값은 윗줄과 아랫줄(주소) 두 군데에서 찾는다 */
+          function v(f) {
+            var el = tr.querySelector('[data-rf="' + f + '"]') ||
+                     (sub && sub.querySelector('[data-rf="' + f + '"]'));
+            return el ? el.value.trim() : '';
+          }
           var cat = v('category') || null;
           var g = parseGrade(v('grade'));
           var d = {
@@ -607,6 +628,10 @@ document.addEventListener('DOMContentLoaded', function () {
             birth_date: v('birth_date') || null,
             sichal: v('sichal') || null,
             note: v('note') || null,
+            phone: v('phone') || null,
+            postcode: v('postcode') || null,
+            address: v('address') || null,
+            church_addr: v('church_addr') || null,
             role: g.role, officer_title: g.title
           };
           if (!d.name) {

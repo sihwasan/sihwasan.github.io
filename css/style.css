@@ -1606,3 +1606,17 @@ input.dp-bad { border-color: var(--red); }
 
 /* 사진 올릴 때 고른 앨범을 한 줄로 알려 준다 */
 .field-hint { font-size: 0.8rem; color: var(--gray-5); margin-top: 6px; line-height: 1.5; }
+
+/* ---------- 명단 관리: 연락처·주소 줄 ---------- */
+.ro-sub > td { border-top: none; padding-top: 0; }
+.ro-addr { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.ro-addr label {
+  display: flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  font-size: 0.8rem; color: var(--gray-5);
+}
+.ro-addr label.wide { flex: 1 1 260px; }
+.ro-addr input { width: 110px; }
+.ro-addr label.wide input { width: 100%; }
+@media (max-width: 900px) {
+  .ro-addr label, .ro-addr label.wide { flex: 1 1 100%; }
+}

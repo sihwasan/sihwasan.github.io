@@ -497,16 +497,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if (info === null) {
       h += '<div class="mb-note">상세 정보는 서버 로그인(구글·이메일) 회원만 볼 수 있습니다.</div>';
     } else if (!info) {
-      h += '<div class="mb-note">아직 홈페이지에 회원 정보를 등록하지 않은 회원입니다.<br>' +
-        '본인이 로그인 후 <strong>내 정보</strong>에서 등록하면 여기에 표시됩니다.</div>';
+      h += '<div class="mb-note">노회 명단에서 이 분을 찾지 못했습니다.<br>' +
+        '노회 서기·간사께서 <strong>관리자 → 명단 관리</strong>에서 확인해 주시기 바랍니다.</div>';
     } else {
       h += '<table class="mb-tbl"><tbody>' +
+        cardRow('시찰', info.sichal) +
+        cardRow('노회 직책', info.officer_title) +
         cardRow('교회 주소', info.church_addr) +
+        cardRow('주소', info.address ? ((info.postcode ? '(' + info.postcode + ') ' : '') + info.address) : '') +
         cardRow('연락처', info.phone) +
         cardRow('생년월일', fmtBirth(info.birth)) +
         cardRow('남은 임기', fmtRemain(info.birth, info.retire)) +
         '</tbody></table>' +
-        '<div class="mb-note">본인 정보는 로그인 후 <strong>내 정보</strong>에서 수정할 수 있습니다.</div>';
+        '<div class="mb-note">노회 명단에 있는 내용입니다. 본인 정보는 로그인 후 ' +
+        '<strong>내 정보</strong>에서, 그 밖의 사항은 노회 서기가 <strong>명단 관리</strong>에서 고칩니다.' +
+        (info.hasAccount ? '' : '<br>이 회원은 아직 홈페이지 계정을 만들지 않으셨습니다.') +
+        '</div>';
     }
     mbBody.innerHTML = h;
   }
@@ -526,8 +532,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!p) { renderCard(meta, false, null); return; }
         var info = {
           church: p.out_church, position: p.out_position,
-          church_addr: p.out_church_addr, phone: p.out_phone,
-          birth: p.out_birth_date, retire: p.out_retire_date
+          category: p.out_category, sichal: p.out_sichal,
+          officer_title: p.out_officer_title,
+          church_addr: p.out_church_addr,
+          address: p.out_address, postcode: p.out_postcode,
+          phone: p.out_phone,
+          birth: p.out_birth_date, retire: p.out_retire_date,
+          hasAccount: p.out_has_account
         };
         if (p.out_photo_path) {
           return c.storage.from('member-photos').createSignedUrl(p.out_photo_path, 300)

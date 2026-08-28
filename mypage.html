@@ -41,7 +41,25 @@ document.addEventListener('DOMContentLoaded', function () {
           '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
         return;
       }
-      renderCloud(p);
+      /* 회원에 관한 내용은 노회 명단이 원본이다. 명단 기록을 먼저 얹는다. */
+      return SHSCloud.init().then(function (c) {
+        return c.rpc('my_member');
+      }).then(function (r) {
+        var m = r && r.data && r.data[0];
+        if (m) {
+          p.roster_id   = m.out_id;
+          p.name        = m.out_name || p.name;
+          p.church      = m.out_church || p.church;
+          p.position    = m.out_position || p.position;
+          p.phone       = m.out_phone || p.phone;
+          p.birth_date  = m.out_birth_date || p.birth_date;
+          p.address     = m.out_address || p.address;
+          p.postcode    = m.out_postcode || p.postcode;
+          p.church_addr = m.out_church_addr || p.church_addr;
+          p.photo_path  = m.out_photo_path || p.photo_path;
+        }
+        renderCloud(p);
+      }).catch(function () { renderCloud(p); });
     });
     return;
   }
@@ -86,9 +104,14 @@ document.addEventListener('DOMContentLoaded', function () {
       '<input type="date" id="q-birth" data-birth value="' + e(p.birth_date || '') + '">' +
       '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 회원명단 카드의 남은 임기 표시에 사용됩니다.</span></div>' +
       '<div class="field"><label>교회 주소</label><input type="text" id="q-charr" value="' + e(p.church_addr || '') + '" placeholder="예: 안산시 단원구 ○○로 12"></div>' +
-      '<div class="field"><label>자택 주소</label><input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
-      '<p style="font-size:0.82rem;color:var(--gray-5)">교회 주소·연락처·생년월일은 정회원에게만 회원명단 카드에서 보여집니다. ' +
-      '자택 주소는 노회 행정에만 사용합니다.</p>' +
+      '<div class="inline-form" style="margin-bottom:16px">' +
+      '<div class="field" style="flex:0 0 130px"><label>우편번호</label>' +
+      '<input type="text" id="q-post" value="' + e(p.postcode || '') + '" placeholder="00000" maxlength="7"></div>' +
+      '<div class="field"><label>자택 주소</label>' +
+      '<input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
+      '</div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5)">여기 적으신 내용은 <strong>노회 명단</strong>에 그대로 저장되어, ' +
+      '회원명단 카드와 주소록에 함께 반영됩니다. 성명·교회·직분을 고치면 명단과 다시 대조하여 등급이 갱신됩니다.</p>' +
       '<button class="btn" id="q-save" style="width:100%">저장</button>' +
       '<div class="form-msg" id="q-msg"></div>' +
       '</div>';
@@ -234,7 +257,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 return c.from('profiles').update({
                   photo_path: path,
                   updated_at: new Date().toISOString()
-                }).eq('id', p.id);
+                }).eq('id', p.id).then(function (r0) {
+                  /* 사진도 명단에 함께 남겨 회원명단 카드에서 보이게 한다 */
+                  return c.rpc('update_my_member', {
+                    p_phone: null, p_address: null, p_postcode: null,
+                    p_church_addr: null, p_birth_date: null, p_photo_path: path
+                  }).then(function () { return r0; });
+                });
               }).then(function (r2) {
                 if (r2.error) throw r2.error;
                 p.photo_path = path;
@@ -319,15 +348,20 @@ document.addEventListener('DOMContentLoaded', function () {
           msg.textContent = r.msg;
           return;
         }
-        /* 생년월일·주소·교회 주소는 본인만 수정할 수 있는 항목이므로 별도 저장 */
+        /* 연락처·주소·생년월일은 노회 명단에 저장한다 (명단이 원본이다) */
         return SHSCloud.init().then(function (c) {
-          return c.from('profiles').update({
-            birth_date: SHSDate.get(document.getElementById('q-birth')) || null,
-            address: document.getElementById('q-addr').value.trim(),
-            church_addr: document.getElementById('q-charr').value.trim(),
-            updated_at: new Date().toISOString()
-          }).eq('id', p.id);
-        }).then(function () {
+          return c.rpc('update_my_member', {
+            p_phone:       document.getElementById('q-phone').value.trim(),
+            p_address:     document.getElementById('q-addr').value.trim(),
+            p_postcode:    document.getElementById('q-post').value.trim(),
+            p_church_addr: document.getElementById('q-charr').value.trim(),
+            p_birth_date:  SHSDate.get(document.getElementById('q-birth')) || null,
+            p_photo_path:  null
+          });
+        }).then(function (r2) {
+          if (r2 && r2.data && r2.data[0] && !r2.data[0].out_ok) {
+            alert(r2.data[0].out_msg);
+          }
           alert('저장되었습니다. 현재 등급: ' + r.roleName + (r.title ? ' (' + r.title + ')' : ''));
           location.reload();
         });
