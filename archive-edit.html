@@ -247,7 +247,15 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td class="left"><input type="text" data-af="title" value="' + e(a.title) + '">' +
           '<input type="text" data-af="description" value="' + e(a.description || '') + '" style="margin-top:4px;font-size:0.85rem">' +
           '<input type="text" data-af="link_url" value="' + e(a.link_url || '') + '" placeholder="바로가기 주소" style="margin-top:4px;font-size:0.85rem">' +
-          (a.file_path ? '<div style="font-size:0.8rem;color:var(--gray-5);margin-top:4px">첨부: ' + e(a.file_name || a.file_path) + '</div>' : '') +
+          '<div class="ae-file">' +
+          '<div class="ae-cur">' +
+          (a.file_path
+            ? '첨부: <strong>' + e(a.file_name || a.file_path) + '</strong>' +
+              ' <button type="button" class="ae-x" data-afdrop="' + a.id + '">떼기</button>'
+            : '<span class="ae-none">첨부 없음</span>') +
+          '</div>' +
+          '<input type="file" data-af="file">' +
+          '</div>' +
           '</td>' +
           '<td><select data-af="section">' + opts(SECTIONS, a.section) + '</select></td>' +
           '<td><select data-af="access">' + opts(ACCESS, a.access, 'v', 't') + '</select></td>' +
@@ -301,6 +309,36 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
+    /* 줄마다 첨부 칸을 끌어다 놓을 수 있는 상자로 만든다 */
+    box.querySelectorAll('.ae-file input[type="file"]').forEach(function (inp) {
+      SHS.dropZone(inp, { what: '첨부파일' });
+      var dz = inp.closest('.dropzone');
+      if (dz) dz.classList.add('sm');
+      inp.addEventListener('change', function () {
+        var tr = inp.closest('tr');
+        if (inp.files && inp.files.length) markDrop(tr, false);
+      });
+    });
+
+    /* 첨부 떼기 : 눌러 두면 저장할 때 첨부가 지워진다 */
+    function markDrop(tr, on) {
+      tr.dataset.dropfile = on ? '1' : '';
+      tr.classList.toggle('ae-dropping', on);
+      var btn = tr.querySelector('.ae-x');
+      if (btn) btn.textContent = on ? '떼기 취소' : '떼기';
+      if (on) {
+        /* 떼기로 해 두면 고르던 파일은 물린다 */
+        var inp = tr.querySelector('input[data-af="file"]');
+        if (inp) { inp.value = ''; inp.dispatchEvent(new Event('change')); }
+      }
+    }
+    box.querySelectorAll('.ae-x').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var tr = btn.closest('tr');
+        markDrop(tr, tr.dataset.dropfile !== '1');
+      });
+    });
+
     box.querySelectorAll('button[data-asave]').forEach(function (b) {
       b.addEventListener('click', function () {
         var tr = b.closest('tr');
@@ -315,9 +353,32 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목은 비울 수 없습니다.'; return; }
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
         var cur = items.filter(function (x) { return String(x.id) === b.dataset.asave; })[0];
+        var fileEl = tr.querySelector('input[data-af="file"]');
+        var picked = fileEl && fileEl.files && fileEl.files[0];
+        var dropping = tr.dataset.dropfile === '1';
+
         db().then(function (c) {
-          return moveFile(cur && cur.file_path, d.access, d.section).then(function (fp) {
-            if (fp && cur && fp !== cur.file_path) d.file_path = fp;
+          var step;
+          if (picked) {
+            /* 새 파일로 바꾼다. 올린 뒤에 옛 파일을 지운다. */
+            step = putFile(picked, d.access, d.section).then(function (url) {
+              d.file_path = url;
+              d.file_name = picked.name;
+              return removeFile(cur && cur.file_path);
+            });
+          } else if (dropping) {
+            /* 첨부만 떼어 낸다 */
+            step = removeFile(cur && cur.file_path).then(function () {
+              d.file_path = null;
+              d.file_name = null;
+            });
+          } else {
+            /* 등급·분류가 바뀌었으면 보관소 안에서 자리만 옮긴다 */
+            step = moveFile(cur && cur.file_path, d.access, d.section).then(function (fp) {
+              if (fp && cur && fp !== cur.file_path) d.file_path = fp;
+            });
+          }
+          return step.then(function () {
             return c.from('archive_items').update(d).eq('id', b.dataset.asave);
           });
         }).then(function (res) {

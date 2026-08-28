@@ -1620,3 +1620,22 @@ input.dp-bad { border-color: var(--red); }
 @media (max-width: 900px) {
   .ro-addr label, .ro-addr label.wide { flex: 1 1 100%; }
 }
+
+/* ---------- 자료 관리: 줄마다 첨부 바꾸기 ---------- */
+.ae-file { margin-top: 6px; }
+.ae-cur { font-size: 0.8rem; color: var(--gray-5); margin-bottom: 4px; }
+.ae-cur strong { color: var(--gray-7); font-weight: 500; }
+.ae-cur .ae-none { color: var(--gray-3); }
+.ae-x {
+  background: none; border: 1px solid var(--gray-2); color: var(--gray-5);
+  border-radius: 999px; padding: 1px 9px; font-size: 0.75rem; margin-left: 4px;
+}
+.ae-x:hover { border-color: var(--red); color: var(--red); }
+/* 첨부를 떼기로 해 둔 줄 */
+.ae-dropping .ae-cur strong { text-decoration: line-through; color: var(--gray-3); }
+.ae-dropping .ae-x { border-color: var(--red); color: var(--red); }
+/* 표 안에 들어가는 작은 끌어놓기 상자 */
+.dropzone.sm { padding: 10px 12px; margin: 0; }
+.dropzone.sm .dz-guide strong { font-size: 0.82rem; }
+.dropzone.sm .dz-guide span { font-size: 0.74rem; }
+.dropzone.sm .dz-item { font-size: 0.78rem; }
