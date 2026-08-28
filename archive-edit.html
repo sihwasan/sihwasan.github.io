@@ -82,14 +82,16 @@ document.addEventListener('DOMContentLoaded', function () {
   var e = SHS.esc;
 
   var SECTIONS = ['회의자료', '결의사항', '규칙', '내규', '서식', '고시',
-                  '회의록', '임원회의록', '공문', '회계', '증명서 발급대장'];
+                  '회의록', '임원회의록', '발송 공문', '접수 공문', '회계',
+                  '증명서 발급대장', '대외비 문서'];
 
   /* 분류마다 보관소에서 쓰는 영문 이름 */
   var SLUG = {
     '회의자료': 'hoeui-jaryo', '결의사항': 'gyeorui', '규칙': 'gyuchik', '내규': 'naegyu',
     '서식': 'seosik', '고시': 'gosi', '회의록': 'hoeuirok',
-    '임원회의록': 'imwon-hoeuirok', '공문': 'gongmun', '회계': 'hoegye',
-    '증명서 발급대장': 'jeungmyeongseo'
+    '임원회의록': 'imwon-hoeuirok', '발송 공문': 'gongmun', '접수 공문': 'gongmun-in',
+    '회계': 'hoegye',
+    '증명서 발급대장': 'jeungmyeongseo', '대외비 문서': 'daeoebi'
   };
   var STORE = 'https://sihwasan-docs.sihwasan.workers.dev';
 
