@@ -423,7 +423,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (nc) nc.innerHTML = (D.pastorsWithoutCharge || []).map(function (n) {
       var nm = typeof n === 'string' ? n : n.name;
       var ch = typeof n === 'string' ? '' : (n.church || '');
-      return canSee ? mlink(nm, ch) : e(SHS.maskName(nm));
+      /* 기도처 등 섬기는 곳이 적혀 있으면 이름 뒤에 함께 보여 준다 */
+      var tag = (ch && ch !== '무임')
+        ? ' <span style="color:var(--gray-5);font-size:0.86em">(' + e(ch) + ')</span>' : '';
+      return (canSee ? mlink(nm, ch) : e(SHS.maskName(nm))) + tag;
     }).join(', ');
 
     fill('staff-body', (D.staff || []).map(function (m, i) {
