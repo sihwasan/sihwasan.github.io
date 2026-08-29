@@ -142,7 +142,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     pool.slice(0, 4).forEach(function (p) {
       g.insertAdjacentHTML('beforeend',
-        '<a href="gallery.html"><img src="' + e(p.thumb) + '" alt="' + e(p.title) + '"></a>');
+        '<a href="gallery.html' + (p.id != null ? '?photo=' + encodeURIComponent(p.id) : '') + '">' +
+        '<img src="' + e(p.thumb) + '" alt="' + e(p.title) + '"></a>');
     });
   }
 
@@ -243,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function () {
       c.from('gallery_items').select('*').order('sort').order('id', { ascending: false }).limit(40)
         .then(function (r) {
           if (r.data && r.data.length) {
-            renderGallery(r.data.map(function (g) { return { thumb: g.thumb_url, title: g.title }; }));
+            renderGallery(r.data.map(function (g) { return { id: g.id, thumb: g.thumb_url, title: g.title }; }));
           }
         });
       /* 나의 알림 */

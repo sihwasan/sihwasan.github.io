@@ -800,6 +800,7 @@ document.addEventListener('DOMContentLoaded', function () {
       buildAlbums();
       renderSlide();
       renderAlbums();
+      openLinkedPhoto();
       if (keepFeed && document.getElementById('feed-mdl').classList.contains('open')) renderFeed();
     }).catch(function () {
       items = SHSData.gallery.map(function (g, i) {
@@ -809,6 +810,20 @@ document.addEventListener('DOMContentLoaded', function () {
       renderSlide();
       renderAlbums();
     });
+  }
+
+  /* 첫 화면 등에서 ?photo=번호 로 들어오면 그 사진을 바로 크게 보여 준다 */
+  var linkedShown = false;
+  function openLinkedPhoto() {
+    if (linkedShown) return;
+    var m = location.search.match(/[?&]photo=([^&]+)/);
+    if (!m) return;
+    var pid = decodeURIComponent(m[1]);
+    var idx = -1;
+    items.forEach(function (p, i) { if (String(p.id) === pid && idx === -1) idx = i; });
+    if (idx === -1) return;
+    linkedShown = true;
+    openLb(items, idx);
   }
 
   loadCats();
