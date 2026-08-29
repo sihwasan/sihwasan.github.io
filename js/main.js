@@ -23,6 +23,7 @@
     { title: '조직', href: 'organization.html', sub: [
       { t: '노회 임원', h: 'organization.html#officers' },
       { t: '회원명단', h: 'organization.html#members' },
+      { t: '회원교회', h: 'organization.html#churches' },
       { t: '시찰회', h: 'organization.html#sichal' },
       { t: '상비부', h: 'organization.html#committees' },
       { t: '상비부 대시보드', h: 'dashboard.html' }

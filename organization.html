@@ -26,6 +26,7 @@
   <div class="tabs">
     <button class="active" data-tab="officers">노회 임원</button>
     <button data-tab="members">회원명단</button>
+    <button data-tab="churches">회원교회</button>
     <button data-tab="sichal">시찰회</button>
     <button data-tab="committees">상비부</button>
     <button data-tab="addrbook" id="tab-addrbook" hidden>주소록</button>
@@ -112,6 +113,12 @@
   </div>
 
   <!-- 시찰회 -->
+  <div class="tab-panel" id="churches">
+    <h2>회원교회</h2>
+    <p>본회에 소속한 지교회입니다. 교회를 누르면 시찰 페이지의 교회 정보로 이동합니다.</p>
+    <div id="churches-body"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+  </div>
+
   <div class="tab-panel" id="sichal">
     <h2>시찰회</h2>
     <p>노회규칙 제20조에 따라 본회는 세 개의 시찰 구역을 두고 있으며, 각 시찰회는 경내 지교회의 형편을 살펴 지도하고 그 상황을 노회에 보고합니다.</p>
@@ -613,5 +620,88 @@ document.addEventListener('DOMContentLoaded', function () {
  });
 });
 </script>
+<script>
+/* ---------- 회원교회 목록 ----------
+ * 관내 교회(sichal_churches)에 교회 명부(church_staff)와 노회 명단을 얹어
+ * 담임목사(위임목사 표기)·조직/미조직을 함께 보여 준다. */
+document.addEventListener('DOMContentLoaded', function () {
+  var box = document.getElementById('churches-body');
+  if (!box) return;
+  var e = SHS.esc;
+  function key(t) { return String(t || '').replace(/\s/g, '').replace(/교회$/, ''); }
+
+  if (!(window.SHSCloud && SHSCloud.enabled())) {
+    box.innerHTML = '<p style="color:var(--gray-5)">서버 연결 후 보실 수 있습니다.</p>';
+    return;
+  }
+  SHSCloud.init().then(function (c) {
+    return Promise.all([
+      c.from('sichal_churches').select('sichal,name,url').order('sichal').order('sort'),
+      c.from('church_staff').select('church,role,name')
+        .then(function (x) { return x; }, function () { return { data: [] }; }),
+      c.from('roster').select('name,church,category,position')
+        .then(function (x) { return x; }, function () { return { data: [] }; })
+    ]);
+  }).then(function (rs) {
+    if (rs[0].error) throw rs[0].error;
+    var churches = rs[0].data || [];
+    var staff = (rs[1] && rs[1].data) || [];
+    var roster = (rs[2] && rs[2].data) || [];
+    if (!churches.length) {
+      /* 회원교회 목록은 정회원에게만 열린다 — 비로그인은 안내를 보여 준다 */
+      SHS.getUser().then(function (u) {
+        box.innerHTML = (u && u.cloud)
+          ? '<p style="color:var(--gray-5)">등록된 교회가 없습니다.</p>'
+          : '<div class="notice-banner">회원교회 목록은 <strong>정회원 로그인</strong> 후 보실 수 있습니다. ' +
+            '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+      });
+      return;
+    }
+    function pastorOf(ch) {
+      return roster.filter(function (m) {
+        return m.category === '목사' && key(m.church) === key(ch);
+      })[0] || null;
+    }
+    function organized(ch) {
+      return staff.some(function (x) { return x.role === '시무장로' && key(x.church) === key(ch); });
+    }
+    var bySic = {};
+    churches.forEach(function (c2) {
+      (bySic[c2.sichal || '기타'] = bySic[c2.sichal || '기타'] || []).push(c2);
+    });
+    var h = '<p style="font-size:0.88rem;color:var(--gray-7)">모두 <strong>' + churches.length +
+      '곳</strong> · 당회가 있는 교회(조직교회) <strong>' +
+      churches.filter(function (c2) { return organized(c2.name); }).length + '곳</strong></p>';
+    Object.keys(bySic).forEach(function (sic) {
+      h += '<h3 style="margin:18px 0 8px;color:var(--navy)">' + e(sic) +
+        ' <span style="font-weight:400;font-size:0.85rem;color:var(--gray-5)">' + bySic[sic].length + '곳</span></h3>' +
+        '<table class="tbl"><thead><tr><th style="width:200px">교회</th><th style="width:160px">담임</th>' +
+        '<th style="width:110px">당회</th><th>홈페이지</th></tr></thead><tbody>' +
+        bySic[sic].map(function (c2) {
+          var pr = pastorOf(c2.name);
+          var org = organized(c2.name);
+          var link = 'sichal.html?s=' + encodeURIComponent(sic) + '&ch=' + encodeURIComponent(c2.name) + '#church';
+          return '<tr>' +
+            '<td class="left"><a href="' + link + '" style="color:var(--ink);font-weight:600">' + e(c2.name) + '</a></td>' +
+            '<td>' + (pr ? e(pr.name) +
+              (pr.position && pr.position !== '목사'
+                ? ' <span style="color:var(--gray-5);font-size:0.82rem">(' + e(pr.position) + ')</span>'
+                : ' 목사')
+              : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td>' + (org ? '조직' : '<span style="color:var(--gray-5)">미조직</span>') + '</td>' +
+            '<td class="left">' + (c2.url
+              ? '<a href="' + e(c2.url) + '" target="_blank" rel="noopener" style="color:var(--navy);text-decoration:underline">' + e(c2.url) + '</a>'
+              : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '</tr>';
+        }).join('') + '</tbody></table>';
+    });
+    box.innerHTML = h;
+  }).catch(function (x) {
+    box.innerHTML = '<p style="color:var(--gray-5)">교회 목록을 불러오지 못했습니다: ' +
+      e((x && x.message) || x) + '</p>';
+  });
+});
+</script>
+
 </body>
 </html>
