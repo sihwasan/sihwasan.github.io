@@ -74,7 +74,8 @@ var SHSCert = (function () {
       return seals[k] && seals[k].url;
     });
 
-    var h = '<div class="cert-sheet' + (rec.void_yn ? ' cert-void' : '') + '">';
+    var h = '<div class="cert-sheet' + (rec.void_yn ? ' cert-void' : '') +
+      (docName === '직인증명서' ? ' cert-seal' : '') + '">';
     if (rec.void_yn) {
       h += '<div class="cert-void-mark">무효</div>';
     }
@@ -95,8 +96,7 @@ var SHSCert = (function () {
         '<div class="c-sealbox-t">' + esc(rec.church) + ' 직인</div>' +
         '<div class="c-sealbox-b">' +
         (rec.church_seal
-          ? '<img src="' + esc(rec.church_seal) + '" alt="' + esc(rec.church) + ' 직인">'
-          : '<span class="c-sealbox-none">직인을 등록하지 않았습니다</span>') +
+          ? '<img src="' + esc(rec.church_seal) + '" alt="' + esc(rec.church) + ' 직인">' : '') +
         '</div></div>';
       h += '<div class="c-text">' + esc(body) + '</div>';
     } else {
@@ -148,7 +148,8 @@ var SHSCert = (function () {
           '확인번호 ' + esc(rec.verify_code) + '</div></div>';
       } catch (ignore) { /* QR을 못 만들어도 증명서 발급은 막지 않는다 */ }
     }
-    h += '<div class="cert-foot">' + esc(OFFICE) + '</div>';
+    var hasQr = !!(rec.verify_code && typeof qrcode === 'function');
+    h += '<div class="cert-foot' + (hasQr ? ' with-qr' : '') + '">' + esc(OFFICE) + '</div>';
     h += '</div>';
     return h;
   }

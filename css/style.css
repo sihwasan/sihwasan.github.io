@@ -1842,15 +1842,27 @@ td[data-duch]:hover { background: #eef2f8; }
 .ops-cols > div > h2:first-child { margin-top: 0; }
 
 /* 직인증명서: 교회 직인을 담는 상자 */
-.c-sealbox { max-width: 300px; margin: 22px auto 18px; text-align: center; }
+.c-sealbox { max-width: 340px; margin: 10px auto 16px; text-align: center; }
 .c-sealbox-t {
   border: 1px solid #333; border-bottom: none; padding: 6px 8px;
   font-size: 0.94rem; font-weight: 600; background: #f4f4f4;
 }
 .c-sealbox-b {
-  border: 1px solid #333; height: 120px;
+  border: 1px solid #333; height: 165px;
   display: flex; align-items: center; justify-content: center;
 }
-.c-sealbox-b img { max-height: 104px; max-width: 92%; object-fit: contain; }
-.c-sealbox-none { color: #999; font-size: 0.86rem; }
-@media print { .c-sealbox-b { height: 32mm; } }
+.c-sealbox-b img { max-height: 148px; max-width: 92%; object-fit: contain; }
+@media print { .c-sealbox-b { height: 44mm; } }
+
+/* 직인증명서는 직인 상자가 커서 항목 표를 조금 촘촘하게 둔다 */
+.cert-sheet.cert-seal .c-body td { padding: 7px 8px; }
+.cert-sheet.cert-seal .c-text { margin-top: 6px; }
+
+/* 증명서 하단: 왼쪽 아래 QR과 노회 주소가 겹치지 않도록 옆으로 나란히 */
+.cert-sheet .cert-foot.with-qr {
+  padding-left: 250px; text-align: right;
+}
+@media print {
+  .cert-sheet .cert-foot.with-qr { padding-left: 46mm; text-align: right; }
+}
+.cert-sheet.cert-pdf-a4 .cert-foot.with-qr { padding-left: 250px; text-align: right; }
