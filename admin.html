@@ -381,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 시무장로가 있는 교회의 담임목사는 저절로 위임목사로 표기된다.
    * 총대장로 표시는 노회 명단의 장로와 짝을 이룬다. */
   var chStaff = [], chChurches = [], chRoster = [], chSel = '';
-  var CH_ROLES = ['목사', '원로목사', '부목사', '시무장로', '원로장로'];
+  var CH_ROLES = ['목사', '원로목사', '부목사', '시무장로', '원로장로', '은퇴장로', '협동장로'];
 
   function chKey(t) {
     return String(t || '').replace(/\s/g, '').replace(/교회$/, '');
@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function () {
           var ro = x.roster_id
             ? chRoster.filter(function (r) { return r.id === x.roster_id; })[0]
             : chRosterOf(x.name);
-          var isElder = role === '시무장로' || role === '원로장로';
+          var isElder = role.indexOf('장로') !== -1;
           h += '<tr data-cs="' + x.id + '">' +
             '<td>' + e(role) + '</td>' +
             '<td><input type="text" data-cf="name" value="' + e(x.name) + '"></td>' +

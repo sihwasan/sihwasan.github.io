@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return Promise.all([
           c.rpc('my_sichals'),
           c.from('sichal_churches').select('*').eq('sichal', NAME).order('sort').order('id'),
-          c.from('roster').select('name,church,position,category,note,birth_date,term_until,address,phone,postcode')
+          c.from('roster').select('id,name,church,position,category,note,birth_date,term_until,address,phone,postcode')
             .eq('sichal', NAME).order('category').order('sort'),
           c.from('church_staff').select('*').order('sort').order('id')
             .then(function (x) { return x; }, function () { return { data: [] }; }),
@@ -352,13 +352,83 @@ document.addEventListener('DOMContentLoaded', function () {
       }).join(', ');
     }
     var out = '';
-    [['원로목사', '원로목사'], ['부목사', '부목사'], ['시무장로', '시무장로'], ['원로장로', '원로장로']]
+    [['원로목사', '원로목사'], ['부목사', '부목사'], ['시무장로', '시무장로'],
+     ['원로장로', '원로장로'], ['은퇴장로', '은퇴장로'], ['협동장로', '협동장로']]
       .forEach(function (r) {
         var v = names(r[0]);
         if (v) out += '<tr><th>' + r[1] + '</th><td class="left">' + v + '</td></tr>';
       });
     if (!out) out = '<tr><th>장로</th><td class="left"><span style="color:var(--gray-5)">-</span></td></tr>';
     return out;
+  }
+
+  /* 정보 고치기 안의 장로 명부 (교회 명부 church_staff 기반) */
+  function elderEditRows(ch) {
+    var key = String(ch.name || '').replace(/\s|교회$/g, '');
+    var elders = churchStaff.filter(function (x) {
+      return x.role.indexOf('장로') !== -1 &&
+        String(x.church || '').replace(/\s|교회$/g, '') === key;
+    });
+    if (!elders.length) {
+      return '<p style="color:var(--gray-5);font-size:0.88rem">등록된 장로가 없습니다. 아래에서 추가해 주세요.</p>';
+    }
+    return '<table class="tbl" style="margin-bottom:12px"><tbody>' +
+      elders.map(function (x) {
+        return '<tr><td style="width:100px">' + e(x.role) + '</td>' +
+          '<td class="left">' + e(x.name) +
+          (x.is_chongdae ? ' <span style="color:var(--navy);font-size:0.82rem">(총대장로)</span>' : '') +
+          (x.ordained_on ? ' <span style="color:var(--gray-5);font-size:0.82rem">장립 ' +
+            e(String(x.ordained_on).slice(0, 10)) + '</span>' : '') + '</td>' +
+          '<td style="width:70px"><button class="btn danger sm" data-cedel="' + x.id +
+          '" data-cen="' + e(x.name) + '">삭제</button></td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function bindElderEditor(ch) {
+    var add = document.getElementById('ce-add');
+    if (!add) return;
+    add.addEventListener('click', function () {
+      var msg = document.getElementById('ce-msg');
+      var name = document.getElementById('ce-name').value.trim();
+      if (!name) { msg.className = 'form-msg err'; msg.textContent = '성명을 적어 주세요.'; return; }
+      var d = {
+        church: ch.name,
+        role: document.getElementById('ce-role').value,
+        name: name,
+        ordained_on: document.getElementById('ce-ordained').value || null,
+        is_chongdae: !!(document.getElementById('ce-chongdae') &&
+                        document.getElementById('ce-chongdae').checked),
+        updated_by: user.name
+      };
+      /* 노회 명단의 같은 이름 장로와 자동으로 짝을 맞춘다 */
+      var ro = pastors.filter(function (m) { return m.category === '장로' && m.name === name; })[0];
+      if (ro && ro.id) d.roster_id = ro.id;
+      msg.className = 'form-msg'; msg.textContent = '추가 중입니다...';
+      db().then(function (c) {
+        return c.from('church_staff').insert(d).select();
+      }).then(function (r) {
+        var w = SHS.wrote(r);
+        if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+        SHSCloud.log('create', '교회 장로 추가', ch.name + ' ' + d.role + ' ' + name +
+          (d.is_chongdae ? ' (총대장로)' : ''));
+        load();
+      });
+    });
+    document.querySelectorAll('button[data-cedel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm(b.dataset.cen + ' 장로를 명부에서 지우시겠습니까?')) return;
+        db().then(function (c) {
+          return c.from('church_staff').delete().eq('id', parseInt(b.dataset.cedel, 10)).select();
+        }).then(function (r) {
+          if (r.error || !(r.data && r.data.length)) {
+            alert((r.error && r.error.message) || '지우지 못했습니다. 권한을 확인해 주세요.');
+            return;
+          }
+          SHSCloud.log('delete', '교회 장로 삭제', ch.name + ' ' + b.dataset.cen);
+          load();
+        });
+      });
+    });
   }
 
   /* 교회 하나를 펼쳐 보여 준다 */
@@ -413,11 +483,25 @@ document.addEventListener('DOMContentLoaded', function () {
         '노회 서기가 명단 관리에서 고치시면 됩니다.</p>' +
         '<div class="field"><label>홈페이지 주소</label>' +
         '<input type="text" id="cv-url" value="' + e(ch.url || '') + '"></div>' +
-        '<div class="field"><label>장로</label>' +
-        '<input type="text" data-names="multi" id="cv-elders" value="' + e(ch.elders || '') + '"></div>' +
-        '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:-8px">' +
-        '노회 명단에 장로로 올라 있는 분은 <strong>총대장로</strong>로 표기되고 남은 임기가 함께 나옵니다. ' +
-        '명단에 없는 분은 <strong>장로</strong>로만 나옵니다.</p>' +
+        '<h4 class="mn-sub">장로 명부</h4>' +
+        '<p style="font-size:0.82rem;color:var(--gray-5)">담임목사는 자기 교회의 장로 명단을 ' +
+        '넣고 뺄 수 있습니다. 노회 회원이 아닌 장로도 등록할 수 있습니다. ' +
+        '<strong>총대장로 표시는 관리자(노회 서기·간사)가 합니다.</strong></p>' +
+        elderEditRows(ch) +
+        '<div class="inline-form" style="margin-bottom:12px">' +
+        '<div class="field" style="flex:0 0 120px"><label>구분</label><select id="ce-role">' +
+        ['시무장로', '원로장로', '은퇴장로', '협동장로'].map(function (r2) {
+          return '<option>' + r2 + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="ce-name"></div>' +
+        '<div class="field" style="flex:0 0 150px"><label>장립일 (선택)</label><input type="date" id="ce-ordained"></div>' +
+        (SHSAuth.canManageMembers(user)
+          ? '<div class="field" style="flex:0 0 90px"><label>총대장로</label>' +
+            '<input type="checkbox" id="ce-chongdae" style="width:auto;margin-top:10px"></div>'
+          : '') +
+        '<button class="btn sm" id="ce-add" style="align-self:flex-end">장로 추가</button>' +
+        '</div>' +
+        '<div class="form-msg" id="ce-msg"></div>' +
         '<div class="field"><label>비고</label>' +
         '<input type="text" id="cv-note" value="' + e(ch.note || '') + '"></div>' +
         '<button class="btn" id="cv-save">저장</button> ' +
@@ -434,10 +518,11 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSNames.attachAll(v);
 
     if (edit) {
+      bindElderEditor(ch);
       document.getElementById('cv-save').addEventListener('click', function () {
         var msg = document.getElementById('cv-msg');
         var d = { updated_at: new Date().toISOString(), updated_by: user.name };
-        ['url', 'elders', 'note'].forEach(function (k) {
+        ['url', 'note'].forEach(function (k) {
           d[k] = document.getElementById('cv-' + k).value.trim() || null;
         });
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
