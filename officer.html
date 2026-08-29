@@ -445,6 +445,128 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="form-msg" id="od-msg"></div></div>';
   }
 
+  /* ---------- 전자 발급 대장 ----------
+   * 홈페이지에서 발급한 증명서(doc_issues)가 자동으로 기록된다.
+   * 기간을 정해 조회하고, 목록을 엑셀(CSV)로 내려받을 수 있다. */
+  var dlRows = [];
+
+  function docLedgerHtml() {
+    var y = new Date().getFullYear();
+    return '<div class="admin-card" style="margin-bottom:18px">' +
+      '<h4 style="margin:0 0 4px">전자 발급 대장</h4>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin:0 0 10px">' +
+      '홈페이지에서 발급한 증명서는 여기에 자동으로 기록됩니다. ' +
+      '아래 자료 등록은 예전 종이 대장 파일을 보관하는 곳입니다.</p>' +
+      '<div class="inline-form" style="margin-bottom:8px">' +
+      '<div class="field" style="flex:0 0 160px"><label>시작일</label>' +
+      '<input type="date" id="dl-from" value="' + y + '-01-01"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>끝일</label>' +
+      '<input type="date" id="dl-to" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+      '<div class="field" style="flex:0 0 210px"><label>검색 (성명·교회·종류·번호)</label>' +
+      '<input type="text" id="dl-q"></div>' +
+      '<button class="btn sm" id="dl-go">조회</button>' +
+      '<button class="btn ghost sm" id="dl-csv">엑셀로 내려받기</button>' +
+      '</div>' +
+      '<div id="dl-list"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
+      '</div>';
+  }
+
+  function dlFiltered() {
+    var q = (document.getElementById('dl-q').value || '').trim();
+    if (!q) return dlRows;
+    return dlRows.filter(function (r) {
+      return [r.doc_no, r.name, r.church, r.doc_type, r.purpose].join(' ').indexOf(q) !== -1;
+    });
+  }
+
+  function drawDocLedger() {
+    var box = document.getElementById('dl-list');
+    if (!box) return;
+    var rows = dlFiltered();
+    if (!rows.length) {
+      box.innerHTML = '<p style="color:var(--gray-5)">이 기간에 발급된 증명서가 없습니다.</p>';
+      return;
+    }
+    var h = '<p style="font-size:0.85rem;color:var(--gray-7);margin:4px 0 8px">모두 <strong>' +
+      rows.length + '건</strong></p>' +
+      '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+      '<th>발급번호</th><th>발급일</th><th>종류</th><th>성명</th><th>소속 교회</th>' +
+      '<th>용도</th><th>발급자</th><th>상태</th><th style="width:80px">열람</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr>' +
+          '<td>' + e(r.doc_no || '') + '</td>' +
+          '<td>' + e(String(r.issued_on || r.created_at || '').slice(0, 10)) + '</td>' +
+          '<td>' + e(r.doc_type || '') + '</td>' +
+          '<td>' + e(r.name || '') + '</td>' +
+          '<td>' + e(r.church || '') + '</td>' +
+          '<td>' + e(r.purpose || '-') + '</td>' +
+          '<td>' + e(r.issuer_name || '') + '</td>' +
+          '<td>' + (r.void_yn ? '<span class="fail">무효</span>' : '유효') + '</td>' +
+          '<td><a class="btn ghost sm" href="certificate.html?id=' + r.id + '" target="_blank" rel="noopener">보기</a></td>' +
+          '</tr>';
+      }).join('') + '</tbody></table></div>';
+    box.innerHTML = h;
+  }
+
+  function loadDocLedger() {
+    var from = document.getElementById('dl-from').value;
+    var to = document.getElementById('dl-to').value;
+    SHSCloud.init().then(function (c) {
+      var q = c.from('doc_issues').select('*').order('id', { ascending: false }).limit(1000);
+      if (from) q = q.gte('issued_on', from);
+      if (to) q = q.lte('issued_on', to);
+      return q;
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      dlRows = r.data || [];
+      drawDocLedger();
+    }).catch(function (err) {
+      var box = document.getElementById('dl-list');
+      if (box) box.innerHTML = '<p style="color:var(--gray-5)">발급 대장을 불러오지 못했습니다: ' +
+        e(err.message || err) + '</p>';
+    });
+  }
+
+  function ledgerCsv() {
+    var rows = dlFiltered();
+    if (!rows.length) { alert('내려받을 내용이 없습니다. 먼저 조회해 주세요.'); return; }
+    var NL = String.fromCharCode(13) + String.fromCharCode(10);
+    function cell(v) {
+      var t = String(v == null ? '' : v);
+      return t.indexOf('"') !== -1 || t.indexOf(',') !== -1 || t.indexOf(NL) !== -1
+        ? '"' + t.split('"').join('""') + '"' : t;
+    }
+    var head = ['발급번호', '발급일', '종류', '성명', '직위', '소속 교회', '용도', '부수',
+      '발급자', '노회장', '서기', '상태', '확인번호'];
+    var lines = [head.join(',')].concat(rows.map(function (r) {
+      return [r.doc_no, String(r.issued_on || r.created_at || '').slice(0, 10), r.doc_type,
+        r.name, r.position, r.church, r.purpose, r.copies,
+        r.issuer_name, r.president, r.clerk,
+        r.void_yn ? '무효' : '유효', r.verify_code].map(cell).join(',');
+    }));
+    /* 엑셀이 한글을 바로 읽도록 BOM(U+FEFF)을 붙인다 */
+    var blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(NL)],
+      { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '증명서 발급대장 ' + document.getElementById('dl-from').value +
+      '~' + document.getElementById('dl-to').value + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 400);
+    SHSCloud.log('view', '증명서 발급대장 엑셀 내려받기',
+      document.getElementById('dl-from').value + '~' + document.getElementById('dl-to').value +
+      ' ' + rows.length + '건');
+  }
+
+  function bindDocLedger() {
+    document.getElementById('dl-go').addEventListener('click', loadDocLedger);
+    document.getElementById('dl-csv').addEventListener('click', ledgerCsv);
+    document.getElementById('dl-q').addEventListener('input', drawDocLedger);
+    loadDocLedger();
+  }
+
   function drawOdSection() {
     var body = document.getElementById('od-body');
     var sec = odCur();
@@ -452,6 +574,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var h = '<p class="sec-level">이 분류의 자료는 <strong>' + OD_LEVEL[sec.a] +
       '</strong>만 열람할 수 있습니다.</p>';
+    if (odSec === '증명서 발급대장') h += docLedgerHtml();
     if (canManageDocs) h += odFormHtml();
     if (list.length > 12) {
       h += '<div class="board-controls" style="margin-bottom:10px">' +
@@ -486,6 +609,7 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '</tbody></table>';
     }
     body.innerHTML = h;
+    if (odSec === '증명서 발급대장') bindDocLedger();
 
     /* 검색 */
     var q = document.getElementById('od-q');

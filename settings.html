@@ -223,7 +223,9 @@ document.addEventListener('DOMContentLoaded', function () {
           SHSCloud.init().then(function (c) {
             var pre = Promise.resolve(null);
             if (file) {
-              var path = key + '-' + Date.now() + '.png';
+              /* 보관소 경로는 한글을 받지 않으므로 영문·숫자로 바꾼다 */
+              var slug = encodeURIComponent(key).replace(/%/g, '').toLowerCase() || 'seal';
+              var path = slug + '-' + Date.now() + '.png';
               pre = c.storage.from('seals').upload(path, file, { upsert: true }).then(function (r3) {
                 if (r3.error) throw r3.error;
                 return path;
