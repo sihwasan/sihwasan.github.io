@@ -25,10 +25,10 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
-<script src="js/main.js?v=20260829p"></script>
+<script src="js/main.js?v=20260830a"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/audit-view.js"></script>
-<script src="js/ops-panel.js?v=20260829"></script>
+<script src="js/ops-panel.js?v=20260830a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -570,13 +570,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- 임원 명부 ---------- */
   function loadOfficers() {
-    db.from('site_settings').select('*').in('key', ['officers', 'delegates']).then(function (r) {
+    db.from('site_settings').select('*').in('key', ['officers', 'delegates', 'veterans']).then(function (r) {
       var box = document.getElementById('mg-officers');
       if (r.error) { box.innerHTML = '<div class="notice-banner">불러오기 실패: ' + e(r.error.message) + '</div>'; return; }
-      var officers = [], delegates = {};
+      var officers = [], delegates = {}, veterans = [];
       (r.data || []).forEach(function (row) {
         if (row.key === 'officers') officers = row.value;
         if (row.key === 'delegates') delegates = row.value;
+        if (row.key === 'veterans') veterans = (row.value && row.value.list) || [];
       });
 
       /* 회원 명단을 받아 성명을 적으면 직분·교회가 저절로 채워지게 한다 */
@@ -634,9 +635,103 @@ document.addEventListener('DOMContentLoaded', function () {
                 : '<span style="color:var(--gray-5)">-</span>') +
               ' <span style="color:var(--gray-5);font-size:0.82rem">(' + names.length + '명)</span></td>' +
               '<td><button class="btn sm" data-dgedit="' + g.k + '" data-dgt="' + g.t + '">수정</button></td></tr>';
-          }).join('') + '</tbody></table>' +
+          }).join('') + '</tbody></table>';
+
+        /* 증경노회장단: 권한 위임이 완료되면 자동 등재되고, 지난 기록은 손으로 넣는다 */
+        html += '<h2>증경노회장단</h2>' +
+          '<p>퇴임하신 목사 노회장과 장로 부노회장으로 구성됩니다. ' +
+          '노회 운영의 <strong>권한 위임</strong>이 완료되면 자동으로 오르며, 지난 기록은 여기서 직접 넣을 수 있습니다.</p>' +
+          '<table class="tbl" style="max-width:820px"><thead><tr>' +
+          '<th style="width:120px">구분</th><th style="width:110px">성명</th>' +
+          '<th style="width:90px">직분</th><th>시무교회</th>' +
+          '<th style="width:90px">회기</th><th style="width:80px">관리</th></tr></thead><tbody>';
+        if (!veterans.length) {
+          html += '<tr><td colspan="6" style="color:var(--gray-5)">등재된 증경단이 없습니다.</td></tr>';
+        }
+        veterans.forEach(function (o, i) {
+          html += '<tr><td>' + e(o.role || '-') + '</td>' +
+            '<td><strong>' + e(o.name || '-') + '</strong></td>' +
+            '<td>' + e(o.position || '-') + '</td>' +
+            '<td class="left">' + e(o.church || '-') + '</td>' +
+            '<td>' + (o.session_no ? '제' + e(o.session_no) + '회기' : '-') + '</td>' +
+            '<td><button class="btn sm" data-vtedit="' + i + '">수정</button></td></tr>';
+        });
+        html += '</tbody></table>' +
+          '<p><button class="btn ghost sm" id="vt-add">증경단 추가</button></p>' +
           '<div class="form-msg" id="of-msg"></div>';
         box.innerHTML = html;
+
+        function saveVeterans(after) {
+          return db.from('site_settings').upsert([
+            { key: 'veterans', value: { list: veterans }, updated_at: new Date().toISOString() }
+          ]).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('update', '증경노회장단 수정', '증경단 ' + veterans.length + '명');
+            if (after) after();
+          });
+        }
+
+        function openVeteranEdit(idx) {
+          var isNew = idx < 0;
+          var v0 = isNew ? { role: '증경노회장', name: '', position: '', church: '', session_no: '' } : veterans[idx];
+          var mo = mgModal(
+            '<h4 style="margin:0 0 14px">' + (isNew ? '증경단 추가' : '증경단 수정') + '</h4>' +
+            '<div class="inline-form">' +
+            '<div class="field" style="flex:0 0 150px"><label>구분</label>' +
+            '<select id="vtm-role">' +
+            ['증경노회장', '증경부노회장'].map(function (t) {
+              return '<option' + (v0.role === t ? ' selected' : '') + '>' + t + '</option>';
+            }).join('') + '</select></div>' +
+            '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
+            '<input type="text" id="vtm-name" list="vtm-names" value="' + e(v0.name || '') + '">' +
+            '<datalist id="vtm-names">' + rosterRows.map(function (m2) {
+              return '<option value="' + e(m2.name) + '">';
+            }).join('') + '</datalist></div>' +
+            '<div class="field" style="flex:0 0 110px"><label>직분</label>' +
+            '<input type="text" id="vtm-pos" value="' + e(v0.position || '') + '"></div>' +
+            '<div class="field" style="flex:1 1 160px"><label>시무교회</label>' +
+            '<input type="text" id="vtm-church" value="' + e(v0.church || '') + '"></div>' +
+            '<div class="field" style="flex:0 0 100px"><label>회기 번호</label>' +
+            '<input type="number" id="vtm-ses" min="1" max="99" value="' + e(v0.session_no || '') + '"></div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;margin-top:14px">' +
+            '<button class="btn" id="vtm-save">저장</button>' +
+            (isNew ? '' : '<button class="btn danger" id="vtm-del">삭제</button>') +
+            '</div>', 640);
+
+          /* 성명을 고르면 명단에서 직분·교회를 채워 준다 */
+          mo.ov.querySelector('#vtm-name').addEventListener('change', function () {
+            var hit = rosterRows.filter(function (m2) { return m2.name === this.value.trim(); }, this)[0];
+            if (!hit) return;
+            mo.ov.querySelector('#vtm-pos').value = hit.position || hit.category || '';
+            mo.ov.querySelector('#vtm-church').value = hit.church || '';
+          });
+          mo.ov.querySelector('#vtm-save').addEventListener('click', function () {
+            var name = mo.ov.querySelector('#vtm-name').value.trim();
+            if (!name) { alert('성명을 적어 주세요.'); return; }
+            var item = {
+              role: mo.ov.querySelector('#vtm-role').value,
+              name: name,
+              position: mo.ov.querySelector('#vtm-pos').value.trim(),
+              church: mo.ov.querySelector('#vtm-church').value.trim(),
+              session_no: parseInt(mo.ov.querySelector('#vtm-ses').value, 10) || null
+            };
+            if (isNew) veterans.push(item); else veterans[idx] = item;
+            mo.close();
+            saveVeterans(drawOfficers);
+          });
+          var delB = mo.ov.querySelector('#vtm-del');
+          if (delB) delB.addEventListener('click', function () {
+            if (!confirm(v0.name + ' 님을 증경단 명단에서 빼시겠습니까?')) return;
+            veterans.splice(idx, 1);
+            mo.close();
+            saveVeterans(drawOfficers);
+          });
+        }
+        box.querySelectorAll('button[data-vtedit]').forEach(function (b) {
+          b.addEventListener('click', function () { openVeteranEdit(parseInt(b.dataset.vtedit, 10)); });
+        });
+        document.getElementById('vt-add').addEventListener('click', function () { openVeteranEdit(-1); });
 
         box.querySelectorAll('button[data-dgedit]').forEach(function (b) {
           b.addEventListener('click', function () {

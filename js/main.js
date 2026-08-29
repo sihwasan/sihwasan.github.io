@@ -503,6 +503,9 @@
     if (n.kind === '문의') {
       return 'board.html#' + (key.indexOf('inquiry-') === 0 ? key : 'inquiry');
     }
+    if (n.kind === '운영' && key.indexOf('handover-') === 0) {
+      return 'dashboard.html';
+    }
     if (n.kind === '서류') {
       if (key.indexOf('docissue-') === 0) {
         return 'certificate.html?id=' + key.slice(9);

@@ -41,6 +41,15 @@
       <tbody id="officers-body"></tbody>
     </table>
 
+    <div id="veterans-wrap" style="display:none">
+      <h2>증경노회장단</h2>
+      <p>역대 노회를 섬기고 퇴임하신 목사 노회장과 장로 부노회장입니다.</p>
+      <table class="tbl" style="max-width:720px">
+        <thead><tr><th>구분</th><th>성명</th><th>직분</th><th>시무교회</th><th>회기</th></tr></thead>
+        <tbody id="veterans-body"></tbody>
+      </table>
+    </div>
+
     <h2>총회 총대</h2>
     <p>제19회 정기노회에서 선출된 총회 총대입니다. 노회규칙 제16조에 따라 노회장과 장로 부노회장은 자동 총대가 됩니다.</p>
     <table class="tbl" style="max-width:720px">
@@ -144,7 +153,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829p"></script>
+<script src="js/main.js?v=20260830a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -182,6 +191,19 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!canSee) return e(SHS.maskName(name));
     return '<a href="#" class="mb-link" data-name="' + e(name) +
       '" data-church="' + e(church || '') + '">' + e(name) + '</a>';
+  }
+
+  function renderVeterans(list) {
+    var wrap = document.getElementById('veterans-wrap');
+    var tb = document.getElementById('veterans-body');
+    if (!wrap || !tb || !list.length) return;
+    wrap.style.display = '';
+    tb.innerHTML = list.map(function (o) {
+      return '<tr><td><span class="role-badge">' + e(o.role || '') + '</span></td>' +
+        '<td>' + e(o.name || '') + '</td><td>' + e(o.position || '-') + '</td>' +
+        '<td>' + e(o.church || '-') + '</td>' +
+        '<td>' + (o.session_no ? '제' + e(o.session_no) + '회기' : '-') + '</td></tr>';
+    }).join('');
   }
 
   var ob = document.getElementById('officers-body');
@@ -268,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSCloud.init().then(function (c) {
       if (!c) return;
       return Promise.all([
-        c.from('site_settings').select('*').in('key', ['officers', 'delegates']),
+        c.from('site_settings').select('*').in('key', ['officers', 'delegates', 'veterans']),
         c.from('delegates').select('*').eq('active', true).order('kind').order('sort'),
         c.from('board_members').select('*').eq('active', true).order('sort')
           .then(function (x) { return x; }, function () { return { data: [] }; })
@@ -277,6 +299,7 @@ document.addEventListener('DOMContentLoaded', function () {
       ((rs[0] && rs[0].data) || []).forEach(function (row) {
         if (row.key === 'officers' && row.value && row.value.length) renderOfficers(row.value);
         if (row.key === 'delegates' && row.value) renderDelegates(row.value);
+        if (row.key === 'veterans' && row.value) renderVeterans(row.value.list || []);
       });
       renderBoards((rs[2] && rs[2].data) || []);
       /* 총대 표는 서버 명단이 있으면 그것으로 바꾼다 (소속 교회·자격 기간 포함) */

@@ -33,6 +33,8 @@ var SHSOps = (function () {
   /* 감독(감사 기록)은 예전에 따로 있던 화면이었으나 여기 탭으로 들어왔다.
    * 열람 권한(canViewAudit)이 있는 분에게만 탭이 보인다. */
   var canAudit = SHSAuth.canViewAudit(user);
+  /* 권한 위임(이·취임)은 노회장과 최고관리자만 다룬다 */
+  var canHand = user.role === 'president' || user.role === 'superadmin';
 
   area.innerHTML =
     '<div class="tabs">' +
@@ -40,6 +42,7 @@ var SHSOps = (function () {
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
     '<button data-tab="ops-sched">운영 일정</button>' +
     '<button data-tab="ops-meet">정기노회 일정</button>' +
+    (canHand ? '<button data-tab="ops-hand">권한 위임</button>' : '') +
     '<button data-tab="ops-aw">감사 기간</button>' +
     (canAudit ? '<button data-tab="ops-audit">감독 (감사 기록)</button>' : '') +
     '</div>' +
@@ -47,6 +50,7 @@ var SHSOps = (function () {
     '<div class="tab-panel" id="ops-manual"></div>' +
     '<div class="tab-panel" id="ops-sched"></div>' +
     '<div class="tab-panel" id="ops-meet"></div>' +
+    (canHand ? '<div class="tab-panel" id="ops-hand"></div>' : '') +
     '<div class="tab-panel" id="ops-aw"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     (canAudit ? '<div class="tab-panel" id="ops-audit"></div>' : '');
 
@@ -84,7 +88,160 @@ var SHSOps = (function () {
   SHSCloud.init().then(function (c) {
     db = c;
     loadAlerts(); loadManual(); loadSchedule(); loadMeetings(); loadAuditWindow();
+    if (canHand) loadHandover();
   });
+
+  /* ---------- 노회장 권한 위임 (이·취임) ----------
+   * 봄 정기노회 뒤 신구 임원 교체 때, 전 노회장이 위임 항목마다 동의하고
+   * 신임 노회장을 지명한다. 신임 노회장이 대시보드에서 취임 서약 후
+   * 수락하는 순간 홈페이지 등급이 교체되고, 퇴임하는 목사 노회장과
+   * 장로 부노회장은 증경노회장단에 자동으로 오른다. */
+  var HAND_ITEMS = [
+    { k: 'account', t: '노회장 계정 권한 이전',
+      d: '서류 발급 승인권과 임원방·관리 화면 접근권이 신임 노회장에게 넘어갑니다.' },
+    { k: 'name', t: '증명서 발급 명의 변경',
+      d: '이후 발급되는 모든 증명서의 노회장 명의가 신임 노회장으로 바뀝니다.' },
+    { k: 'seal', t: '노회장 직인 날인권 이전',
+      d: '증명서에 찍는 노회장 도장의 사용권을 넘깁니다. 신임 노회장은 내 정보에서 본인 도장을 등록합니다.' },
+    { k: 'physical', t: '실물 인수인계 확인',
+      d: '노회 직인·중요 문서·통장 등 실물 인수인계를 마쳤음을 확인합니다.' },
+    { k: 'secrecy', t: '비밀 유지 서약',
+      d: '재임 중 알게 된 회원 개인정보와 노회 기밀을 퇴임 후에도 지키겠습니다.' }
+  ];
+
+  function handThankCard(d) {
+    return '<div class="admin-card" style="max-width:680px;border-left:4px solid var(--gold,#b9974e);margin-bottom:18px">' +
+      '<h3 style="margin:0 0 8px">위임 완료 — 감사드립니다</h3>' +
+      '<p style="margin:0 0 6px;line-height:1.75"><strong>' + e(d.from_name || '') + ' 전임 노회장님</strong>, ' +
+      '재임 기간 동안 노회를 위해 수고를 아끼지 않으시고 무거운 직무를 감당해 주셔서 진심으로 감사드립니다. ' +
+      '증경노회장단에 모셨습니다. 늘 평안하시기를 빕니다.</p>' +
+      '<p style="margin:0;line-height:1.75"><strong>' + e(d.to_name || '') + ' 신임 노회장님</strong>, ' +
+      '취임을 축하드립니다. 노회의 새 회기를 잘 이끌어 주시기를 부탁드립니다.</p>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin:8px 0 0">완료일 ' +
+      e(String(d.accepted_at || '').slice(0, 10)) + '</p></div>';
+  }
+
+  function loadHandover() {
+    var box = document.getElementById('ops-hand');
+    if (!box) return;
+    db.from('handovers').select('*').order('id', { ascending: false }).limit(10).then(function (r) {
+      if (r.error) {
+        box.innerHTML = '<div class="notice-banner">불러오기 실패: ' + e(r.error.message) + '</div>';
+        return;
+      }
+      var rows = r.data || [];
+      var pending = rows.filter(function (x) { return x.status === '요청'; })[0];
+      var lastDone = rows.filter(function (x) { return x.status === '완료'; })[0];
+
+      var h = '<h2>노회장 권한 위임 (이·취임)</h2>' +
+        '<p>봄 정기노회 뒤 신구 임원 교체 때 씁니다. 전 노회장께서 아래 항목마다 동의하시고 ' +
+        '신임 노회장을 지명하시면, 신임 노회장께서 대시보드에서 취임 서약 후 수락하는 순간 ' +
+        '홈페이지 권한이 교체됩니다. 퇴임하시는 목사 노회장과 장로 부노회장은 ' +
+        '<strong>증경노회장단</strong>에 자동으로 오릅니다.</p>';
+
+      /* 두 달 안에 마친 위임이 있으면 감사 인사를 보여 준다 */
+      if (lastDone && Date.now() - new Date(lastDone.accepted_at).getTime() < 62 * 86400000) {
+        h += handThankCard(lastDone);
+      }
+
+      if (pending) {
+        h += '<div class="admin-card" style="max-width:680px">' +
+          '<h3 style="margin:0 0 8px">위임 진행 중</h3>' +
+          '<p style="margin:0 0 10px;line-height:1.7">' + e(pending.from_name || '전임 노회장') +
+          ' 노회장께서 <strong>' + e(pending.to_name || '') + '</strong> 님을 신임 노회장으로 지명하셨습니다. ' +
+          '신임 노회장께서 대시보드의 취임 서약 카드에서 수락하시면 위임이 완료됩니다.</p>' +
+          '<p style="font-size:0.84rem;color:var(--gray-5);margin:0 0 12px">요청일 ' +
+          e(String(pending.created_at).slice(0, 10)) + ' · 동의 항목 ' +
+          ((pending.items || []).length) + '개</p>' +
+          '<button class="btn danger sm" id="hd-cancel">위임 요청 취소</button>' +
+          '<div class="form-msg" id="hd-msg"></div></div>';
+      } else {
+        h += '<div class="admin-card" style="max-width:680px">' +
+          '<h3 style="margin:0 0 12px">1. 위임 항목 동의</h3>' +
+          HAND_ITEMS.map(function (it) {
+            return '<label style="display:flex;gap:9px;align-items:flex-start;margin:0 0 10px;' +
+              'font-size:0.92rem;cursor:pointer">' +
+              '<input type="checkbox" class="hd-item" data-k="' + it.k + '" style="margin-top:3px">' +
+              '<span><strong>' + it.t + '</strong><br>' +
+              '<span style="color:var(--gray-6);font-size:0.85rem">' + it.d + '</span></span></label>';
+          }).join('') +
+          '<h3 style="margin:18px 0 10px">2. 신임 노회장 지명</h3>' +
+          '<div class="inline-form"><div class="field" style="flex:1 1 260px">' +
+          '<label>신임 노회장 (홈페이지 계정)</label>' +
+          '<select id="hd-to"><option value="">— 선택 —</option></select></div></div>' +
+          '<p style="font-size:0.84rem;color:var(--gray-5)">홈페이지에 가입된 계정만 지명할 수 있습니다. ' +
+          '수락하는 순간 노회장 등급이 넘어가고, 전임 노회장은 일반 정회원 등급이 됩니다.</p>' +
+          '<button class="btn" id="hd-start">위임 요청 보내기</button>' +
+          '<div class="form-msg" id="hd-msg"></div></div>';
+      }
+
+      if (rows.length) {
+        h += '<h3 style="margin:22px 0 8px">위임 기록</h3>' +
+          '<table class="tbl" style="max-width:680px"><thead><tr>' +
+          '<th style="width:110px">요청일</th><th>전임 → 신임</th>' +
+          '<th style="width:90px">상태</th></tr></thead><tbody>' +
+          rows.map(function (x) {
+            return '<tr><td>' + e(String(x.created_at).slice(0, 10)) + '</td>' +
+              '<td class="left">' + e(x.from_name || '-') + ' → ' + e(x.to_name || '-') +
+              (x.cancel_note ? ' <span style="color:var(--gray-5);font-size:0.8rem">(' +
+                e(x.cancel_note) + ')</span>' : '') + '</td>' +
+              '<td>' + e(x.status) + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      }
+      box.innerHTML = h;
+
+      function hmsg(ok, t) {
+        var m = document.getElementById('hd-msg');
+        if (!m) return;
+        m.className = 'form-msg ' + (ok ? 'ok' : 'err');
+        m.textContent = t;
+      }
+
+      if (pending) {
+        document.getElementById('hd-cancel').addEventListener('click', function () {
+          var why = prompt('취소 사유를 남기시겠습니까? (선택)', '');
+          if (why === null) return;
+          db.rpc('cancel_handover', { p_id: pending.id, p_note: why.trim() || null })
+            .then(function (res) {
+              if (res.error) { hmsg(false, res.error.message); return; }
+              loadHandover();
+            });
+        });
+      } else {
+        /* 지명 대상: 홈페이지 계정 목록 */
+        db.from('profiles').select('id,name,church,role').order('name').then(function (pr) {
+          var sel = document.getElementById('hd-to');
+          if (!sel) return;
+          ((pr && pr.data) || []).forEach(function (x) {
+            if (x.id === user.id || x.role === 'pending') return;
+            var o = document.createElement('option');
+            o.value = x.id;
+            o.textContent = x.name + (x.church ? ' (' + x.church + ')' : '');
+            sel.appendChild(o);
+          });
+        }, function () {});
+
+        document.getElementById('hd-start').addEventListener('click', function () {
+          var boxes = Array.prototype.slice.call(box.querySelectorAll('.hd-item'));
+          if (boxes.some(function (b) { return !b.checked; })) {
+            hmsg(false, '모든 위임 항목에 동의하셔야 요청할 수 있습니다.');
+            return;
+          }
+          var to = document.getElementById('hd-to');
+          if (!to.value) { hmsg(false, '신임 노회장을 선택해 주세요.'); return; }
+          var toName = to.options[to.selectedIndex].textContent;
+          if (!confirm(toName + ' 님을 신임 노회장으로 지명하고 위임을 요청하시겠습니까?')) return;
+          var items = HAND_ITEMS.map(function (it) {
+            return { k: it.k, t: it.t, agreed: true };
+          });
+          db.rpc('start_handover', { p_to: to.value, p_items: items }).then(function (res) {
+            if (res.error) { hmsg(false, res.error.message); return; }
+            loadHandover();
+          });
+        });
+      }
+    });
+  }
 
   /* ---------- 감사 기간 ----------
    * 감사는 3월(봄)·9월(가을)에 저절로 열린다. 그 달 안에 마치지 못하는
