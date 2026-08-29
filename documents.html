@@ -231,7 +231,9 @@ document.addEventListener('DOMContentLoaded', function () {
         c.from('doc_issues').select('id,request_id,doc_no,void_yn')
           .then(function (x) { return x; }, function (x) { return { error: x }; }),
         /* 재직증명서 처리에 필요한 재직 시작일 (회원 명단이 원본) */
-        c.from('roster').select('name,church,served_from')
+        c.from('roster').select('id,name,church,served_from')
+          .then(function (x) { return x; }, function () { return { data: [] }; }),
+        c.from('site_settings').select('*').eq('key', 'doc_fees')
           .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
@@ -247,12 +249,16 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       var rosterRows = (rs[2] && rs[2].data) || [];
-      function servedOf(name, church) {
+      var feeTable = ((((rs[3] || {}).data) || [])[0] || {}).value || null;
+      function rosterOf(name, church) {
         var key = String(church || '').replace(/\s|교회$/g, '');
-        var hit = rosterRows.filter(function (m) {
+        return rosterRows.filter(function (m) {
           return m.name === name &&
             String(m.church || '').replace(/\s|교회$/g, '') === key;
-        })[0] || rosterRows.filter(function (m) { return m.name === name; })[0];
+        })[0] || rosterRows.filter(function (m) { return m.name === name; })[0] || null;
+      }
+      function servedOf(name, church) {
+        var hit = rosterOf(name, church);
         return hit ? hit.served_from : null;
       }
 
@@ -286,11 +292,13 @@ document.addEventListener('DOMContentLoaded', function () {
           act = (canPayChk
               ? '<button class="btn sm" data-rqpaid="' + q.id + '">입금 확인</button> '
               : '<span style="color:var(--gray-5);font-size:0.82rem">간사의 입금 확인 대기</span> ') +
+            '<button class="btn ghost sm" data-rqreview="' + q.id + '">검토·수정</button> ' +
             '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>';
         } else if (q.status === '입금확인') {
           act = (canApprove
               ? '<button class="btn sm" data-rqok="' + q.id + '">발급 승인</button> '
               : '<span style="color:var(--gray-5);font-size:0.82rem">서기·노회장의 승인 대기</span> ') +
+            '<button class="btn ghost sm" data-rqreview="' + q.id + '">검토·수정</button> ' +
             '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>';
         } else {
           /* 발급승인(또는 예전 상태) — 증명서를 만든다 */
@@ -322,7 +330,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(q.handled_by) + '</div>' : '') + '</td>' +
           '<td>' + act + '</td></tr>';
       });
-      html2 += '</tbody></table>';
+      html2 += '</tbody></table><div id="rq-edit"></div>';
       box.innerHTML = html2;
 
       function setStatus(id, status) {
@@ -365,6 +373,103 @@ document.addEventListener('DOMContentLoaded', function () {
           document.getElementById('d-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
       });
+      /* ----- 검토·수정: 승인 전에 신청 내용을 바로잡는다 -----
+       * 재직 시작일은 회원 명단(roster)이 원본이므로 명단에 저장된다. */
+      function openReqEditor(q) {
+        var slot = document.getElementById('rq-edit');
+        var ro = rosterOf(q.name, q.church);
+        var isJj = q.doc_type === '재직증명서';
+        slot.innerHTML = '<div class="admin-card" style="margin-top:14px">' +
+          '<h4 style="margin:0 0 10px">신청 검토·수정 — 신청번호 ' + q.id + ' (' + e(q.name) + ')</h4>' +
+          '<div class="inline-form" style="margin-bottom:8px">' +
+          '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
+          '<input type="text" id="re-name" value="' + e(q.name || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 130px"><label>직분</label>' +
+          '<input type="text" id="re-pos" value="' + e(q.position || '') + '"></div>' +
+          '<div class="field"><label>소속 교회</label>' +
+          '<input type="text" id="re-church" value="' + e(q.church || '') + '"></div>' +
+          '</div>' +
+          '<div class="inline-form" style="margin-bottom:8px">' +
+          '<div class="field" style="flex:0 0 160px"><label>용도</label>' +
+          '<input type="text" id="re-purpose" value="' + e(q.purpose || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 100px"><label>부수</label>' +
+          '<input type="number" id="re-copies" min="1" max="10" value="' + (q.copies || 1) + '"></div>' +
+          (isJj
+            ? '<div class="field" style="flex:0 0 180px"><label>재직 시작(부임)</label>' +
+              '<input type="date" id="re-served" value="' + e((ro && ro.served_from) || '') + '"' +
+              (ro ? '' : ' disabled') + '></div>'
+            : '') +
+          '</div>' +
+          (isJj
+            ? (ro
+                ? '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:-4px">재직 시작일은 ' +
+                  '<strong>회원 명단</strong>(' + e(ro.name) + ' · ' + e(ro.church || '') + ')에 저장되어 ' +
+                  '재직증명서의 재직 기간에 쓰입니다.</p>'
+                : '<p style="font-size:0.8rem;color:var(--red);margin-top:-4px">회원 명단에서 이 분을 찾지 못해 ' +
+                  '재직 시작일을 저장할 수 없습니다. 먼저 관리자 → 명단 관리에서 확인해 주세요.</p>')
+            : '') +
+          (q.memo ? '<p style="font-size:0.85rem;color:var(--gray-7)">요청 사항: ' + e(q.memo) + '</p>' : '') +
+          '<button class="btn" id="re-save">저장</button> ' +
+          '<button class="btn ghost" id="re-close">닫기</button>' +
+          '<div class="form-msg" id="re-msg"></div></div>';
+        slot.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        document.getElementById('re-close').addEventListener('click', function () {
+          slot.innerHTML = '';
+        });
+        document.getElementById('re-save').addEventListener('click', function () {
+          var msg = document.getElementById('re-msg');
+          var d = {
+            name: document.getElementById('re-name').value.trim(),
+            position: document.getElementById('re-pos').value.trim() || null,
+            church: document.getElementById('re-church').value.trim(),
+            purpose: document.getElementById('re-purpose').value.trim() || null,
+            copies: parseInt(document.getElementById('re-copies').value, 10) || 1,
+            handled_by: user.name,
+            updated_at: new Date().toISOString()
+          };
+          if (!d.name || !d.church) {
+            msg.className = 'form-msg err';
+            msg.textContent = '성명과 소속 교회는 비울 수 없습니다.';
+            return;
+          }
+          /* 부수가 바뀌면 수수료도 다시 계산한다 */
+          if (feeTable) {
+            var fee = Number(feeTable[q.doc_type] != null ? feeTable[q.doc_type] : feeTable['기타']);
+            if (!isNaN(fee)) d.amount = fee * d.copies;
+          }
+          var servedEl = document.getElementById('re-served');
+          var served = servedEl && !servedEl.disabled ? (servedEl.value || null) : undefined;
+
+          msg.className = 'form-msg';
+          msg.textContent = '저장 중입니다...';
+          SHSCloud.init().then(function (c) {
+            return c.from('doc_requests').update(d).eq('id', q.id).select().then(function (r1) {
+              if (r1.error) throw r1.error;
+              if (served === undefined || !ro) return r1;
+              return c.from('roster').update({ served_from: served }).eq('id', ro.id)
+                .then(function (r2) {
+                  if (r2.error) throw r2.error;
+                  return r1;
+                });
+            });
+          }).then(function () {
+            SHSCloud.log('update', '서류 신청 검토·수정',
+              '신청번호 ' + q.id + ' (' + d.name + (served !== undefined ? ', 재직 시작 ' + (served || '지움') : '') + ')');
+            loadRequests();
+          }).catch(function (x) {
+            msg.className = 'form-msg err';
+            msg.textContent = '저장 실패: ' + ((x && x.message) || x);
+          });
+        });
+      }
+      box.querySelectorAll('button[data-rqreview]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var q = rows.filter(function (x) { return String(x.id) === b.dataset.rqreview; })[0];
+          if (q) openReqEditor(q);
+        });
+      });
+
       function runStep(fn, id, doneMsg) {
         SHSCloud.init().then(function (c) {
           return c.rpc(fn, { p_id: parseInt(id, 10) });
