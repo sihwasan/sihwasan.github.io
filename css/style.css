@@ -1825,3 +1825,13 @@ td[data-duch]:hover { background: #eef2f8; }
 }
 @keyframes nt-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
 @media print { #noti-toasts { display: none !important; } }
+
+/* 상비부 배정 팝업: 1·2·3년조를 나란히 놓는다 */
+.com-years { display: grid; gap: 16px 20px; margin-bottom: 4px; }
+@media (min-width: 760px) {
+  .com-years { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .com-years.one { grid-template-columns: 1fr; }
+}
+.com-years .field { margin-bottom: 0; }
+.com-years .mm-list { grid-template-columns: 1fr; gap: 6px; }
+.com-years label { font-weight: 600; color: var(--navy); }

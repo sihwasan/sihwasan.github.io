@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260829f">
+<link rel="stylesheet" href="css/style.css?v=20260829h">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829g"></script>
+<script src="js/main.js?v=20260829h"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/dashboard.js"></script>
 <script>
@@ -1188,27 +1188,70 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 장로 총대 관리 ----------
    * 근거: 노회규칙 제16조 2항 (노회총대는 당회장이 제출한다)
    * 정년(만 70세)과 자격 기간을 두고, 교체되지 않으면 1년씩 자동 연장된다. */
+  /* ---------- 회기(會期) ----------
+   * 노회는 정기회마다 회기가 바뀐다. 총대 자격 기간은 날짜가 아니라
+   * 회기로 정하는 것이 노회 실무에 맞으므로, 화면에서는 회기로 고르고
+   * 저장은 그 회기의 시작·끝 날짜로 한다. (자동 연장 기능과 호환) */
+  var SESSIONS = { current: 19, list: [] };
+
+  function sesList() { return SESSIONS.list || []; }
+  function sesFind(no) {
+    return sesList().filter(function (x) { return Number(x.no) === Number(no); })[0] || null;
+  }
+  /* 날짜가 어느 회기에 드는지 */
+  function sesOfDate(ymd) {
+    if (!ymd) return null;
+    var hit = sesList().filter(function (x) {
+      return String(ymd) >= String(x.from) && String(ymd) <= String(x.to);
+    })[0];
+    return hit ? Number(hit.no) : null;
+  }
+  /* 끝 날짜로 끝 회기를 찾는다 (끝 날짜는 그 회기의 마지막 날) */
+  function sesOfEnd(ymd) {
+    if (!ymd) return null;
+    var exact = sesList().filter(function (x) { return String(x.to) === String(ymd); })[0];
+    if (exact) return Number(exact.no);
+    return sesOfDate(ymd);
+  }
+  function sesLabel(from, until) {
+    var a = sesOfDate(from), b = sesOfEnd(until);
+    if (!a && !b) return null;
+    if (a && b && a !== b) return '제' + a + '~' + b + '회기';
+    return '제' + (a || b) + '회기';
+  }
+  function sesOptions(sel) {
+    return sesList().map(function (x) {
+      return '<option value="' + x.no + '"' + (Number(sel) === Number(x.no) ? ' selected' : '') + '>' +
+        '제' + x.no + '회기 (' + x.from + ' ~ ' + x.to + ')</option>';
+    }).join('');
+  }
+
+  /* ---------- 장로 총대 자격 ----------
+   * 근거: 노회규칙 제16조 2항 (노회총대는 당회장이 제출한다)
+   * 정년(만 70세)과 자격 회기를 두고, 교체되지 않으면 자동 연장된다. */
   function renderElders() {
     var box = document.getElementById('elder-area');
     if (!box) return;
     SHSCloud.init().then(function (c) {
-      return c.from('roster').select('*').eq('category', '장로').order('sichal').order('sort');
-    }).then(function (r) {
+      return Promise.all([
+        c.from('roster').select('*').eq('category', '장로').order('sichal').order('sort'),
+        c.from('site_settings').select('value').eq('key', 'sessions')
+          .then(function (x) { return x; }, function () { return { data: [] }; })
+      ]);
+    }).then(function (rs) {
+      var r = rs[0];
       if (r.error) {
         box.innerHTML = '<div class="notice-banner">장로 총대 명단을 불러오지 못했습니다: ' +
-          e(r.error.message) + ' (28 장로 총대 자격 관리 등록이 필요할 수 있습니다)</div>';
+          e(r.error.message) + '</div>';
         return;
       }
+      var ses = ((rs[1] && rs[1].data) || [])[0];
+      if (ses && ses.value) SESSIONS = ses.value;
+
       var rows = r.data || [];
       if (!rows.length) {
         box.innerHTML = '<p style="color:var(--gray-5)">등록된 장로가 없습니다. ' +
-          '노회 명단 관리에서 조직 분류를 <strong>장로</strong>로 지정해 주세요.</p>';
-        return;
-      }
-      var hasTerm = Object.prototype.hasOwnProperty.call(rows[0], 'term_until');
-      if (!hasTerm) {
-        box.innerHTML = '<div class="notice-banner">장로 총대의 정년과 자격 기간을 관리하시려면 ' +
-          '<strong>supabase/28_elder_terms.sql</strong> 을 먼저 실행해 주세요.</div>';
+          '노회 명단 관리에서 직분을 <strong>장로</strong>로 지정해 주세요.</p>';
         return;
       }
 
@@ -1219,24 +1262,28 @@ document.addEventListener('DOMContentLoaded', function () {
         return x.term_until && new Date(x.term_until + 'T00:00:00') <= today;
       }).length;
 
-      function retireCell(x) {
+      function retireText(x) {
         var rd = SHS.retireDate(x.birth_date);
         if (!rd) return '<span style="color:var(--gray-5)">생년월일 미등록</span>';
         var over = rd <= today;
         return '<span class="' + (over ? 'fail' : '') + '">' +
-          rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.' +
-          (over ? ' (정년 경과)' : '') + '</span>';
+          rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '.' + (over ? ' (경과)' : '') + '</span>';
       }
-      function termCell(x) {
-        if (!x.term_until) return '<span style="color:var(--gray-5)">기간 미정</span>';
-        var left = Math.ceil((new Date(x.term_until + 'T00:00:00') - today) / 86400000);
-        if (left <= 0) return '<span class="fail">만료 (연장 대상)</span>';
-        return '<span style="color:var(--gray-5)">' + left + '일 남음</span>';
+      function termText(x) {
+        var lab = sesLabel(x.term_from, x.term_until);
+        if (!lab) return '<span style="color:var(--gray-5)">미정</span>';
+        var left = x.term_until
+          ? Math.ceil((new Date(x.term_until + 'T00:00:00') - today) / 86400000) : null;
+        return '<strong>' + lab + '</strong>' +
+          (left != null
+            ? '<div style="font-size:0.78rem;color:' + (left <= 0 ? 'var(--red)' : 'var(--gray-5)') + '">' +
+              (left <= 0 ? '만료 (연장 대상)' : left + '일 남음') + '</div>'
+            : '');
       }
 
       var h = '<div class="notice-banner">노회규칙 제16조 2항에 따라 장로 총대는 당회장이 제출합니다. ' +
-        '<strong>교체되지 않은 총대는 다음 회기에 자격이 1년 자동 연장</strong>됩니다. ' +
-        '정년(만 70세)이 지난 분은 연장되지 않습니다.' +
+        '자격은 <strong>회기</strong>로 정하며, 지금은 <strong>제' + SESSIONS.current + '회기</strong>입니다. ' +
+        '교체되지 않은 총대는 다음 회기에 자격이 자동 연장되고, 정년(만 70세)이 지난 분은 연장되지 않습니다.' +
         (expiring ? ' <strong>지금 자격이 만료된 총대 ' + expiring + '명</strong>' : '') +
         '</div>';
 
@@ -1245,28 +1292,21 @@ document.addEventListener('DOMContentLoaded', function () {
         '정기노회 뒤에 한 번 눌러 주시면 됩니다. 정년이 지난 분은 제외됩니다.</span></p>' +
         '<div class="form-msg" id="el-msg"></div>';
 
-      h += '<table class="tbl"><thead><tr><th style="width:60px">번호</th>' +
-        '<th style="width:110px">성명</th><th style="width:150px">소속 교회</th>' +
-        '<th style="width:110px">시찰</th><th style="width:165px">생년월일</th>' +
-        '<th style="width:150px">정년 (만 70세)</th>' +
-        '<th style="width:340px">총대 자격 기간</th>' +
-        '<th style="width:160px">관리</th></tr></thead><tbody>';
+      h += '<table class="tbl"><thead><tr><th style="width:50px">번호</th>' +
+        '<th style="width:110px">성명</th><th style="width:160px">소속 교회</th>' +
+        '<th style="width:110px">시찰</th><th style="width:120px">생년월일</th>' +
+        '<th style="width:120px">정년</th><th style="width:170px">총대 자격</th>' +
+        '<th style="width:80px">관리</th></tr></thead><tbody>';
       live.forEach(function (x, i) {
-        h += '<tr data-el="' + x.id + '">' +
+        h += '<tr>' +
           '<td>' + (i + 1) + '</td>' +
-          '<td>' + e(x.name) + '</td>' +
-          '<td>' + e(x.church) + '</td>' +
+          '<td><strong>' + e(x.name) + '</strong></td>' +
+          '<td class="left">' + e(x.church) + '</td>' +
           '<td>' + e(x.sichal || '-') + '</td>' +
-          '<td><input type="date" data-ef="birth_date" value="' + e(x.birth_date || '') + '"></td>' +
-          '<td style="font-size:0.82rem">' + retireCell(x) + '</td>' +
-          '<td><input type="date" data-ef="term_from" value="' + e(x.term_from || '') + '" style="width:47%">' +
-          ' ~ <input type="date" data-ef="term_until" value="' + e(x.term_until || '') + '" style="width:47%">' +
-          '<div style="font-size:0.8rem;margin-top:3px">' + termCell(x) +
-          (String(x.note || '').indexOf('자동 연장') !== -1
-            ? ' <span style="color:var(--gray-5)">· 자동 연장됨</span>' : '') + '</div></td>' +
-          '<td><button class="btn sm" data-elsave="' + x.id + '">저장</button> ' +
-          '<button class="btn ghost sm" data-elswap="' + x.id + '" data-eln="' + e(x.name) +
-          '" data-elc="' + e(x.church) + '">교체</button></td>' +
+          '<td>' + e(x.birth_date || '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+          '<td style="font-size:0.84rem">' + retireText(x) + '</td>' +
+          '<td>' + termText(x) + '</td>' +
+          '<td><button class="btn sm" data-eledit="' + x.id + '">수정</button></td>' +
           '</tr>';
       });
       h += '</tbody></table>';
@@ -1285,55 +1325,92 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       box.innerHTML = h;
 
-      /* 줄 저장 */
-      box.querySelectorAll('button[data-elsave]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var tr = b.closest('tr');
-          var msg = document.getElementById('el-msg');
-          function v(fl) { return tr.querySelector('[data-ef="' + fl + '"]').value || null; }
-          var d = { birth_date: v('birth_date'), term_from: v('term_from'), term_until: v('term_until') };
+      /* ----- 수정 팝업 ----- */
+      function openElderEdit(x) {
+        var fromNo = sesOfDate(x.term_from) || SESSIONS.current;
+        var untilNo = sesOfEnd(x.term_until) || (Number(SESSIONS.current) + 1);
+        var mo = adminModal(
+          '<h3 style="margin:0 0 4px;color:var(--navy)">' + e(x.name) + ' — 장로 총대 자격</h3>' +
+          '<p style="font-size:0.86rem;color:var(--gray-6);margin:0 0 14px">' +
+          e(x.church) + (x.sichal ? ' · ' + e(x.sichal) : '') + '</p>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 170px"><label>생년월일</label>' +
+          '<input type="date" id="elm-birth" value="' + e(x.birth_date || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 150px"><label>연락처</label>' +
+          '<input type="text" id="elm-phone" value="' + e(x.phone || '') + '" placeholder="010-0000-0000"></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field"><label>자격 시작 회기</label><select id="elm-from">' +
+          sesOptions(fromNo) + '</select></div>' +
+          '<div class="field"><label>자격 끝 회기</label><select id="elm-until">' +
+          sesOptions(untilNo) + '</select></div>' +
+          '</div>' +
+          '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:-4px">' +
+          '회기를 고르면 그 회기의 시작일과 마지막 날로 저장됩니다. ' +
+          '회기 기간은 <a href="manage.html#mg-ops" style="text-decoration:underline">사이트 관리 → 노회 운영</a>에서 정합니다.</p>' +
+          '<div style="margin-top:6px"><button class="btn" id="elm-save">저장</button> ' +
+          '<button class="btn ghost" id="elm-swap">총대 교체</button></div>' +
+          '<div class="form-msg" id="elm-msg"></div>');
+
+        document.getElementById('elm-save').addEventListener('click', function () {
+          var msg = document.getElementById('elm-msg');
+          var a = sesFind(document.getElementById('elm-from').value);
+          var b = sesFind(document.getElementById('elm-until').value);
+          if (!a || !b) { msg.className = 'form-msg err'; msg.textContent = '회기를 고르지 못했습니다.'; return; }
+          if (Number(b.no) < Number(a.no)) {
+            msg.className = 'form-msg err';
+            msg.textContent = '끝 회기는 시작 회기보다 앞설 수 없습니다.';
+            return;
+          }
+          var d = {
+            birth_date: document.getElementById('elm-birth').value || null,
+            phone: document.getElementById('elm-phone').value.trim() || null,
+            term_from: a.from, term_until: b.to
+          };
           msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
           SHSCloud.init().then(function (c) {
-            return c.from('roster').update(d).eq('id', b.dataset.elsave);
+            return c.from('roster').update(d).eq('id', x.id);
           }).then(function (res) {
             if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
-            SHSCloud.log('update', '장로 총대 자격 수정', tr.children[1].textContent);
+            SHSCloud.log('update', '장로 총대 자격 수정',
+              x.name + ' 제' + a.no + '~' + b.no + '회기');
+            mo.close();
             renderElders();
           });
         });
-      });
 
-      /* 교체 */
-      box.querySelectorAll('button[data-elswap]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var nm = prompt('"' + b.dataset.eln + '" 총대를 대신할 새 장로 총대의 성명을 적어 주세요.', '');
+        document.getElementById('elm-swap').addEventListener('click', function () {
+          var nm = prompt('"' + x.name + '" 총대를 대신할 새 장로 총대의 성명을 적어 주세요.', '');
           if (nm === null || !nm.trim()) return;
-          var ch = prompt('새 총대의 소속 교회를 적어 주세요.', b.dataset.elc);
+          var ch = prompt('새 총대의 소속 교회를 적어 주세요.', x.church || '');
           if (ch === null) return;
           var bd = prompt('새 총대의 생년월일을 적어 주세요. (예: 1965-03-21, 모르시면 비워 두세요)', '');
           if (bd === null) return;
-          var msg = document.getElementById('el-msg');
-          msg.className = 'form-msg'; msg.textContent = '교체 중입니다...';
           SHSCloud.init().then(function (c) {
             return c.rpc('replace_elder', {
-              p_id: Number(b.dataset.elswap), p_name: nm.trim(),
+              p_id: Number(x.id), p_name: nm.trim(),
               p_church: ch.trim(), p_birth: bd.trim() || null
             });
           }).then(function (res) {
-            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
-            SHSCloud.log('update', '장로 총대 교체', b.dataset.eln + ' → ' + nm.trim());
-            msg.className = 'form-msg ok';
-            msg.textContent = b.dataset.eln + ' 총대를 ' + nm.trim() + ' 총대로 교체했습니다. ' +
-              '이전 총대는 아래 교체 기록에 남습니다.';
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('update', '장로 총대 교체', x.name + ' → ' + nm.trim());
+            mo.close();
             renderElders();
             renderRoster();
           });
+        });
+      }
+
+      box.querySelectorAll('button[data-eledit]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var x = live.filter(function (y) { return String(y.id) === b.dataset.eledit; })[0];
+          if (x) openElderEdit(x);
         });
       });
 
       /* 자격 일괄 연장 */
       document.getElementById('el-extend').addEventListener('click', function () {
-        if (!confirm('자격이 만료된 장로 총대의 기간을 1년 연장하시겠습니까?\n' +
+        if (!confirm('자격이 만료된 장로 총대의 기간을 1년 연장하시겠습니까? ' +
                      '교체되지 않은 총대만 연장되며, 정년이 지난 분은 제외됩니다.')) return;
         var msg = document.getElementById('el-msg');
         msg.className = 'form-msg'; msg.textContent = '연장 중입니다...';
@@ -1723,169 +1800,117 @@ document.addEventListener('DOMContentLoaded', function () {
       return c.from('sichals').select('*').order('sort');
     }).then(function (r) {
       if (r.error) {
-        box.innerHTML = '<div class="notice-banner">시찰 정보를 불러오지 못했습니다: ' + e(r.error.message) +
-          ' (16 조직 명단·시찰 관리 등록이 필요할 수 있습니다)</div>';
+        box.innerHTML = '<div class="notice-banner">시찰 정보를 불러오지 못했습니다: ' +
+          e(r.error.message) + '</div>';
         return;
       }
       var rows = r.data || [];
+      function churchCount(x) {
+        return String(x.churches || '').split('\n')
+          .filter(function (t) { return t.trim(); }).length;
+      }
+
       var html = '<div class="notice-banner">시찰 구성은 조직 페이지와 <strong>회원가입 화면의 교회 목록</strong>에 함께 쓰입니다. ' +
-        '교회가 새로 들어오거나 나가면 여기에서 고쳐 주세요.</div>';
-
-      rows.forEach(function (s) {
-        html += '<div class="admin-card" style="margin-bottom:14px" data-si="' + s.id + '">' +
-          '<div class="inline-form" style="margin-bottom:6px">' +
-          '<div class="field" style="flex:0 0 140px"><label>시찰 이름</label><input type="text" data-sf="name" value="' + e(s.name) + '"></div>' +
-          '<div class="field"><label>관할 지역</label><input type="text" data-sf="area" value="' + e(s.area || '') + '"></div>' +
-          '</div>' +
-          '<div class="inline-form" style="margin-bottom:6px">' +
-          '<div class="field"><label>시찰장</label><input type="text" data-names data-sf="head" value="' + e(s.head || '') + '"></div>' +
-          '<div class="field"><label>서기</label><input type="text" data-names data-sf="clerk" value="' + e(s.clerk || '') + '"></div>' +
-          '<div class="field"><label>회계</label><input type="text" data-names data-sf="treasurer" value="' + e(s.treasurer || '') + '"></div>' +
-          '</div>' +
-          '<div class="field"><label>소속 교회 (한 줄에 한 교회씩 적어 주세요)</label>' +
-          '<textarea data-sf="churches" rows="8">' + e(s.churches || '') + '</textarea></div>' +
-          '<button class="btn sm" data-sisave="' + s.id + '">저장</button> ' +
-          '<button class="btn danger sm" data-sidel="' + s.id + '" data-siname="' + e(s.name) + '">시찰 삭제</button>' +
-          '<div class="form-msg" data-simsg="' + s.id + '"></div></div>';
+        '관내 교회의 교역자·장로 명부는 <strong>교회 관리</strong>에서 다룹니다.</div>';
+      html += '<table class="tbl"><thead><tr><th style="width:120px">시찰</th>' +
+        '<th style="width:120px">시찰장</th><th style="width:110px">서기</th>' +
+        '<th style="width:110px">회계</th><th style="width:90px">관내 교회</th>' +
+        '<th>관할 지역</th><th style="width:80px">관리</th></tr></thead><tbody>';
+      if (!rows.length) {
+        html += '<tr><td colspan="7" style="color:var(--gray-5)">등록된 시찰이 없습니다.</td></tr>';
+      }
+      rows.forEach(function (x) {
+        html += '<tr><td><strong>' + e(x.name) + '</strong></td>' +
+          '<td>' + e(x.head || '-') + '</td>' +
+          '<td>' + e(x.clerk || '-') + '</td>' +
+          '<td>' + e(x.treasurer || '-') + '</td>' +
+          '<td>' + churchCount(x) + '곳</td>' +
+          '<td class="left" style="font-size:0.86rem">' + e(x.area || '-') + '</td>' +
+          '<td><button class="btn sm" data-siedit="' + x.id + '">수정</button></td></tr>';
       });
-
-      html += '<div class="admin-card"><h3 style="margin-top:0">시찰 추가</h3>' +
-        '<div class="inline-form"><div class="field"><label>시찰 이름</label><input type="text" id="si-new"></div>' +
-        '<button class="btn" id="si-add">추가</button></div>' +
-        '<div class="form-msg" id="si-newmsg"></div></div>';
+      html += '</tbody></table>';
+      html += '<p style="margin-top:12px"><button class="btn ghost sm" id="si-new">시찰 추가</button> ' +
+        '<span class="form-msg" id="si-newmsg" style="margin:0"></span></p>';
       box.innerHTML = html;
-      SHSNames.attachAll(box);
 
-      box.querySelectorAll('button[data-sisave]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var card = b.closest('[data-si]');
-          var msg = box.querySelector('[data-simsg="' + b.dataset.sisave + '"]');
-          function v(f) { return card.querySelector('[data-sf="' + f + '"]').value.trim(); }
-          var lines = card.querySelector('[data-sf="churches"]').value.split('\n');
+      function openSichalEdit(x) {
+        var isNew = !x;
+        x = x || { name: '', area: '', head: '', clerk: '', treasurer: '', churches: '' };
+        var mo = adminModal(
+          '<div id="si-card">' +
+          '<h3 style="margin:0 0 14px;color:var(--navy)">' +
+          (isNew ? '시찰 추가' : e(x.name) + ' — 시찰 정보 수정') + '</h3>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 160px"><label>시찰 이름</label>' +
+          '<input type="text" id="sim-name" value="' + e(x.name) + '"></div>' +
+          '<div class="field"><label>관할 지역</label>' +
+          '<input type="text" id="sim-area" value="' + e(x.area || '') + '"></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field"><label>시찰장</label>' +
+          '<input type="text" data-names id="sim-head" value="' + e(x.head || '') + '"></div>' +
+          '<div class="field"><label>서기</label>' +
+          '<input type="text" data-names id="sim-clerk" value="' + e(x.clerk || '') + '"></div>' +
+          '<div class="field"><label>회계</label>' +
+          '<input type="text" data-names id="sim-treasurer" value="' + e(x.treasurer || '') + '"></div>' +
+          '</div>' +
+          '<div class="field"><label>소속 교회 (한 줄에 한 교회씩)</label>' +
+          '<textarea id="sim-churches" rows="10">' + e(x.churches || '') + '</textarea></div>' +
+          '<div style="margin-top:6px"><button class="btn" id="sim-save">저장</button> ' +
+          (isNew ? '' : '<button class="btn danger" id="sim-del" style="float:right">시찰 삭제</button>') +
+          '</div><div class="form-msg" id="sim-msg"></div></div>', 720);
+        SHSNames.attachAll(mo.ov);
+
+        document.getElementById('sim-save').addEventListener('click', function () {
+          var msg = document.getElementById('sim-msg');
+          var lines = document.getElementById('sim-churches').value.split('\n')
+            .map(function (t) { return t.trim(); }).filter(function (t) { return t; });
           var d = {
-            name: v('name'), area: v('area'), head: v('head'),
-            clerk: v('clerk'), treasurer: v('treasurer'),
-            churches: lines.map(function (x) { return x.trim(); })
-              .filter(function (x) { return x; }).join('\n'),
+            name: document.getElementById('sim-name').value.trim(),
+            area: document.getElementById('sim-area').value.trim() || null,
+            head: document.getElementById('sim-head').value.trim() || null,
+            clerk: document.getElementById('sim-clerk').value.trim() || null,
+            treasurer: document.getElementById('sim-treasurer').value.trim() || null,
+            churches: lines.join('\n') || null,
             updated_at: new Date().toISOString(), updated_by: user.name
           };
-          if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '시찰 이름을 입력해 주세요.'; return; }
+          if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '시찰 이름을 적어 주세요.'; return; }
+          if (isNew) d.sort = (rows.length + 1) * 10;
           msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
           SHSCloud.init().then(function (c) {
-            return c.from('sichals').update(d).eq('id', b.dataset.sisave);
+            return isNew ? c.from('sichals').insert(d).select()
+                         : c.from('sichals').update(d).eq('id', x.id).select();
           }).then(function (res) {
-            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
-            SHSCloud.log('update', '시찰 정보 수정', d.name);
-            msg.className = 'form-msg ok';
-            msg.textContent = '저장되었습니다. 조직 페이지와 회원가입 화면에 반영되었습니다.';
-          });
-        });
-      });
-
-      box.querySelectorAll('button[data-sidel]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (!confirm('"' + b.dataset.siname + '" 시찰을 삭제하시겠습니까? 소속 교회 목록도 함께 사라집니다.')) return;
-          SHSCloud.init().then(function (c) {
-            return c.from('sichals').delete().eq('id', b.dataset.sidel);
-          }).then(function (res) {
-            if (res.error) { alert(res.error.message); return; }
-            SHSCloud.log('delete', '시찰 삭제', b.dataset.siname);
+            var w = SHS.wrote(res);
+            if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+            SHSCloud.log(isNew ? 'create' : 'update', isNew ? '시찰 추가' : '시찰 정보 수정', d.name);
+            mo.close();
             renderSichals();
           });
         });
-      });
 
-      document.getElementById('si-add').addEventListener('click', function () {
-        var msg = document.getElementById('si-newmsg');
-        var nm = document.getElementById('si-new').value.trim();
-        if (!nm) { msg.className = 'form-msg err'; msg.textContent = '시찰 이름을 입력해 주세요.'; return; }
-        SHSCloud.init().then(function (c) {
-          return c.from('sichals').insert({
-            name: nm, churches: '',
-            sort: (rows.length ? Number(rows[rows.length - 1].sort || 0) : 0) + 10,
-            updated_at: new Date().toISOString(), updated_by: user.name
+        var del = document.getElementById('sim-del');
+        if (del) del.addEventListener('click', function () {
+          if (!confirm('"' + x.name + '" 시찰을 지우시겠습니까? 되돌릴 수 없습니다.')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('sichals').delete().eq('id', x.id);
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('delete', '시찰 삭제', x.name);
+            mo.close();
+            renderSichals();
           });
-        }).then(function (res) {
-          if (res.error) {
-            msg.className = 'form-msg err';
-            msg.textContent = res.error.code === '23505' ? '같은 이름의 시찰이 이미 있습니다.' : res.error.message;
-            return;
-          }
-          SHSCloud.log('create', '시찰 추가', nm);
-          renderSichals();
+        });
+      }
+
+      box.querySelectorAll('button[data-siedit]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var x = rows.filter(function (y) { return String(y.id) === b.dataset.siedit; })[0];
+          if (x) openSichalEdit(x);
         });
       });
+      document.getElementById('si-new').addEventListener('click', function () { openSichalEdit(null); });
     });
-  }
-
-  /* ---------- 상비부 배정 관리 ---------- */
-
-  /* 년조 한 칸에 여러 이름을 쉼표로 몰아 적으면 누가 빠졌는지 알아보기
-   * 어렵다. 한 사람에 한 칸씩 두고, 칸을 더하거나 지울 수 있게 한다.
-   * 저장할 때는 예전처럼 쉼표로 이어 한 칸(y1·y2·y3)에 넣는다. */
-  function nameRow(v) {
-    return '<div class="mm-row">' +
-      '<input type="text" data-names="plain" value="' + SHS.esc(v || '') + '">' +
-      '<button type="button" class="mm-del" data-ydel aria-label="이 사람 지우기" ' +
-      'title="이 사람 지우기">&times;</button></div>';
-  }
-  function splitNames(v) {
-    return String(v || '').split(',')
-      .map(function (x) { return x.trim(); })
-      .filter(function (x) { return x; });
-  }
-  function yearBox(label, key, value) {
-    var list = splitNames(value);
-    if (!list.length) list = [''];        /* 비어 있어도 적을 칸 하나는 둔다 */
-    return '<div class="field"><label>' + label + '</label>' +
-      '<div class="mm-list" data-y="' + key + '">' +
-      list.map(nameRow).join('') + '</div>' +
-      '<button type="button" class="btn ghost sm mm-add" data-yadd="' + key + '">+ 이름 추가</button>' +
-      '</div>';
-  }
-
-  /* 한 카드 안의 이름 칸에 명부 찾기를 붙이고, 더하기·지우기를 잇는다 */
-  function bindNameRows(card) {
-    SHSNames.attachAll(card);
-
-    card.querySelectorAll('button[data-yadd]').forEach(function (b) {
-      if (b.dataset.ready) return;
-      b.dataset.ready = '1';
-      b.addEventListener('click', function () {
-        var list = card.querySelector('.mm-list[data-y="' + b.dataset.yadd + '"]');
-        var tmp = document.createElement('div');
-        tmp.innerHTML = nameRow('');
-        var row = tmp.firstChild;
-        list.appendChild(row);
-        bindNameRows(card);
-        row.querySelector('input').focus();
-      });
-    });
-
-    card.querySelectorAll('button[data-ydel]').forEach(function (b) {
-      if (b.dataset.ready) return;
-      b.dataset.ready = '1';
-      b.addEventListener('click', function () {
-        var row = b.parentNode;
-        var list = row.parentNode;
-        row.parentNode.removeChild(row);
-        /* 마지막 한 칸까지 없어지면 적을 곳이 사라지므로 빈 칸을 하나 둔다 */
-        if (!list.querySelector('.mm-row')) {
-          list.innerHTML = nameRow('');
-          bindNameRows(card);
-        }
-      });
-    });
-  }
-
-  /* 년조 칸에 적힌 이름을 모아 쉼표로 잇는다 */
-  function yearValue(card, key) {
-    var list = card.querySelector('.mm-list[data-y="' + key + '"]');
-    if (!list) return '';
-    return Array.prototype.slice.call(list.querySelectorAll('input'))
-      .map(function (i) { return i.value.trim(); })
-      .filter(function (x) { return x; })
-      .join(', ');
   }
 
   function renderCommittees() {
@@ -1930,14 +1955,15 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field"><label>회계</label><input type="text" data-names data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
           '</div>' +
           (SHS.isBoard(cm.name)
-            ? yearBox('위원', 'members', cm.members)
-            : yearBox('1년조', 'y1', cm.y1) +
+            ? '<div class="com-years one">' + yearBox('위원', 'members', cm.members) + '</div>'
+            : '<div class="com-years">' +
+              yearBox('1년조', 'y1', cm.y1) +
               yearBox('2년조', 'y2', cm.y2) +
-              yearBox('3년조', 'y3', cm.y3)) +
+              yearBox('3년조', 'y3', cm.y3) + '</div>') +
           '<button class="btn sm" data-cmsave="' + e(cm.name) + '">저장</button>' +
           '<span class="form-msg" data-cmmsg="' + e(cm.name) + '" style="margin-left:10px"></span>' +
           '</div>';
-        var mo = adminModal(inner, 860);
+        var mo = adminModal(inner, 940);
         var card0 = mo.ov.querySelector('div[data-cmt]');
         bindNameRows(card0);
         mo.ov.querySelector('button[data-cmsave]').addEventListener('click', function () {

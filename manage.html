@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>사이트 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260829f">
+<link rel="stylesheet" href="css/style.css?v=20260829h">
 </head>
 <body>
 
@@ -25,7 +25,10 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
-<script src="js/main.js?v=20260829g"></script>
+<script src="js/main.js?v=20260829h"></script>
+<script src="js/audit-mark.js"></script>
+<script src="js/audit-view.js"></script>
+<script src="js/ops-panel.js?v=20260829"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -67,6 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
     '<button data-tab="mg-hero">메인 화면</button>' +
     '<button data-tab="mg-officers">임원 명부</button>' +
     '<button data-tab="mg-gallery">갤러리</button>' +
+    '<button data-tab="mg-ops">노회 운영</button>' +
     '<button data-tab="mg-links">그 외 관리</button>' +
     '</div>' +
     '<div class="tab-panel active" id="mg-notice"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
@@ -74,6 +78,8 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div class="tab-panel" id="mg-hero"></div>' +
     '<div class="tab-panel" id="mg-officers"></div>' +
     '<div class="tab-panel" id="mg-gallery"></div>' +
+    '<div class="tab-panel" id="mg-ops"><div id="mg-terms"></div>' +
+    '<div id="mg-opsbody"><p style="color:var(--gray-5)">불러오는 중...</p></div></div>' +
     /* 예전에는 여기에 다른 관리 화면으로 가는 바로가기 카드가 있었으나,
      * 같은 곳을 상단 '관리자' 메뉴가 이미 가리키고 있어 길이 두 갈래가
      * 되어 있었다. 이제 어디서 하는 일인지만 적어 둔다. */
@@ -109,9 +115,110 @@ document.addEventListener('DOMContentLoaded', function () {
   SHSCloud.init().then(function (c) {
     db = c;
     loadNotices(); loadSchedule(); loadHero(); loadOfficers(); loadGallery();
+    loadTerms();
+    SHSOps.mount(document.getElementById('mg-opsbody'), user);
   });
 
   /* ---------- 공지사항 ---------- */
+  /* ---------- 회기(會期) 설정 ----------
+   * 노회는 정기회마다 회기가 바뀐다. 총대 자격처럼 회기로 정하는 일이
+   * 많으므로, 회기 번호와 기간을 여기 한곳에서 정한다. */
+  function loadTerms() {
+    var box = document.getElementById('mg-terms');
+    if (!box) return;
+    db.from('site_settings').select('value').eq('key', 'sessions').then(function (r) {
+      var v = (r.data && r.data[0] && r.data[0].value) || { current: 19, list: [] };
+      var list = (v.list || []).slice().sort(function (a, b) { return a.no - b.no; });
+      var h = '<h2>회기 설정</h2>' +
+        '<p>정기노회마다 바뀌는 회기입니다. 장로 총대 자격과 증명서 발급번호가 이 회기를 따릅니다.</p>' +
+        '<div class="admin-card" style="max-width:720px">' +
+        '<div class="inline-form" style="margin-bottom:10px">' +
+        '<div class="field" style="flex:0 0 160px"><label>현재 회기</label>' +
+        '<select id="tm-cur">' + list.map(function (x) {
+          return '<option value="' + x.no + '"' + (Number(v.current) === Number(x.no) ? ' selected' : '') +
+            '>제' + x.no + '회기</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field"><label>기간</label>' +
+        '<input type="text" id="tm-now" value="" disabled></div>' +
+        '</div>' +
+        '<table class="tbl"><thead><tr><th style="width:110px">회기</th>' +
+        '<th style="width:180px">시작</th><th style="width:180px">끝</th>' +
+        '<th style="width:80px">관리</th></tr></thead><tbody id="tm-rows">' +
+        list.map(function (x) {
+          return '<tr data-tm="' + x.no + '"><td><strong>제' + x.no + '회기</strong></td>' +
+            '<td><input type="date" data-tf="from" value="' + e(x.from) + '"></td>' +
+            '<td><input type="date" data-tf="to" value="' + e(x.to) + '"></td>' +
+            '<td><button class="btn danger sm" data-tmdel="' + x.no + '">삭제</button></td></tr>';
+        }).join('') + '</tbody></table>' +
+        '<div class="inline-form" style="margin-top:10px">' +
+        '<div class="field" style="flex:0 0 120px"><label>회기 번호</label>' +
+        '<input type="number" id="tm-no" min="1" max="99" value="' +
+        (list.length ? Number(list[list.length - 1].no) + 1 : 19) + '"></div>' +
+        '<div class="field" style="flex:0 0 170px"><label>시작</label><input type="date" id="tm-from"></div>' +
+        '<div class="field" style="flex:0 0 170px"><label>끝</label><input type="date" id="tm-to"></div>' +
+        '<button class="btn sm" id="tm-add" style="align-self:flex-end">회기 추가</button>' +
+        '</div>' +
+        '<button class="btn" id="tm-save">저장</button>' +
+        '<div class="form-msg" id="tm-msg"></div></div>';
+      box.innerHTML = h;
+
+      function showNow() {
+        var no = document.getElementById('tm-cur').value;
+        var hit = list.filter(function (x) { return String(x.no) === String(no); })[0];
+        document.getElementById('tm-now').value = hit ? hit.from + ' ~ ' + hit.to : '';
+      }
+      showNow();
+      document.getElementById('tm-cur').addEventListener('change', showNow);
+
+      function collect() {
+        var out = [];
+        box.querySelectorAll('#tm-rows tr[data-tm]').forEach(function (tr) {
+          out.push({
+            no: Number(tr.dataset.tm),
+            from: tr.querySelector('[data-tf="from"]').value,
+            to: tr.querySelector('[data-tf="to"]').value
+          });
+        });
+        return out;
+      }
+      function save(next, done) {
+        db.from('site_settings').upsert({
+          key: 'sessions',
+          value: { current: Number(document.getElementById('tm-cur').value), list: next },
+          updated_at: new Date().toISOString()
+        }).then(function (res) {
+          var msg = document.getElementById('tm-msg');
+          if (res.error) { toast(msg, false, res.error.message); return; }
+          SHSCloud.log('update', '회기 설정 변경',
+            '현재 제' + document.getElementById('tm-cur').value + '회기, 회기 ' + next.length + '개');
+          if (done) done(); else toast(msg, true, '저장되었습니다.');
+          loadTerms();
+        });
+      }
+
+      document.getElementById('tm-save').addEventListener('click', function () {
+        save(collect());
+      });
+      box.querySelectorAll('button[data-tmdel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('제' + b.dataset.tmdel + '회기를 지우시겠습니까?')) return;
+          save(collect().filter(function (x) { return String(x.no) !== b.dataset.tmdel; }));
+        });
+      });
+      document.getElementById('tm-add').addEventListener('click', function () {
+        var msg = document.getElementById('tm-msg');
+        var no = parseInt(document.getElementById('tm-no').value, 10);
+        var from = document.getElementById('tm-from').value;
+        var to = document.getElementById('tm-to').value;
+        if (!no || !from || !to) { toast(msg, false, '회기 번호와 기간을 모두 적어 주세요.'); return; }
+        var next = collect().filter(function (x) { return x.no !== no; });
+        next.push({ no: no, from: from, to: to });
+        next.sort(function (a, b) { return a.no - b.no; });
+        save(next);
+      });
+    });
+  }
+
   /* 관리 화면 공용 수정 팝업 */
   function mgModal(inner, maxWidth) {
     var old = document.getElementById('mg-modal');

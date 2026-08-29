@@ -80,7 +80,7 @@
    * 성격이 이어지는 것은 한 화면의 탭으로 모았다.
    *   · 상비부 대시보드 → 회원 관리 안의 탭
    *   · 회칙 개정 반영   → 자료·회칙 관리 안의 탭
-   *   · 감독(감사 기록) → 시스템 운영 안의 탭
+   *   · 감독(감사 기록) → 사이트 관리 > 노회 운영 안의 탭
    *   · 직인·도장       → 따로 세운 항목 (예전 '홈페이지 설정' 화면)
    * 서류 발급은 관리자 일이므로 여기로 들여왔다. */
   var ADMIN_NAV = { title: '관리자', href: 'manage.html', sub: [
@@ -89,7 +89,7 @@
     { t: '서류 발급', h: 'documents.html' },
     { t: '자료·회칙 관리', h: 'archive-edit.html' },
     { t: '직인·도장', h: 'settings.html' },
-    { t: '시스템 운영', h: 'ops.html' }
+    { t: '노회 운영', h: 'manage.html#mg-ops' }
   ]};
 
   /* 로그인한 정회원에게 상단 메뉴 맨 앞에 <대시보드>를 보여 준다.
@@ -774,7 +774,7 @@
         '<div class="notice-banner" style="border-left:4px solid var(--accent)">' +
         '<strong>[시스템 알림]</strong> 확인이 필요한 운영 알림이 ' + active.length + '건 있습니다: ' +
         active.map(function (n) { return n.title; }).join(', ') + ' ' +
-        '<a class="btn sm" style="margin-left:8px" href="ops.html">알림 확인하기</a>' +
+        '<a class="btn sm" style="margin-left:8px" href="manage.html#mg-ops">알림 확인하기</a>' +
         '</div>';
       var gnb = document.querySelector('.gnb');
       if (gnb) gnb.insertAdjacentElement('afterend', bar);
