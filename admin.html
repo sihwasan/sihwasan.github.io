@@ -820,41 +820,47 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button class="btn ghost" id="ro-qclear">지우기</button>' +
         '</div>';
 
-      /* 명단 표 (그 자리에서 고칠 수 있다) */
-      html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th><th style="width:110px">성명</th>' +
-        '<th>소속 교회</th><th style="width:130px">직분</th><th style="width:150px">생년월일</th>' +
-        '<th style="width:120px">시찰</th><th style="width:130px">연락처</th>' +
+      /* 부여 등급을 읽기 좋은 말로 */
+      function gradeName(v) {
+        var g = parseGrade(v);
+        return g.title || ROSTER_ROLES[g.role] || g.role || '정회원';
+      }
+      /* 남은 임기: 장로 총대는 자격 기간, 그 외는 정년(만 70세)까지 */
+      function remainLabel(m) {
+        var today = new Date();
+        if (m.category === '장로' && m.term_until) {
+          var left = Math.ceil((new Date(m.term_until + 'T00:00:00') - today) / 86400000);
+          if (left <= 0) return '<span class="fail">총대 만료</span>';
+          if (left < 365) return '총대 ' + left + '일';
+          return '총대 ' + (Math.round(left / 36.5) / 10) + '년';
+        }
+        var rd = SHS.retireDate(m.birth_date);
+        if (!rd) return '<span style="color:var(--gray-5)">-</span>';
+        if (rd <= today) return '<span class="fail">정년 경과</span>';
+        var months = (rd.getFullYear() - today.getFullYear()) * 12 + (rd.getMonth() - today.getMonth());
+        var y = Math.floor(months / 12), mo = months % 12;
+        return (y ? y + '년 ' : '') + (mo ? mo + '개월' : (y ? '' : '한 달 미만'));
+      }
 
-        '<th style="width:150px">부여 등급</th><th style="width:120px">관리</th></tr></thead><tbody>';
+      /* 명단 표 — 읽기 전용. [수정]을 누르면 팝업에서 고친다. */
+      html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th>' +
+        '<th style="width:110px">성명</th><th style="width:110px">직분</th>' +
+        '<th>소속 교회</th><th style="width:110px">시찰</th>' +
+        '<th style="width:130px">남은 임기</th><th style="width:130px">부여 등급</th>' +
+        '<th style="width:80px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
-        var old70 = overAge(m.birth_date);
         html += '<tr data-ro="' + m.id + '" data-find="' +
           e([m.name, m.church, m.category, m.sichal, m.note].filter(Boolean).join(' ')) + '"' +
           ' data-cat="' + e(m.category || '') + '" data-grade="' + e(rosterGrade(m)) + '">' +
           '<td class="ro-no">' + (i + 1) + '</td>' +
-          '<td><input type="text" data-rf="name" value="' + e(m.name) + '"></td>' +
-          '<td><input type="text" data-rf="church" value="' + e(m.church) + '"></td>' +
-          '<td><select data-rf="category">' +
-          catOptions(m.position === '위임목사' ? '위임목사' : (m.category || '')) + '</select></td>' +
-          '<td><input type="date" data-rf="birth_date" value="' + e(m.birth_date || '') + '">' +
-          (old70 ? '<div class="ro-hint">정년 경과</div>' : '') + '</td>' +
-          '<td><select data-rf="sichal">' + sichalOptions(m.sichal || '') + '</select></td>' +
-          '<td><input type="text" data-rf="phone" value="' + e(m.phone || '') + '" placeholder="010-0000-0000"></td>' +
-
-          '<td><select data-rf="grade">' + gradeOptions(rosterGrade(m)) + '</select></td>' +
-          '<td><button class="btn sm" data-rosave="' + m.id + '">저장</button> ' +
-          '<button class="btn danger sm" data-rodel="' + m.id + '" data-roname="' + e(m.name) + '">삭제</button></td>' +
-          '</tr>' +
-          /* 주소는 길어서 아랫줄에 따로 펼쳐 둔다. 저장은 윗줄 저장 단추가 함께 한다. */
-          '<tr class="ro-sub" data-rosub="' + m.id + '"><td></td>' +
-          '<td colspan="8"><div class="ro-addr">' +
-          '<label>우편번호<input type="text" data-rf="postcode" value="' + e(m.postcode || '') +
-          '" placeholder="00000" maxlength="7"></label>' +
-          '<label>재직 시작(부임)<input type="date" data-rf="served_from" value="' + e(m.served_from || '') +
-          '" title="재직증명서의 재직 기간에 쓰입니다"></label>' +
-          '<label class="wide">주소<input type="text" data-rf="address" value="' + e(m.address || '') +
-          '" placeholder="주소 — 증명서 등 모든 문서에 이 주소가 쓰입니다"></label>' +
-          '</div></td></tr>';
+          '<td><strong>' + e(m.name) + '</strong></td>' +
+          '<td>' + e(m.position || m.category || '-') + '</td>' +
+          '<td class="left">' + e(m.church || '-') + '</td>' +
+          '<td>' + e(m.sichal || '-') + '</td>' +
+          '<td>' + remainLabel(m) + '</td>' +
+          '<td>' + e(gradeName(rosterGrade(m))) + '</td>' +
+          '<td><button class="btn sm" data-roedit="' + m.id + '">수정</button></td>' +
+          '</tr>';
       });
       html += '</tbody></table>';
       html += '<div class="form-msg' + (rosterFlash ? ' ok' : '') + '" id="ro-rowmsg">' +
@@ -862,7 +868,7 @@ document.addEventListener('DOMContentLoaded', function () {
       rosterFlash = '';
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 <strong>' + rows.length + '</strong>명' +
         '<span id="ro-count"></span>. ' +
-        '칸을 고친 뒤 그 줄의 <strong>저장</strong>을 누르시면 됩니다. 모든 변경은 감사 기록에 남습니다.<br>' +
+        '<strong>수정</strong>을 누르면 팝업에서 모든 정보를 고칠 수 있습니다. 모든 변경은 감사 기록에 남습니다.<br>' +
         '총회 정년은 만 70세입니다. <strong>생년월일을 적으시면 정년이 지난 분은 ' +
         '<em>일반회원</em>으로 저절로 바뀝니다.</strong> 직분을 <strong>직원</strong>으로 하시면 ' +
         '간사(관리자) 등급이 함께 붙습니다. 두 가지 모두 등급 칸에서 고치실 수 있습니다.</p>';
@@ -935,11 +941,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('ro-cat'),
         document.getElementById('ro-birth'),
         document.getElementById('ro-grade'));
-      box.querySelectorAll('#ro-tbl tbody tr').forEach(function (tr) {
-        autoGrade(tr, tr.querySelector('[data-rf="category"]'),
-                  tr.querySelector('[data-rf="birth_date"]'),
-                  tr.querySelector('[data-rf="grade"]'));
-      });
+
 
       document.getElementById('ro-add').addEventListener('click', function () {
         var msg = document.getElementById('ro-msg');
@@ -979,51 +981,90 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       });
 
-      box.querySelectorAll('button[data-rosave]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var tr = b.closest('tr');
-          var sub = tr.parentNode.querySelector('tr[data-rosub="' + b.dataset.rosave + '"]');
-          var msg = document.getElementById('ro-rowmsg');
-          /* 값은 윗줄과 아랫줄(주소) 두 군데에서 찾는다 */
-          function v(f) {
-            var el = tr.querySelector('[data-rf="' + f + '"]') ||
-                     (sub && sub.querySelector('[data-rf="' + f + '"]'));
-            return el ? el.value.trim() : '';
-          }
-          var cat = v('category') || null;
+      /* ----- 수정 팝업 ----- */
+      function openRosterEdit(m) {
+        var old = document.getElementById('ro-modal');
+        if (old) old.remove();
+        var ov = document.createElement('div');
+        ov.id = 'ro-modal';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:300;' +
+          'display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto';
+        ov.innerHTML =
+          '<div style="background:#fff;border-radius:8px;max-width:560px;width:100%;padding:24px;' +
+          'box-shadow:0 10px 40px rgba(0,0,0,.25)">' +
+          '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(m.name) + ' — 회원 정보 수정</h3>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
+          '<input type="text" id="rm-name" value="' + e(m.name) + '"></div>' +
+          '<div class="field" style="flex:0 0 140px"><label>직분</label><select id="rm-cat">' +
+          catOptions(m.position === '위임목사' ? '위임목사' : (m.category || '')) + '</select></div>' +
+          '<div class="field"><label>소속 교회</label>' +
+          '<input type="text" id="rm-church" value="' + e(m.church || '') + '"></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 160px"><label>생년월일</label>' +
+          '<input type="date" id="rm-birth" value="' + e(m.birth_date || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 140px"><label>시찰</label><select id="rm-sichal">' +
+          sichalOptions(m.sichal || '') + '</select></div>' +
+          '<div class="field"><label>연락처</label>' +
+          '<input type="text" id="rm-phone" value="' + e(m.phone || '') + '" placeholder="010-0000-0000"></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 160px"><label>재직 시작(부임)</label>' +
+          '<input type="date" id="rm-served" value="' + e(m.served_from || '') +
+          '" title="재직증명서의 재직 기간에 쓰입니다"></div>' +
+          '<div class="field"><label>부여 등급</label><select id="rm-grade">' +
+          gradeOptions(rosterGrade(m)) + '</select></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 120px"><label>우편번호</label>' +
+          '<input type="text" id="rm-post" value="' + e(m.postcode || '') + '" maxlength="7"></div>' +
+          '<div class="field"><label>주소</label>' +
+          '<input type="text" id="rm-addr" value="' + e(m.address || '') +
+          '" placeholder="증명서 등 모든 문서에 이 주소가 쓰입니다"></div>' +
+          '</div>' +
+          '<div style="margin-top:6px">' +
+          '<button class="btn" id="rm-save">저장</button> ' +
+          '<button class="btn ghost" id="rm-close">닫기</button> ' +
+          '<button class="btn danger" id="rm-del" style="float:right">명단에서 삭제</button>' +
+          '</div>' +
+          '<div class="form-msg" id="rm-msg"></div>' +
+          '</div>';
+        document.body.appendChild(ov);
+        ov.addEventListener('click', function (ev) { if (ev.target === ov) ov.remove(); });
+        document.getElementById('rm-close').addEventListener('click', function () { ov.remove(); });
+        autoGrade(null, document.getElementById('rm-cat'),
+                  document.getElementById('rm-birth'), document.getElementById('rm-grade'));
+
+        document.getElementById('rm-save').addEventListener('click', function () {
+          var msg = document.getElementById('rm-msg');
+          function v(id) { return document.getElementById(id).value.trim(); }
+          var cat = v('rm-cat') || null;
           var pos = cat;
           if (cat === '위임목사') cat = '목사';   /* 조직 분류는 목사 무리로 둔다 */
-          var g = parseGrade(v('grade'));
+          var g = parseGrade(v('rm-grade'));
           var d = {
-            name: v('name'), church: churchFor(v('church'), cat),
-            position: pos,
-            category: cat,
-            birth_date: v('birth_date') || null,
-            sichal: v('sichal') || null,
-            phone: v('phone') || null,
-            postcode: v('postcode') || null,
-            address: v('address') || null,
-            served_from: v('served_from') || null,
+            name: v('rm-name'), church: churchFor(v('rm-church'), cat),
+            position: pos, category: cat,
+            birth_date: v('rm-birth') || null,
+            sichal: v('rm-sichal') || null,
+            phone: v('rm-phone') || null,
+            postcode: v('rm-post') || null,
+            address: v('rm-addr') || null,
+            served_from: v('rm-served') || null,
             role: g.role, officer_title: g.title
           };
-          if (!d.name) {
-            msg.className = 'form-msg err';
-            msg.textContent = '성명은 비울 수 없습니다.';
-            return;
-          }
+          if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명은 비울 수 없습니다.'; return; }
           if (!d.church) {
             msg.className = 'form-msg err';
-            msg.textContent = '소속 교회를 적어 주세요. ' +
-              '사임하셨다면 직분을 무임목사·은퇴목사·원로목사로 바꾸시면 ' +
-              '교회 칸을 비워 두셔도 됩니다.';
+            msg.textContent = '소속 교회를 적어 주세요. 사임하셨다면 직분을 ' +
+              '무임목사·은퇴목사·원로목사로 바꾸시면 교회 칸을 비워 두셔도 됩니다.';
             return;
           }
-          /* 무임이 되면 시찰 소속도 없어진다 */
-          if (NO_CHURCH[cat]) d.sichal = null;
-          msg.className = 'form-msg';
-          msg.textContent = '저장 중입니다...';
+          if (NO_CHURCH[cat]) d.sichal = null;   /* 무임이 되면 시찰 소속도 없어진다 */
+          msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
           SHSCloud.init().then(function (c) {
-            return c.from('roster').update(d).eq('id', b.dataset.rosave);
+            return c.from('roster').update(d).eq('id', m.id);
           }).then(function (res) {
             if (res.error) {
               msg.className = 'form-msg err';
@@ -1036,23 +1077,28 @@ document.addEventListener('DOMContentLoaded', function () {
             rosterFlash = e(d.name) + ' 님 정보를 저장했습니다. (' + e(d.church) +
               (d.category ? ' · ' + e(d.category) : '') + ' · ' +
               e(d.officer_title || ROSTER_ROLES[d.role] || d.role) + ') 조직 페이지에 반영되었습니다.';
-            msg.className = 'form-msg ok';
-            msg.innerHTML = rosterFlash;
+            ov.remove();
             renderRoster();
           });
         });
-      });
 
-      box.querySelectorAll('button[data-rodel]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (!confirm('"' + b.dataset.roname + '" 님을 명단에서 삭제하시겠습니까?')) return;
+        document.getElementById('rm-del').addEventListener('click', function () {
+          if (!confirm('"' + m.name + '" 님을 명단에서 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
           SHSCloud.init().then(function (c) {
-            return c.from('roster').delete().eq('id', b.dataset.rodel);
+            return c.from('roster').delete().eq('id', m.id);
           }).then(function (res) {
             if (res.error) { alert('삭제하지 못했습니다: ' + res.error.message); return; }
-            SHSCloud.log('delete', '명단 삭제', b.dataset.roname);
+            SHSCloud.log('delete', '명단 삭제', m.name);
+            ov.remove();
             renderRoster();
           });
+        });
+      }
+
+      box.querySelectorAll('button[data-roedit]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var m = rows.filter(function (x) { return String(x.id) === b.dataset.roedit; })[0];
+          if (m) openRosterEdit(m);
         });
       });
     });
