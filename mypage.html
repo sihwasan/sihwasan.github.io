@@ -24,6 +24,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20260830a"></script>
+<script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/date-pick.js"></script>
 <script>
@@ -133,6 +134,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<input type="text" id="q-post" value="' + e(p.postcode || '') + '" placeholder="00000" maxlength="7"></div>' +
       '<div class="field"><label>주소</label>' +
       '<input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
+      '<button class="btn ghost sm" data-addrsearch="q-addr,q-post" ' +
+      'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' +
       '</div>' +
       '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:-8px">주소는 한 칸입니다. 증명서·보고서 등 모든 문서에 이 주소가 쓰입니다.</p>' +
       '<p style="font-size:0.82rem;color:var(--gray-5)">여기 적으신 내용은 <strong>노회 명단</strong>에 그대로 저장되어, ' +

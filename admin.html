@@ -25,6 +25,7 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20260830a"></script>
 <script src="js/name-picker.js"></script>
+<script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -397,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('sichal_churches').select('*').order('sichal').order('sort').order('id'),
         c.from('church_staff').select('*').order('sort').order('id'),
-        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from')
+        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode')
       ]);
     }).then(function (rs) {
       if (rs[1].error) throw rs[1].error;
@@ -617,6 +618,9 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field" style="flex:0 0 120px"><label>우편번호</label>' +
       '<input type="text" id="chv-post" value="' + e((chPastorOf(chSel) || {}).postcode || '') + '"' +
       (chPastorOf(chSel) ? '' : ' disabled') + '></div>' +
+      (chPastorOf(chSel)
+        ? '<button class="btn ghost sm" data-addrsearch="chv-addr,chv-post" ' +
+          'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' : '') +
       '</div>' +
       '<div class="field"><label>비고</label><input type="text" id="chv-note" value="' + e(row.note || '') + '"></div>' +
       '<p style="font-size:0.8rem;color:var(--gray-5)">교회 이름을 바꾸면 교회 명부와 노회 명단의 소속 교회 이름도 함께 바뀝니다. ' +
@@ -1195,6 +1199,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field"><label>주소</label>' +
           '<input type="text" id="rm-addr" value="' + e(m.address || '') +
           '" placeholder="증명서 등 모든 문서에 이 주소가 쓰입니다"></div>' +
+          '<button class="btn ghost sm" data-addrsearch="rm-addr,rm-post" ' +
+          'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' +
           '</div>' +
           '<div style="margin-top:6px">' +
           '<button class="btn" id="rm-save">저장</button> ' +
