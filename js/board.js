@@ -33,6 +33,9 @@ var SHSBoard = (function () {
     if (!can(user)) { box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
     var full = !!(opts && opts.full);
+    /* 최고관리자(노회 사무실 계정)는 소속 교회·시찰·부서가 없으므로
+     * 개인 칸은 빼고 노회 전체 정보만 보여 준다. */
+    var isSuper = user.role === 'superadmin';
 
     box.innerHTML =
       '<div class="section-title"><h2>대시보드</h2>' +
@@ -45,20 +48,22 @@ var SHSBoard = (function () {
       '<section aria-label="노회 일정"><h3 class="dash-h">노회 일정</h3>' +
       '<div id="dash-sched"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>' +
+      (isSuper ? '' :
       '<div class="dash-cols">' +
       '<section aria-label="나의 교회"><h3 class="dash-h">나의 교회</h3>' +
       '<div id="dash-church"><p class="dash-none">불러오는 중...</p></div></section>' +
       '<section aria-label="나의 상회비"><h3 class="dash-h">나의 상회비</h3>' +
       '<div id="dash-mydues"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '</div>' +
+      '</div>') +
       '<div class="dash-cols">' +
+      (isSuper ? '' :
       '<section aria-label="나의 시찰" id="dash-sichal-sec"><h3 class="dash-h">나의 시찰</h3>' +
-      '<div id="dash-sichal"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '<section aria-label="상회비 전체" id="dash-dues-sec" class="hidden">' +
+      '<div id="dash-sichal"><p class="dash-none">불러오는 중...</p></div></section>') +
+      '<section aria-label="상회비 전체" id="dash-dues-sec" class="hidden' + (isSuper ? ' span2' : '') + '">' +
       '<h3 class="dash-h">상회비 전체 <a class="more" href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면</a></h3>' +
       '<div id="dash-dues-body"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>' +
-      '<div id="dash-com"></div>' +
+      (isSuper ? '' : '<div id="dash-com"></div>') +
       '<div class="dash-cols">' +
       '<section aria-label="신청서류 발급 현황"><h3 class="dash-h">신청서류 발급 현황</h3>' +
       '<div id="dash-doc"><p class="dash-none">불러오는 중...</p></div></section>' +
@@ -71,13 +76,13 @@ var SHSBoard = (function () {
      * 내 교회는 노회 명단(roster)에서 온다 — my_dues 가 계정→명단→교회로 잇는다. */
     (function () {
       if (!user.cloud) return;
-      var canDues = SHSAuth.canManageMembers(user) ||
-        (user.role === 'officer' && user.title && user.title.indexOf('회계') !== -1);
+      var canDues = SHSAuth.canManageMembers(user) || user.role === 'officer';
       var duesLink = 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC';
       /* 관리자·회계에게는 나의 시찰 옆에 전체 요약 칸을 연다.
        * 아닌 회원에게는 나의 시찰이 줄 전체를 쓴다. */
+      var sicSec = document.getElementById('dash-sichal-sec');
       if (canDues) document.getElementById('dash-dues-sec').classList.remove('hidden');
-      else document.getElementById('dash-sichal-sec').classList.add('span2');
+      else if (sicSec) sicSec.classList.add('span2');
       var yr = new Date().getFullYear();
       var mo = new Date().getMonth() + 1;
 
@@ -86,6 +91,7 @@ var SHSBoard = (function () {
         return c.rpc('my_dues', { p_year: yr });
       }).then(function (r) {
         var el = document.getElementById('dash-mydues');
+        if (!el) return;
         var rows = (r && r.data) || [];
         if (!rows.length) {
           el.innerHTML = '<p class="dash-none">우리 교회는 올해 상회비 설정에 없습니다. ' +
@@ -214,8 +220,9 @@ var SHSBoard = (function () {
       var sic = String(sicName || (row && row.sichal) || '');
       var link = 'sichal.html?s=' + encodeURIComponent(sic);
 
-      /* 나의 교회 */
+      /* 나의 교회 (최고관리자 화면에는 이 칸이 없다) */
       var el = document.getElementById('dash-church');
+      if (!el) return;
       var h = '';
       if (!myChurch) {
         h = '<p class="dash-none">가입 정보에 소속 교회가 없습니다. ' +
@@ -364,7 +371,9 @@ var SHSBoard = (function () {
       var mine = rows.filter(function (r) { return r.church === myChurch; })[0];
 
       var h = '';
-      if (myChurch) {
+      if (user.role === 'superadmin') {
+        h += '';   /* 노회 사무실 계정은 낼 보고서가 없다 — 아래 전체 현황만 */
+      } else if (myChurch) {
         h += mine
           ? '<div class="dash-ok"><strong>' + esc(myChurch) + '</strong>의 ' + year + '년 보고서를 ' +
             '제출하셨습니다. <span class="dash-dim">(' +
