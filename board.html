@@ -10,7 +10,7 @@
 <meta property="og:title" content="게시판 - 시화산노회">
 <meta property="og:description" content="시화산노회 게시판 — 공지사항과 자유게시판입니다.">
 <meta property="og:url" content="https://sihwasan.org/board.html">
-<link rel="stylesheet" href="css/style.css?v=20260829">
+<link rel="stylesheet" href="css/style.css?v=20260829f">
 </head>
 <body>
 
@@ -140,7 +140,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829d"></script>
+<script src="js/main.js?v=20260829f"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -317,7 +317,9 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td>' + e(q.author) + '</td>' +
           '<td>' + e(String(q.created_at).slice(0, 10)) + '</td>' +
           '<td>' + (q.answer ? '<span class="role-badge">답변 완료</span>' : '<span style="color:var(--gray-5)">대기</span>') + '</td>' +
-          '<td>' + (mine || canMng
+          '<td>' + (canMng
+            ? '<button class="btn sm" data-iqreply="' + q.id + '">답장</button> ' : '') +
+          (mine || canMng
             ? '<button class="btn ghost sm" data-iqedit="' + q.id + '">수정</button> ' +
               '<button class="btn danger sm" data-iqdel="' + q.id + '">삭제</button>'
             : '') + '</td></tr>';
@@ -325,6 +327,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
       tb.querySelectorAll('a[data-iq]').forEach(function (a) {
         a.addEventListener('click', function (ev) { ev.preventDefault(); openInquiry(+a.dataset.iq); });
+      });
+      tb.querySelectorAll('button[data-iqreply]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          openInquiry(+b.dataset.iqreply);
+          var t = document.getElementById('iqv-atext');
+          if (t) t.focus();
+        });
       });
       tb.querySelectorAll('button[data-iqedit]').forEach(function (b) {
         b.addEventListener('click', function () { editInquiry(+b.dataset.iqedit); });

@@ -411,6 +411,8 @@
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
           loadUnread();
+          /* 1분마다 새 알림을 확인해 팝업으로 띄운다 */
+          setInterval(loadUnread, 60000);
         }
 
         /* 정기노회가 다가오면 알림을 내보낸다.
@@ -487,6 +489,53 @@
     });
   });
 
+  /* ---------- 알림 팝업 (토스트) ----------
+   * 새 알림은 화면 오른쪽 위에 팝업 카드로 한 번 띄운다.
+   * 한 번 띄운 알림은 이 기기에서 다시 띄우지 않는다 (알림함에는 그대로 남는다). */
+  var TOAST_SEEN_KEY = 'shs_toast_seen_v1';
+  function toastLink(n) {
+    if (n.kind === '문의') return 'board.html#inquiry';
+    if (n.kind === '서류') return 'notifications.html';
+    return 'notifications.html';
+  }
+  function showToasts(rows) {
+    var seen;
+    try { seen = JSON.parse(localStorage.getItem(TOAST_SEEN_KEY) || '[]'); } catch (x) { seen = []; }
+    var fresh = rows.filter(function (n) { return seen.indexOf(n.id) === -1; }).slice(0, 4);
+    if (!fresh.length) return;
+    rows.forEach(function (n) { if (seen.indexOf(n.id) === -1) seen.push(n.id); });
+    if (seen.length > 300) seen = seen.slice(-300);
+    localStorage.setItem(TOAST_SEEN_KEY, JSON.stringify(seen));
+
+    var wrap = document.getElementById('noti-toasts');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'noti-toasts';
+      document.body.appendChild(wrap);
+    }
+    fresh.forEach(function (n, i) {
+      var card = document.createElement('div');
+      card.className = 'noti-toast';
+      card.innerHTML =
+        '<button class="nt-x" aria-label="닫기">&times;</button>' +
+        '<a href="' + toastLink(n) + '">' +
+        '<span class="nt-kind">' + SHS.esc(n.kind || '알림') + '</span>' +
+        '<strong class="nt-title">' + SHS.esc(n.title || '') + '</strong>' +
+        '<span class="nt-body">' + SHS.esc(String(n.body || '').slice(0, 90)) + '</span>' +
+        '<span class="nt-go">' + (n.kind === '문의' ? '문의 확인·답장하기' : '알림함에서 보기') + '</span>' +
+        '</a>';
+      setTimeout(function () { wrap.appendChild(card); }, i * 250);
+      card.querySelector('.nt-x').addEventListener('click', function (ev) {
+        ev.preventDefault();
+        card.remove();
+      });
+      setTimeout(function () {
+        card.classList.add('out');
+        setTimeout(function () { card.remove(); }, 500);
+      }, 12000 + i * 250);
+    });
+  }
+
   /* ---------- 알림 표시 ----------
    * 읽지 않은 알림이 있으면 상단에 개수를 표시하고,
    * 임명·취임 같은 중요한 알림은 화면 위에 배너로 한 번 더 알린다. */
@@ -512,6 +561,7 @@
         }
       }
       if (!rows.length) return;
+      showToasts(rows);
 
       /* 임명·취임 알림은 놓치지 않도록 배너로도 안내한다 */
       var big = rows.filter(function (n) { return n.kind === '임명'; })[0];
@@ -525,6 +575,7 @@
         '<strong>[' + SHS.esc(big.title) + ']</strong> 새로운 알림이 도착했습니다. ' +
         '<a class="btn sm" style="margin-left:8px" href="notifications.html">알림 확인</a> ' +
         '<button class="btn ghost sm" id="noti-hide">나중에 보기</button></div>';
+      if (document.getElementById('noti-hide')) return;   /* 배너는 하나만 */
       var gnb = document.querySelector('.gnb');
       if (gnb) gnb.insertAdjacentElement('afterend', bar);
       var hb = document.getElementById('noti-hide');
