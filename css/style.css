@@ -1684,3 +1684,47 @@ input.dp-bad { border-color: var(--red); }
 .v-void .v-badge { background: #c07f1e; }
 .v-no   { border-left-color: var(--red); }
 .v-no .v-badge { background: var(--red); }
+
+/* ---------- 상회비 관리 ---------- */
+.dues-head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; }
+.dues-yr { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; }
+.dues-tabs { margin-bottom: 0; flex: 1; }
+.dues-stats { display: flex; gap: 12px; flex-wrap: wrap; margin: 14px 0 20px; }
+.dues-stats .ds {
+  flex: 1 1 130px; border: 1px solid var(--gray-2); border-radius: 10px;
+  padding: 14px 16px; background: var(--white);
+}
+.dues-stats .ds .n { font-size: 1.25rem; font-weight: 700; color: var(--navy); }
+.dues-stats .ds .l { font-size: 0.78rem; color: var(--gray-5); margin-top: 3px; }
+
+/* 달마다 납부 교회 수 막대그래프 */
+.dues-chart {
+  display: flex; gap: 6px; align-items: flex-end; margin: 6px 0 8px;
+  padding: 14px 12px 8px; border: 1px solid var(--gray-2); border-radius: 10px;
+}
+.dues-chart .dc-col { flex: 1; text-align: center; min-width: 0; }
+.dues-chart .dc-v { font-size: 0.72rem; color: var(--gray-5); height: 16px; }
+.dues-chart .dc-track {
+  height: 110px; background: var(--gray-1); border-radius: 5px;
+  display: flex; align-items: flex-end; overflow: hidden;
+}
+.dues-chart .dc-bar { width: 100%; background: var(--navy-light); border-radius: 5px 5px 0 0; min-height: 0; }
+.dues-chart .cur .dc-bar { background: var(--accent); }
+.dues-chart .dc-l { font-size: 0.74rem; color: var(--gray-7); margin-top: 5px; }
+.dues-chart .cur .dc-l { font-weight: 700; color: var(--navy); }
+
+/* 교회 × 월 납부표 */
+.dues-tbl { font-size: 0.85rem; }
+.dues-tbl th.cur, .dues-tbl td.cur { background: rgba(176, 141, 62, 0.08); }
+.dues-tbl .dues-sc td {
+  background: var(--gray-1); color: var(--navy); font-weight: 700;
+  text-align: left; padding-left: 12px;
+}
+.dues-cell { color: var(--gray-3); }
+.dues-cell.paid { color: var(--navy); font-weight: 700; }
+td[data-duch] { cursor: pointer; }
+td[data-duch]:hover { background: #eef2f8; }
+.dues-closed-chip {
+  background: var(--red); color: #fff; border-radius: 999px;
+  padding: 4px 14px; font-size: 0.8rem; font-weight: 700;
+}

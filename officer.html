@@ -85,6 +85,10 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '</tbody></table>';
   }
 
+  /* 상회비 관리 */
+  html += '<h2>상회비 관리</h2>';
+  html += '<div id="dues-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+
   /* 교회상황 보고서 (연도별) — 각 교회가 시찰 화면에서 올린 것을 임원이 모아 본다 */
   html += '<h2>교회상황 보고서</h2>';
   html += '<p>각 교회가 시찰회 화면에서 올린 해마다의 교회상황 보고서입니다. ' +
@@ -603,6 +607,469 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   renderArchiveShell();
+
+  /* ================= 상회비 관리 =================
+   * 설정(dues_rates): 교회마다 월 상회비를 정해 둔다 (만원 단위)
+   * 납부(dues_payments): 달마다 납부를 표시한다
+   * 보기는 임원 누구나, 고치기는 관리자와 회계·부회계만 한다. */
+  var DUES_SICHALS = ['북부시찰', '상록시찰', '남부시찰', '기타'];
+  var duesYear = new Date().getFullYear();
+  var duesRates = [], duesPays = [];
+  var duesView = 'status';
+  var duesClosed = null;      /* 마감 기록. 있으면 그 해는 잠겨 있다 */
+  var canDues = SHSAuth.canManageMembers(user) ||
+    (user.role === 'officer' && user.title && user.title.indexOf('회계') !== -1);
+
+  function duesBox() { return document.getElementById('dues-area'); }
+  function manwon(n) { return Number(n || 0).toLocaleString('ko-KR') + '만'; }
+
+  function loadDues() {
+    var box = duesBox();
+    if (!box) return;
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      box.innerHTML = '<div class="notice-banner">상회비 관리는 서버 계정(구글 또는 이메일)으로 ' +
+        '로그인하신 뒤에 보실 수 있습니다.</div>';
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return Promise.all([
+        c.from('dues_rates').select('*').eq('year', duesYear).order('sort'),
+        c.from('dues_payments').select('*').eq('year', duesYear),
+        c.from('dues_closings').select('*').eq('year', duesYear)
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) throw rs[0].error;
+      duesRates = rs[0].data || [];
+      duesPays = (rs[1].data) || [];
+      duesClosed = ((rs[2] || {}).data || [])[0] || null;
+      renderDues();
+    }).catch(function (err) {
+      box.innerHTML = '<div class="notice-banner">불러오지 못했습니다: ' + e(err.message || err) + '</div>';
+    });
+  }
+
+  function payOf(church, month) {
+    return duesPays.filter(function (p2) {
+      return p2.church === church && p2.month === month;
+    })[0] || null;
+  }
+  function paidAmount(rate, pay) {
+    if (!pay) return 0;
+    return pay.amount != null ? Number(pay.amount) : Number(rate.monthly_amount || 0);
+  }
+
+  function renderDues() {
+    var box = duesBox();
+    var now = new Date();
+    var curMonth = duesYear === now.getFullYear() ? now.getMonth() + 1 : 0;
+
+    /* ----- 머리: 연도 고르기와 보기 전환 ----- */
+    var h = '<div class="dues-head">' +
+      '<div class="dues-yr">' +
+      '<button class="btn ghost sm" id="du-prev">&#8249;</button>' +
+      '<strong>' + duesYear + '년</strong>' +
+      '<button class="btn ghost sm" id="du-next">&#8250;</button>' +
+      '</div>' +
+      '<div class="tabs dues-tabs">' +
+      '<button' + (duesView === 'status' ? ' class="active"' : '') + ' data-duv="status">납부 현황</button>' +
+      '<button' + (duesView === 'rates' ? ' class="active"' : '') + ' data-duv="rates">상회비 설정</button>' +
+      '</div>' +
+      (duesClosed
+        ? '<span class="dues-closed-chip">마감됨</span>'
+        : (canDues && duesRates.length
+            ? '<button class="btn ghost sm" id="du-close">회계연도 마감</button>' : '')) +
+      '</div>';
+    if (duesClosed) {
+      h += '<div class="notice-banner">' + duesYear + '년 상회비는 <strong>' +
+        e(String(duesClosed.closed_on || '')) + '</strong>에 <strong>' +
+        e(duesClosed.closed_by || '') + '</strong> 님이 마감했습니다. ' +
+        '더는 고칠 수 없으며, 납입현황 PDF는 임원 자료실 <strong>회계</strong> 분류에 있습니다.' +
+        (SHSAuth.canManageMembers(user)
+          ? ' <button class="btn danger sm" id="du-reopen" style="margin-left:10px">마감 해제</button>' : '') +
+        '</div>';
+    }
+
+    if (!duesRates.length) {
+      h += '<div class="notice-banner">' + duesYear + '년 상회비 설정이 아직 없습니다.' +
+        (canDues ? ' <button class="btn sm" id="du-copy" style="margin-left:10px">지난해 설정 불러오기</button>' : '') +
+        '</div>';
+      if (canDues && duesView === 'rates') h += ratesHtml();
+      box.innerHTML = h;
+      bindDuesHead();
+      if (duesView === 'rates') bindRates();
+      return;
+    }
+
+    if (duesView === 'rates') {
+      h += ratesHtml();
+      box.innerHTML = h;
+      bindDuesHead(); bindRates();
+      return;
+    }
+
+    /* ----- 대시보드 ----- */
+    var totalMonthly = 0;
+    duesRates.forEach(function (r) { totalMonthly += Number(r.monthly_amount || 0); });
+    var paidSum = 0;
+    duesPays.forEach(function (p2) {
+      var r = duesRates.filter(function (x) { return x.church === p2.church; })[0];
+      paidSum += p2.amount != null ? Number(p2.amount) : Number((r && r.monthly_amount) || 0);
+    });
+    var yearPlan = totalMonthly * 12;
+    var rate = yearPlan ? Math.round(paidSum / yearPlan * 100) : 0;
+    var curPaid = curMonth ? duesRates.filter(function (r) { return payOf(r.church, curMonth); }).length : 0;
+
+    h += '<div class="dues-stats">' +
+      '<div class="ds"><div class="n">' + duesRates.length + '곳</div><div class="l">교회 수</div></div>' +
+      '<div class="ds"><div class="n">' + manwon(totalMonthly) + '</div><div class="l">월 부과액</div></div>' +
+      '<div class="ds"><div class="n">' + manwon(paidSum) + '</div><div class="l">올해 납부액</div></div>' +
+      '<div class="ds"><div class="n">' + rate + '%</div><div class="l">연간 납부율 (예정 ' + manwon(yearPlan) + ')</div></div>' +
+      (curMonth ? '<div class="ds"><div class="n">' + curPaid + '/' + duesRates.length + '</div><div class="l">' + curMonth + '월 납부 교회</div></div>' : '') +
+      '</div>';
+
+    /* ----- 그래프: 달마다 납부한 교회 수 ----- */
+    h += '<div class="dues-chart">';
+    for (var m = 1; m <= 12; m++) {
+      var cnt = 0, amt = 0;
+      duesRates.forEach(function (r) {
+        var p2 = payOf(r.church, m);
+        if (p2) { cnt++; amt += paidAmount(r, p2); }
+      });
+      var pct = duesRates.length ? Math.round(cnt / duesRates.length * 100) : 0;
+      h += '<div class="dc-col' + (m === curMonth ? ' cur' : '') + '" ' +
+        'title="' + m + '월: ' + cnt + '/' + duesRates.length + '교회, ' + manwon(amt) + '원">' +
+        '<div class="dc-v">' + (cnt || '') + '</div>' +
+        '<div class="dc-track"><div class="dc-bar" style="height:' + pct + '%"></div></div>' +
+        '<div class="dc-l">' + m + '월</div></div>';
+    }
+    h += '</div>';
+    h += '<p style="font-size:0.82rem;color:var(--gray-5)">막대는 그 달에 상회비를 낸 교회 수입니다. ' +
+      '막대에 마우스를 올리면 납부 교회 수와 금액이 보입니다.</p>';
+
+    /* ----- 교회별 × 월별 납부표 ----- */
+    h += '<div style="overflow-x:auto"><table class="tbl dues-tbl"><thead><tr>' +
+      '<th style="min-width:110px">교회</th><th style="width:64px">월액</th>';
+    for (m = 1; m <= 12; m++) h += '<th class="' + (m === curMonth ? 'cur' : '') + '">' + m + '</th>';
+    h += '<th style="width:90px">납부 합계</th></tr></thead><tbody>';
+
+    DUES_SICHALS.forEach(function (sc) {
+      var rows = duesRates.filter(function (r) { return (r.sichal || '기타') === sc; });
+      if (!rows.length) return;
+      h += '<tr class="dues-sc"><td colspan="15">' + e(sc) + '</td></tr>';
+      rows.forEach(function (r) {
+        var sum = 0, months = 0;
+        h += '<tr><td class="left">' + e(r.church) + '</td>' +
+          '<td>' + manwon(r.monthly_amount) + '</td>';
+        for (m = 1; m <= 12; m++) {
+          var p2 = payOf(r.church, m);
+          if (p2) { sum += paidAmount(r, p2); months++; }
+          h += '<td class="dues-cell' + (p2 ? ' paid' : '') + (m === curMonth ? ' cur' : '') + '"' +
+            (canDues && !duesClosed ? ' data-duch="' + e(r.church) + '" data-dum="' + m + '"' : '') +
+            (p2 ? ' title="' + e(String(p2.paid_on || '')) + ' 납부 ' + manwon(paidAmount(r, p2)) + '원"' : '') +
+            '>' + (p2 ? '●' : '·') + '</td>';
+        }
+        h += '<td>' + months + '개월 · ' + manwon(sum) + '</td></tr>';
+      });
+    });
+    h += '</tbody></table></div>';
+    h += duesClosed
+      ? ''
+      : (canDues
+        ? '<p style="font-size:0.82rem;color:var(--gray-5)">칸을 누르면 그 달을 납부로 표시하고, 다시 누르면 되돌립니다. ' +
+          '금액은 설정된 월액으로 적히며, 월액이 0원인 교회는 누를 때 금액을 물어봅니다.</p>'
+        : '<p style="font-size:0.82rem;color:var(--gray-5)">납부 입력은 회계·부회계와 관리자가 할 수 있습니다.</p>');
+
+    box.innerHTML = h;
+    bindDuesHead();
+    bindDuesCells();
+  }
+
+  function bindDuesHead() {
+    var box = duesBox();
+    box.querySelector('#du-prev').addEventListener('click', function () { duesYear--; loadDues(); });
+    box.querySelector('#du-next').addEventListener('click', function () { duesYear++; loadDues(); });
+    box.querySelectorAll('.dues-tabs button').forEach(function (b) {
+      b.addEventListener('click', function () { duesView = b.dataset.duv; renderDues(); });
+    });
+    var cl = box.querySelector('#du-close');
+    if (cl) cl.addEventListener('click', closeDuesYear);
+    var ro = box.querySelector('#du-reopen');
+    if (ro) ro.addEventListener('click', function () {
+      if (!confirm(duesYear + '년 상회비 마감을 해제할까요?\n' +
+        '임원 자료실 회계 분류의 마감 PDF는 그대로 남습니다.')) return;
+      SHSCloud.init().then(function (c) {
+        return c.from('dues_closings').delete().eq('year', duesYear);
+      }).then(function (res) {
+        if (res.error) { alert(res.error.message); return; }
+        SHSCloud.log('update', '상회비 마감 해제', duesYear + '년');
+        loadDues();
+      });
+    });
+
+    var cp = box.querySelector('#du-copy');
+    if (cp) cp.addEventListener('click', function () {
+      SHSCloud.init().then(function (c) {
+        return c.from('dues_rates').select('*').eq('year', duesYear - 1).order('sort');
+      }).then(function (r) {
+        var rows = r.data || [];
+        if (!rows.length) { alert((duesYear - 1) + '년 설정이 없습니다.'); return; }
+        if (!confirm((duesYear - 1) + '년 교회 ' + rows.length + '곳의 설정을 ' + duesYear + '년으로 불러올까요?')) return;
+        return SHSCloud.init().then(function (c) {
+          return c.from('dues_rates').insert(rows.map(function (x) {
+            return { year: duesYear, sichal: x.sichal, church: x.church,
+                     monthly_amount: x.monthly_amount, sort: x.sort };
+          }));
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('create', '상회비 설정 복사', (duesYear - 1) + '년 → ' + duesYear + '년 ' + rows.length + '곳');
+          loadDues();
+        });
+      });
+    });
+  }
+
+  function bindDuesCells() {
+    if (!canDues) return;
+    duesBox().querySelectorAll('td[data-duch]').forEach(function (td) {
+      td.addEventListener('click', function () {
+        var church = td.dataset.duch, m = +td.dataset.dum;
+        var r = duesRates.filter(function (x) { return x.church === church; })[0];
+        var p2 = payOf(church, m);
+        SHSCloud.init().then(function (c) {
+          if (p2) {
+            if (!confirm(church + ' ' + m + '월 납부 표시를 지울까요?')) return null;
+            return c.from('dues_payments').delete().eq('id', p2.id).then(function (res) {
+              if (res.error) throw res.error;
+              SHSCloud.log('delete', '상회비 납부 취소', duesYear + '년 ' + m + '월 ' + church);
+            });
+          }
+          var amt = Number(r.monthly_amount || 0);
+          if (!amt) {
+            var v = prompt(church + ' ' + m + '월 납부액(만원)을 적어 주세요.', '0');
+            if (v === null) return null;
+            amt = Math.max(0, Math.round(Number(v) || 0));
+          }
+          return c.from('dues_payments').insert({
+            year: duesYear, church: church, month: m,
+            amount: amt === Number(r.monthly_amount || 0) ? null : amt,
+            entered_by: user.name
+          }).then(function (res) {
+            if (res.error) throw res.error;
+            SHSCloud.log('create', '상회비 납부 입력', duesYear + '년 ' + m + '월 ' + church + ' ' + amt + '만원');
+          });
+        }).then(function (done) {
+          if (done !== null) loadDues();
+        }).catch(function (err) { alert(err.message || err); });
+      });
+    });
+  }
+
+  /* ----- 회계연도 마감 -----
+   * 납입현황을 PDF 한 장으로 떠서 임원 자료실 회계 분류에 넣고, 그 해를 잠근다. */
+  var duesPdfLoading = null;
+  function loadPdfTool() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (duesPdfLoading) return duesPdfLoading;
+    duesPdfLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+      sc.onload = function () { resolve(window.html2pdf); };
+      sc.onerror = function () { duesPdfLoading = null; reject(new Error('PDF 도구를 불러오지 못했습니다.')); };
+      document.head.appendChild(sc);
+    });
+    return duesPdfLoading;
+  }
+
+  /* 마감 보고서 한 장 (A4 가로) */
+  function duesReportHtml() {
+    var totalMonthly = 0;
+    duesRates.forEach(function (r) { totalMonthly += Number(r.monthly_amount || 0); });
+    var paidSum = 0;
+    duesPays.forEach(function (p2) {
+      var r = duesRates.filter(function (x) { return x.church === p2.church; })[0];
+      paidSum += p2.amount != null ? Number(p2.amount) : Number((r && r.monthly_amount) || 0);
+    });
+    var h = '<div style="font-family:\'Noto Sans KR\',sans-serif;color:#222;padding:24px 28px;background:#fff">' +
+      '<h1 style="font-size:20px;text-align:center;margin:0 0 4px">' + duesYear +
+      '년 시화산노회 상회비 납입현황</h1>' +
+      '<p style="text-align:center;font-size:11px;color:#666;margin:0 0 14px">' +
+      '교회 ' + duesRates.length + '곳 · 월 부과액 ' + manwon(totalMonthly) + '원 · ' +
+      '연간 납부액 ' + manwon(paidSum) + '원 · 마감일 ' + new Date().toISOString().slice(0, 10) + '</p>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:10.5px">' +
+      '<thead><tr style="background:#eef1f6">' +
+      '<th style="border:1px solid #999;padding:4px">시찰</th>' +
+      '<th style="border:1px solid #999;padding:4px">교회</th>' +
+      '<th style="border:1px solid #999;padding:4px">월액</th>';
+    for (var m = 1; m <= 12; m++) h += '<th style="border:1px solid #999;padding:4px;width:30px">' + m + '월</th>';
+    h += '<th style="border:1px solid #999;padding:4px">납부 합계</th></tr></thead><tbody>';
+    DUES_SICHALS.forEach(function (sc) {
+      var rows = duesRates.filter(function (r) { return (r.sichal || '기타') === sc; });
+      rows.forEach(function (r, i) {
+        var sum = 0;
+        h += '<tr>' + (i === 0
+          ? '<td style="border:1px solid #999;padding:4px;text-align:center" rowspan="' + rows.length + '">' + e(sc) + '</td>'
+          : '') +
+          '<td style="border:1px solid #999;padding:4px">' + e(r.church) + '</td>' +
+          '<td style="border:1px solid #999;padding:4px;text-align:right">' + Number(r.monthly_amount || 0) + '</td>';
+        for (var m2 = 1; m2 <= 12; m2++) {
+          var p2 = payOf(r.church, m2);
+          if (p2) sum += paidAmount(r, p2);
+          h += '<td style="border:1px solid #999;padding:4px;text-align:center">' + (p2 ? '●' : '') + '</td>';
+        }
+        h += '<td style="border:1px solid #999;padding:4px;text-align:right">' + sum + '</td></tr>';
+      });
+    });
+    h += '</tbody></table>' +
+      '<p style="font-size:10px;color:#666;margin-top:10px">단위: 만원 · ● = 납부 · 시화산노회 홈페이지 상회비 관리에서 마감 시 자동 생성</p></div>';
+    return h;
+  }
+
+  function closeDuesYear() {
+    if (!confirm(duesYear + '년 상회비를 마감할까요?\n\n' +
+      '· 마감하면 설정과 납부 기록을 더 고칠 수 없습니다.\n' +
+      '· 납입현황이 PDF로 만들어져 임원 자료실 회계 분류에 저장됩니다.\n' +
+      '· 마감 해제는 관리자(노회장·서기·간사)만 할 수 있습니다.')) return;
+
+    var stage = document.createElement('div');
+    stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:1100px;background:#fff';
+    stage.innerHTML = duesReportHtml();
+    document.body.appendChild(stage);
+
+    loadPdfTool().then(function (html2pdf) {
+      return html2pdf().set({
+        margin: 6,
+        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      }).from(stage.firstChild).outputPdf('blob');
+    }).then(function (blob) {
+      stage.remove();
+      var file = new File([blob], duesYear + '년 상회비 납입현황(마감).pdf', { type: 'application/pdf' });
+      /* 자료 보관소의 회계 칸에 올린다 */
+      return odPut(file, 'officer', '회계').then(function (url) {
+        return SHSCloud.init().then(function (c) {
+          return c.from('archive_items').insert({
+            section: '회계', access: 'officer',
+            title: duesYear + '년 상회비 납입현황 (마감)',
+            description: '상회비 관리에서 회계연도를 마감하며 자동 저장된 납입현황입니다.',
+            doc_date: new Date().toISOString().slice(0, 10),
+            sort: duesYear * 100 + 99,
+            file_path: url, file_name: file.name,
+            updated_by: user.name
+          }).select('id').single().then(function (res) {
+            if (res.error) throw res.error;
+            return c.from('dues_closings').insert({
+              year: duesYear, closed_by: user.name, archive_id: res.data.id
+            });
+          });
+        });
+      });
+    }).then(function (res) {
+      if (res && res.error) throw res.error;
+      SHSCloud.log('update', '상회비 회계연도 마감',
+        duesYear + '년 마감, 납입현황 PDF를 회계 분류에 저장');
+      alert(duesYear + '년 상회비를 마감했습니다.\n납입현황 PDF가 임원 자료실 회계 분류에 저장되었습니다.');
+      loadDues();
+      loadOfficerDocs(true);
+    }).catch(function (err) {
+      stage.remove();
+      alert('마감하지 못했습니다: ' + (err.message || err));
+    });
+  }
+
+  /* ----- 상회비 설정 ----- */
+  function ratesHtml() {
+    var canEditRates = canDues && !duesClosed;
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">교회마다 매달 내는 상회비입니다. 단위는 만원입니다.' +
+      (duesClosed ? ' 이 해는 마감되어 고칠 수 없습니다.'
+        : (canDues ? ' 고치고 저장을 누르면 바로 반영됩니다.' : ' 설정 변경은 회계·부회계와 관리자가 합니다.')) + '</p>';
+    h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:640px"><thead><tr>' +
+      '<th style="width:120px">시찰</th><th>교회</th><th style="width:110px">월액(만원)</th>' +
+      (canEditRates ? '<th style="width:130px">관리</th>' : '') + '</tr></thead><tbody>';
+    duesRates.forEach(function (r) {
+      h += '<tr data-durate="' + r.id + '">' +
+        (canEditRates
+          ? '<td><select data-df="sichal">' + DUES_SICHALS.map(function (x) {
+              return '<option' + ((r.sichal || '기타') === x ? ' selected' : '') + '>' + x + '</option>';
+            }).join('') + '</select></td>' +
+            '<td><input type="text" data-df="church" value="' + e(r.church) + '"></td>' +
+            '<td><input type="number" data-df="amount" min="0" value="' + Number(r.monthly_amount || 0) + '"></td>' +
+            '<td><button class="btn sm" data-dusave="' + r.id + '">저장</button> ' +
+            '<button class="btn danger sm" data-dudel="' + r.id + '" data-dun="' + e(r.church) + '">삭제</button></td>'
+          : '<td>' + e(r.sichal || '기타') + '</td><td class="left">' + e(r.church) + '</td>' +
+            '<td>' + manwon(r.monthly_amount) + '</td>') +
+        '</tr>';
+    });
+    h += '</tbody></table></div>';
+    if (canEditRates) {
+      h += '<div class="admin-card" style="max-width:640px;margin-top:14px"><h4 style="margin:0 0 10px">교회 추가</h4>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 140px"><label>시찰</label><select id="du-nsc">' +
+        DUES_SICHALS.map(function (x) { return '<option>' + x + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label>교회</label><input type="text" id="du-nch" placeholder="예: 반월"></div>' +
+        '<div class="field" style="flex:0 0 120px"><label>월액(만원)</label><input type="number" id="du-namt" min="0" value="0"></div>' +
+        '<button class="btn" id="du-nadd">추가</button></div>' +
+        '<div class="form-msg" id="du-nmsg"></div></div>';
+    }
+    return h;
+  }
+
+  function bindRates() {
+    if (!canDues || duesClosed) return;
+    var box = duesBox();
+    box.querySelectorAll('button[data-dusave]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var tr = b.closest('tr');
+        function v(f) { return tr.querySelector('[data-df="' + f + '"]').value.trim(); }
+        var d = { sichal: v('sichal'), church: v('church'),
+                  monthly_amount: Math.max(0, Math.round(Number(v('amount')) || 0)) };
+        if (!d.church) { alert('교회 이름은 비울 수 없습니다.'); return; }
+        SHSCloud.init().then(function (c) {
+          return c.from('dues_rates').update(d).eq('id', b.dataset.dusave);
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('update', '상회비 설정 수정', duesYear + '년 ' + d.church + ' ' + d.monthly_amount + '만원');
+          loadDues();
+        });
+      });
+    });
+    box.querySelectorAll('button[data-dudel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('"' + b.dataset.dun + '" 설정을 지울까요? (이미 입력한 납부 기록은 남습니다)')) return;
+        SHSCloud.init().then(function (c) {
+          return c.from('dues_rates').delete().eq('id', b.dataset.dudel);
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('delete', '상회비 설정 삭제', duesYear + '년 ' + b.dataset.dun);
+          loadDues();
+        });
+      });
+    });
+    var add = box.querySelector('#du-nadd');
+    if (add) add.addEventListener('click', function () {
+      var msg = box.querySelector('#du-nmsg');
+      var d = {
+        year: duesYear,
+        sichal: box.querySelector('#du-nsc').value,
+        church: box.querySelector('#du-nch').value.trim(),
+        monthly_amount: Math.max(0, Math.round(Number(box.querySelector('#du-namt').value) || 0)),
+        sort: (duesRates.length ? Math.max.apply(null, duesRates.map(function (x) { return Number(x.sort || 0); })) : 0) + 1
+      };
+      if (!d.church) { msg.className = 'form-msg err'; msg.textContent = '교회 이름을 적어 주세요.'; return; }
+      SHSCloud.init().then(function (c) {
+        return c.from('dues_rates').insert(d);
+      }).then(function (res) {
+        if (res.error) {
+          msg.className = 'form-msg err';
+          msg.textContent = res.error.code === '23505' ? '같은 교회가 이미 있습니다.' : res.error.message;
+          return;
+        }
+        SHSCloud.log('create', '상회비 설정 추가', duesYear + '년 ' + d.church + ' ' + d.monthly_amount + '만원');
+        loadDues();
+      });
+    });
+  }
+
+  loadDues();
  });
 });
 </script>
