@@ -72,6 +72,14 @@
       권한이 있는 분은 로그인 후 <a href="admin.html"><strong>회원 관리</strong></a> 페이지를 이용해 주시기 바랍니다.
     </div>
 
+    <div id="mem-vet-wrap" class="hidden">
+      <h3>증경노회장단</h3>
+      <table class="tbl" style="max-width:640px">
+        <thead><tr><th>번호</th><th>구분</th><th>성명</th><th>직분</th><th>시무교회</th></tr></thead>
+        <tbody id="mem-vet-body"></tbody>
+      </table>
+    </div>
+
     <h3>원로목사</h3>
     <table class="tbl" style="max-width:640px">
       <thead><tr><th>번호</th><th>성명</th><th>교회</th><th>은퇴일</th></tr></thead>
@@ -194,16 +202,31 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function renderVeterans(list) {
+    if (!list.length) return;
     var wrap = document.getElementById('veterans-wrap');
     var tb = document.getElementById('veterans-body');
-    if (!wrap || !tb || !list.length) return;
-    wrap.style.display = '';
-    tb.innerHTML = list.map(function (o) {
-      return '<tr><td><span class="role-badge">' + e(o.role || '') + '</span></td>' +
-        '<td>' + e(o.name || '') + '</td><td>' + e(o.position || '-') + '</td>' +
-        '<td>' + e(o.church || '-') + '</td>' +
-        '<td>' + (o.session_no ? '제' + e(o.session_no) + '회기' : '-') + '</td></tr>';
-    }).join('');
+    if (wrap && tb) {
+      wrap.style.display = '';
+      tb.innerHTML = list.map(function (o) {
+        return '<tr><td><span class="role-badge">' + e(o.role || '') + '</span></td>' +
+          '<td>' + e(o.name || '') + '</td><td>' + e(o.position || '-') + '</td>' +
+          '<td>' + e(o.church || '-') + '</td>' +
+          '<td>' + (o.session_no ? '제' + e(o.session_no) + '회기' : '-') + '</td></tr>';
+      }).join('');
+    }
+    /* 회원명단 탭에도 같은 명단을 보여 준다 */
+    var mw = document.getElementById('mem-vet-wrap');
+    var mb = document.getElementById('mem-vet-body');
+    if (mw && mb) {
+      mw.classList.remove('hidden');
+      mb.innerHTML = list.map(function (o, i) {
+        return '<tr><td>' + (i + 1) + '</td>' +
+          '<td>' + e(o.role || '') + '</td>' +
+          '<td>' + mlink(o.name || '', o.church || '') + '</td>' +
+          '<td>' + e(o.position || '-') + '</td>' +
+          '<td>' + e(o.church || '-') + '</td></tr>';
+      }).join('');
+    }
   }
 
   var ob = document.getElementById('officers-body');
