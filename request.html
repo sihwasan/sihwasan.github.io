@@ -277,6 +277,13 @@ document.addEventListener('DOMContentLoaded', function () {
         msg.textContent = '성명과 소속 교회를 입력해 주세요.';
         return;
       }
+      /* 신청 내용을 한 번 더 확인한다. 확인한 뒤에 입금 계좌를 알려 준다. */
+      var NL = String.fromCharCode(10);
+      if (!confirm(
+        d.doc_type + ' ' + d.copies + '부 · ' + d.purpose + NL +
+        d.name + ' (' + d.church + ')' + NL +
+        '수수료 ' + won(d.amount) + NL + NL +
+        '이대로 신청하시겠습니까?')) return;
       msg.className = 'form-msg';
       msg.textContent = '신청 중입니다...';
       SHSCloud.init().then(function (c) {
