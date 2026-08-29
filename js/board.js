@@ -248,7 +248,8 @@ var SHSBoard = (function () {
             : '<p class="dash-none">관내 교회 명단에 이 교회가 아직 없습니다. ' +
               '노회 사무실로 알려 주시기 바랍니다.</p>');
         h += '</div><div class="dash-more">' +
-          (sic ? '<a href="' + link + '#church">교회 정보 보기·고치기</a>' : '') + '</div>';
+          (sic ? '<a href="' + link + '&ch=' + encodeURIComponent(myChurch) +
+            '#church">교회 정보 보기·고치기</a>' : '') + '</div>';
       }
       el.innerHTML = h;
 

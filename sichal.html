@@ -229,6 +229,9 @@ document.addEventListener('DOMContentLoaded', function () {
     { k: 'note',    t: '비고' }
   ];
   var openCh = null;   /* 지금 열어 둔 교회 */
+  /* 주소의 ?ch=교회명 — 대시보드 등에서 특정 교회를 바로 펼쳐 달라는 요청 */
+  var WANT_CH = decodeURIComponent((location.search.match(/[?&]ch=([^&]*)/) || [])[1] || '')
+                  .replace(/\+/g, ' ');
 
   /* 장로 한 분을 노회 명단과 대조한다.
    * 명단에 장로로 올라 있으면 <총대장로>, 없으면 그냥 <장로>다.
@@ -325,6 +328,15 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
+    if (!openCh && WANT_CH) {
+      var key0 = WANT_CH.replace(/\s|교회$/g, '');
+      var wi = -1;
+      churches.forEach(function (c, i) {
+        if (wi === -1 && String(c.name || '').replace(/\s|교회$/g, '') === key0) wi = i;
+      });
+      WANT_CH = '';
+      if (wi !== -1) { showChurch(wi); return; }
+    }
     if (openCh) {
       var idx = churches.map(function (c) { return c.id; }).indexOf(openCh);
       if (idx !== -1) showChurch(idx, true);
