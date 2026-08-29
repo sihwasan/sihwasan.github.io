@@ -674,6 +674,9 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button' + (duesView === 'status' ? ' class="active"' : '') + ' data-duv="status">납부 현황</button>' +
       '<button' + (duesView === 'rates' ? ' class="active"' : '') + ' data-duv="rates">상회비 설정</button>' +
       '</div>' +
+      (canDues && duesRates.length
+        ? '<button class="btn ghost sm" id="du-print">인쇄</button>' +
+          '<button class="btn ghost sm" id="du-pdf">PDF 저장</button>' : '') +
       (duesClosed
         ? '<span class="dues-closed-chip">마감됨</span>'
         : (canDues && duesRates.length
@@ -794,6 +797,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     var cl = box.querySelector('#du-close');
     if (cl) cl.addEventListener('click', closeDuesYear);
+    var pr = box.querySelector('#du-print');
+    if (pr) pr.addEventListener('click', printDues);
+    var pf = box.querySelector('#du-pdf');
+    if (pf) pf.addEventListener('click', saveDuesPdf);
     var ro = box.querySelector('#du-reopen');
     if (ro) ro.addEventListener('click', function () {
       if (!confirm(duesYear + '년 상회비 마감을 해제할까요?\n' +
@@ -866,6 +873,54 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* ----- 납부 현황 인쇄·PDF 저장 (관리자·회계) ----- */
+  function printDues() {
+    var old = document.getElementById('dues-print');
+    if (old) old.remove();
+    if (!document.getElementById('dues-print-style')) {
+      var st = document.createElement('style');
+      st.id = 'dues-print-style';
+      st.textContent = '#dues-print{display:none}' +
+        '@media print{body>*:not(#dues-print){display:none!important}' +
+        '#dues-print{display:block!important}@page{size:A4 landscape;margin:8mm}}';
+      document.head.appendChild(st);
+    }
+    var wrap = document.createElement('div');
+    wrap.id = 'dues-print';
+    wrap.innerHTML = duesReportHtml();
+    document.body.appendChild(wrap);
+    window.addEventListener('afterprint', function once() {
+      window.removeEventListener('afterprint', once);
+      wrap.remove();
+    });
+    SHSCloud.log('view', '상회비 납입현황 인쇄', duesYear + '년');
+    window.print();
+  }
+
+  function saveDuesPdf() {
+    var btn = document.getElementById('du-pdf');
+    if (btn) { btn.disabled = true; btn.textContent = '만드는 중...'; }
+    function done() { if (btn) { btn.disabled = false; btn.textContent = 'PDF 저장'; } }
+    var stage = document.createElement('div');
+    stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:1100px;background:#fff';
+    stage.innerHTML = duesReportHtml();
+    document.body.appendChild(stage);
+    loadPdfTool().then(function (html2pdf) {
+      return html2pdf().set({
+        margin: 6,
+        filename: duesYear + '년 상회비 납입현황.pdf',
+        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+      }).from(stage.firstChild).save();
+    }).then(function () {
+      stage.remove(); done();
+      SHSCloud.log('view', '상회비 납입현황 PDF 저장', duesYear + '년');
+    }).catch(function (err) {
+      stage.remove(); done();
+      alert('PDF를 만들지 못했습니다: ' + (err.message || err));
+    });
+  }
+
   /* ----- 회계연도 마감 -----
    * 납입현황을 PDF 한 장으로 떠서 임원 자료실 회계 분류에 넣고, 그 해를 잠근다. */
   var duesPdfLoading = null;
@@ -883,7 +938,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* 마감 보고서 한 장 (A4 가로) */
-  function duesReportHtml() {
+  function duesReportHtml(dateLabel) {
     var totalMonthly = 0;
     duesRates.forEach(function (r) { totalMonthly += Number(r.monthly_amount || 0); });
     var paidSum = 0;
@@ -896,7 +951,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '년 시화산노회 상회비 납입현황</h1>' +
       '<p style="text-align:center;font-size:11px;color:#666;margin:0 0 14px">' +
       '교회 ' + duesRates.length + '곳 · 월 부과액 ' + manwon(totalMonthly) + '원 · ' +
-      '연간 납부액 ' + manwon(paidSum) + '원 · 마감일 ' + new Date().toISOString().slice(0, 10) + '</p>' +
+      '연간 납부액 ' + manwon(paidSum) + '원 · ' + (dateLabel || '출력일') + ' ' +
+      new Date().toISOString().slice(0, 10) + '</p>' +
       '<table style="width:100%;border-collapse:collapse;font-size:10.5px">' +
       '<thead><tr style="background:#eef1f6">' +
       '<th style="border:1px solid #999;padding:4px">시찰</th>' +
@@ -924,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
     h += '</tbody></table>' +
-      '<p style="font-size:10px;color:#666;margin-top:10px">단위: 만원 · ● = 납부 · 시화산노회 홈페이지 상회비 관리에서 마감 시 자동 생성</p></div>';
+      '<p style="font-size:10px;color:#666;margin-top:10px">단위: 만원 · ● = 납부 · 시화산노회 홈페이지 상회비 관리에서 생성</p></div>';
     return h;
   }
 
@@ -936,7 +992,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var stage = document.createElement('div');
     stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:1100px;background:#fff';
-    stage.innerHTML = duesReportHtml();
+    stage.innerHTML = duesReportHtml('마감일');
     document.body.appendChild(stage);
 
     loadPdfTool().then(function (html2pdf) {
