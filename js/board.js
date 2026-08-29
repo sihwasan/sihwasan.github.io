@@ -199,7 +199,8 @@ var SHSBoard = (function () {
         soft(c.from('sichal_churches').select('sichal,name,pastor,url,address,phone')),
         soft(c.from('sichals').select('name,area,head,clerk,treasurer').order('sort')),
         soft(c.rpc('my_sichal_name')),
-        soft(c.from('sichal_report_submissions').select('*').eq('year', year))
+        soft(c.from('sichal_report_submissions').select('*').eq('year', year)),
+        soft(c.from('church_staff').select('church').eq('role', '시무장로'))
       ]);
     }).then(function (rs) {
       drawNoti((rs[0] && rs[0].data) || []);
@@ -209,6 +210,7 @@ var SHSBoard = (function () {
       drawReports((rs[5] && rs[5].data) || [], (rs[9] && rs[9].data) || []);
       drawMine((rs[6] && rs[6].data) || [], (rs[7] && rs[7].data) || [],
                (rs[8] && rs[8].data) || '');
+      drawDanghoi((rs[6] && rs[6].data) || [], (rs[10] && rs[10].data) || []);
     }).catch(function () {});
 
     /* ---------- 나의 교회 · 나의 시찰 ----------
@@ -359,6 +361,25 @@ var SHSBoard = (function () {
         (admin ? ' · <a href="documents.html">발급 대장</a>' : '') +
         '</div>';
       el.innerHTML = h;
+    }
+
+    /* ---------- 당회가 있는 교회 수 (관리자) ----------
+     * 당회가 있는 교회 = 시무장로가 있는 조직교회 (담임은 위임목사로 표기).
+     * 교회 관리에서 시무장로를 넣고 빼면 이 수가 함께 바뀐다. */
+    function drawDanghoi(churches, elders) {
+      if (!SHSAuth.canManageMembers(user)) return;
+      var el = document.getElementById('dash-report');
+      if (!el) return;
+      var set = {};
+      (elders || []).forEach(function (x) {
+        set[String(x.church || '').replace(/\s|교회$/g, '')] = 1;
+      });
+      var organized = Object.keys(set).length;
+      var total = (churches || []).length;
+      el.insertAdjacentHTML('afterbegin',
+        '<p class="dash-sub" style="margin-top:0">당회가 있는 교회(조직교회) <strong>' +
+        organized + '곳</strong>' + (total ? ' / 관내 교회 ' + total + '곳' : '') +
+        ' <span class="dash-dim">— 교회 관리의 시무장로 기준</span></p>');
     }
 
     /* ---------- 교회상황 보고서 ---------- */

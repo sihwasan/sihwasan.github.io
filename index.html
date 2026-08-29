@@ -107,7 +107,7 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20260829d"></script>
 <script src="js/dashboard.js"></script>
-<script src="js/board.js?v=20260829b"></script>
+<script src="js/board.js?v=20260829e"></script>
 <script src="js/hero.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -134,7 +134,13 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderGallery(list) {
     var g = document.getElementById('home-gallery');
     g.innerHTML = '';
-    list.slice(0, 4).forEach(function (p) {
+    /* 최근 사진 40장 가운데 4장을 무작위로 골라, 올 때마다 다른 사진이 보이게 한다 */
+    var pool = list.slice(0, 40);
+    for (var i = pool.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    pool.slice(0, 4).forEach(function (p) {
       g.insertAdjacentHTML('beforeend',
         '<a href="gallery.html"><img src="' + e(p.thumb) + '" alt="' + e(p.title) + '"></a>');
     });
@@ -234,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
           renderSchedule(r.data.map(function (s) { return { date: s.date_label, title: s.title }; }));
         }
       });
-      c.from('gallery_items').select('*').order('sort').order('id', { ascending: false })
+      c.from('gallery_items').select('*').order('sort').order('id', { ascending: false }).limit(40)
         .then(function (r) {
           if (r.data && r.data.length) {
             renderGallery(r.data.map(function (g) { return { thumb: g.thumb_url, title: g.title }; }));
