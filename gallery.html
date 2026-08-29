@@ -554,6 +554,28 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('lb-rotsave').addEventListener('click', lbRotSave);
   document.getElementById('lb-del').addEventListener('click', lbDelete);
   lb.addEventListener('click', function (ev) { if (ev.target === lb) lb.classList.remove('open'); });
+
+  /* 손가락으로 옆으로 쓸어 넘기기 (모바일).
+   * 가로로 40px 넘게, 세로 움직임보다 크게 쓸면 앞·뒤 사진으로 넘어간다.
+   * 두 손가락(확대·축소)일 때는 넘기지 않는다. */
+  (function () {
+    var x0 = null, y0 = null;
+    lb.addEventListener('touchstart', function (ev) {
+      if (ev.touches.length !== 1) { x0 = null; return; }
+      x0 = ev.touches[0].clientX;
+      y0 = ev.touches[0].clientY;
+    }, { passive: true });
+    lb.addEventListener('touchend', function (ev) {
+      if (x0 == null || ev.changedTouches.length !== 1) { x0 = null; return; }
+      var dx = ev.changedTouches[0].clientX - x0;
+      var dy = ev.changedTouches[0].clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+      if (dx < 0) lbIdx++; else lbIdx--;
+      showLb();
+    }, { passive: true });
+  })();
+
   document.addEventListener('keydown', function (ev) {
     if (!lb.classList.contains('open')) return;
     if (ev.key === 'Escape') lb.classList.remove('open');
