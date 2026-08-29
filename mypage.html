@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', function () {
           p.postcode    = m.out_postcode || p.postcode;
           p.church_addr = m.out_church_addr || p.church_addr;
           p.photo_path  = m.out_photo_path || p.photo_path;
+          p.served_from = m.out_served_from || null;
         }
         renderCloud(p);
       }).catch(function () { renderCloud(p); });
@@ -69,6 +70,22 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="notice-banner">로그인 후 이용할 수 있습니다. ' +
       '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
     return;
+  }
+
+  /* 2001-04-01 → '2001년 4월 1일', 그리고 오늘까지 몇 년 몇 개월째인지 */
+  function sinceText(d) {
+    var t = d ? new Date(String(d).slice(0, 10) + 'T00:00:00') : null;
+    if (!t || isNaN(t)) return null;
+    var now = new Date();
+    var months = (now.getFullYear() - t.getFullYear()) * 12 + (now.getMonth() - t.getMonth());
+    if (now.getDate() < t.getDate()) months--;
+    if (months < 0) months = 0;
+    var y = Math.floor(months / 12), m = months % 12;
+    var span = y ? y + '년' + (m ? ' ' + m + '개월' : '') : m + '개월';
+    return {
+      date: t.getFullYear() + '년 ' + (t.getMonth() + 1) + '월 ' + t.getDate() + '일',
+      span: span + '째'
+    };
   }
 
   /* ---------- 구글 로그인 회원용 화면 ---------- */
@@ -103,6 +120,14 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>생년월일</label>' +
       '<input type="date" id="q-birth" data-birth value="' + e(p.birth_date || '') + '">' +
       '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 회원명단 카드의 남은 임기 표시에 사용됩니다.</span></div>' +
+      (function () {
+        var sv = sinceText(p.served_from);
+        return '<div class="field"><label>부임(위임)일</label>' +
+          '<input type="text" value="' +
+          (sv ? sv.date + ' — 위임 ' + sv.span : '아직 등록되지 않았습니다') + '" disabled>' +
+          '<span style="font-size:0.8rem;color:var(--gray-5)">부임(위임)일은 재직증명서의 재직 기간에 쓰이며, ' +
+          '수정은 노회 서기·간사가 명단 관리에서 합니다.</span></div>';
+      })() +
       '<div class="inline-form" style="margin-bottom:16px">' +
       '<div class="field" style="flex:0 0 130px"><label>우편번호</label>' +
       '<input type="text" id="q-post" value="' + e(p.postcode || '') + '" placeholder="00000" maxlength="7"></div>' +

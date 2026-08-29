@@ -505,6 +505,10 @@ document.addEventListener('DOMContentLoaded', function () {
         cardRow('노회 직책', info.officer_title) +
         cardRow('주소', info.address ? ((info.postcode ? '(' + info.postcode + ') ' : '') + info.address) : '') +
         cardRow('연락처', info.phone) +
+        (function () {
+          var sv = sinceText(info.served_from);
+          return sv ? cardRow('부임(위임)', sv.date + ' · ' + sv.span) : '';
+        })() +
         cardRow('생년월일', fmtBirth(info.birth)) +
         cardRow('남은 임기', fmtRemain(info.birth, info.retire)) +
         '</tbody></table>' +
@@ -514,6 +518,22 @@ document.addEventListener('DOMContentLoaded', function () {
         '</div>';
     }
     mbBody.innerHTML = h;
+  }
+
+  /* 2001-04-01 → '2001년 4월 1일', 그리고 오늘까지 몇 년 몇 개월째인지 */
+  function sinceText(d) {
+    var t = d ? new Date(String(d).slice(0, 10) + 'T00:00:00') : null;
+    if (!t || isNaN(t)) return null;
+    var now = new Date();
+    var months = (now.getFullYear() - t.getFullYear()) * 12 + (now.getMonth() - t.getMonth());
+    if (now.getDate() < t.getDate()) months--;
+    if (months < 0) months = 0;
+    var y = Math.floor(months / 12), m = months % 12;
+    var span = y ? y + '년' + (m ? ' ' + m + '개월' : '') : m + '개월';
+    return {
+      date: t.getFullYear() + '년 ' + (t.getMonth() + 1) + '월 ' + t.getDate() + '일',
+      span: span + '째'
+    };
   }
 
   function showCard(name, church) {
@@ -535,6 +555,7 @@ document.addEventListener('DOMContentLoaded', function () {
           officer_title: p.out_officer_title,
           church_addr: p.out_church_addr,
           address: p.out_address, postcode: p.out_postcode,
+          served_from: p.out_served_from,
           phone: p.out_phone,
           birth: p.out_birth_date, retire: p.out_retire_date,
           hasAccount: p.out_has_account
