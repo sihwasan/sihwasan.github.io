@@ -376,8 +376,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
   /* ================= 교회 관리 =================
-   * 교회마다 목사·원로목사·부목사·시무장로·원로장로를 관리한다.
-   * 이 명부는 시찰 페이지의 교회 정보와 연동되고,
+   * 회원교회의 기준 데이터베이스다. 여기 내용이 조직>회원교회와
+   * 시찰 페이지의 교회 정보에 그대로 연동된다.
+   * 교회마다 목사·원로목사·부목사·장로(시무·원로·은퇴·협동)를 관리하고,
    * 시무장로가 있는 교회의 담임목사는 저절로 위임목사로 표기된다.
    * 총대장로 표시는 노회 명단의 장로와 짝을 이룬다. */
   var chStaff = [], chChurches = [], chRoster = [], chSel = '';
@@ -392,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!box) return;
     SHSCloud.init().then(function (c) {
       return Promise.all([
-        c.from('sichal_churches').select('sichal,name').order('sichal').order('sort'),
+        c.from('sichal_churches').select('*').order('sichal').order('sort').order('id'),
         c.from('church_staff').select('*').order('sort').order('id'),
         c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from')
       ]);
@@ -405,9 +406,11 @@ document.addEventListener('DOMContentLoaded', function () {
       var seen = {};
       chChurches.forEach(function (x) { seen[chKey(x.name)] = 1; });
       chStaff.forEach(function (x) {
-        if (!seen[chKey(x.church)]) { seen[chKey(x.church)] = 1; chChurches.push({ sichal: '기타', name: x.church }); }
+        if (!seen[chKey(x.church)]) {
+          seen[chKey(x.church)] = 1;
+          chChurches.push({ id: null, sichal: '기타', name: x.church });
+        }
       });
-      if (!chSel && chChurches.length) chSel = chChurches[0].name;
       drawChurches();
     }).catch(function (x) {
       box.innerHTML = '<div class="notice-banner">교회 명부를 불러오지 못했습니다: ' +
@@ -418,26 +421,134 @@ document.addEventListener('DOMContentLoaded', function () {
   function chRosterOf(name) {
     return chRoster.filter(function (r) { return r.name === name; })[0] || null;
   }
+  function chStaffOf(church) {
+    return chStaff.filter(function (x) { return chKey(x.church) === chKey(church); });
+  }
+  function chPastorOf(church) {
+    return chRoster.filter(function (r) {
+      return r.category === '목사' && chKey(r.church) === chKey(church);
+    })[0] || null;
+  }
+  function chOrganized(church) {
+    return chStaffOf(church).some(function (x) { return x.role === '시무장로'; });
+  }
+  function chSichalNames() {
+    var out = [];
+    chChurches.forEach(function (x) {
+      if (x.sichal && out.indexOf(x.sichal) === -1) out.push(x.sichal);
+    });
+    ['북부시찰', '상록시찰', '남부시찰'].forEach(function (n) {
+      if (out.indexOf(n) === -1) out.push(n);
+    });
+    return out;
+  }
 
   function drawChurches() {
     var box = document.getElementById('church-area');
-    var staff = chStaff.filter(function (x) { return chKey(x.church) === chKey(chSel); });
-    var organized = staff.some(function (x) { return x.role === '시무장로'; });
+    var orgCnt = chChurches.filter(function (x) { return chOrganized(x.name); }).length;
 
-    var h = '<div class="notice-banner">교회를 골라 교역자와 장로를 관리하세요. ' +
+    var h = '<div class="notice-banner">여기가 회원교회의 <strong>기준 데이터베이스</strong>입니다. ' +
+      '이 내용이 조직의 회원교회 목록과 시찰 페이지의 교회 정보에 그대로 연동됩니다. ' +
       '<strong>시무장로가 있는 교회(조직교회)의 담임목사는 명단에 위임목사로 저절로 표기</strong>되고, ' +
-      '<strong>총대장로</strong> 표시는 노회 명단의 장로와 짝을 이룹니다. ' +
-      '여기 내용은 시찰 페이지의 교회 정보에 그대로 나옵니다.</div>';
+      '<strong>총대장로</strong> 표시는 노회 명단의 장로와 짝을 이룹니다.</div>';
 
-    h += '<div class="field" style="max-width:320px"><label>교회</label><select id="ch-pick">' +
-      chChurches.map(function (x) {
-        return '<option value="' + e(x.name) + '"' + (x.name === chSel ? ' selected' : '') + '>' +
-          e((x.sichal || '') + ' — ' + x.name) + '</option>';
-      }).join('') + '</select></div>';
+    /* ----- 전체 교회 목록 ----- */
+    h += '<p style="font-size:0.9rem;color:var(--gray-7)">전체 <strong>' + chChurches.length +
+      '곳</strong> · 당회가 있는 교회(조직교회) <strong>' + orgCnt + '곳</strong></p>';
+    h += '<table class="tbl"><thead><tr><th style="width:90px">시찰</th><th style="width:170px">교회</th>' +
+      '<th style="width:150px">담임</th><th style="width:80px">당회</th>' +
+      '<th style="width:110px">교역자·장로</th><th>홈페이지</th><th style="width:70px">관리</th></tr></thead><tbody>';
+    chChurches.forEach(function (x) {
+      var pr = chPastorOf(x.name);
+      var cnt = chStaffOf(x.name).length;
+      var sel = chKey(x.name) === chKey(chSel);
+      h += '<tr' + (sel ? ' style="background:var(--gray-1,#f4f5f8)"' : '') + '>' +
+        '<td>' + e(x.sichal || '기타') + '</td>' +
+        '<td class="left"><strong>' + e(x.name) + '</strong></td>' +
+        '<td>' + (pr ? e(pr.name) + (pr.position === '위임목사'
+          ? ' <span style="color:var(--gray-5);font-size:0.8rem">(위임목사)</span>' : '')
+          : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+        '<td>' + (chOrganized(x.name) ? '조직' : '<span style="color:var(--gray-5)">미조직</span>') + '</td>' +
+        '<td>' + cnt + '명</td>' +
+        '<td class="left" style="font-size:0.82rem">' + (x.url ? e(x.url) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+        '<td><button class="btn ' + (sel ? '' : 'ghost ') + 'sm" data-chsel="' + e(x.name) + '">' +
+        (sel ? '편집 중' : '편집') + '</button></td></tr>';
+    });
+    h += '</tbody></table>';
 
-    h += '<p style="font-size:0.88rem;color:var(--gray-7)"><strong>' + e(chSel) + '</strong> — ' +
+    /* ----- 새 교회 추가 ----- */
+    h += '<div class="inline-form" style="margin:10px 0 22px">' +
+      '<div class="field" style="flex:0 0 200px"><label>새 교회 이름</label><input type="text" id="chn-name" placeholder="예: 반월교회"></div>' +
+      '<div class="field" style="flex:0 0 140px"><label>시찰</label><select id="chn-sichal">' +
+      chSichalNames().map(function (n) { return '<option>' + e(n) + '</option>'; }).join('') + '</select></div>' +
+      '<button class="btn sm" id="chn-add" style="align-self:flex-end">교회 추가</button>' +
+      '<span class="form-msg" id="chn-msg" style="margin:0;align-self:flex-end"></span></div>';
+
+    if (chSel) h += churchEditor();
+
+    box.innerHTML = h;
+
+    box.querySelectorAll('button[data-chsel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        chSel = b.dataset.chsel;
+        drawChurches();
+        var ed = document.getElementById('chv-card');
+        if (ed) ed.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    });
+
+    document.getElementById('chn-add').addEventListener('click', function () {
+      var msg = document.getElementById('chn-msg');
+      var name = document.getElementById('chn-name').value.trim();
+      if (!name) { msg.className = 'form-msg err'; msg.textContent = '교회 이름을 적어 주세요.'; return; }
+      SHSCloud.init().then(function (c) {
+        return c.from('sichal_churches').insert({
+          name: name, sichal: document.getElementById('chn-sichal').value,
+          sort: (chChurches.length + 1) * 10, updated_by: user.name
+        }).select();
+      }).then(function (r) {
+        var w = SHS.wrote(r);
+        if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+        SHSCloud.log('create', '교회 추가', name);
+        chSel = name;
+        renderChurches();
+      });
+    });
+
+    if (chSel) bindChurchEditor();
+  }
+
+  /* ----- 고른 교회: 교회 정보 + 직원 명부 ----- */
+  function churchEditor() {
+    var row = chChurches.filter(function (x) { return chKey(x.name) === chKey(chSel); })[0] || {};
+    var staff = chStaffOf(chSel);
+    var organized = chOrganized(chSel);
+
+    var h = '<div class="admin-card" id="chv-card" style="margin-top:6px">' +
+      '<h3 style="margin:0 0 4px">' + e(chSel) + '</h3>' +
+      '<p style="font-size:0.85rem;color:var(--gray-7);margin:0 0 12px">' +
       (organized ? '조직교회 (시무장로 있음 · 담임은 위임목사로 표기)' : '미조직교회 (시무장로 없음)') + '</p>';
 
+    /* 교회 정보 */
+    h += '<h4 class="mn-sub">교회 정보</h4>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 190px"><label>교회 이름</label>' +
+      '<input type="text" id="chv-name" value="' + e(row.name || chSel) + '"></div>' +
+      '<div class="field" style="flex:0 0 140px"><label>시찰</label><select id="chv-sichal">' +
+      chSichalNames().map(function (n) {
+        return '<option' + (n === row.sichal ? ' selected' : '') + '>' + e(n) + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field"><label>홈페이지 주소</label><input type="text" id="chv-url" value="' + e(row.url || '') + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>비고</label><input type="text" id="chv-note" value="' + e(row.note || '') + '"></div>' +
+      '<p style="font-size:0.8rem;color:var(--gray-5)">교회 이름을 바꾸면 교회 명부와 노회 명단의 소속 교회 이름도 함께 바뀝니다. ' +
+      '담임·주소·연락처는 회원 명단이 원본입니다 (명단 관리에서 수정).</p>' +
+      '<button class="btn sm" id="chv-save"' + (row.id ? '' : ' disabled title="관내 교회 목록에 없는 교회입니다"') + '>교회 정보 저장</button> ' +
+      (row.id ? '<button class="btn danger sm" id="chv-del">교회 삭제</button>' : '') +
+      '<span class="form-msg" id="chv-msg" style="margin-left:10px"></span>';
+
+    /* 직원 명부 */
+    h += '<h4 class="mn-sub" style="margin-top:20px">교역자·장로 명부</h4>';
     if (!staff.length) {
       h += '<p style="color:var(--gray-5)">등록된 교역자·장로가 없습니다. 아래에서 추가해 주세요.</p>';
     } else {
@@ -473,9 +584,7 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '</tbody></table>';
     }
 
-    /* 추가 폼 */
-    h += '<div class="admin-card" style="margin-top:14px"><h4 style="margin:0 0 10px">' + e(chSel) + '에 추가</h4>' +
-      '<div class="inline-form">' +
+    h += '<div class="inline-form" style="margin-top:10px">' +
       '<div class="field" style="flex:0 0 120px"><label>구분</label><select id="cs-role">' +
       CH_ROLES.map(function (r) { return '<option>' + r + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="cs-name"></div>' +
@@ -483,19 +592,71 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field" style="flex:0 0 150px"><label>장립일 (장로)</label><input type="date" id="cs-ordained"></div>' +
       '<div class="field" style="flex:0 0 160px"><label>연락처</label><input type="text" id="cs-phone" placeholder="010-0000-0000"></div>' +
       '<div class="field" style="flex:0 0 100px"><label>총대장로</label><input type="checkbox" id="cs-chongdae" style="width:auto;margin-top:10px"></div>' +
-      '<button class="btn" id="cs-add">추가</button>' +
+      '<button class="btn" id="cs-add" style="align-self:flex-end">추가</button>' +
       '</div>' +
       '<p style="font-size:0.8rem;color:var(--gray-5)">성명이 노회 명단과 같으면 자동으로 연동되어 ' +
       '생년월일·연락처를 명단에서 가져옵니다.</p>' +
       '<div class="form-msg" id="cs-msg"></div></div>';
+    return h;
+  }
 
-    box.innerHTML = h;
+  function bindChurchEditor() {
+    var box = document.getElementById('church-area');
+    var row = chChurches.filter(function (x) { return chKey(x.name) === chKey(chSel); })[0] || {};
 
-    document.getElementById('ch-pick').addEventListener('change', function () {
-      chSel = this.value;
-      drawChurches();
+    /* ----- 교회 정보 저장 (이름을 바꾸면 명부·명단도 함께) ----- */
+    var sv = document.getElementById('chv-save');
+    if (sv) sv.addEventListener('click', function () {
+      var msg = document.getElementById('chv-msg');
+      var newName = document.getElementById('chv-name').value.trim();
+      if (!newName) { msg.className = 'form-msg err'; msg.textContent = '교회 이름은 비울 수 없습니다.'; return; }
+      var d = {
+        name: newName,
+        sichal: document.getElementById('chv-sichal').value,
+        url: document.getElementById('chv-url').value.trim() || null,
+        note: document.getElementById('chv-note').value.trim() || null,
+        updated_at: new Date().toISOString(), updated_by: user.name
+      };
+      var renamed = newName !== row.name;
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      SHSCloud.init().then(function (c) {
+        return c.from('sichal_churches').update(d).eq('id', row.id).select().then(function (r1) {
+          if (r1.error) throw r1.error;
+          if (!renamed) return r1;
+          /* 이름이 바뀌면 교회 명부와 노회 명단의 소속 교회도 따라간다 */
+          return c.from('church_staff').update({ church: newName }).eq('church', row.name)
+            .then(function () {
+              return c.from('roster').update({ church: newName }).eq('church', row.name);
+            }).then(function () { return r1; });
+        });
+      }).then(function () {
+        SHSCloud.log('update', '교회 정보 수정', row.name + (renamed ? ' → ' + newName : ''));
+        chSel = newName;
+        renderChurches();
+        renderRoster();
+      }).catch(function (x) {
+        msg.className = 'form-msg err';
+        msg.textContent = '저장 실패: ' + ((x && x.message) || x);
+      });
     });
 
+    var del = document.getElementById('chv-del');
+    if (del) del.addEventListener('click', function () {
+      if (!confirm('"' + chSel + '"을(를) 회원교회 목록에서 지우시겠습니까?' +
+        ' 교회 명부(교역자·장로)도 함께 지워집니다. 되돌릴 수 없습니다.')) return;
+      SHSCloud.init().then(function (c) {
+        return c.from('church_staff').delete().eq('church', row.name).then(function () {
+          return c.from('sichal_churches').delete().eq('id', row.id);
+        });
+      }).then(function (r) {
+        if (r.error) { alert(r.error.message); return; }
+        SHSCloud.log('delete', '교회 삭제', chSel);
+        chSel = '';
+        renderChurches();
+      });
+    });
+
+    /* ----- 직원 명부 ----- */
     function csv(tr, f) {
       var el2 = tr.querySelector('[data-cf="' + f + '"]');
       if (!el2) return null;
@@ -545,7 +706,8 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
-    document.getElementById('cs-add').addEventListener('click', function () {
+    var addBtn = document.getElementById('cs-add');
+    if (addBtn) addBtn.addEventListener('click', function () {
       var msg = document.getElementById('cs-msg');
       var role = document.getElementById('cs-role').value;
       var name = document.getElementById('cs-name').value.trim();
