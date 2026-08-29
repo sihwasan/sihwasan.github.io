@@ -1420,6 +1420,10 @@ input.dp-bad { border-color: var(--red); }
   .cert-sheet .c-body, .cert-sheet .c-body tbody,
   .cert-sheet .c-body tr, .cert-sheet .c-body td { display: revert !important; }
   .cert-sheet .cert-foot { position: absolute; left: 24mm; right: 24mm; bottom: 14mm; }
+  /* QR은 종이 왼쪽 아래, 기관명(cert-foot) 위에 앉힌다 */
+  .cert-verify { left: 24mm; bottom: 24mm; }
+  .cert-verify img { width: 17mm; height: 17mm; }
+  .cert-verify .t { font-size: 2.6mm; }
 }
 
 /* 자간 때문에 마지막 글자 뒤 여백이 생겨 제목이 오른쪽으로 밀리는 것을 바로잡는다 */
@@ -1451,6 +1455,9 @@ input.dp-bad { border-color: var(--red); }
 .cert-sheet.cert-pdf-a4 .cert-foot {
   position: absolute; left: 91px; right: 91px; bottom: 53px; margin-top: 0;
 }
+.cert-sheet.cert-pdf-a4 .cert-verify { left: 91px; bottom: 92px; }
+.cert-sheet.cert-pdf-a4 .cert-verify img { width: 64px; height: 64px; }
+.cert-sheet.cert-pdf-a4 .cert-verify .t { font-size: 10px; }
 
 /* 로그인 옵션 (아이디 저장 / 로그인 상태 유지) */
 .login-opts { display: flex; gap: 18px; flex-wrap: wrap; }
@@ -1647,3 +1654,33 @@ input.dp-bad { border-color: var(--red); }
   padding: 7px 12px; border-radius: 0 6px 6px 0; margin: 0 0 14px;
 }
 .sec-level strong { color: var(--navy); font-weight: 500; }
+
+/* 증명서 진위 확인 QR (왼쪽 아래 구석) */
+.cert-verify {
+  position: absolute; left: 34px; bottom: 30px;
+  display: flex; align-items: center; gap: 8px;
+}
+.cert-verify img { width: 64px; height: 64px; image-rendering: pixelated; }
+.cert-verify .t {
+  font-size: 8.5px; line-height: 1.5; color: #555;
+  font-family: 'Noto Sans KR', sans-serif; letter-spacing: 0;
+}
+
+/* ---------- 증명서 진위 확인 결과 ---------- */
+.v-card {
+  border: 1px solid var(--gray-2); border-left-width: 4px; border-radius: 10px;
+  padding: 20px 22px; max-width: 560px; position: relative;
+}
+.v-card .v-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%; color: #fff;
+  font-weight: 700; margin-bottom: 10px;
+}
+.v-card .v-title { font-size: 1.05rem; font-weight: 500; margin-bottom: 6px; }
+.v-card p { font-size: 0.9rem; color: var(--gray-7); }
+.v-ok   { border-left-color: #2c7a3f; }
+.v-ok .v-badge { background: #2c7a3f; }
+.v-void { border-left-color: #c07f1e; }
+.v-void .v-badge { background: #c07f1e; }
+.v-no   { border-left-color: var(--red); }
+.v-no .v-badge { background: var(--red); }

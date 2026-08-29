@@ -88,6 +88,19 @@ var SHSCert = (function () {
       }).join('') + '</div>';
     }
 
+    /* 진위 확인 QR: 카메라로 찍으면 확인 페이지가 열려 발급 대장과 대조한다 */
+    if (rec.verify_code && typeof qrcode === 'function') {
+      try {
+        var vurl = 'https://sihwasan.org/verify.html?c=' + rec.verify_code;
+        var q = qrcode(0, 'M');
+        q.addData(vurl);
+        q.make();
+        h += '<div class="cert-verify">' +
+          '<img src="' + q.createDataURL(4, 2) + '" alt="진위 확인 QR">' +
+          '<div class="t">진위 확인<br>sihwasan.org/verify<br>' +
+          '확인번호 ' + esc(rec.verify_code) + '</div></div>';
+      } catch (ignore) { /* QR을 못 만들어도 증명서 발급은 막지 않는다 */ }
+    }
     h += '<div class="cert-foot">' + esc(OFFICE) + '</div>';
     h += '</div>';
     return h;
