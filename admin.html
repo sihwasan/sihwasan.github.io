@@ -1913,6 +1913,76 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* ---------- 상비부 배정 관리 ---------- */
+
+  /* 년조 한 칸에 여러 이름을 쉼표로 몰아 적으면 누가 빠졌는지 알아보기
+   * 어렵다. 한 사람에 한 칸씩 두고, 칸을 더하거나 지울 수 있게 한다.
+   * 저장할 때는 예전처럼 쉼표로 이어 한 칸(y1·y2·y3)에 넣는다. */
+  function nameRow(v) {
+    return '<div class="mm-row">' +
+      '<input type="text" data-names="plain" value="' + SHS.esc(v || '') + '">' +
+      '<button type="button" class="mm-del" data-ydel aria-label="이 사람 지우기" ' +
+      'title="이 사람 지우기">&times;</button></div>';
+  }
+  function splitNames(v) {
+    return String(v || '').split(',')
+      .map(function (x) { return x.trim(); })
+      .filter(function (x) { return x; });
+  }
+  function yearBox(label, key, value) {
+    var list = splitNames(value);
+    if (!list.length) list = [''];        /* 비어 있어도 적을 칸 하나는 둔다 */
+    return '<div class="field"><label>' + label + '</label>' +
+      '<div class="mm-list" data-y="' + key + '">' +
+      list.map(nameRow).join('') + '</div>' +
+      '<button type="button" class="btn ghost sm mm-add" data-yadd="' + key + '">+ 이름 추가</button>' +
+      '</div>';
+  }
+
+  /* 한 카드 안의 이름 칸에 명부 찾기를 붙이고, 더하기·지우기를 잇는다 */
+  function bindNameRows(card) {
+    SHSNames.attachAll(card);
+
+    card.querySelectorAll('button[data-yadd]').forEach(function (b) {
+      if (b.dataset.ready) return;
+      b.dataset.ready = '1';
+      b.addEventListener('click', function () {
+        var list = card.querySelector('.mm-list[data-y="' + b.dataset.yadd + '"]');
+        var tmp = document.createElement('div');
+        tmp.innerHTML = nameRow('');
+        var row = tmp.firstChild;
+        list.appendChild(row);
+        bindNameRows(card);
+        row.querySelector('input').focus();
+      });
+    });
+
+    card.querySelectorAll('button[data-ydel]').forEach(function (b) {
+      if (b.dataset.ready) return;
+      b.dataset.ready = '1';
+      b.addEventListener('click', function () {
+        var row = b.parentNode;
+        var list = row.parentNode;
+        row.parentNode.removeChild(row);
+        /* 마지막 한 칸까지 없어지면 적을 곳이 사라지므로 빈 칸을 하나 둔다 */
+        if (!list.querySelector('.mm-row')) {
+          list.innerHTML = nameRow('');
+          bindNameRows(card);
+        }
+      });
+    });
+  }
+
+  /* 년조 칸에 적힌 이름을 모아 쉼표로 잇는다 */
+  function yearValue(card, key) {
+    var list = card.querySelector('.mm-list[data-y="' + key + '"]');
+    if (!list) return '';
+    return Array.prototype.slice.call(list.querySelectorAll('input'))
+      .map(function (i) { return i.value.trim(); })
+      .filter(function (x) { return x; })
+      .join(', ');
+  }
+
   function renderCommittees() {
     var box = document.getElementById('committee-area');
     SHSCloud.init().then(function (c) {
