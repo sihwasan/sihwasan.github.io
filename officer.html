@@ -909,6 +909,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return html2pdf().set({
         margin: 6,
         filename: duesYear + '년 상회비 납입현황.pdf',
+        pagebreak: { mode: ['css', 'legacy'] },
         html2canvas: { scale: 2, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       }).from(stage.firstChild).save();
@@ -937,7 +938,9 @@ document.addEventListener('DOMContentLoaded', function () {
     return duesPdfLoading;
   }
 
-  /* 마감 보고서 한 장 (A4 가로) */
+  /* 마감 보고서 (A4 가로) — 쪽 단위로 미리 나눠 만든다.
+   * 한 장짜리 그림을 픽셀로 자르면 줄이 반으로 잘리므로,
+   * 쪽마다 표 머리를 다시 붙인 완결된 표를 만들어 페이지를 넘긴다. */
   function duesReportHtml(dateLabel) {
     var totalMonthly = 0;
     duesRates.forEach(function (r) { totalMonthly += Number(r.monthly_amount || 0); });
@@ -946,42 +949,77 @@ document.addEventListener('DOMContentLoaded', function () {
       var r = duesRates.filter(function (x) { return x.church === p2.church; })[0];
       paidSum += p2.amount != null ? Number(p2.amount) : Number((r && r.monthly_amount) || 0);
     });
-    var h = '<div style="font-family:\'Noto Sans KR\',sans-serif;color:#222;padding:24px 28px;background:#fff">' +
-      '<h1 style="font-size:20px;text-align:center;margin:0 0 4px">' + duesYear +
-      '년 시화산노회 상회비 납입현황</h1>' +
-      '<p style="text-align:center;font-size:11px;color:#666;margin:0 0 14px">' +
-      '교회 ' + duesRates.length + '곳 · 월 부과액 ' + manwon(totalMonthly) + '원 · ' +
-      '연간 납부액 ' + manwon(paidSum) + '원 · ' + (dateLabel || '출력일') + ' ' +
-      new Date().toISOString().slice(0, 10) + '</p>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:10.5px">' +
-      '<thead><tr style="background:#eef1f6">' +
-      '<th style="border:1px solid #999;padding:4px">시찰</th>' +
-      '<th style="border:1px solid #999;padding:4px">교회</th>' +
-      '<th style="border:1px solid #999;padding:4px">교역자</th>' +
-      '<th style="border:1px solid #999;padding:4px">월액</th>';
-    for (var m = 1; m <= 12; m++) h += '<th style="border:1px solid #999;padding:4px;width:30px">' + m + '월</th>';
-    h += '<th style="border:1px solid #999;padding:4px">납부 합계</th></tr></thead><tbody>';
+
+    var td = 'border:1px solid #999;padding:3px 4px;';
+    function headRow() {
+      var o = '<tr style="background:#eef1f6">' +
+        '<th style="' + td + 'width:64px">시찰</th>' +
+        '<th style="' + td + '">교회</th>' +
+        '<th style="' + td + 'width:72px">교역자</th>' +
+        '<th style="' + td + 'width:44px">월액</th>';
+      for (var m = 1; m <= 12; m++) o += '<th style="' + td + 'width:26px">' + m + '월</th>';
+      return o + '<th style="' + td + 'width:64px">납부 합계</th></tr>';
+    }
+
+    /* 줄을 시찰 순서대로 편다 (rowspan 은 쪽 넘김에서 깨지므로 쓰지 않는다) */
+    var flat = [];
     DUES_SICHALS.forEach(function (sc) {
-      var rows = duesRates.filter(function (r) { return (r.sichal || '기타') === sc; });
-      rows.forEach(function (r, i) {
-        var sum = 0;
-        h += '<tr>' + (i === 0
-          ? '<td style="border:1px solid #999;padding:4px;text-align:center" rowspan="' + rows.length + '">' + e(sc) + '</td>'
-          : '') +
-          '<td style="border:1px solid #999;padding:4px">' + e(r.church) + '</td>' +
-          '<td style="border:1px solid #999;padding:4px">' + e(r.pastor || '') + '</td>' +
-          '<td style="border:1px solid #999;padding:4px;text-align:right">' + Number(r.monthly_amount || 0) + '</td>';
-        for (var m2 = 1; m2 <= 12; m2++) {
-          var p2 = payOf(r.church, m2);
-          if (p2) sum += paidAmount(r, p2);
-          h += '<td style="border:1px solid #999;padding:4px;text-align:center">' + (p2 ? '●' : '') + '</td>';
-        }
-        h += '<td style="border:1px solid #999;padding:4px;text-align:right">' + sum + '</td></tr>';
-      });
+      duesRates.filter(function (r) { return (r.sichal || '기타') === sc; })
+        .forEach(function (r) { flat.push({ r: r, sc: sc }); });
     });
-    h += '</tbody></table>' +
-      '<p style="font-size:10px;color:#666;margin-top:10px">단위: 만원 · ● = 납부 · 시화산노회 홈페이지 상회비 관리에서 생성</p></div>';
-    return h;
+
+    function rowHtml(x, showSc) {
+      var r = x.r, sum = 0;
+      var o = '<tr>' +
+        '<td style="' + td + 'text-align:center">' + (showSc ? e(x.sc) : '') + '</td>' +
+        '<td style="' + td + '">' + e(r.church) + '</td>' +
+        '<td style="' + td + '">' + e(r.pastor || '') + '</td>' +
+        '<td style="' + td + 'text-align:right">' + Number(r.monthly_amount || 0) + '</td>';
+      for (var m2 = 1; m2 <= 12; m2++) {
+        var p2 = payOf(r.church, m2);
+        if (p2) sum += paidAmount(r, p2);
+        o += '<td style="' + td + 'text-align:center">' + (p2 ? '●' : '') + '</td>';
+      }
+      return o + '<td style="' + td + 'text-align:right">' + sum + '</td></tr>';
+    }
+
+    var FIRST = 24, REST = 28;      /* 쪽마다 담을 줄 수 (여유 있게) */
+    var pages = [], idx = 0, pageNo = 0;
+    while (idx < flat.length || pageNo === 0) {
+      var chunk = flat.slice(idx, idx + (pageNo === 0 ? FIRST : REST));
+      idx += chunk.length;
+      var last = idx >= flat.length;
+      var pg = '<div class="dues-pg" style="background:#fff;color:#222;' +
+        "font-family:'Noto Sans KR',sans-serif;" +
+        (last ? '' : 'page-break-after:always;') + '">';
+      if (pageNo === 0) {
+        pg += '<h1 style="font-size:20px;text-align:center;margin:0 0 4px">' + duesYear +
+          '년 시화산노회 상회비 납입현황</h1>' +
+          '<p style="text-align:center;font-size:11px;color:#666;margin:0 0 10px">' +
+          '교회 ' + duesRates.length + '곳 · 월 부과액 ' + manwon(totalMonthly) + '원 · ' +
+          '연간 납부액 ' + manwon(paidSum) + '원 · ' + (dateLabel || '출력일') + ' ' +
+          new Date().toISOString().slice(0, 10) + '</p>';
+      } else {
+        pg += '<p style="font-size:11px;color:#666;margin:0 0 6px">' + duesYear +
+          '년 시화산노회 상회비 납입현황 — 계속 (' + (pageNo + 1) + '쪽)</p>';
+      }
+      var lastSc = null;
+      pg += '<table style="width:100%;border-collapse:collapse;font-size:10.5px">' +
+        '<thead>' + headRow() + '</thead><tbody>' +
+        chunk.map(function (x) {
+          var show = x.sc !== lastSc;
+          lastSc = x.sc;
+          return rowHtml(x, show);
+        }).join('') + '</tbody></table>';
+      if (last) {
+        pg += '<p style="font-size:10px;color:#666;margin-top:8px">' +
+          '단위: 만원 · ● = 납부 · 시화산노회 홈페이지 상회비 관리에서 생성</p>';
+      }
+      pages.push(pg + '</div>');
+      pageNo++;
+      if (pageNo > 40) break;
+    }
+    return '<div style="padding:8px 6px">' + pages.join('') + '</div>';
   }
 
   function closeDuesYear() {
@@ -998,6 +1036,7 @@ document.addEventListener('DOMContentLoaded', function () {
     loadPdfTool().then(function (html2pdf) {
       return html2pdf().set({
         margin: 6,
+        pagebreak: { mode: ['css', 'legacy'] },
         html2canvas: { scale: 2, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       }).from(stage.firstChild).outputPdf('blob');
