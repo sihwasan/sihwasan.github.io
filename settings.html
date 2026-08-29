@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
         box.innerHTML = '<p style="color:var(--gray-5)">요금 설정을 불러오지 못했습니다: ' + e(r.error.message) + '</p>';
         return;
       }
-      var fees = {}, pay = { bank: 'NH농협', account: '3511015867663', holder: '시화산노회' };
+      var fees = {}, pay = { bank: 'NH농협', account: '3511015867663', holder: '시화산노회',
+        staff_phone: '010-2498-8696' };
       (r.data || []).forEach(function (x) {
         if (x.key === 'doc_fees' && x.value) fees = x.value;
         if (x.key === 'doc_pay' && x.value) pay = x.value;
@@ -93,7 +94,11 @@ document.addEventListener('DOMContentLoaded', function () {
         '<input type="text" id="fee-acct" value="' + e(pay.account || '') + '"></div>' +
         '<div class="field" style="flex:0 0 140px"><label>예금주</label>' +
         '<input type="text" id="fee-holder" value="' + e(pay.holder || '') + '"></div>' +
+        '<div class="field" style="flex:0 0 170px"><label>간사 연락처</label>' +
+        '<input type="text" id="fee-phone" value="' + e(pay.staff_phone || '') + '" placeholder="010-0000-0000"></div>' +
         '</div>' +
+        '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:-6px">간사 연락처는 입금 안내 창에 ' +
+        '"빠른 확인이 필요하면 연락하세요"로 나옵니다.</p>' +
         '<button class="btn" id="fee-save">저장</button>' +
         '<div class="form-msg" id="fee-msg"></div></div>';
       box.innerHTML = h;
@@ -110,7 +115,8 @@ document.addEventListener('DOMContentLoaded', function () {
         var newPay = {
           bank: document.getElementById('fee-bank').value.trim(),
           account: document.getElementById('fee-acct').value.trim().replace(/[^0-9-]/g, ''),
-          holder: document.getElementById('fee-holder').value.trim()
+          holder: document.getElementById('fee-holder').value.trim(),
+          staff_phone: document.getElementById('fee-phone').value.trim()
         };
         if (bad || !newPay.account) {
           msg.className = 'form-msg err';
