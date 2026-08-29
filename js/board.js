@@ -48,11 +48,17 @@ var SHSBoard = (function () {
       '<div class="dash-cols">' +
       '<section aria-label="나의 교회"><h3 class="dash-h">나의 교회</h3>' +
       '<div id="dash-church"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '<section aria-label="나의 시찰"><h3 class="dash-h">나의 시찰</h3>' +
+      '<section aria-label="나의 상회비"><h3 class="dash-h">나의 상회비</h3>' +
+      '<div id="dash-mydues"><p class="dash-none">불러오는 중...</p></div></section>' +
+      '</div>' +
+      '<div class="dash-cols">' +
+      '<section aria-label="나의 시찰" id="dash-sichal-sec"><h3 class="dash-h">나의 시찰</h3>' +
       '<div id="dash-sichal"><p class="dash-none">불러오는 중...</p></div></section>' +
+      '<section aria-label="상회비 전체" id="dash-dues-sec" class="hidden">' +
+      '<h3 class="dash-h">상회비 전체 <a class="more" href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면</a></h3>' +
+      '<div id="dash-dues-body"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>' +
       '<div id="dash-com"></div>' +
-      '<div id="dash-dues"></div>' +
       '<div class="dash-cols">' +
       '<section aria-label="신청서류 발급 현황"><h3 class="dash-h">신청서류 발급 현황</h3>' +
       '<div id="dash-doc"><p class="dash-none">불러오는 중...</p></div></section>' +
@@ -67,17 +73,11 @@ var SHSBoard = (function () {
       if (!user.cloud) return;
       var canDues = SHSAuth.canManageMembers(user) ||
         (user.role === 'officer' && user.title && user.title.indexOf('회계') !== -1);
-      var boxD = document.getElementById('dash-dues');
       var duesLink = 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC';
-      boxD.innerHTML = '<div class="dash-cols">' +
-        '<section aria-label="나의 상회비"><h3 class="dash-h">나의 상회비</h3>' +
-        '<div id="dash-mydues"><p class="dash-none">불러오는 중...</p></div></section>' +
-        (canDues
-          ? '<section aria-label="상회비 전체"><h3 class="dash-h">상회비 전체 ' +
-            '<a class="more" href="' + duesLink + '">관리 화면</a></h3>' +
-            '<div id="dash-dues-body"><p class="dash-none">불러오는 중...</p></div></section>'
-          : '') +
-        '</div>';
+      /* 관리자·회계에게는 나의 시찰 옆에 전체 요약 칸을 연다.
+       * 아닌 회원에게는 나의 시찰이 줄 전체를 쓴다. */
+      if (canDues) document.getElementById('dash-dues-sec').classList.remove('hidden');
+      else document.getElementById('dash-sichal-sec').classList.add('span2');
       var yr = new Date().getFullYear();
       var mo = new Date().getMonth() + 1;
 
