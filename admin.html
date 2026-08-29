@@ -896,6 +896,14 @@ document.addEventListener('DOMContentLoaded', function () {
         '<select id="ro-fgrade"><option value="">등급 전체</option>' +
         GRADES.map(function (g) { return '<option value="' + g.v + '">' + e(g.t) + '</option>'; }).join('') +
         '</select></div>' +
+        '<div class="field" style="flex:0 0 175px"><label for="ro-fview">보기 방식</label>' +
+        '<select id="ro-fview">' +
+        '<option value="">기본 (명부 순)</option>' +
+        '<option value="term">남은 임기 짧은 순</option>' +
+        '<option value="wiim">위임목사 먼저</option>' +
+        '<option value="member">정회원 먼저</option>' +
+        '<option value="officers">임원만 보기</option>' +
+        '</select></div>' +
         '<button class="btn ghost" id="ro-qclear">지우기</button>' +
         '</div>';
 
@@ -930,11 +938,23 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:130px">남은 임기</th><th style="width:130px">부여 등급</th>' +
         '<th style="width:80px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
+        /* 보기 방식 정렬에 쓸 값: 남은 날수(장로 총대는 자격 기간, 그 외는 정년) */
+        var days = 999999;
+        if (m.category === '장로' && m.term_until) {
+          days = Math.ceil((new Date(m.term_until + 'T00:00:00') - new Date()) / 86400000);
+        } else {
+          var rd0 = SHS.retireDate(m.birth_date);
+          if (rd0) days = Math.ceil((rd0 - new Date()) / 86400000);
+        }
         html += '<tr data-ro="' + m.id + '" data-find="' +
           e([m.name, m.church, m.category, m.sichal, m.note].filter(Boolean).join(' ')) + '"' +
-          ' data-cat="' + e(m.category || '') + '" data-grade="' + e(rosterGrade(m)) + '">' +
+          ' data-cat="' + e(m.category || '') + '" data-grade="' + e(rosterGrade(m)) + '"' +
+          ' data-days="' + days + '" data-pos="' + e(m.position || m.category || '') + '"' +
+          ' data-idx="' + i + '">' +
           '<td class="ro-no">' + (i + 1) + '</td>' +
-          '<td><strong>' + e(m.name) + '</strong></td>' +
+          '<td><a data-roview="' + m.id + '" title="정보 보기" ' +
+          'style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;' +
+          'text-decoration-style:dotted;text-underline-offset:3px">' + e(m.name) + '</a></td>' +
           '<td>' + e(m.position || m.category || '-') + '</td>' +
           '<td class="left">' + e(m.church || '-') + '</td>' +
           '<td>' + e(m.sichal || '-') + '</td>' +
@@ -977,14 +997,40 @@ document.addEventListener('DOMContentLoaded', function () {
       var qBox = document.getElementById('ro-q');
       var fCat = document.getElementById('ro-fcat');
       var fGrade = document.getElementById('ro-fgrade');
+      var fView = document.getElementById('ro-fview');
+      function isOfficerGrade(g2) {
+        return g2 === 'president' || g2 === 'clerk' || String(g2).indexOf('officer:') === 0;
+      }
       function applyFilter() {
         var q = (qBox.value || '').trim();
-        var c = fCat.value, g = fGrade.value;
+        var c = fCat.value, g = fGrade.value, view = fView.value;
+
+        /* 보기 방식에 따라 줄 순서를 바꾼다 (기본은 명부 순) */
+        var tbody = box.querySelector('#ro-tbl tbody');
+        var trs = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-ro]'));
+        trs.sort(function (a, b) {
+          var tie = (+a.dataset.idx) - (+b.dataset.idx);
+          if (view === 'term') return ((+a.dataset.days) - (+b.dataset.days)) || tie;
+          if (view === 'wiim') {
+            return ((b.dataset.pos === '위임목사' ? 1 : 0) - (a.dataset.pos === '위임목사' ? 1 : 0)) || tie;
+          }
+          if (view === 'member') {
+            return ((b.dataset.grade === 'member' ? 1 : 0) - (a.dataset.grade === 'member' ? 1 : 0)) || tie;
+          }
+          return tie;
+        });
+        trs.forEach(function (tr) {
+          tbody.appendChild(tr);
+          var sub2 = tbody.querySelector('tr[data-rosub="' + tr.dataset.ro + '"]');
+          if (sub2) tbody.appendChild(sub2);
+        });
+
         var shown = 0, n = 0;
         box.querySelectorAll('#ro-tbl tbody tr[data-ro]').forEach(function (tr) {
           var ok = (!q || (tr.dataset.find || '').indexOf(q) !== -1)
                 && (!c || tr.dataset.cat === c)
-                && (!g || tr.dataset.grade === g);
+                && (!g || tr.dataset.grade === g)
+                && (view !== 'officers' || isOfficerGrade(tr.dataset.grade));
           tr.classList.toggle('hidden', !ok);
           /* 주소가 담긴 아랫줄도 같이 숨기거나 보인다 */
           var sub = box.querySelector('#ro-tbl tr[data-rosub="' + tr.dataset.ro + '"]');
@@ -992,9 +1038,9 @@ document.addEventListener('DOMContentLoaded', function () {
           if (ok) { shown++; tr.querySelector('.ro-no').textContent = ++n; }
         });
         var el = document.getElementById('ro-count');
-        el.textContent = (q || c || g) ? ' 가운데 ' + shown + '명' : '';
+        el.textContent = (q || c || g || fView.value === 'officers') ? ' 가운데 ' + shown + '명' : '';
       }
-      [qBox, fCat, fGrade].forEach(function (el) {
+      [qBox, fCat, fGrade, fView].forEach(function (el) {
         el.addEventListener('input', applyFilter);
         el.addEventListener('change', applyFilter);
       });
@@ -1180,6 +1226,60 @@ document.addEventListener('DOMContentLoaded', function () {
         b.addEventListener('click', function () {
           var m = rows.filter(function (x) { return String(x.id) === b.dataset.roedit; })[0];
           if (m) openRosterEdit(m);
+        });
+      });
+
+      /* 이름을 누르면 정보를 한눈에 본다 (고치는 일은 [수정]에서) */
+      function viewRow(t, v) {
+        return '<tr><td style="width:130px;color:var(--gray-6);font-size:0.88rem">' + t +
+          '</td><td class="left">' + (v || '<span style="color:var(--gray-5)">-</span>') + '</td></tr>';
+      }
+      function openRosterView(m) {
+        var served = '';
+        if (m.served_from) {
+          var sd = new Date(m.served_from + 'T00:00:00');
+          var months = (new Date().getFullYear() - sd.getFullYear()) * 12 +
+            (new Date().getMonth() - sd.getMonth());
+          if (months < 0) months = 0;
+          served = e(m.served_from) + ' <span style="color:var(--gray-5)">(' +
+            (Math.floor(months / 12) ? Math.floor(months / 12) + '년 ' : '') +
+            (months % 12) + '개월 경과)</span>';
+        }
+        var term = '';
+        if (m.category === '장로' && (m.term_from || m.term_until)) {
+          term = e(m.term_from || '?') + ' ~ ' + e(m.term_until || '?');
+        }
+        var mo = adminModal(
+          '<h4 style="margin:0 0 4px">' + e(m.name) +
+          ' <span style="font-weight:400;color:var(--gray-6);font-size:0.9rem">' +
+          e(m.position || m.category || '') + '</span></h4>' +
+          '<table class="tbl" style="margin-top:12px"><tbody>' +
+          viewRow('소속 교회', e(m.church || '')) +
+          viewRow('시찰', e(m.sichal || '')) +
+          viewRow('직분 / 직위', e(m.category || '') +
+            (m.position && m.position !== m.category ? ' / ' + e(m.position) : '')) +
+          viewRow('부여 등급', e(gradeName(rosterGrade(m)))) +
+          viewRow('생년월일', e(m.birth_date || '')) +
+          viewRow('남은 임기', remainLabel(m)) +
+          viewRow('부임(위임)일', served) +
+          (term ? viewRow('장로 총대 자격', term) : '') +
+          viewRow('연락처', e(m.phone || '')) +
+          viewRow('주소', e([m.address, m.postcode ? '(' + m.postcode + ')' : '']
+            .filter(Boolean).join(' '))) +
+          (m.note ? viewRow('비고', e(m.note)) : '') +
+          '</tbody></table>' +
+          '<div style="margin-top:14px"><button class="btn sm" id="rv-edit">수정하러 가기</button></div>',
+          560);
+        mo.ov.querySelector('#rv-edit').addEventListener('click', function () {
+          mo.close();
+          openRosterEdit(m);
+        });
+      }
+      box.querySelectorAll('a[data-roview]').forEach(function (a) {
+        a.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          var m = rows.filter(function (x) { return String(x.id) === a.dataset.roview; })[0];
+          if (m) openRosterView(m);
         });
       });
     });
