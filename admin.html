@@ -382,6 +382,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 시무장로가 있는 교회의 담임목사는 저절로 위임목사로 표기된다.
    * 총대장로 표시는 노회 명단의 장로와 짝을 이룬다. */
   var chStaff = [], chChurches = [], chRoster = [], chSel = '';
+  var chModalOpen = false;
   var CH_ROLES = ['목사', '원로목사', '부목사', '시무장로', '원로장로', '은퇴장로', '협동장로'];
 
   function chKey(t) {
@@ -461,8 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
     chChurches.forEach(function (x) {
       var pr = chPastorOf(x.name);
       var cnt = chStaffOf(x.name).length;
-      var sel = chKey(x.name) === chKey(chSel);
-      h += '<tr' + (sel ? ' style="background:var(--gray-1,#f4f5f8)"' : '') + '>' +
+      h += '<tr>' +
         '<td>' + e(x.sichal || '기타') + '</td>' +
         '<td class="left"><strong>' + e(x.name) + '</strong></td>' +
         '<td>' + (pr ? e(pr.name) + (pr.position === '위임목사'
@@ -471,8 +471,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<td>' + (chOrganized(x.name) ? '조직' : '<span style="color:var(--gray-5)">미조직</span>') + '</td>' +
         '<td>' + cnt + '명</td>' +
         '<td class="left" style="font-size:0.82rem">' + (x.url ? e(x.url) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
-        '<td><button class="btn ' + (sel ? '' : 'ghost ') + 'sm" data-chsel="' + e(x.name) + '">' +
-        (sel ? '편집 중' : '편집') + '</button></td></tr>';
+        '<td><button class="btn ghost sm" data-chsel="' + e(x.name) + '">수정</button></td></tr>';
     });
     h += '</tbody></table>';
 
@@ -484,16 +483,13 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="btn sm" id="chn-add" style="align-self:flex-end">교회 추가</button>' +
       '<span class="form-msg" id="chn-msg" style="margin:0;align-self:flex-end"></span></div>';
 
-    if (chSel) h += churchEditor();
-
     box.innerHTML = h;
 
     box.querySelectorAll('button[data-chsel]').forEach(function (b) {
       b.addEventListener('click', function () {
         chSel = b.dataset.chsel;
-        drawChurches();
-        var ed = document.getElementById('chv-card');
-        if (ed) ed.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        chModalOpen = true;
+        openChurchModal();
       });
     });
 
@@ -515,7 +511,31 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
-    if (chSel) bindChurchEditor();
+    /* 명부를 고친 뒤 다시 그릴 때 팝업이 열려 있었다면 새 내용으로 다시 연다 */
+    if (chModalOpen && chSel) openChurchModal();
+  }
+
+  /* ----- 수정 팝업 ----- */
+  function openChurchModal() {
+    var old = document.getElementById('ch-modal');
+    if (old) old.remove();
+    var ov = document.createElement('div');
+    ov.id = 'ch-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:300;' +
+      'display:flex;align-items:flex-start;justify-content:center;padding:36px 16px;overflow:auto';
+    ov.innerHTML = '<div style="background:#fff;border-radius:8px;max-width:960px;width:100%;' +
+      'box-shadow:0 10px 40px rgba(0,0,0,.25);padding:6px 18px 18px;position:relative">' +
+      '<button id="ch-modal-x" aria-label="닫기" style="position:absolute;top:10px;right:14px;' +
+      'border:none;background:none;font-size:1.4rem;color:var(--gray-5);cursor:pointer">&times;</button>' +
+      churchEditor() + '</div>';
+    document.body.appendChild(ov);
+    function close() {
+      chModalOpen = false;
+      ov.remove();
+    }
+    ov.addEventListener('click', function (ev) { if (ev.target === ov) close(); });
+    document.getElementById('ch-modal-x').addEventListener('click', close);
+    bindChurchEditor();
   }
 
   /* ----- 고른 교회: 교회 정보 + 직원 명부 ----- */
@@ -601,7 +621,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function bindChurchEditor() {
-    var box = document.getElementById('church-area');
+    var box = document.getElementById('ch-modal') || document.getElementById('church-area');
     var row = chChurches.filter(function (x) { return chKey(x.name) === chKey(chSel); })[0] || {};
 
     /* ----- 교회 정보 저장 (이름을 바꾸면 명부·명단도 함께) ----- */
@@ -652,6 +672,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (r.error) { alert(r.error.message); return; }
         SHSCloud.log('delete', '교회 삭제', chSel);
         chSel = '';
+        chModalOpen = false;
+        var mo = document.getElementById('ch-modal');
+        if (mo) mo.remove();
         renderChurches();
       });
     });
