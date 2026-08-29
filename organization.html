@@ -10,7 +10,7 @@
 <meta property="og:title" content="조직 - 시화산노회">
 <meta property="og:description" content="시화산노회 조직 — 임원 명단, 총회 총대, 회원명단, 시찰회, 상비부 구성을 안내합니다.">
 <meta property="og:url" content="https://sihwasan.org/organization.html">
-<link rel="stylesheet" href="css/style.css?v=20260829h">
+<link rel="stylesheet" href="css/style.css?v=20260829j">
 </head>
 <body>
 
@@ -85,6 +85,12 @@
     <table class="tbl" style="max-width:640px">
       <thead><tr><th>번호</th><th>성명</th><th>시무교회</th></tr></thead>
       <tbody id="assoc-body"></tbody>
+    </table>
+
+    <h3 id="lic-head" class="hidden">강도사·전도사</h3>
+    <table class="tbl hidden" id="lic-table" style="max-width:640px">
+      <thead><tr><th>번호</th><th>성명</th><th>직분</th><th>시무교회</th></tr></thead>
+      <tbody id="lic-body"></tbody>
     </table>
 
     <h3>무임목사</h3>
@@ -315,6 +321,19 @@ document.addEventListener('DOMContentLoaded', function () {
       return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td><td>' + e(m.church) + '</td></tr>';
     }).join(''));
 
+    /* 강도사·전도사는 있을 때만 보여 준다 */
+    var lic = D.licentiates || [];
+    var licHead = document.getElementById('lic-head');
+    var licTable = document.getElementById('lic-table');
+    if (licHead && licTable) {
+      licHead.classList.toggle('hidden', !lic.length);
+      licTable.classList.toggle('hidden', !lic.length);
+    }
+    fill('lic-body', lic.map(function (m, i) {
+      return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td>' +
+        '<td>' + e(m.cat || '') + '</td><td>' + e(m.church) + '</td></tr>';
+    }).join(''));
+
     var nc = document.getElementById('nocharge-body');
     if (nc) nc.innerHTML = (D.pastorsWithoutCharge || []).map(function (n) {
       var nm = typeof n === 'string' ? n : n.name;
@@ -360,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 서버 명단을 분류별로 묶어 화면이 쓰는 모양으로 바꾼다 */
   /* ---------- 주소록 (임원 이상) ---------- */
-  var ORDER_CAT = ['목사', '부목사', '원로목사', '은퇴목사', '무임목사', '장로', '직원'];
+  var ORDER_CAT = ['목사', '부목사', '강도사', '전도사', '원로목사', '은퇴목사', '무임목사', '장로', '직원'];
   var addrRows = [];
 
   function drawAddrBook() {
@@ -409,13 +428,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function groupRoster(rows) {
     var D = { seniorPastors: [], retiredPastors: [], pastors: [], assocPastors: [],
-              pastorsWithoutCharge: [], elders: {}, staff: [] };
+              licentiates: [], pastorsWithoutCharge: [], elders: {}, staff: [] };
     rows.forEach(function (r) {
-      var m = { name: r.name, church: r.church, retired: r.note || '' };
+      var m = { name: r.name, church: r.church, retired: r.note || '', cat: r.category };
       switch (r.category) {
         case '원로목사': D.seniorPastors.push(m); break;
         case '은퇴목사': D.retiredPastors.push(m); break;
         case '부목사':   D.assocPastors.push(m); break;
+        case '강도사':
+        case '전도사':   D.licentiates.push(m); break;
         case '무임목사': D.pastorsWithoutCharge.push({ name: r.name, church: r.church }); break;
         case '장로':
           var k = r.sichal || '기타';

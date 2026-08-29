@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내 정보 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260829h">
+<link rel="stylesheet" href="css/style.css?v=20260829j">
 </head>
 <body>
 
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>이메일 (구글 계정)</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
       '<div class="field"><label>성명</label><input type="text" id="q-name" value="' + e(p.name || '') + '"></div>' +
       '<div class="field"><label>직분</label><select id="q-pos">' +
-      ['목사', '위임목사', '부목사', '장로', '간사'].map(function (x) {
+      ['목사', '위임목사', '부목사', '강도사', '전도사', '장로', '간사'].map(function (x) {
         return '<option' + (p.position === x ? ' selected' : '') + '>' + x + '</option>';
       }).join('') + '</select></div>' +
       '<div class="field"><label>소속 교회</label><select id="q-church">' +

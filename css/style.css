@@ -1835,3 +1835,8 @@ td[data-duch]:hover { background: #eef2f8; }
 .com-years .field { margin-bottom: 0; }
 .com-years .mm-list { grid-template-columns: 1fr; gap: 6px; }
 .com-years label { font-weight: 600; color: var(--navy); }
+
+/* 노회 운영 탭: 회기 설정과 임원 명부를 나란히 */
+.ops-cols { display: grid; gap: 24px 32px; align-items: start; }
+@media (min-width: 1100px) { .ops-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.ops-cols > div > h2:first-child { margin-top: 0; }

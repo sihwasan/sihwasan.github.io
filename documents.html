@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>서류 발급 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260829h">
+<link rel="stylesheet" href="css/style.css?v=20260829j">
 </head>
 <body>
 
@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function () {
     '</select></div>' +
     '<div class="field"><label>대상자 성명</label>' +
     '<input type="text" data-names="plain" id="d-name" autocomplete="off"></div>' +
-    '<div class="field"><label>직위</label><select id="d-pos"><option>목사</option><option>부목사</option><option>장로</option><option>전도사</option></select></div>' +
+    '<div class="field"><label>직위</label><select id="d-pos"><option>목사</option><option>부목사</option><option>강도사</option><option>장로</option><option>전도사</option></select></div>' +
     '<div class="field"><label>소속 교회</label><input type="text" id="d-church"></div>' +
     '<div class="field"><label>용도</label><select id="d-purpose">' +
     '<option>연말정산용</option><option>은행제출용</option><option>기관제출용</option><option>총회제출용</option><option>회사제출용</option><option>교회제출용</option><option>기타</option>' +
@@ -197,6 +197,7 @@ document.addEventListener('DOMContentLoaded', function () {
     p = p || '';
     if (p.indexOf('부목사') !== -1) return '부목사';
     if (p.indexOf('목사') !== -1) return '목사';
+    if (p.indexOf('강도사') !== -1) return '강도사';
     if (p.indexOf('장로') !== -1) return '장로';
     if (p.indexOf('전도사') !== -1) return '전도사';
     return '';
