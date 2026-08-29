@@ -610,9 +610,17 @@ document.addEventListener('DOMContentLoaded', function () {
       }).join('') + '</select></div>' +
       '<div class="field"><label>홈페이지 주소</label><input type="text" id="chv-url" value="' + e(row.url || '') + '"></div>' +
       '</div>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:1 1 300px"><label>교회 주소</label>' +
+      '<input type="text" id="chv-addr" value="' + e((chPastorOf(chSel) || {}).address || '') + '"' +
+      (chPastorOf(chSel) ? '' : ' disabled placeholder="담임목사를 먼저 지정하면 적을 수 있습니다"') + '></div>' +
+      '<div class="field" style="flex:0 0 120px"><label>우편번호</label>' +
+      '<input type="text" id="chv-post" value="' + e((chPastorOf(chSel) || {}).postcode || '') + '"' +
+      (chPastorOf(chSel) ? '' : ' disabled') + '></div>' +
+      '</div>' +
       '<div class="field"><label>비고</label><input type="text" id="chv-note" value="' + e(row.note || '') + '"></div>' +
       '<p style="font-size:0.8rem;color:var(--gray-5)">교회 이름을 바꾸면 교회 명부와 노회 명단의 소속 교회 이름도 함께 바뀝니다. ' +
-      '담임·주소·연락처는 회원 명단이 원본입니다 (명단 관리에서 수정).</p>' +
+      '주소는 담임목사의 회원 명단 주소와 하나로 연동됩니다 — 여기서 고치면 명단과 증명서에도 그대로 쓰입니다.</p>' +
       '<button class="btn sm" id="chv-save"' + (row.id ? '' : ' disabled title="관내 교회 목록에 없는 교회입니다"') + '>교회 정보 저장</button> ' +
       (row.id ? '<button class="btn danger sm" id="chv-del">교회 삭제</button>' : '') +
       '<span class="form-msg" id="chv-msg" style="margin-left:10px"></span>';
@@ -697,9 +705,28 @@ document.addEventListener('DOMContentLoaded', function () {
         updated_at: new Date().toISOString(), updated_by: user.name
       };
       var renamed = newName !== row.name;
+      /* 주소는 담임목사의 명단 주소가 원본 — 바뀌었으면 함께 고친다 */
+      var head = chPastorOf(chSel);
+      var addrEl = document.getElementById('chv-addr');
+      var postEl = document.getElementById('chv-post');
+      var addrChanged = head && addrEl && !addrEl.disabled &&
+        (addrEl.value.trim() !== (head.address || '') ||
+         postEl.value.trim() !== (head.postcode || ''));
       msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
       SHSCloud.init().then(function (c) {
-        return c.from('sichal_churches').update(d).eq('id', row.id).select().then(function (r1) {
+        var first = addrChanged
+          ? c.from('roster').update({
+              address: addrEl.value.trim() || null,
+              postcode: postEl.value.trim() || null
+            }).eq('id', head.id).then(function (r0) {
+              if (r0.error) throw r0.error;
+              SHSCloud.log('update', '교회 주소 수정',
+                chSel + ' → ' + (addrEl.value.trim() || '(지움)') + ' (담임 ' + head.name + ' 명단 연동)');
+            })
+          : Promise.resolve();
+        return first.then(function () {
+          return c.from('sichal_churches').update(d).eq('id', row.id).select();
+        }).then(function (r1) {
           if (r1.error) throw r1.error;
           if (!renamed) return r1;
           /* 이름이 바뀌면 교회 명부와 노회 명단의 소속 교회도 따라간다 */
