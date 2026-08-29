@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260828">
+<link rel="stylesheet" href="css/style.css?v=20260829">
 </head>
 <body>
 
@@ -480,9 +480,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<label>우편번호<input type="text" data-rf="postcode" value="' + e(m.postcode || '') +
           '" placeholder="00000" maxlength="7"></label>' +
           '<label class="wide">주소<input type="text" data-rf="address" value="' + e(m.address || '') +
-          '" placeholder="회원 주소"></label>' +
-          '<label class="wide">교회 주소<input type="text" data-rf="church_addr" value="' + e(m.church_addr || '') +
-          '" placeholder="교회 주소 (증명서에 쓰입니다)"></label>' +
+          '" placeholder="주소 — 증명서 등 모든 문서에 이 주소가 쓰입니다"></label>' +
           '</div></td></tr>';
       });
       html += '</tbody></table>';
@@ -631,7 +629,6 @@ document.addEventListener('DOMContentLoaded', function () {
             phone: v('phone') || null,
             postcode: v('postcode') || null,
             address: v('address') || null,
-            church_addr: v('church_addr') || null,
             role: g.role, officer_title: g.title
           };
           if (!d.name) {

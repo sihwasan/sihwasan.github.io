@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>교회상황 보고서 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20260829">
+<style>
+/* ---------- 작성 화면 ---------- */
+.rf-sec { margin: 0 0 18px; }
+.rf-sec h3 { margin: 0 0 4px; color: var(--navy); font-size: 1.02rem; }
+.rf-sec .rf-hint { font-size: 0.8rem; color: var(--gray-5); margin: 0 0 10px; }
+.rf-tbl { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.rf-tbl th, .rf-tbl td { border: 1px solid var(--gray-3, #d8dbe2); padding: 4px 6px; text-align: center; }
+.rf-tbl th { background: var(--gray-1, #f4f5f8); font-weight: 600; color: var(--gray-7); }
+.rf-tbl input { width: 100%; min-width: 0; border: none; background: transparent; text-align: center; font: inherit; padding: 4px 2px; }
+.rf-tbl input:focus { outline: 2px solid var(--navy); border-radius: 3px; }
+.rf-tbl .sum { background: var(--gray-1, #f4f5f8); font-weight: 700; }
+.rf-tbl .rowh { background: var(--gray-1, #f4f5f8); font-weight: 600; }
+.rf-scroll { overflow-x: auto; }
+.rf-bar { position: sticky; bottom: 0; background: var(--white, #fff); border-top: 1px solid var(--gray-3, #d8dbe2);
+  padding: 12px 0; margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; z-index: 5; }
+.rf-seal-tip { font-size: 0.82rem; color: var(--gray-6); }
+.rf-seal-tip img { height: 34px; vertical-align: middle; margin-left: 6px; }
+
+/* ---------- 종이 문서 (미리보기·인쇄) ---------- */
+#sheet-wrap { display: none; }
+#sheet-wrap.show { display: block; }
+.sheet { background: #fff; color: #111; max-width: 800px; margin: 0 auto; padding: 46px 50px;
+  border: 1px solid var(--gray-3, #ddd); box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  font-family: "Batang", "바탕", "Noto Serif KR", serif; font-size: 12px; line-height: 1.5; }
+.sheet h1 { text-align: center; font-size: 26px; letter-spacing: 14px; margin: 0 0 20px; font-weight: 700; }
+.sheet .s-tbl { width: 100%; border-collapse: collapse; margin: 4px 0 12px; }
+.sheet .s-tbl th, .sheet .s-tbl td { border: 1px solid #333; padding: 3px 5px; text-align: center; font-weight: 400; font-size: 11.5px; }
+.sheet .s-tbl th { background: #f2f2f2; }
+.sheet .s-h { font-weight: 700; font-size: 13px; margin: 14px 0 2px; }
+.sheet .s-head-line { display: flex; justify-content: space-between; align-items: flex-end; margin: 10px 0 4px; }
+.sheet .s-close { text-align: center; margin-top: 26px; }
+.sheet .s-stamp-line { text-align: center; font-size: 15px; font-weight: 700; margin-top: 18px; }
+.sheet .s-seal-spot { position: relative; display: inline-block; }
+.sheet .s-seal-spot img.stamp { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  height: 64px; opacity: 0.92; pointer-events: none; }
+.sheet .s-note { font-size: 10.5px; color: #333; }
+@media print {
+  body > *:not(#sheet-wrap) { display: none !important; }
+  #sheet-wrap { display: block !important; }
+  .sheet { border: none; box-shadow: none; max-width: none; padding: 0; }
+  .sheet-tools { display: none !important; }
+  @page { size: A4 portrait; margin: 14mm 12mm; }
+}
+.sheet-tools { max-width: 800px; margin: 0 auto 12px; display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>교회상황 보고서</h1>
+    <div class="crumb">홈 &gt; 서류발급 &gt; 교회상황 보고서</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="rp-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<div id="sheet-wrap"></div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20260829"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  'use strict';
+  var area = document.getElementById('rp-area');
+  var e = SHS.esc;
+
+  var gate = SHS.memberGate(user, '교회상황 보고서');
+  if (gate) { area.innerHTML = gate; return; }
+  if (!user.cloud || !window.SHSCloud || !SHSCloud.enabled()) {
+    area.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.</div>';
+    return;
+  }
+
+  function db() { return SHSCloud.init(); }
+  function qs(k) {
+    var m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)'));
+    return m ? decodeURIComponent(m[1]).replace(/\+/g, ' ') : '';
+  }
+  function num(v) { var n = parseInt(String(v == null ? '' : v).replace(/[^\d-]/g, ''), 10); return isNaN(n) ? 0 : n; }
+  function comma(n) { return n ? Number(n).toLocaleString('ko-KR') : ''; }
+  function today() { return new Date().toISOString().slice(0, 10); }
+  function chKey(s) { return String(s || '').replace(/\s|교회$/g, ''); }
+
+  /* ---------- 무엇을 할지 정한다 ---------- */
+  var VIEW_ID = num(qs('id')) || null;                 /* 저장된 보고서 열람 */
+  var CHURCH = qs('church') || user.church || '';      /* 작성 대상 교회 */
+  var YEAR = num(qs('year')) || new Date().getFullYear();
+
+  /* ---------- 양식 구성표 ---------- */
+  var CLERGY = [
+    ['damim', '담임'], ['wonro', '원로'], ['bumok', '부목사(파트 포함)'], ['hyup', '협동'],
+    ['gita', '기타'], ['gangdosa', '강도사'], ['jd_m', '전도사 남'], ['jd_f', '전도사 여']
+  ];
+  var JEJIK = [
+    ['jr_simu', '장로 시무'], ['jr_wonro', '장로 원로'], ['jr_euntoe', '장로 은퇴'],
+    ['jr_hyup', '장로 협동'], ['jr_gita', '장로 기타'],
+    ['as_simu', '안수집사 시무'], ['as_gita', '안수집사 기타'],
+    ['ks_simu', '권사 시무'], ['ks_gita', '권사 기타'],
+    ['ss_m', '서리집사 남'], ['ss_f', '서리집사 여']
+  ];
+  var DEPTS = ['유아부', '유치부', '유년부', '초등부', '중등부', '고등부', '대학부', '청년부', '장년부', '노년부'];
+  var MCOLS = [['tm', '전체 남'], ['tf', '전체 여'], ['cm', '교사 남'], ['cf', '교사 여'],
+    ['bm', '유아세례 남'], ['bf', '유아세례 여'], ['hm', '학습 남'], ['hf', '학습 여'],
+    ['sm', '세례 남'], ['sf', '세례 여']];
+  var FIN_IN = [['carry', '전년이월'], ['offer', '헌금 (십일조·주일·감사·절기 등)'],
+    ['special', '특별헌금 (건축 등)'], ['mission', '선교·구제헌금'], ['etc', '기타수입']];
+  var FIN_OUT = [['oper', '교회운영비 (행정비·예배비)'], ['labor', '인건비 (사례비 등)'],
+    ['mission', '선 교 비'], ['edu', '교 육 비'], ['reserve', '예 비 비'], ['carry', '차년도이월금']];
+  var ASSET_ROWS = [
+    { cat: '부동산', n: 4 }, { cat: '임대보증금', n: 1 }, { cat: '차량', n: 3 }
+  ];
+
+  var record = null;       /* 서버에 저장된 줄 */
+  var mySeal = null;       /* 내 직인 (data URL) */
+  var meRow = null;        /* 명단에서 찾은 나 */
+  var pastorRow = null;    /* 이 교회의 담임목사 (명단) */
+  var SICHAL = '';
+
+  /* ---------- 불러오기 ---------- */
+  function load() {
+    db().then(function (c) {
+      var jobs = [
+        c.rpc('my_member').then(null, function () { return { data: null }; }),
+        c.from('member_seals').select('image').eq('user_id', user.id)
+          .then(null, function () { return { data: null }; })
+      ];
+      if (VIEW_ID) {
+        jobs.push(c.from('church_reports').select('*').eq('id', VIEW_ID));
+      } else {
+        jobs.push(c.from('church_reports').select('*').eq('year', YEAR).eq('church', CHURCH));
+        jobs.push(c.from('roster').select('name,church,position,category,sichal,address,postcode,phone,email')
+          .eq('category', '목사').eq('active', true));
+      }
+      return Promise.all(jobs);
+    }).then(function (rs) {
+      meRow = rs[0].data && rs[0].data[0] || null;
+      mySeal = rs[1].data && rs[1].data[0] ? rs[1].data[0].image : null;
+
+      if (VIEW_ID) {
+        record = rs[2].data && rs[2].data[0];
+        if (!record) {
+          area.innerHTML = '<div class="notice-banner">보고서를 찾을 수 없거나 열람 권한이 없습니다.</div>';
+          return;
+        }
+        renderDoc(record);
+        return;
+      }
+
+      record = rs[2].data && rs[2].data[0] || null;
+      var pastors = rs[3] && rs[3].data || [];
+      pastorRow = pastors.filter(function (m) { return chKey(m.church) === chKey(CHURCH); })[0] || null;
+      SICHAL = (record && record.sichal) || (pastorRow && pastorRow.sichal) ||
+               (meRow && meRow.out_church === CHURCH ? '' : '') || '';
+      if (!SICHAL) {
+        /* 시찰을 명단에서 못 찾으면 내 시찰이라도 쓴다 */
+        SICHAL = qs('sichal') || '';
+      }
+      renderForm();
+    }).catch(function (x) {
+      area.innerHTML = '<div class="notice-banner">불러오지 못했습니다: ' + e((x && x.message) || String(x)) + '</div>';
+    });
+  }
+
+  /* ================================================================
+   *  작성 화면
+   * ================================================================ */
+  function numCell(id, val, w) {
+    return '<td' + (w ? ' style="width:' + w + '"' : '') +
+      '><input type="text" inputmode="numeric" id="' + id + '" value="' + (val || '') + '"></td>';
+  }
+  function txtCell(id, val) {
+    return '<td><input type="text" id="' + id + '" value="' + e(val || '') + '"></td>';
+  }
+  function g(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+  function gn(id) { return num(g(id)); }
+
+  function renderForm() {
+    if (!CHURCH) {
+      area.innerHTML = '<div class="notice-banner">소속 교회가 없습니다. <a href="mypage.html">내 정보</a>에서 소속 교회를 먼저 채워 주세요.</div>';
+      return;
+    }
+    var d = (record && record.data) || {};
+    var head = d.head || {};
+    var addr = d.addr || {};
+    var clergy = d.clergy || {};
+    var jejik = d.jejik || {};
+    var members = d.members || {};
+    var family = d.family || { rows: [] };
+    var fin = d.fin || { 'in': {}, out: {} };
+    var assets = d.assets || [];
+    var support = d.support || { rows: [], mis: [] };
+
+    /* 처음 쓰는 보고서라면 명단에서 미리 채운다 */
+    var preAddr = addr.ch || (pastorRow && pastorRow.address) || (meRow && meRow.out_address) || '';
+    var prePastor = head.pastor || (pastorRow && pastorRow.name) ||
+      (user.position && user.position.indexOf('목사') !== -1 ? user.name : '');
+    var preTel = addr.tel || (pastorRow && pastorRow.phone) || '';
+    var preMobile = addr.mobile || (meRow && meRow.out_phone) || '';
+    var preEmail = addr.email || user.email || '';
+
+    var h = '';
+    h += '<div class="notice-banner"><strong>' + YEAR + '년 ' + e(CHURCH) + '</strong> 교회상황 보고서' +
+      (record ? ' — 제출된 내용을 고치고 있습니다.' : ' — 총회 서식 그대로 온라인으로 작성합니다.') +
+      ' 적은 내용은 <strong>시찰 서기</strong>에게 전달되고, 하단 (직인) 자리에는 ' +
+      '<a href="mypage.html" style="text-decoration:underline">내 정보</a>에 올려 둔 교회 직인이 찍힙니다.</div>';
+
+    /* ① 기본 정보 */
+    h += '<div class="admin-card rf-sec"><h3>① 기본 정보</h3>' +
+      '<p class="rf-hint">교회명·시찰·주소는 회원 명단에서 자동으로 가져왔습니다.</p>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 130px"><label>보고 연도</label><input type="text" value="' + YEAR + '년" disabled></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>보고일</label><input type="date" id="f-date" value="' + e(d.date || today()) + '"></div>' +
+      '<div class="field" style="flex:0 0 180px"><label>교회명</label><input type="text" value="' + e(CHURCH) + '" disabled></div>' +
+      '<div class="field" style="flex:0 0 130px"><label>시찰</label><input type="text" id="f-sichal" value="' + e(SICHAL) + '"' + (SICHAL ? ' disabled' : ' placeholder="예: 남부시찰"') + '></div>' +
+      '</div>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 160px"><label>담임교역자</label><input type="text" id="f-pastor" value="' + e(prePastor) + '"></div>' +
+      '<div class="field" style="flex:0 0 140px"><label>구분</label><select id="f-ptype">' +
+      ['위임', '임시', '전도사'].map(function (x) {
+        return '<option' + ((head.ptype || '위임') === x ? ' selected' : '') + '>' + x + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 200px"><label>주민등록번호 (선택)</label><input type="text" id="f-prrn" value="' + e(head.prrn || '') + '" placeholder="인쇄 후 자필 기입 가능"></div>' +
+      '</div>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 140px"><label>당회 구성</label><select id="f-danghoi">' +
+      ['조직', '미조직'].map(function (x) { return '<option' + ((head.danghoi || '조직') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="field" style="flex:0 0 140px"><label>재정</label><select id="f-finance">' +
+      ['자립', '미자립'].map(function (x) { return '<option' + ((head.finance || '자립') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="field" style="flex:0 0 140px"><label>지역</label><select id="f-region">' +
+      ['도시', '농어촌'].map(function (x) { return '<option' + ((head.region || '도시') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') +
+      '</select></div>' +
+      '</div></div>';
+
+    /* ② 주소·연락처 */
+    h += '<div class="admin-card rf-sec"><h3>② 주소·연락처</h3>' +
+      '<div class="field"><label>교회 주소</label><input type="text" id="f-achurch" value="' + e(preAddr) + '"></div>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 180px"><label>전화</label><input type="text" id="f-atel" value="' + e(preTel) + '"></div>' +
+      '<div class="field" style="flex:0 0 180px"><label>팩스</label><input type="text" id="f-afax" value="' + e(addr.fax || '') + '"></div>' +
+      '<div class="field"><label>홈페이지</label><input type="text" id="f-ahome" value="' + e(addr.home || '') + '"></div>' +
+      '</div>' +
+      '<div class="field"><label>사택 주소</label><input type="text" id="f-amanse" value="' + e(addr.manse || '') + '"></div>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 180px"><label>사택 전화</label><input type="text" id="f-amtel" value="' + e(addr.mtel || '') + '"></div>' +
+      '<div class="field" style="flex:0 0 180px"><label>핸드폰</label><input type="text" id="f-amobile" value="' + e(preMobile) + '"></div>' +
+      '<div class="field"><label>E-mail</label><input type="text" id="f-aemail" value="' + e(preEmail) + '"></div>' +
+      '</div></div>';
+
+    /* ③ 교역자·제직 */
+    h += '<div class="admin-card rf-sec"><h3>③ 교역자 수 및 제직자 수</h3><div class="rf-scroll">' +
+      '<table class="rf-tbl"><thead><tr>' +
+      CLERGY.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') +
+      '<th style="width:64px">계</th></tr></thead><tbody><tr>' +
+      CLERGY.map(function (c) { return numCell('f-c-' + c[0], clergy[c[0]]); }).join('') +
+      '<td class="sum" id="sum-clergy">0</td></tr></tbody></table></div>' +
+      '<div class="rf-scroll" style="margin-top:10px">' +
+      '<table class="rf-tbl"><thead><tr>' +
+      JEJIK.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') +
+      '<th style="width:64px">계</th></tr></thead><tbody><tr>' +
+      JEJIK.map(function (c) { return numCell('f-j-' + c[0], jejik[c[0]]); }).join('') +
+      '<td class="sum" id="sum-jejik">0</td></tr></tbody></table></div></div>';
+
+    /* ④ 교인수 */
+    h += '<div class="admin-card rf-sec"><h3>④ 교인수</h3>' +
+      '<p class="rf-hint">해당 없는 칸은 비워 두시면 됩니다. 합계는 자동으로 계산됩니다.</p>' +
+      '<div class="rf-scroll"><table class="rf-tbl"><thead>' +
+      '<tr><th rowspan="2" style="width:74px">구분</th><th colspan="2">전체인원</th><th colspan="2">교사수</th>' +
+      '<th colspan="2">유아세례</th><th colspan="2">학습</th><th colspan="2">세례교인</th></tr>' +
+      '<tr>' + '<th>남</th><th>여</th>'.repeat(5) + '</tr></thead><tbody>' +
+      DEPTS.map(function (dp) {
+        var row = members[dp] || {};
+        return '<tr><td class="rowh">' + dp + '</td>' +
+          MCOLS.map(function (c) { return numCell('f-m-' + dp + '-' + c[0], row[c[0]]); }).join('') + '</tr>';
+      }).join('') +
+      '<tr><td class="rowh">합계</td>' +
+      MCOLS.map(function (c) { return '<td class="sum" id="sum-m-' + c[0] + '">0</td>'; }).join('') +
+      '</tr></tbody></table></div>' +
+      '<div class="field" style="max-width:220px;margin-top:12px"><label>주일 낮 평균 출석 (통계용)</label>' +
+      '<input type="text" inputmode="numeric" id="f-wavg" value="' + (d.worship_avg || '') + '"></div></div>';
+
+    /* ⑤ 교역자 가족 (미자립) */
+    h += '<div class="admin-card rf-sec"><h3>⑤ 교역자 가족 현황 <span style="font-weight:400;font-size:0.82rem;color:var(--gray-5)">(미자립교회 교역자 대상 — 해당 없으면 비워 두세요)</span></h3>' +
+      '<div class="rf-scroll"><table class="rf-tbl"><thead><tr>' +
+      '<th style="width:90px">관계</th><th>성명</th><th style="width:70px">성별</th><th style="width:70px">연령</th><th>직업 / 학년</th></tr></thead><tbody>' +
+      [0, 1, 2, 3].map(function (i) {
+        var r = family.rows[i] || {};
+        return '<tr>' + txtCell('f-fam-rel-' + i, r.rel) + txtCell('f-fam-name-' + i, r.name) +
+          txtCell('f-fam-sex-' + i, r.sex) + numCell('f-fam-age-' + i, r.age) + txtCell('f-fam-job-' + i, r.job) + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="inline-form" style="margin-top:10px">' +
+      '<div class="field" style="flex:0 0 170px"><label>사례비 월지급액 (원)</label><input type="text" inputmode="numeric" id="f-pay-monthly" value="' + ((family.pay || {}).monthly || '') + '"></div>' +
+      '<div class="field" style="flex:0 0 110px"><label>지급 개월</label><input type="text" inputmode="numeric" id="f-pay-mmon" value="' + ((family.pay || {}).mmon || '') + '"></div>' +
+      '<div class="field" style="flex:0 0 170px"><label>기타지급액 (원)</label><input type="text" inputmode="numeric" id="f-pay-extra" value="' + ((family.pay || {}).extra || '') + '"></div>' +
+      '<div class="field" style="flex:0 0 110px"><label>지급 개월</label><input type="text" inputmode="numeric" id="f-pay-emon" value="' + ((family.pay || {}).emon || '') + '"></div>' +
+      '</div></div>';
+
+    /* ⑥ 교회 재정 */
+    h += '<div class="admin-card rf-sec"><h3>⑥ 교회 재정 <span style="font-weight:400;font-size:0.82rem;color:var(--gray-5)">(연말 공동의회 재정보고 자료에 의거, 원 단위)</span></h3>' +
+      '<div class="rf-scroll"><table class="rf-tbl"><thead>' +
+      '<tr><th colspan="2">수입</th><th colspan="2">지출</th></tr>' +
+      '<tr><th>항목</th><th style="width:22%">금액</th><th>항목</th><th style="width:22%">금액</th></tr></thead><tbody>' +
+      [0, 1, 2, 3, 4, 5].map(function (i) {
+        var a = FIN_IN[i], b = FIN_OUT[i];
+        return '<tr>' +
+          (a ? '<td class="rowh">' + a[1] + '</td>' + numCell('f-fi-' + a[0], (fin['in'] || {})[a[0]]) : '<td></td><td></td>') +
+          (b ? '<td class="rowh">' + b[1] + '</td>' + numCell('f-fo-' + b[0], (fin.out || {})[b[0]]) : '<td></td><td></td>') +
+          '</tr>';
+      }).join('') +
+      '<tr><td class="rowh">합계</td><td class="sum" id="sum-fi">0</td>' +
+      '<td class="rowh">합계</td><td class="sum" id="sum-fo">0</td></tr>' +
+      '</tbody></table></div></div>';
+
+    /* ⑦ 교회 자산 */
+    var assetIdx = 0;
+    h += '<div class="admin-card rf-sec"><h3>⑦ 교회 자산 현황</h3>' +
+      '<div class="rf-scroll"><table class="rf-tbl"><thead><tr>' +
+      '<th style="width:100px">항목</th><th>수량(면적)</th><th>가액(원)</th><th>용도</th><th>소유명</th></tr></thead><tbody>' +
+      ASSET_ROWS.map(function (grp) {
+        var out = '';
+        for (var k = 0; k < grp.n; k++) {
+          var r = assets[assetIdx] || {};
+          out += '<tr>' +
+            (k === 0 ? '<td class="rowh" rowspan="' + grp.n + '">' + grp.cat + '</td>' : '') +
+            txtCell('f-as-qty-' + assetIdx, r.qty) + numCell('f-as-val-' + assetIdx, r.value) +
+            txtCell('f-as-use-' + assetIdx, r.use) + txtCell('f-as-own-' + assetIdx, r.owner) + '</tr>';
+          assetIdx++;
+        }
+        return out;
+      }).join('') + '</tbody></table></div></div>';
+
+    /* ⑧ 후원 현황 */
+    h += '<div class="admin-card rf-sec"><h3>⑧ 미자립교회 후원 · 피후원 현황</h3>' +
+      '<p class="rf-hint">지원하는 교회는 피후원교회를, 지원받는 교회는 후원하는 교회를 적습니다.</p>' +
+      '<div class="rf-scroll"><table class="rf-tbl"><thead><tr>' +
+      '<th style="width:100px">구분</th><th>노회</th><th>교회</th><th>교역자</th><th>지원액(원)</th><th>지역</th></tr></thead><tbody>' +
+      [0, 1, 2, 3, 4].map(function (i) {
+        var r = support.rows[i] || {};
+        return '<tr><td><select id="f-su-kind-' + i + '">' +
+          ['', '후원', '피후원'].map(function (x) {
+            return '<option value="' + x + '"' + ((r.kind || '') === x ? ' selected' : '') + '>' + (x || '—') + '</option>';
+          }).join('') + '</select></td>' +
+          txtCell('f-su-nohoi-' + i, r.nohoi) + txtCell('f-su-church-' + i, r.church) +
+          txtCell('f-su-pastor-' + i, r.pastor) + numCell('f-su-amount-' + i, r.amount) +
+          txtCell('f-su-region-' + i, r.region) + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<h4 class="mn-sub" style="margin-top:14px">선교사 후원 현황</h4>' +
+      '<div class="rf-scroll"><table class="rf-tbl"><thead><tr>' +
+      '<th>선교사명</th><th>선교국가</th><th>파송기관</th><th>월후원액(원)</th><th>파송일자</th></tr></thead><tbody>' +
+      [0, 1, 2, 3, 4].map(function (i) {
+        var r = support.mis[i] || {};
+        return '<tr>' + txtCell('f-mi-name-' + i, r.name) + txtCell('f-mi-country-' + i, r.country) +
+          txtCell('f-mi-org-' + i, r.org) + numCell('f-mi-monthly-' + i, r.monthly) +
+          txtCell('f-mi-date-' + i, r.date) + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="field" style="margin-top:12px"><label>특기사항 (선택)</label>' +
+      '<textarea id="f-note" rows="3">' + e(d.note || record && record.note || '') + '</textarea></div></div>';
+
+    /* 제출 줄 */
+    h += '<div class="rf-bar">' +
+      '<button class="btn" id="rp-send">시찰 서기에게 제출</button>' +
+      '<button class="btn ghost" id="rp-preview">미리보기 · 인쇄</button>' +
+      '<span class="rf-seal-tip">' +
+      (mySeal
+        ? '문서 하단에 이 직인이 찍힙니다:<img src="' + mySeal + '" alt="직인">'
+        : '아직 직인이 없습니다. <a href="mypage.html" style="text-decoration:underline">내 정보</a>에서 올려 두시면 문서에 찍힙니다.') +
+      '</span>' +
+      '<span class="form-msg" id="rp-msg" style="margin:0"></span></div>';
+
+    area.innerHTML = h;
+
+    /* 합계 자동 계산 */
+    function sums() {
+      var t = 0;
+      CLERGY.forEach(function (c) { t += gn('f-c-' + c[0]); });
+      document.getElementById('sum-clergy').textContent = t || 0;
+      t = 0;
+      JEJIK.forEach(function (c) { t += gn('f-j-' + c[0]); });
+      document.getElementById('sum-jejik').textContent = t || 0;
+      MCOLS.forEach(function (c) {
+        var s2 = 0;
+        DEPTS.forEach(function (dp) { s2 += gn('f-m-' + dp + '-' + c[0]); });
+        document.getElementById('sum-m-' + c[0]).textContent = s2 || 0;
+      });
+      var fi = 0;
+      FIN_IN.forEach(function (c) { fi += gn('f-fi-' + c[0]); });
+      document.getElementById('sum-fi').textContent = comma(fi) || 0;
+      var fo = 0;
+      FIN_OUT.forEach(function (c) { fo += gn('f-fo-' + c[0]); });
+      document.getElementById('sum-fo').textContent = comma(fo) || 0;
+    }
+    area.addEventListener('input', sums);
+    sums();
+
+    document.getElementById('rp-preview').addEventListener('click', function () {
+      openSheet(collect(), mySeal);
+    });
+    document.getElementById('rp-send').addEventListener('click', send);
+  }
+
+  /* 화면의 값을 하나의 자료로 모은다 */
+  function collect() {
+    var d = { v: 1, date: g('f-date') || today(), worship_avg: gn('f-wavg') || null, note: g('f-note') || null };
+    d.head = { pastor: g('f-pastor'), ptype: g('f-ptype'), prrn: g('f-prrn'),
+      danghoi: g('f-danghoi'), finance: g('f-finance'), region: g('f-region') };
+    d.addr = { ch: g('f-achurch'), tel: g('f-atel'), fax: g('f-afax'), home: g('f-ahome'),
+      manse: g('f-amanse'), mtel: g('f-amtel'), mobile: g('f-amobile'), email: g('f-aemail') };
+    d.clergy = {}; CLERGY.forEach(function (c) { d.clergy[c[0]] = gn('f-c-' + c[0]) || null; });
+    d.jejik = {}; JEJIK.forEach(function (c) { d.jejik[c[0]] = gn('f-j-' + c[0]) || null; });
+    d.members = {};
+    DEPTS.forEach(function (dp) {
+      var row = {}, any = false;
+      MCOLS.forEach(function (c) {
+        var v = gn('f-m-' + dp + '-' + c[0]);
+        if (v) any = true;
+        row[c[0]] = v || null;
+      });
+      if (any) d.members[dp] = row;
+    });
+    d.family = { rows: [], pay: { monthly: gn('f-pay-monthly') || null, mmon: gn('f-pay-mmon') || null,
+      extra: gn('f-pay-extra') || null, emon: gn('f-pay-emon') || null } };
+    [0, 1, 2, 3].forEach(function (i) {
+      var r = { rel: g('f-fam-rel-' + i), name: g('f-fam-name-' + i), sex: g('f-fam-sex-' + i),
+        age: g('f-fam-age-' + i), job: g('f-fam-job-' + i) };
+      if (r.rel || r.name) d.family.rows.push(r);
+    });
+    d.fin = { 'in': {}, out: {} };
+    FIN_IN.forEach(function (c) { d.fin['in'][c[0]] = gn('f-fi-' + c[0]) || null; });
+    FIN_OUT.forEach(function (c) { d.fin.out[c[0]] = gn('f-fo-' + c[0]) || null; });
+    d.assets = [];
+    for (var i = 0; i < 8; i++) {
+      d.assets.push({ qty: g('f-as-qty-' + i), value: gn('f-as-val-' + i) || null,
+        use: g('f-as-use-' + i), owner: g('f-as-own-' + i) });
+    }
+    d.support = { rows: [], mis: [] };
+    [0, 1, 2, 3, 4].forEach(function (i) {
+      var r = { kind: g('f-su-kind-' + i), nohoi: g('f-su-nohoi-' + i), church: g('f-su-church-' + i),
+        pastor: g('f-su-pastor-' + i), amount: gn('f-su-amount-' + i) || null, region: g('f-su-region-' + i) };
+      if (r.church || r.pastor) d.support.rows.push(r);
+      var m = { name: g('f-mi-name-' + i), country: g('f-mi-country-' + i), org: g('f-mi-org-' + i),
+        monthly: gn('f-mi-monthly-' + i) || null, date: g('f-mi-date-' + i) };
+      if (m.name) d.support.mis.push(m);
+    });
+    return d;
+  }
+
+  function sumOf(obj, keys) {
+    var t = 0; keys.forEach(function (k) { t += num(obj[k]); }); return t;
+  }
+
+  /* ---------- 제출 ---------- */
+  function send() {
+    var msg = document.getElementById('rp-msg');
+    var d = collect();
+    if (!d.head.pastor) {
+      msg.className = 'form-msg err'; msg.textContent = '담임교역자 성명을 적어 주세요.'; return;
+    }
+    var sichal = SICHAL || g('f-sichal');
+    if (!sichal) {
+      msg.className = 'form-msg err'; msg.textContent = '시찰을 적어 주세요. (예: 남부시찰)'; return;
+    }
+    var mem = d.members, mt = 0, mb = 0, sch = 0;
+    DEPTS.forEach(function (dp) {
+      var r = mem[dp] || {};
+      mt += num(r.tm) + num(r.tf);
+      mb += num(r.sm) + num(r.sf);
+      if ('유아부유치부유년부초등부중등부고등부'.indexOf(dp) !== -1) sch += num(r.tm) + num(r.tf);
+    });
+    var row = {
+      year: YEAR, sichal: sichal, church: CHURCH,
+      pastor: d.head.pastor,
+      members_total: mt || null,
+      members_baptized: mb || null,
+      staff_pastors: sumOf(d.clergy, ['damim', 'wonro', 'bumok', 'hyup', 'gita', 'gangdosa', 'jd_m', 'jd_f']) || null,
+      staff_elders: sumOf(d.jejik, ['jr_simu', 'jr_wonro', 'jr_euntoe', 'jr_hyup', 'jr_gita']) || null,
+      staff_deacons: sumOf(d.jejik, ['as_simu', 'as_gita']) || null,
+      staff_kwonsa: sumOf(d.jejik, ['ks_simu', 'ks_gita']) || null,
+      worship_avg: d.worship_avg,
+      school_total: sch || null,
+      offering_year: sumOf(d.fin['in'], ['carry', 'offer', 'special', 'mission', 'etc']) || null,
+      note: d.note,
+      data: d,
+      /* 내 교회 보고서일 때만 내 직인을 찍는다 */
+      seal_image: (chKey(user.church) === chKey(CHURCH) && mySeal) ? mySeal : (record && record.seal_image) || null,
+      submitted_by: user.name,
+      updated_at: new Date().toISOString()
+    };
+    if (!record) row.user_id = user.id;
+
+    var btn = document.getElementById('rp-send');
+    btn.disabled = true;
+    msg.className = 'form-msg'; msg.textContent = '제출하는 중입니다...';
+    db().then(function (c) {
+      return record
+        ? c.from('church_reports').update(row).eq('id', record.id).select()
+        : c.from('church_reports').insert(row).select();
+    }).then(function (r) {
+      btn.disabled = false;
+      var w = SHS.wrote(r);
+      if (!w.ok) {
+        msg.className = 'form-msg err';
+        msg.textContent = (r.error && r.error.code === '23505')
+          ? '그 해의 보고서가 이미 있습니다. 화면을 새로 고친 뒤 다시 저장해 주세요.' : w.why;
+        return;
+      }
+      record = r.data[0];
+      SHSCloud.log(record && record.created_at !== record.updated_at ? 'update' : 'create',
+        '교회상황 보고서 제출', YEAR + '년 ' + CHURCH);
+      msg.className = 'form-msg ok';
+      msg.textContent = '제출되었습니다. 시찰 서기에게 알림이 전달되었습니다.';
+    }).catch(function (x) {
+      btn.disabled = false;
+      msg.className = 'form-msg err';
+      msg.textContent = '제출 실패: ' + ((x && x.message) || String(x));
+    });
+  }
+
+  /* ================================================================
+   *  종이 문서 (열람·인쇄)
+   * ================================================================ */
+  function renderDoc(rec) {
+    var d = rec.data;
+    var h = '<div class="notice-banner"><strong>' + rec.year + '년 ' + e(rec.church) + '</strong> 교회상황 보고서' +
+      ' <span style="color:var(--gray-5)">(제출: ' + e(rec.submitted_by || '-') + ' · ' +
+      e(String(rec.updated_at || rec.created_at || '').slice(0, 10)) + ')</span></div>' +
+      '<div style="margin:12px 0 18px">' +
+      '<button class="btn" id="doc-print">인쇄</button> ' +
+      '<a class="btn ghost" href="report.html?church=' + encodeURIComponent(rec.church) + '&year=' + rec.year + '">수정하기</a> ' +
+      '<a class="btn ghost" href="sichal.html?s=' + encodeURIComponent(rec.sichal || '') + '#report">시찰 페이지로</a>' +
+      '</div>';
+    if (!d) {
+      h += '<div class="notice-banner">이 보고서는 예전 요약 방식으로 제출되어 정식 양식 내용이 없습니다. ' +
+        '<a href="report.html?church=' + encodeURIComponent(rec.church) + '&year=' + rec.year +
+        '" style="text-decoration:underline">정식 양식으로 다시 작성</a>하실 수 있습니다.</div>';
+      area.innerHTML = h;
+      return;
+    }
+    area.innerHTML = h;
+    openSheet(d, rec.seal_image, rec);
+    document.getElementById('doc-print').addEventListener('click', function () { window.print(); });
+  }
+
+  function openSheet(d, seal, rec) {
+    var wrap = document.getElementById('sheet-wrap');
+    wrap.innerHTML = buildSheet(d, seal, rec);
+    wrap.classList.add('show');
+    var pr = document.getElementById('sheet-print');
+    if (pr) pr.addEventListener('click', function () { window.print(); });
+    var cl = document.getElementById('sheet-close');
+    if (cl) cl.addEventListener('click', function () {
+      wrap.classList.remove('show');
+      wrap.innerHTML = '';
+    });
+    wrap.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function sv(x) { return x == null || x === '' ? '&nbsp;' : e(String(x)); }
+  function sn(x) { return x ? comma(num(x)) : '&nbsp;'; }
+
+  function buildSheet(d, seal, rec) {
+    var church = (rec && rec.church) || CHURCH;
+    var year = (rec && rec.year) || YEAR;
+    var head = d.head || {}, addr = d.addr || {}, clergy = d.clergy || {}, jejik = d.jejik || {};
+    var members = d.members || {}, family = d.family || { rows: [] }, fin = d.fin || { 'in': {}, out: {} };
+    var assets = d.assets || [], support = d.support || { rows: [], mis: [] };
+    var dt = (d.date || today()).split('-');
+
+    var h = '<div class="sheet-tools">' +
+      '<button class="btn" id="sheet-print">인쇄</button>' +
+      (VIEW_ID ? '' : '<button class="btn ghost" id="sheet-close">미리보기 닫기</button>') +
+      '</div>';
+    h += '<div class="sheet">';
+    h += '<h1>교회 상황 보고서</h1>';
+    h += '<div class="s-head-line"><span>주후 ' + dt[0] + '년 ' + num(dt[1]) + '월 ' + num(dt[2]) + '일</span>' +
+      '<span><strong>' + e(church) + '</strong>&nbsp;&nbsp;당회장: <strong>' + sv(head.pastor) + '</strong> (인)</span></div>';
+    h += '<p style="margin:8px 0 2px"><strong>시화산노회장 귀하</strong><br>지난 노회기간 본 교회의 상황을 아래와 같이 보고합니다.</p>';
+
+    /* 1. 기본·주소 */
+    h += '<div class="s-h">1. 주소</div>';
+    h += '<table class="s-tbl"><tbody>' +
+      '<tr><th style="width:12%">노회명</th><td style="width:18%">시화산노회</td>' +
+      '<th style="width:12%">교회명</th><td style="width:18%">' + e(church) + '</td>' +
+      '<th style="width:14%">담임교역자</th><td>' + sv(head.pastor) + ' (' + sv(head.ptype) + ')</td></tr>' +
+      '<tr><th>시찰</th><td>' + sv((rec && rec.sichal) || SICHAL) + '</td>' +
+      '<th>당회구성</th><td>' + sv(head.danghoi) + '</td>' +
+      '<th>재정 / 지역</th><td>' + sv(head.finance) + ' / ' + sv(head.region) + '</td></tr>' +
+      (head.prrn ? '<tr><th>주민등록번호</th><td colspan="5" style="text-align:left">' + sv(head.prrn) + '</td></tr>' : '') +
+      '<tr><th>교회주소</th><td colspan="3" style="text-align:left">' + sv(addr.ch) + '</td>' +
+      '<th>전화 / 팩스</th><td>' + sv(addr.tel) + (addr.fax ? ' / ' + e(addr.fax) : '') + '</td></tr>' +
+      '<tr><th>사택주소</th><td colspan="3" style="text-align:left">' + sv(addr.manse) + '</td>' +
+      '<th>핸드폰</th><td>' + sv(addr.mobile) + '</td></tr>' +
+      '<tr><th>홈페이지</th><td colspan="3" style="text-align:left">' + sv(addr.home) + '</td>' +
+      '<th>E-mail</th><td>' + sv(addr.email) + '</td></tr>' +
+      '</tbody></table>';
+
+    /* 2. 교역자·제직 */
+    var ct = 0; CLERGY.forEach(function (c) { ct += num(clergy[c[0]]); });
+    var jt = 0; JEJIK.forEach(function (c) { jt += num(jejik[c[0]]); });
+    h += '<div class="s-h">2. 교역자 수 및 제직자 수</div>';
+    h += '<table class="s-tbl"><tbody><tr>' +
+      CLERGY.map(function (c) { return '<th>' + c[1].replace('(파트 포함)', '') + '</th>'; }).join('') + '<th>계</th></tr><tr>' +
+      CLERGY.map(function (c) { return '<td>' + sv(clergy[c[0]]) + '</td>'; }).join('') + '<td><strong>' + (ct || '') + '</strong></td></tr></tbody></table>';
+    h += '<table class="s-tbl"><tbody><tr>' +
+      JEJIK.map(function (c) { return '<th>' + c[1] + '</th>'; }).join('') + '<th>계</th></tr><tr>' +
+      JEJIK.map(function (c) { return '<td>' + sv(jejik[c[0]]) + '</td>'; }).join('') + '<td><strong>' + (jt || '') + '</strong></td></tr></tbody></table>';
+
+    /* 3. 교인수 */
+    h += '<div class="s-h">3. 교인수</div>';
+    h += '<table class="s-tbl"><tbody>' +
+      '<tr><th rowspan="2">구분</th><th colspan="2">전체인원</th><th colspan="2">교사수</th>' +
+      '<th colspan="2">유아세례</th><th colspan="2">학습</th><th colspan="2">세례교인</th></tr>' +
+      '<tr>' + '<th>남</th><th>여</th>'.repeat(5) + '</tr>' +
+      DEPTS.map(function (dp) {
+        var r = members[dp] || {};
+        return '<tr><th>' + dp + '</th>' + MCOLS.map(function (c) {
+          return '<td>' + sv(r[c[0]]) + '</td>';
+        }).join('') + '</tr>';
+      }).join('') +
+      '<tr><th>합계</th>' + MCOLS.map(function (c) {
+        var t = 0; DEPTS.forEach(function (dp) { t += num((members[dp] || {})[c[0]]); });
+        return '<td><strong>' + (t || '&nbsp;') + '</strong></td>';
+      }).join('') + '</tr></tbody></table>';
+
+    /* 4. 교역자 가족 */
+    if ((family.rows || []).length || (family.pay && (family.pay.monthly || family.pay.extra))) {
+      h += '<div class="s-h">4. 교역자 가족 현황 <span class="s-note">(미자립교회 교역자 대상)</span></div>';
+      h += '<table class="s-tbl"><tbody><tr><th>관계</th><th>성명</th><th>성별</th><th>연령</th><th>직업 / 학년</th></tr>' +
+        (family.rows || []).map(function (r) {
+          return '<tr><td>' + sv(r.rel) + '</td><td>' + sv(r.name) + '</td><td>' + sv(r.sex) +
+            '</td><td>' + sv(r.age) + '</td><td>' + sv(r.job) + '</td></tr>';
+        }).join('') +
+        (family.pay && (family.pay.monthly || family.pay.extra)
+          ? '<tr><th>교역자 사례비</th><td colspan="2">월지급액 ' + sn(family.pay.monthly) + '원 · ' + sv(family.pay.mmon) + '개월</td>' +
+            '<td colspan="2">기타지급액 ' + sn(family.pay.extra) + '원 · ' + sv(family.pay.emon) + '개월</td></tr>'
+          : '') +
+        '</tbody></table>';
+    }
+
+    /* 5. 재정 */
+    var fi = 0; FIN_IN.forEach(function (c) { fi += num((fin['in'] || {})[c[0]]); });
+    var fo = 0; FIN_OUT.forEach(function (c) { fo += num((fin.out || {})[c[0]]); });
+    h += '<div class="s-h">5. 교회재정 <span class="s-note">(연말 공동의회 재정보고 자료에 의거 작성)</span></div>';
+    h += '<table class="s-tbl"><tbody><tr><th colspan="2">수입</th><th colspan="2">지출</th></tr>' +
+      [0, 1, 2, 3, 4, 5].map(function (i) {
+        var a = FIN_IN[i], b = FIN_OUT[i];
+        return '<tr>' +
+          (a ? '<th style="width:28%">' + a[1] + '</th><td style="width:22%">' + sn((fin['in'] || {})[a[0]]) + '</td>'
+             : '<th>&nbsp;</th><td>&nbsp;</td>') +
+          (b ? '<th style="width:28%">' + b[1] + '</th><td style="width:22%">' + sn((fin.out || {})[b[0]]) + '</td>'
+             : '<th>&nbsp;</th><td>&nbsp;</td>') + '</tr>';
+      }).join('') +
+      '<tr><th>합계</th><td><strong>' + (fi ? comma(fi) : '&nbsp;') + '</strong></td>' +
+      '<th>합계</th><td><strong>' + (fo ? comma(fo) : '&nbsp;') + '</strong></td></tr></tbody></table>';
+
+    /* 6. 자산 */
+    var anyAsset = (assets || []).some(function (r) { return r && (r.qty || r.value || r.use || r.owner); });
+    if (anyAsset) {
+      h += '<div class="s-h">6. 교회자산현황</div>';
+      var idx = 0;
+      h += '<table class="s-tbl"><tbody><tr><th>항목</th><th>수량(면적)</th><th>가액(원)</th><th>용도</th><th>소유명</th></tr>' +
+        ASSET_ROWS.map(function (grp) {
+          var out = '';
+          for (var k = 0; k < grp.n; k++) {
+            var r = assets[idx] || {};
+            if (r.qty || r.value || r.use || r.owner || k === 0) {
+              out += '<tr>' + (k === 0 ? '<th>' + grp.cat + '</th>' : '<th>&nbsp;</th>') +
+                '<td>' + sv(r.qty) + '</td><td>' + sn(r.value) + '</td><td>' + sv(r.use) + '</td><td>' + sv(r.owner) + '</td></tr>';
+            }
+            idx++;
+          }
+          return out;
+        }).join('') + '</tbody></table>';
+    }
+
+    /* 7. 후원 */
+    if ((support.rows || []).length || (support.mis || []).length) {
+      h += '<div class="s-h">7. 미자립교회 후원 및 피후원 현황</div>';
+      if ((support.rows || []).length) {
+        h += '<table class="s-tbl"><tbody><tr><th>구분</th><th>노회</th><th>교회</th><th>교역자</th><th>지원액(원)</th><th>지역</th></tr>' +
+          support.rows.map(function (r) {
+            return '<tr><td>' + sv(r.kind) + '</td><td>' + sv(r.nohoi) + '</td><td>' + sv(r.church) +
+              '</td><td>' + sv(r.pastor) + '</td><td>' + sn(r.amount) + '</td><td>' + sv(r.region) + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      }
+      if ((support.mis || []).length) {
+        h += '<table class="s-tbl"><tbody><tr><th>선교사명</th><th>선교국가</th><th>파송기관</th><th>월후원액(원)</th><th>파송일자</th></tr>' +
+          support.mis.map(function (r) {
+            return '<tr><td>' + sv(r.name) + '</td><td>' + sv(r.country) + '</td><td>' + sv(r.org) +
+              '</td><td>' + sn(r.monthly) + '</td><td>' + sv(r.date) + '</td></tr>';
+          }).join('') + '</tbody></table>';
+      }
+    }
+
+    if (d.note) {
+      h += '<div class="s-h">특기사항</div><p style="white-space:pre-wrap;font-size:11.5px">' + e(d.note) + '</p>';
+    }
+
+    /* 맺음 + 직인 */
+    h += '<div class="s-close">상기와 같이 본 교회 통계현황을 보고합니다.<br><br>' +
+      dt[0] + '년 ' + num(dt[1]) + '월 ' + num(dt[2]) + '일</div>';
+    h += '<div class="s-stamp-line">대한예수교장로회 ' + e(church) + ' ' +
+      '<span class="s-seal-spot">(직인)' +
+      (seal ? '<img class="stamp" src="' + seal + '" alt="교회 직인">' : '') +
+      '</span></div>';
+    h += '</div>';
+    return h;
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>

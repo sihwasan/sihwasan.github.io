@@ -1790,3 +1790,11 @@ td[data-duch]:hover { background: #eef2f8; }
 .dues-mini-late strong { color: var(--red) !important; }
 /* 대시보드: 짝 없는 칸이 줄 전체를 쓴다 */
 .dash-cols .span2 { grid-column: 1 / -1; }
+
+/* 직인 미리보기: 투명한 부분이 보이도록 격자 바탕 */
+.seal-preview {
+  background:
+    linear-gradient(45deg, #eceff3 25%, transparent 25%, transparent 75%, #eceff3 75%) 0 0 / 16px 16px,
+    linear-gradient(45deg, #eceff3 25%, #fff 25%, #fff 75%, #eceff3 75%) 8px 8px / 16px 16px;
+}
+.seal-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }

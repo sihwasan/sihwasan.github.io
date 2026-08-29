@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내 정보 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260828">
+<link rel="stylesheet" href="css/style.css?v=20260829">
 </head>
 <body>
 
@@ -103,13 +103,13 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>생년월일</label>' +
       '<input type="date" id="q-birth" data-birth value="' + e(p.birth_date || '') + '">' +
       '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 회원명단 카드의 남은 임기 표시에 사용됩니다.</span></div>' +
-      '<div class="field"><label>교회 주소</label><input type="text" id="q-charr" value="' + e(p.church_addr || '') + '" placeholder="예: 안산시 단원구 ○○로 12"></div>' +
       '<div class="inline-form" style="margin-bottom:16px">' +
       '<div class="field" style="flex:0 0 130px"><label>우편번호</label>' +
       '<input type="text" id="q-post" value="' + e(p.postcode || '') + '" placeholder="00000" maxlength="7"></div>' +
-      '<div class="field"><label>자택 주소</label>' +
+      '<div class="field"><label>주소</label>' +
       '<input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
       '</div>' +
+      '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:-8px">주소는 한 칸입니다. 증명서·보고서 등 모든 문서에 이 주소가 쓰입니다.</p>' +
       '<p style="font-size:0.82rem;color:var(--gray-5)">여기 적으신 내용은 <strong>노회 명단</strong>에 그대로 저장되어, ' +
       '회원명단 카드와 주소록에 함께 반영됩니다. 성명·교회·직분을 고치면 명단과 다시 대조하여 등급이 갱신됩니다.</p>' +
       '<button class="btn" id="q-save" style="width:100%">저장</button>' +
@@ -133,6 +133,22 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="form-msg" id="ph-msg"></div>' +
       '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:8px">사진은 비공개 보관소에 저장되며, ' +
       '정회원에게만 회원명단 카드에서 보여집니다.</p>' +
+      '</div>';
+
+    /* 교회 직인·도장: 교회상황 보고서 등 문서 하단에 찍힌다 */
+    html += '<h2>교회 직인·도장</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<div class="ph-wrap">' +
+      '<div class="ph-preview seal-preview" id="sl-preview">직인 없음</div>' +
+      '<div class="ph-drop" id="sl-drop">직인이나 도장을 찍은 사진·그림 파일을<br>' +
+      '끌어다 놓거나 <span>눌러서 선택</span>하세요' +
+      '<small>흰 바탕은 자동으로 투명하게 지워져, 문서 위에 자연스럽게 찍힙니다</small></div>' +
+      '</div>' +
+      '<input type="file" id="sl-file" accept="image/*" class="hidden">' +
+      '<button class="btn ghost hidden" id="sl-del" style="width:100%;margin-top:12px">직인 지우기</button>' +
+      '<div class="form-msg" id="sl-msg"></div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:8px">본인만 보고 쓸 수 있으며, ' +
+      '<strong>교회상황 보고서</strong>를 제출하거나 인쇄할 때 문서 하단 (직인) 자리에 찍힙니다.</p>' +
       '</div>';
 
     /* 노회장 전용: 차기 노회장에게 권한 이양 */
@@ -179,7 +195,129 @@ document.addEventListener('DOMContentLoaded', function () {
     area.innerHTML = html;
     SHSDate.attachAll(area);   /* 생년월일 — 손으로 적거나 굴려서 고른다 */
     setupPhoto();
+    setupSeal();
     SHSMyDuties.mount(document.getElementById('duty-area'), p);
+
+    /* ---------- 교회 직인·도장 올리기 ----------
+     * 흰 바탕을 투명하게 지우고 420px 이하 PNG로 줄여
+     * member_seals 표(본인 전용)에 저장한다. */
+    function setupSeal() {
+      var drop = document.getElementById('sl-drop');
+      var fileIn = document.getElementById('sl-file');
+      var preview = document.getElementById('sl-preview');
+      var delBtn = document.getElementById('sl-del');
+      var msg = document.getElementById('sl-msg');
+      if (!drop) return;
+
+      function setMsg(t, err) {
+        msg.className = 'form-msg' + (err ? ' err' : ' ok');
+        msg.textContent = t || '';
+      }
+      function show(dataUrl) {
+        if (dataUrl) {
+          preview.innerHTML = '<img src="' + dataUrl + '" alt="교회 직인">';
+          delBtn.classList.remove('hidden');
+        } else {
+          preview.textContent = '직인 없음';
+          delBtn.classList.add('hidden');
+        }
+      }
+
+      SHSCloud.init().then(function (c) {
+        return c.from('member_seals').select('image').eq('user_id', p.id);
+      }).then(function (r) {
+        var row = r.data && r.data[0];
+        if (row) show(row.image);
+      }).catch(function () {});
+
+      /* 420px 이하로 줄이고, 흰 바탕(밝은 회색까지)을 투명하게 지운다 */
+      function toSeal(f) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          var url = URL.createObjectURL(f);
+          img.onload = function () {
+            var MAX = 420;
+            var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+            var w = Math.max(1, Math.round(img.naturalWidth * sc));
+            var hh = Math.max(1, Math.round(img.naturalHeight * sc));
+            var cv = document.createElement('canvas');
+            cv.width = w; cv.height = hh;
+            var cx = cv.getContext('2d');
+            cx.drawImage(img, 0, 0, w, hh);
+            URL.revokeObjectURL(url);
+            try {
+              var d = cx.getImageData(0, 0, w, hh);
+              var a = d.data;
+              for (var i = 0; i < a.length; i += 4) {
+                var mn = Math.min(a[i], a[i + 1], a[i + 2]);
+                if (mn > 235) a[i + 3] = 0;                       /* 흰 바탕 */
+                else if (mn > 200) a[i + 3] = Math.round(a[i + 3] * (235 - mn) / 35);
+              }
+              cx.putImageData(d, 0, 0);
+            } catch (x) { /* 못 지워도 그대로 저장한다 */ }
+            resolve(cv.toDataURL('image/png'));
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            reject(new Error('그림 파일을 읽지 못했습니다.'));
+          };
+          img.src = url;
+        });
+      }
+
+      function upload(f) {
+        if (!f) return;
+        if (!/^image\//.test(f.type)) { setMsg('그림 파일만 올릴 수 있습니다.', true); return; }
+        setMsg('직인을 다듬어 저장하는 중입니다…');
+        toSeal(f).then(function (dataUrl) {
+          if (dataUrl.length > 900000) throw new Error('그림이 너무 큽니다. 더 작은 파일로 올려 주세요.');
+          return SHSCloud.init().then(function (c) {
+            return c.from('member_seals').upsert({
+              user_id: p.id, image: dataUrl, updated_at: new Date().toISOString()
+            });
+          }).then(function (r) {
+            if (r.error) throw r.error;
+            SHSCloud.log('update', '교회 직인 등록', p.email);
+            setMsg('직인이 저장되었습니다. 이제 보고서에 찍을 수 있습니다.');
+            show(dataUrl);
+          });
+        }).catch(function (err) {
+          setMsg((err && err.message) || '직인을 올리지 못했습니다.', true);
+        });
+      }
+
+      drop.addEventListener('click', function () { fileIn.click(); });
+      fileIn.addEventListener('change', function () {
+        upload(fileIn.files && fileIn.files[0]);
+        fileIn.value = '';
+      });
+      ['dragenter', 'dragover'].forEach(function (ev) {
+        drop.addEventListener(ev, function (x) {
+          x.preventDefault(); x.stopPropagation();
+          drop.classList.add('over');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        drop.addEventListener(ev, function (x) {
+          x.preventDefault(); x.stopPropagation();
+          drop.classList.remove('over');
+        });
+      });
+      drop.addEventListener('drop', function (x) {
+        upload(x.dataTransfer && x.dataTransfer.files && x.dataTransfer.files[0]);
+      });
+      delBtn.addEventListener('click', function () {
+        if (!confirm('등록된 직인을 지우시겠습니까?')) return;
+        SHSCloud.init().then(function (c) {
+          return c.from('member_seals').delete().eq('user_id', p.id);
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          SHSCloud.log('update', '교회 직인 삭제', p.email);
+          setMsg('직인을 지웠습니다.');
+          show(null);
+        }).catch(function () { setMsg('직인을 지우지 못했습니다.', true); });
+      });
+    }
 
     /* ---------- 내 사진 올리기 ----------
      * 끌어다 놓거나 눌러서 선택하면 캔버스로 웹 크기(긴 변 480px, JPEG)로
@@ -354,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function () {
             p_phone:       document.getElementById('q-phone').value.trim(),
             p_address:     document.getElementById('q-addr').value.trim(),
             p_postcode:    document.getElementById('q-post').value.trim(),
-            p_church_addr: document.getElementById('q-charr').value.trim(),
+            p_church_addr: null,
             p_birth_date:  SHSDate.get(document.getElementById('q-birth')) || null,
             p_photo_path:  null
           });
