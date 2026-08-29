@@ -1764,3 +1764,27 @@ td[data-duch]:hover { background: #eef2f8; }
   overflow: hidden; margin-top: 10px;
 }
 .dues-mini-bar > div { height: 100%; background: var(--navy-light); border-radius: 999px; }
+/* 상회비 표: 교회 옆 담임 이름 */
+.dues-pastor { display: block; font-size: 0.76rem; color: var(--gray-5); margin-top: 1px; }
+/* 나의 상회비 */
+.mydues-head { font-size: 0.92rem; color: var(--gray-7); margin-bottom: 10px; }
+.mydues-head strong { color: var(--navy); }
+.mydues-p { color: var(--gray-5); font-size: 0.84rem; }
+.mydues-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+.md-dot {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--gray-1); color: var(--gray-5); font-size: 0.76rem;
+}
+.md-dot.on { background: var(--navy); color: #fff; font-weight: 700; }
+.md-dot.cur { box-shadow: 0 0 0 2px var(--accent); }
+.mydues-sum { font-size: 0.86rem; color: var(--gray-7); margin-top: 10px; }
+.mydues-note { display: block; font-size: 0.76rem; color: var(--gray-5); margin-top: 2px; }
+/* 상회비 미납 표기 */
+.mydues-late {
+  margin-top: 10px; font-size: 0.88rem; color: var(--red);
+  background: rgba(176,58,58,0.07); border-left: 3px solid var(--red);
+  padding: 7px 12px; border-radius: 0 6px 6px 0;
+}
+.mydues-ok { margin-top: 10px; font-size: 0.86rem; color: #2c7a3f; }
+.dues-mini-late strong { color: var(--red) !important; }

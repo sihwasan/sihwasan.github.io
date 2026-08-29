@@ -758,7 +758,8 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<tr class="dues-sc"><td colspan="15">' + e(sc) + '</td></tr>';
       rows.forEach(function (r) {
         var sum = 0, months = 0;
-        h += '<tr><td class="left">' + e(r.church) + '</td>' +
+        h += '<tr><td class="left">' + e(r.church) +
+          (r.pastor ? ' <span class="dues-pastor">' + e(r.pastor) + '</span>' : '') + '</td>' +
           '<td>' + manwon(r.monthly_amount) + '</td>';
         for (m = 1; m <= 12; m++) {
           var p2 = payOf(r.church, m);
@@ -817,6 +818,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return SHSCloud.init().then(function (c) {
           return c.from('dues_rates').insert(rows.map(function (x) {
             return { year: duesYear, sichal: x.sichal, church: x.church,
+                     pastor: x.pastor || null,
                      monthly_amount: x.monthly_amount, sort: x.sort };
           }));
         }).then(function (res) {
@@ -899,6 +901,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<thead><tr style="background:#eef1f6">' +
       '<th style="border:1px solid #999;padding:4px">시찰</th>' +
       '<th style="border:1px solid #999;padding:4px">교회</th>' +
+      '<th style="border:1px solid #999;padding:4px">교역자</th>' +
       '<th style="border:1px solid #999;padding:4px">월액</th>';
     for (var m = 1; m <= 12; m++) h += '<th style="border:1px solid #999;padding:4px;width:30px">' + m + '월</th>';
     h += '<th style="border:1px solid #999;padding:4px">납부 합계</th></tr></thead><tbody>';
@@ -910,6 +913,7 @@ document.addEventListener('DOMContentLoaded', function () {
           ? '<td style="border:1px solid #999;padding:4px;text-align:center" rowspan="' + rows.length + '">' + e(sc) + '</td>'
           : '') +
           '<td style="border:1px solid #999;padding:4px">' + e(r.church) + '</td>' +
+          '<td style="border:1px solid #999;padding:4px">' + e(r.pastor || '') + '</td>' +
           '<td style="border:1px solid #999;padding:4px;text-align:right">' + Number(r.monthly_amount || 0) + '</td>';
         for (var m2 = 1; m2 <= 12; m2++) {
           var p2 = payOf(r.church, m2);
@@ -982,8 +986,9 @@ document.addEventListener('DOMContentLoaded', function () {
     var h = '<p style="color:var(--gray-5);font-size:0.88rem">교회마다 매달 내는 상회비입니다. 단위는 만원입니다.' +
       (duesClosed ? ' 이 해는 마감되어 고칠 수 없습니다.'
         : (canDues ? ' 고치고 저장을 누르면 바로 반영됩니다.' : ' 설정 변경은 회계·부회계와 관리자가 합니다.')) + '</p>';
-    h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:640px"><thead><tr>' +
-      '<th style="width:120px">시찰</th><th>교회</th><th style="width:110px">월액(만원)</th>' +
+    h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:760px"><thead><tr>' +
+      '<th style="width:120px">시찰</th><th>교회</th><th style="width:120px">담임목사</th>' +
+      '<th style="width:110px">월액(만원)</th>' +
       (canEditRates ? '<th style="width:130px">관리</th>' : '') + '</tr></thead><tbody>';
     duesRates.forEach(function (r) {
       h += '<tr data-durate="' + r.id + '">' +
@@ -992,10 +997,12 @@ document.addEventListener('DOMContentLoaded', function () {
               return '<option' + ((r.sichal || '기타') === x ? ' selected' : '') + '>' + x + '</option>';
             }).join('') + '</select></td>' +
             '<td><input type="text" data-df="church" value="' + e(r.church) + '"></td>' +
+            '<td><input type="text" data-df="pastor" value="' + e(r.pastor || '') + '"></td>' +
             '<td><input type="number" data-df="amount" min="0" value="' + Number(r.monthly_amount || 0) + '"></td>' +
             '<td><button class="btn sm" data-dusave="' + r.id + '">저장</button> ' +
             '<button class="btn danger sm" data-dudel="' + r.id + '" data-dun="' + e(r.church) + '">삭제</button></td>'
           : '<td>' + e(r.sichal || '기타') + '</td><td class="left">' + e(r.church) + '</td>' +
+            '<td>' + e(r.pastor || '') + '</td>' +
             '<td>' + manwon(r.monthly_amount) + '</td>') +
         '</tr>';
     });
@@ -1006,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="field" style="flex:0 0 140px"><label>시찰</label><select id="du-nsc">' +
         DUES_SICHALS.map(function (x) { return '<option>' + x + '</option>'; }).join('') + '</select></div>' +
         '<div class="field"><label>교회</label><input type="text" id="du-nch" placeholder="예: 반월"></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>담임목사</label><input type="text" id="du-npt"></div>' +
         '<div class="field" style="flex:0 0 120px"><label>월액(만원)</label><input type="number" id="du-namt" min="0" value="0"></div>' +
         '<button class="btn" id="du-nadd">추가</button></div>' +
         '<div class="form-msg" id="du-nmsg"></div></div>';
@@ -1021,6 +1029,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var tr = b.closest('tr');
         function v(f) { return tr.querySelector('[data-df="' + f + '"]').value.trim(); }
         var d = { sichal: v('sichal'), church: v('church'),
+                  pastor: v('pastor') || null,
                   monthly_amount: Math.max(0, Math.round(Number(v('amount')) || 0)) };
         if (!d.church) { alert('교회 이름은 비울 수 없습니다.'); return; }
         SHSCloud.init().then(function (c) {
@@ -1051,6 +1060,7 @@ document.addEventListener('DOMContentLoaded', function () {
         year: duesYear,
         sichal: box.querySelector('#du-nsc').value,
         church: box.querySelector('#du-nch').value.trim(),
+        pastor: box.querySelector('#du-npt').value.trim() || null,
         monthly_amount: Math.max(0, Math.round(Number(box.querySelector('#du-namt').value) || 0)),
         sort: (duesRates.length ? Math.max.apply(null, duesRates.map(function (x) { return Number(x.sort || 0); })) : 0) + 1
       };

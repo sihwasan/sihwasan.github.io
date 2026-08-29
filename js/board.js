@@ -60,17 +60,75 @@ var SHSBoard = (function () {
       '<div id="dash-report"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>';
 
-    /* 상회비: 관리자와 회계·부회계에게만 보이는 요약 상자 */
+    /* 상회비: 정회원 모두에게 '나의 교회 납부 현황'을,
+     * 관리자와 회계·부회계에게는 노회 전체 요약을 함께 보여 준다.
+     * 내 교회는 노회 명단(roster)에서 온다 — my_dues 가 계정→명단→교회로 잇는다. */
     (function () {
+      if (!user.cloud) return;
       var canDues = SHSAuth.canManageMembers(user) ||
         (user.role === 'officer' && user.title && user.title.indexOf('회계') !== -1);
-      if (!canDues || !user.cloud) return;
       var boxD = document.getElementById('dash-dues');
-      boxD.innerHTML = '<div class="dash-cols"><section aria-label="상회비">' +
-        '<h3 class="dash-h">상회비 <a class="more" href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면</a></h3>' +
-        '<div id="dash-dues-body"><p class="dash-none">불러오는 중...</p></div></section></div>';
+      var duesLink = 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC';
+      boxD.innerHTML = '<div class="dash-cols">' +
+        '<section aria-label="나의 상회비"><h3 class="dash-h">나의 상회비</h3>' +
+        '<div id="dash-mydues"><p class="dash-none">불러오는 중...</p></div></section>' +
+        (canDues
+          ? '<section aria-label="상회비 전체"><h3 class="dash-h">상회비 전체 ' +
+            '<a class="more" href="' + duesLink + '">관리 화면</a></h3>' +
+            '<div id="dash-dues-body"><p class="dash-none">불러오는 중...</p></div></section>'
+          : '') +
+        '</div>';
       var yr = new Date().getFullYear();
       var mo = new Date().getMonth() + 1;
+
+      /* ----- 나의 상회비 (명단의 내 교회 기준) ----- */
+      SHSCloud.init().then(function (c) {
+        return c.rpc('my_dues', { p_year: yr });
+      }).then(function (r) {
+        var el = document.getElementById('dash-mydues');
+        var rows = (r && r.data) || [];
+        if (!rows.length) {
+          el.innerHTML = '<p class="dash-none">우리 교회는 올해 상회비 설정에 없습니다. ' +
+            '궁금하신 점은 노회 회계에게 문의해 주세요.</p>';
+          return;
+        }
+        var info = rows[0];
+        var paid = {};
+        rows.forEach(function (x) { if (x.out_month) paid[x.out_month] = x; });
+        var months = Object.keys(paid).length;
+        var sum = 0;
+        rows.forEach(function (x) { if (x.out_month) sum += Number(x.out_amount || 0); });
+        var dots = '';
+        for (var m = 1; m <= 12; m++) {
+          var pd = paid[m];
+          dots += '<span class="md-dot' + (pd ? ' on' : '') + (m === mo ? ' cur' : '') + '"' +
+            (pd ? ' title="' + m + '월 ' + Number(pd.out_amount || 0) + '만원 (' + (pd.out_paid_on || '') + ')"'
+                : ' title="' + m + '월 미납"') + '>' + m + '</span>';
+        }
+        /* 이번 달까지 안 낸 달을 미납으로 본다 */
+        var lateMonths = [];
+        for (var lm = 1; lm <= mo; lm++) if (!paid[lm]) lateMonths.push(lm);
+        var lateAmt = lateMonths.length * Number(info.out_monthly || 0);
+        var lateHtml = lateMonths.length
+          ? '<p class="mydues-late">' + lateMonths.join('·') + '월 미납 — <strong>' +
+            lateAmt.toLocaleString('ko-KR') + '만원</strong></p>'
+          : '<p class="mydues-ok">이번 달까지 미납이 없습니다.</p>';
+        el.innerHTML =
+          '<div class="mydues-head"><strong>' + SHS.esc(info.out_church) + '</strong>' +
+          (info.out_pastor ? ' <span class="mydues-p">' + SHS.esc(info.out_pastor) + ' 목사</span>' : '') +
+          ' · 월 ' + Number(info.out_monthly || 0) + '만원' +
+          (info.out_closed ? ' <span class="dues-mini-closed">' + yr + '년 마감</span>' : '') + '</div>' +
+          '<div class="mydues-dots">' + dots + '</div>' +
+          lateHtml +
+          '<p class="mydues-sum">올해 ' + months + '개월 납부 · ' + sum.toLocaleString('ko-KR') + '만원' +
+          '<span class="mydues-note">납부 확인이 실제와 다르면 노회 회계에게 알려 주세요.</span></p>';
+      }).catch(function () {
+        var el = document.getElementById('dash-mydues');
+        if (el) el.innerHTML = '<p class="dash-none">상회비 현황을 불러오지 못했습니다.</p>';
+      });
+
+      /* ----- 전체 요약 (관리자·회계) ----- */
+      if (!canDues) return;
       SHSCloud.init().then(function (c) {
         return Promise.all([
           c.from('dues_rates').select('church,monthly_amount').eq('year', yr),
@@ -83,22 +141,28 @@ var SHSBoard = (function () {
         var el = document.getElementById('dash-dues-body');
         if (!rates.length) {
           el.innerHTML = '<p class="dash-none">' + yr + '년 상회비 설정이 아직 없습니다. ' +
-            '<a href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC" style="color:var(--navy);text-decoration:underline">관리 화면에서 설정</a></p>';
+            '<a href="' + duesLink + '" style="color:var(--navy);text-decoration:underline">관리 화면에서 설정</a></p>';
           return;
         }
-        var monthly = 0, paid = 0, curCnt = 0;
+        var monthly = 0, paid = 0, curCnt = 0, paidToDate = 0;
         var rateBy = {};
-        rates.forEach(function (r) { monthly += Number(r.monthly_amount || 0); rateBy[r.church] = Number(r.monthly_amount || 0); });
+        rates.forEach(function (r2) { monthly += Number(r2.monthly_amount || 0); rateBy[r2.church] = Number(r2.monthly_amount || 0); });
         pays.forEach(function (p2) {
-          paid += p2.amount != null ? Number(p2.amount) : (rateBy[p2.church] || 0);
+          var a = p2.amount != null ? Number(p2.amount) : (rateBy[p2.church] || 0);
+          paid += a;
+          if (p2.month <= mo) paidToDate += a;
           if (p2.month === mo) curCnt++;
         });
         var pct = monthly ? Math.round(paid / (monthly * 12) * 100) : 0;
+        /* 이번 달까지 부과된 금액과 실제 낸 금액의 차이 */
+        var late = Math.max(0, monthly * mo - paidToDate);
         el.innerHTML =
           '<div class="dues-mini">' +
           '<span><strong>' + curCnt + '/' + rates.length + '</strong> ' + mo + '월 납부 교회</span>' +
           '<span><strong>' + paid.toLocaleString('ko-KR') + '만</strong> 올해 납부액</span>' +
           '<span><strong>' + pct + '%</strong> 연간 납부율</span>' +
+          '<span class="' + (late ? 'dues-mini-late' : '') + '"><strong>' +
+          late.toLocaleString('ko-KR') + '만</strong> ' + mo + '월까지 미납</span>' +
           (closed ? '<span class="dues-mini-closed">' + yr + '년 마감됨</span>' : '') +
           '</div>' +
           '<div class="dues-mini-bar"><div style="width:' + Math.min(100, pct) + '%"></div></div>';
