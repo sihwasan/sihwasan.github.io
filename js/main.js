@@ -410,6 +410,7 @@
             '<a href="mypage.html">내 정보</a><a href="#" id="btn-logout2">로그아웃</a>';
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
+          window.__shsUser = p;
           loadUnread();
           /* 1분마다 새 알림을 확인해 팝업으로 띄운다 */
           setInterval(loadUnread, 60000);
@@ -493,12 +494,29 @@
    * 새 알림은 화면 오른쪽 위에 팝업 카드로 한 번 띄운다.
    * 한 번 띄운 알림은 이 기기에서 다시 띄우지 않는다 (알림함에는 그대로 남는다). */
   var TOAST_SEEN_KEY = 'shs_toast_seen_v1';
-  function toastLink(n) {
+  /* 알림 하나가 가리키는 화면.
+   * 문의는 그 글로, 서류는 그 신청·증명서로 곧장 데려간다.
+   * 서류는 보는 사람에 따라 갈 곳이 다르다 —
+   * 관리자는 처리 화면(서류 발급), 신청자는 내 신청 내역. */
+  function notiLinkOf(n, u) {
+    var key = String((n && n.dedupe_key) || '');
     if (n.kind === '문의') {
-      return 'board.html#' +
-        (n.dedupe_key && String(n.dedupe_key).indexOf('inquiry-') === 0 ? n.dedupe_key : 'inquiry');
+      return 'board.html#' + (key.indexOf('inquiry-') === 0 ? key : 'inquiry');
+    }
+    if (n.kind === '서류') {
+      if (key.indexOf('docissue-') === 0) {
+        return 'certificate.html?id=' + key.slice(9);
+      }
+      var canDo = u && SHSAuth.canIssueDocuments && SHSAuth.canIssueDocuments(u);
+      if (key.indexOf('docreq-') === 0) {
+        return canDo ? 'documents.html#' + key : 'request.html#' + key;
+      }
+      return canDo ? 'documents.html#requests' : 'request.html';
     }
     return 'notifications.html';
+  }
+  function toastLink(n) {
+    return notiLinkOf(n, window.__shsUser || null);
   }
   function showToasts(rows) {
     var seen;
@@ -524,7 +542,9 @@
         '<span class="nt-kind">' + SHS.esc(n.kind || '알림') + '</span>' +
         '<strong class="nt-title">' + SHS.esc(n.title || '') + '</strong>' +
         '<span class="nt-body">' + SHS.esc(String(n.body || '').slice(0, 90)) + '</span>' +
-        '<span class="nt-go">' + (n.kind === '문의' ? '답장하기' : '알림함에서 보기') + '</span>' +
+        '<span class="nt-go">' +
+        (n.kind === '문의' ? '답장하기' : n.kind === '서류' ? '바로 가기' : '알림함에서 보기') +
+        '</span>' +
         '</a>';
       setTimeout(function () { wrap.appendChild(card); }, i * 250);
       card.querySelector('.nt-x').addEventListener('click', function (ev) {
@@ -1206,6 +1226,7 @@
   }
 
   window.SHS = {
+    notiLinkOf: notiLinkOf,
     user: user,
     getUser: getUser,
     sectionize: sectionize,

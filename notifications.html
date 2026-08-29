@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>알림 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260829n">
+<link rel="stylesheet" href="css/style.css?v=20260829p">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829i"></script>
+<script src="js/main.js?v=20260829p"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -155,10 +155,9 @@ document.addEventListener('DOMContentLoaded', function () {
               ? '<div class="n-from">보낸이 ' + e(n.sent_by_name) + '</div>' : '') +
             '<div class="n-body">' + e(n.body || '') + '</div>' +
             '<p style="margin:10px 0 0">' +
-            (n.kind === '문의'
-              ? '<a class="btn sm" href="board.html#' +
-                (n.dedupe_key && n.dedupe_key.indexOf('inquiry-') === 0 ? e(n.dedupe_key) : 'inquiry') +
-                '" style="margin-right:6px">답장하기</a>' : '') +
+            (SHS.notiLinkOf && (n.kind === '문의' || n.kind === '서류')
+              ? '<a class="btn sm" href="' + e(SHS.notiLinkOf(n, user)) + '" style="margin-right:6px">' +
+                (n.kind === '문의' ? '답장하기' : '바로 가기') + '</a>' : '') +
             (n.read_at ? '' : '<button class="btn ghost sm" data-ntread="' + n.id + '" style="margin-right:6px">읽음</button>') +
             '<button class="btn danger sm" data-ntdel="' + n.id + '">삭제</button>' +
             '</p>' +

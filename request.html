@@ -10,7 +10,7 @@
 <meta property="og:title" content="서류발급 - 시화산노회">
 <meta property="og:description" content="시화산노회 서류발급 — 소속·재직·대표자·직인 증명서 신청과 발급 절차를 안내합니다.">
 <meta property="og:url" content="https://sihwasan.org/request.html">
-<link rel="stylesheet" href="css/style.css?v=20260829n">
+<link rel="stylesheet" href="css/style.css?v=20260829p">
 </head>
 <body>
 
@@ -56,10 +56,10 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829i"></script>
+<script src="js/main.js?v=20260829p"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
-<script src="js/certificate.js?v=20260829n"></script>
+<script src="js/certificate.js?v=20260829p"></script>
 <script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -209,7 +209,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
           cell = '<span style="color:var(--gray-5)">발급 대기</span>';
         }
-        html += '<tr><td>' + e(String(r.created_at).slice(0, 10)) + '</td><td>' + e(r.doc_type) + '</td>' +
+        html += '<tr data-req="' + r.id + '"><td>' + e(String(r.created_at).slice(0, 10)) + '</td><td>' + e(r.doc_type) + '</td>' +
           '<td>' + e(r.purpose || '-') + '</td><td>' + e(r.copies) + '</td>' +
           '<td><span class="role-badge">' + e(statusLabel(r.status)) + '</span>' +
           (r.status === '신청'
@@ -294,6 +294,22 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* 알림에서 넘어온 신청 건(#docreq-12)을 찾아 표시해 준다 */
+  function openReqFromHash() {
+    var m = (location.hash || '').match(/^#docreq-(\d+)$/);
+    if (!m) return;
+    var tries = 0;
+    var timer = setInterval(function () {
+      var row = document.querySelector('tr[data-req="' + m[1] + '"]');
+      if (row) {
+        clearInterval(timer);
+        row.style.outline = '2px solid var(--navy)';
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (++tries > 20) { clearInterval(timer); }
+    }, 300);
+  }
+  window.addEventListener('hashchange', openReqFromHash);
+
   var lastList = [];
   function load() {
     SHSCloud.init().then(function (c) {
@@ -325,6 +341,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       lastList = r.data || [];
       render(lastList);
+      openReqFromHash();
     });
   }
   load();

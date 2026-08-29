@@ -1654,11 +1654,11 @@ input.dp-bad { border-color: var(--red); }
 
 /* 증명서 진위 확인 QR — 문서 상단 왼쪽, 발급번호와 한 줄 */
 .cert-top {
-  display: flex; align-items: flex-start; gap: 14px;
-  margin-bottom: 6px; min-height: 52px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; margin-bottom: 6px; min-height: 52px;
 }
 .cert-top .c-no { align-self: center; }
-.cert-verify { display: flex; align-items: center; gap: 7px; }
+.cert-verify { display: flex; align-items: center; gap: 7px; text-align: right; }
 .cert-verify img { width: 52px; height: 52px; image-rendering: pixelated; }
 .cert-verify .t {
   font-size: 8px; line-height: 1.45; color: #666;

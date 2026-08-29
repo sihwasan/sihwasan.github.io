@@ -92,8 +92,9 @@ var SHSCert = (function () {
           '확인번호 ' + esc(rec.verify_code) + '</div></div>';
       } catch (ignore) { /* QR을 못 만들어도 증명서 발급은 막지 않는다 */ }
     }
-    h += '<div class="cert-top">' + qrHtml +
-      '<div class="c-no">' + esc(rec.doc_no || rec.no || '') + '</div></div>';
+    h += '<div class="cert-top">' +
+      '<div class="c-no">' + esc(rec.doc_no || rec.no || '') + '</div>' +
+      qrHtml + '</div>';
     h += '<h2>' + esc(docName) + '</h2>';
 
     if (docName === '직인증명서') {

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>서류 발급 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260829n">
+<link rel="stylesheet" href="css/style.css?v=20260829p">
 </head>
 <body>
 
@@ -24,11 +24,11 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829i"></script>
+<script src="js/main.js?v=20260829p"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
-<script src="js/certificate.js?v=20260829n"></script>
+<script src="js/certificate.js?v=20260829p"></script>
 <script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -319,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<div style="font-size:0.72rem;color:var(--navy)">재직 시작 ' + e(String(sf)) + '</div>'
             : '<div style="font-size:0.72rem;color:var(--red)">재직 시작일 없음 — 명단 관리에서 입력</div>';
         }
-        html2 += '<tr><td>' + e(String(q.created_at).slice(0, 10)) + '</td>' +
+        html2 += '<tr data-req="' + q.id + '"><td>' + e(String(q.created_at).slice(0, 10)) + '</td>' +
           '<td>' + e(q.name) + '<div style="font-size:0.75rem;color:var(--gray-5)">' + e(q.position || '') + '</div>' +
           servedNote + '</td>' +
           '<td>' + e(q.church || '-') + '</td><td>' + e(q.doc_type) + '</td><td>' + e(q.purpose || '-') + '</td>' +
@@ -507,6 +507,24 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   loadRequests();
+
+  /* 알림에서 넘어온 신청 건(#docreq-12)을 찾아 표시해 준다 */
+  function openReqFromHash() {
+    var m = (location.hash || '').match(/^#docreq-(\d+)$/);
+    if (!m) return;
+    var tries = 0;
+    var timer = setInterval(function () {
+      var row = document.querySelector('tr[data-req="' + m[1] + '"]');
+      if (row) {
+        clearInterval(timer);
+        row.style.outline = '2px solid var(--navy)';
+        row.style.background = 'var(--gray-1, #f4f5f8)';
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (++tries > 20) { clearInterval(timer); }
+    }, 300);
+  }
+  openReqFromHash();
+  window.addEventListener('hashchange', openReqFromHash);
 
   /* ---------- 발급 대장 (노회 서버에 보관) ---------- */
   function renderLog() {
