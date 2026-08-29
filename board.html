@@ -26,6 +26,7 @@
   <div class="tabs">
     <button class="active" data-tab="notice">공지사항</button>
     <button data-tab="free">자유게시판</button>
+    <button data-tab="inquiry">문의하기</button>
   </div>
 
   <!-- 공지사항 -->
@@ -75,6 +76,60 @@
         <p id="pv-meta" style="font-size:0.82rem;color:var(--gray-5)"></p>
         <p id="pv-body" style="white-space:pre-wrap"></p>
         <button class="btn ghost sm" id="pv-close">목록으로</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 문의하기 -->
+  <div class="tab-panel" id="inquiry">
+    <div class="notice-banner">
+      관리자·서기·노회장에게 문의를 남기면 바로 알림이 전달됩니다.
+      <strong>비밀글</strong>로 쓰면 본인과 관리자 외에는 목록에서도 보이지 않습니다.
+    </div>
+    <div class="board-controls">
+      <span id="iq-count" style="color:var(--gray-7);font-size:0.88rem"></span>
+      <button class="btn" id="iq-write">문의하기</button>
+    </div>
+    <table class="tbl">
+      <thead><tr><th style="width:60px">번호</th><th style="width:90px">받는 곳</th><th>제목</th>
+      <th style="width:100px">작성자</th><th style="width:105px">작성일</th>
+      <th style="width:90px">상태</th><th style="width:130px">관리</th></tr></thead>
+      <tbody id="iq-body"></tbody>
+    </table>
+
+    <div id="iq-form" class="hidden side-box" style="margin-top:20px">
+      <div class="box-head" id="iq-ftitle">문의하기</div>
+      <div class="box-body">
+        <input type="hidden" id="iq-id">
+        <div class="inline-form">
+          <div class="field" style="flex:0 0 150px"><label>받는 곳</label>
+            <select id="iq-target"><option>관리자</option><option>서기</option><option>노회장</option><option>기타</option></select>
+          </div>
+          <div class="field"><label>제목</label><input type="text" id="iq-title"></div>
+        </div>
+        <div class="field"><label>내용</label><textarea id="iq-text" rows="6"></textarea></div>
+        <div class="field"><label>사진 (선택 · 최대 3장)</label>
+          <input type="file" id="iq-photos" accept="image/*" multiple>
+          <div id="iq-pre" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.9rem;margin-bottom:14px">
+          <input type="checkbox" id="iq-secret" style="width:auto">
+          비밀글로 하기 — 본인과 관리자만 볼 수 있습니다
+        </label>
+        <button class="btn" id="iq-save">등록</button>
+        <button class="btn ghost" id="iq-cancel">취소</button>
+        <div class="form-msg" id="iq-msg"></div>
+      </div>
+    </div>
+
+    <div id="iq-view" class="hidden side-box" style="margin-top:20px">
+      <div class="box-head" id="iqv-title"></div>
+      <div class="box-body">
+        <p id="iqv-meta" style="font-size:0.82rem;color:var(--gray-5)"></p>
+        <p id="iqv-body" style="white-space:pre-wrap"></p>
+        <div id="iqv-photos" style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0"></div>
+        <div id="iqv-answer"></div>
+        <button class="btn ghost sm" id="iqv-close">목록으로</button>
       </div>
     </div>
   </div>
@@ -217,6 +272,276 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('btn-cancel').addEventListener('click', function () {
     document.getElementById('write-form').classList.add('hidden');
   });
+  /* ================= 문의하기 (서버) ================= */
+  (function () {
+    var iqRows = [];
+    var iqPhotos = [];          /* 새로 고른 사진 data URL 목록 */
+    var canMng = SHSAuth.canManageMembers(user);
+
+    function el(id) { return document.getElementById(id); }
+    function serverOk() { return user && user.cloud && window.SHSCloud && SHSCloud.enabled(); }
+
+    function loadInquiries() {
+      if (!serverOk()) {
+        el('iq-body').innerHTML =
+          '<tr><td colspan="7">문의하기는 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.</td></tr>';
+        return;
+      }
+      SHSCloud.init().then(function (c) {
+        return c.from('inquiries').select('*').order('id', { ascending: false });
+      }).then(function (r) {
+        if (r.error) throw r.error;
+        iqRows = r.data || [];
+        drawInquiries();
+      }).catch(function (x) {
+        el('iq-body').innerHTML = '<tr><td colspan="7">불러오지 못했습니다: ' +
+          e((x && x.message) || x) + '</td></tr>';
+      });
+    }
+
+    function drawInquiries() {
+      var tb = el('iq-body');
+      el('iq-count').textContent = iqRows.length ? '모두 ' + iqRows.length + '건' : '';
+      if (!iqRows.length) {
+        tb.innerHTML = '<tr><td colspan="7">등록된 문의가 없습니다.</td></tr>';
+        return;
+      }
+      tb.innerHTML = iqRows.map(function (q, i) {
+        var mine = user && q.user_id === user.id;
+        return '<tr><td>' + (iqRows.length - i) + '</td>' +
+          '<td>' + e(q.target) + '</td>' +
+          '<td class="left"><a href="#" data-iq="' + q.id + '" style="color:var(--ink)">' +
+          (q.secret ? '<span style="color:var(--gray-5);font-size:0.8rem">[비밀]</span> ' : '') + e(q.title) +
+          ((q.photos || []).length ? ' <span style="color:var(--gray-5);font-size:0.8rem">[사진 ' + q.photos.length + ']</span>' : '') +
+          '</a></td>' +
+          '<td>' + e(q.author) + '</td>' +
+          '<td>' + e(String(q.created_at).slice(0, 10)) + '</td>' +
+          '<td>' + (q.answer ? '<span class="role-badge">답변 완료</span>' : '<span style="color:var(--gray-5)">대기</span>') + '</td>' +
+          '<td>' + (mine || canMng
+            ? '<button class="btn ghost sm" data-iqedit="' + q.id + '">수정</button> ' +
+              '<button class="btn danger sm" data-iqdel="' + q.id + '">삭제</button>'
+            : '') + '</td></tr>';
+      }).join('');
+
+      tb.querySelectorAll('a[data-iq]').forEach(function (a) {
+        a.addEventListener('click', function (ev) { ev.preventDefault(); openInquiry(+a.dataset.iq); });
+      });
+      tb.querySelectorAll('button[data-iqedit]').forEach(function (b) {
+        b.addEventListener('click', function () { editInquiry(+b.dataset.iqedit); });
+      });
+      tb.querySelectorAll('button[data-iqdel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var q = byId(+b.dataset.iqdel);
+          if (!q || !confirm('"' + q.title + '" 문의를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('inquiries').delete().eq('id', q.id);
+          }).then(function (r) {
+            if (r.error) { alert(r.error.message); return; }
+            SHSCloud.log('delete', '문의 삭제', q.title);
+            el('iq-view').classList.add('hidden');
+            loadInquiries();
+          });
+        });
+      });
+    }
+
+    function byId(id) {
+      return iqRows.filter(function (x) { return x.id === id; })[0] || null;
+    }
+
+    function openInquiry(id) {
+      var q = byId(id);
+      if (!q) return;
+      el('iqv-title').textContent = (q.secret ? '[비밀] ' : '') + q.title;
+      el('iqv-meta').textContent = q.target + ' 앞 · ' + q.author +
+        (q.church ? ' (' + q.church + ')' : '') + ' · ' + String(q.created_at).slice(0, 10) +
+        (q.secret ? ' · 비밀글' : '');
+      el('iqv-body').textContent = q.body;
+      el('iqv-photos').innerHTML = (q.photos || []).map(function (p) {
+        return '<a href="' + p + '" target="_blank" rel="noopener">' +
+          '<img src="' + p + '" alt="첨부 사진" style="max-width:220px;max-height:220px;border:1px solid var(--gray-3,#ddd);border-radius:4px"></a>';
+      }).join('');
+
+      var ah = '';
+      if (q.answer) {
+        ah += '<div class="notice-banner" style="margin:10px 0"><strong>답변</strong> ' +
+          '<span style="font-size:0.82rem;color:var(--gray-5)">(' + e(q.answered_by || '관리자') +
+          ' · ' + e(String(q.answered_at || '').slice(0, 10)) + ')</span><br>' +
+          '<span style="white-space:pre-wrap">' + e(q.answer) + '</span></div>';
+      }
+      if (canMng) {
+        ah += '<div class="field"><label>' + (q.answer ? '답변 고치기' : '답변 쓰기') +
+          ' (저장하면 문의자에게 알림이 갑니다)</label>' +
+          '<textarea id="iqv-atext" rows="3">' + e(q.answer || '') + '</textarea></div>' +
+          '<button class="btn sm" id="iqv-asave">답변 저장</button> ' +
+          '<span class="form-msg" id="iqv-amsg" style="margin:0"></span><div style="height:10px"></div>';
+      }
+      el('iqv-answer').innerHTML = ah;
+      var asave = el('iqv-asave');
+      if (asave) asave.addEventListener('click', function () {
+        var t = el('iqv-atext').value.trim();
+        var msg = el('iqv-amsg');
+        if (!t) { msg.className = 'form-msg err'; msg.textContent = '답변 내용을 적어 주세요.'; return; }
+        msg.className = 'form-msg'; msg.textContent = '저장 중...';
+        SHSCloud.init().then(function (c) {
+          return c.from('inquiries').update({
+            answer: t, answered_by: user.name, answered_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }).eq('id', q.id).select();
+        }).then(function (r) {
+          var w = SHS.wrote(r);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+          SHSCloud.log('update', '문의 답변', q.title);
+          loadInquiries();
+          openInquiryAfterReload(q.id);
+        });
+      });
+      el('iq-view').classList.remove('hidden');
+      el('iq-view').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      SHS.logAction('view', '문의 열람', q.title);
+    }
+
+    function openInquiryAfterReload(id) {
+      setTimeout(function () { if (byId(id)) openInquiry(id); }, 600);
+    }
+
+    /* 긴 변 1000px JPEG로 줄인다 — 사진은 글과 함께 저장되어 같은 권한으로 보호된다 */
+    function shrink(f) {
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        var url = URL.createObjectURL(f);
+        img.onload = function () {
+          var MAX = 1000;
+          var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+          var cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(img.naturalWidth * sc));
+          cv.height = Math.max(1, Math.round(img.naturalHeight * sc));
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          URL.revokeObjectURL(url);
+          resolve(cv.toDataURL('image/jpeg', 0.75));
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진을 읽지 못했습니다.')); };
+        img.src = url;
+      });
+    }
+
+    function drawPre() {
+      el('iq-pre').innerHTML = iqPhotos.map(function (p, i) {
+        return '<span style="position:relative;display:inline-block">' +
+          '<img src="' + p + '" style="width:90px;height:90px;object-fit:cover;border:1px solid var(--gray-3,#ddd);border-radius:4px">' +
+          '<button type="button" data-iqpx="' + i + '" style="position:absolute;top:-6px;right:-6px;' +
+          'width:22px;height:22px;border-radius:50%;border:none;background:var(--red,#b3352f);color:#fff;cursor:pointer">&times;</button></span>';
+      }).join('');
+      el('iq-pre').querySelectorAll('button[data-iqpx]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          iqPhotos.splice(+b.dataset.iqpx, 1);
+          drawPre();
+        });
+      });
+    }
+
+    el('iq-photos').addEventListener('change', function () {
+      var files = Array.prototype.slice.call(this.files || []);
+      this.value = '';
+      files.forEach(function (f) {
+        if (!/^image\//.test(f.type)) return;
+        if (iqPhotos.length >= 3) return;
+        shrink(f).then(function (d) {
+          if (iqPhotos.length >= 3) return;
+          iqPhotos.push(d);
+          drawPre();
+        }).catch(function () {});
+      });
+    });
+
+    function resetForm() {
+      el('iq-id').value = '';
+      el('iq-target').value = '관리자';
+      el('iq-title').value = '';
+      el('iq-text').value = '';
+      el('iq-secret').checked = false;
+      iqPhotos = [];
+      drawPre();
+      el('iq-ftitle').textContent = '문의하기';
+      el('iq-msg').textContent = '';
+    }
+
+    function editInquiry(id) {
+      var q = byId(id);
+      if (!q) return;
+      el('iq-id').value = q.id;
+      el('iq-target').value = q.target;
+      el('iq-title').value = q.title;
+      el('iq-text').value = q.body;
+      el('iq-secret').checked = !!q.secret;
+      iqPhotos = (q.photos || []).slice();
+      drawPre();
+      el('iq-ftitle').textContent = '문의 수정';
+      el('iq-form').classList.remove('hidden');
+      el('iq-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    el('iq-write').addEventListener('click', function () {
+      if (!SHS.isActiveMember(user)) {
+        alert(user ? '문의하기는 정회원만 이용할 수 있습니다.' : '문의는 로그인 후 이용할 수 있습니다.');
+        if (!user) location.href = 'login.html';
+        return;
+      }
+      if (!serverOk()) { alert('서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.'); return; }
+      resetForm();
+      el('iq-form').classList.remove('hidden');
+      el('iq-form').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    el('iq-cancel').addEventListener('click', function () {
+      el('iq-form').classList.add('hidden');
+    });
+
+    el('iq-save').addEventListener('click', function () {
+      var msg = el('iq-msg');
+      var id = el('iq-id').value;
+      var d = {
+        target: el('iq-target').value,
+        title: el('iq-title').value.trim(),
+        body: el('iq-text').value.trim(),
+        secret: el('iq-secret').checked,
+        photos: iqPhotos.length ? iqPhotos : null,
+        updated_at: new Date().toISOString()
+      };
+      if (!d.title || !d.body) {
+        msg.className = 'form-msg err';
+        msg.textContent = '제목과 내용을 모두 적어 주세요.';
+        return;
+      }
+      if (!id) {
+        d.user_id = user.id;
+        d.author = user.name;
+        d.church = user.church || null;
+      }
+      msg.className = 'form-msg'; msg.textContent = '등록 중입니다...';
+      SHSCloud.init().then(function (c) {
+        return id ? c.from('inquiries').update(d).eq('id', id).select()
+                  : c.from('inquiries').insert(d).select();
+      }).then(function (r) {
+        var w = SHS.wrote(r);
+        if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+        SHSCloud.log(id ? 'update' : 'create', '문의 ' + (id ? '수정' : '등록'),
+          d.target + ' 앞 "' + d.title + '"' + (d.secret ? ' (비밀글)' : ''));
+        el('iq-form').classList.add('hidden');
+        if (!id) alert('문의가 등록되었습니다. ' + d.target + '에게 알림이 전달되었습니다.');
+        loadInquiries();
+      }).catch(function (x) {
+        msg.className = 'form-msg err';
+        msg.textContent = '등록 실패: ' + ((x && x.message) || x);
+      });
+    });
+
+    el('iqv-close').addEventListener('click', function () {
+      el('iq-view').classList.add('hidden');
+    });
+
+    loadInquiries();
+  })();
+
   document.getElementById('btn-submit').addEventListener('click', function () {
     var t = document.getElementById('w-title').value.trim();
     var b = document.getElementById('w-body').value.trim();

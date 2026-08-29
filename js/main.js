@@ -58,7 +58,8 @@
     ]},
     { title: '게시판', href: 'board.html', sub: [
       { t: '공지사항', h: 'board.html#notice' },
-      { t: '자유게시판', h: 'board.html#free' }
+      { t: '자유게시판', h: 'board.html#free' },
+      { t: '문의하기', h: 'board.html#inquiry' }
     ]},
     { title: '갤러리', href: 'gallery.html', sub: [
       { t: '노회 행사', h: 'gallery.html' }
