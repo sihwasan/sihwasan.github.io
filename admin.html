@@ -496,8 +496,8 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<tr>' +
         '<td>' + e(x.sichal || '기타') + '</td>' +
         '<td class="left"><strong>' + e(x.name) + '</strong></td>' +
-        '<td>' + (pr ? e(pr.name) + (pr.position === '위임목사'
-          ? ' <span style="color:var(--gray-5);font-size:0.8rem">(위임목사)</span>' : '')
+        '<td>' + (pr ? e(pr.name) + (pr.position === '위임목사' || pr.position === '시무목사'
+          ? ' <span style="color:var(--gray-5);font-size:0.8rem">(' + e(pr.position) + ')</span>' : '')
           : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
         '<td>' + (chOrganized(x.name) ? '조직' : '<span style="color:var(--gray-5)">미조직</span>') + '</td>' +
         '<td>' + cnt + '명</td>' +
@@ -598,7 +598,9 @@ document.addEventListener('DOMContentLoaded', function () {
     var h = '<div id="chv-card">' +
       '<h3 style="margin:0 0 4px;color:var(--navy)">' + e(chSel) + '</h3>' +
       '<p style="font-size:0.85rem;color:var(--gray-7);margin:0 0 12px">' +
-      (organized ? '조직교회 (시무장로 있음 · 담임은 위임목사로 표기)' : '미조직교회 (시무장로 없음)') + '</p>';
+      (organized
+        ? '조직교회 (시무장로 있음 · 담임은 위임목사로 표기 — 위임식 전이면 명단 관리에서 직분을 <strong>시무목사</strong>로 바꾸면 그대로 유지됩니다)'
+        : '미조직교회 (시무장로 없음)') + '</p>';
 
     /* 교회 정보 */
     h += '<h4 class="mn-sub">교회 정보</h4>' +
@@ -882,10 +884,11 @@ document.addEventListener('DOMContentLoaded', function () {
       var hasOrg = rows.filter(function (m) { return m.category; }).length > 0;
 
       function catOptions(v) {
-        /* 위임목사는 목사 무리 안의 직분이다. 시무장로가 있는 교회의 목사는
-         * 교회 관리에서 저절로 위임목사로 표기되고, 여기서 직접 고를 수도 있다. */
+        /* 위임목사·시무목사는 목사 무리 안의 직분이다. 시무장로가 있는 교회의
+         * 담임은 저절로 위임목사로 표기되지만, 아직 위임식을 하지 않았다면
+         * 여기서 시무목사로 고르면 그대로 유지된다. */
         var list = CATEGORIES.slice();
-        list.splice(1, 0, '위임목사');
+        list.splice(1, 0, '위임목사', '시무목사');
         return '<option value="">— 없음 —</option>' + list.map(function (x) {
           return '<option' + (x === v ? ' selected' : '') + '>' + e(x) + '</option>';
         }).join('');
@@ -1174,7 +1177,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
           '<input type="text" id="rm-name" value="' + e(m.name) + '"></div>' +
           '<div class="field" style="flex:0 0 140px"><label>직분</label><select id="rm-cat">' +
-          catOptions(m.position === '위임목사' ? '위임목사' : (m.category || '')) + '</select></div>' +
+          catOptions(m.position === '위임목사' || m.position === '시무목사'
+            ? m.position : (m.category || '')) + '</select></div>' +
           '<div class="field"><label>소속 교회</label>' +
           '<input type="text" id="rm-church" value="' + e(m.church || '') + '"></div>' +
           '</div>' +
@@ -1220,7 +1224,8 @@ document.addEventListener('DOMContentLoaded', function () {
           function v(id) { return document.getElementById(id).value.trim(); }
           var cat = v('rm-cat') || null;
           var pos = cat;
-          if (cat === '위임목사') cat = '목사';   /* 조직 분류는 목사 무리로 둔다 */
+          /* 위임목사·시무목사는 조직 분류로는 목사 무리에 둔다 */
+          if (cat === '위임목사' || cat === '시무목사') cat = '목사';
           var g = parseGrade(v('rm-grade'));
           var d = {
             name: v('rm-name'), church: churchFor(v('rm-church'), cat),
