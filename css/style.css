@@ -1412,7 +1412,7 @@ input.dp-bad { border-color: var(--red); }
     display: block !important;
     box-sizing: border-box;
     width: 210mm; min-height: 297mm; max-width: none;
-    margin: 0; padding: 28mm 24mm 20mm;
+    margin: 0; padding: 18mm 24mm 20mm;
     border: none;
     page-break-after: always;
   }
@@ -1420,10 +1420,8 @@ input.dp-bad { border-color: var(--red); }
   .cert-sheet .c-body, .cert-sheet .c-body tbody,
   .cert-sheet .c-body tr, .cert-sheet .c-body td { display: revert !important; }
   .cert-sheet .cert-foot { position: absolute; left: 24mm; right: 24mm; bottom: 14mm; }
-  /* QR은 종이 왼쪽 아래, 기관명(cert-foot) 위에 앉힌다 */
-  .cert-verify { left: 24mm; bottom: 24mm; }
-  .cert-verify img { width: 17mm; height: 17mm; }
-  .cert-verify .t { font-size: 2.6mm; }
+  .cert-verify img { width: 15mm; height: 15mm; }
+  .cert-verify .t { font-size: 2.4mm; }
 }
 
 /* 자간 때문에 마지막 글자 뒤 여백이 생겨 제목이 오른쪽으로 밀리는 것을 바로잡는다 */
@@ -1447,17 +1445,16 @@ input.dp-bad { border-color: var(--red); }
 .cert-sheet.cert-pdf-a4 {
   display: block; box-sizing: border-box;
   width: 794px; min-height: 1116px; max-width: none;
-  margin: 0; padding: 106px 91px 76px; border: none;
+  margin: 0; padding: 64px 91px 76px; border: none;
   background: #fff; position: relative;
 }
-.cert-sheet.cert-pdf-a4 .c-text { margin: 83px 0 0; }
-.cert-sheet.cert-pdf-a4 .c-date { margin: 76px 0 38px; }
+.cert-sheet.cert-pdf-a4 .c-text { margin: 64px 0 0; }
+.cert-sheet.cert-pdf-a4 .c-date { margin: 58px 0 32px; }
 .cert-sheet.cert-pdf-a4 .cert-foot {
   position: absolute; left: 91px; right: 91px; bottom: 53px; margin-top: 0;
 }
-.cert-sheet.cert-pdf-a4 .cert-verify { left: 91px; bottom: 92px; }
-.cert-sheet.cert-pdf-a4 .cert-verify img { width: 64px; height: 64px; }
-.cert-sheet.cert-pdf-a4 .cert-verify .t { font-size: 10px; }
+.cert-sheet.cert-pdf-a4 .cert-verify img { width: 58px; height: 58px; }
+.cert-sheet.cert-pdf-a4 .cert-verify .t { font-size: 9px; }
 
 /* 로그인 옵션 (아이디 저장 / 로그인 상태 유지) */
 .login-opts { display: flex; gap: 18px; flex-wrap: wrap; }
@@ -1655,15 +1652,17 @@ input.dp-bad { border-color: var(--red); }
 }
 .sec-level strong { color: var(--navy); font-weight: 500; }
 
-/* 증명서 진위 확인 QR (왼쪽 아래 구석) */
-.cert-verify {
-  position: absolute; left: 34px; bottom: 30px;
-  display: flex; align-items: center; gap: 8px;
+/* 증명서 진위 확인 QR — 문서 상단 왼쪽, 발급번호와 한 줄 */
+.cert-top {
+  display: flex; align-items: flex-start; gap: 14px;
+  margin-bottom: 6px; min-height: 52px;
 }
-.cert-verify img { width: 64px; height: 64px; image-rendering: pixelated; }
+.cert-top .c-no { align-self: center; }
+.cert-verify { display: flex; align-items: center; gap: 7px; }
+.cert-verify img { width: 52px; height: 52px; image-rendering: pixelated; }
 .cert-verify .t {
-  font-size: 8.5px; line-height: 1.5; color: #555;
-  font-family: 'Noto Sans KR', sans-serif; letter-spacing: 0;
+  font-size: 8px; line-height: 1.45; color: #666;
+  font-family: 'Noto Sans KR', sans-serif; letter-spacing: 0; white-space: nowrap;
 }
 
 /* ---------- 증명서 진위 확인 결과 ---------- */
@@ -1858,11 +1857,3 @@ td[data-duch]:hover { background: #eef2f8; }
 .cert-sheet.cert-sealdoc .c-body td { padding: 7px 8px; }
 .cert-sheet.cert-sealdoc .c-text { margin-top: 6px; }
 
-/* 증명서 하단: 왼쪽 아래 QR과 노회 주소가 겹치지 않도록 옆으로 나란히 */
-.cert-sheet .cert-foot.with-qr {
-  padding-left: 250px; text-align: right;
-}
-@media print {
-  .cert-sheet .cert-foot.with-qr { padding-left: 46mm; text-align: right; }
-}
-.cert-sheet.cert-pdf-a4 .cert-foot.with-qr { padding-left: 250px; text-align: right; }

@@ -79,7 +79,21 @@ var SHSCert = (function () {
     if (rec.void_yn) {
       h += '<div class="cert-void-mark">무효</div>';
     }
-    h += '<div class="c-no">' + esc(rec.doc_no || rec.no || '') + '</div>';
+    /* 상단 왼쪽: 진위 확인 QR과 발급번호를 한 줄에 둔다 */
+    var qrHtml = '';
+    if (rec.verify_code && typeof qrcode === 'function') {
+      try {
+        var q0 = qrcode(0, 'M');
+        q0.addData('https://sihwasan.org/verify.html?c=' + rec.verify_code);
+        q0.make();
+        qrHtml = '<div class="cert-verify">' +
+          '<img src="' + q0.createDataURL(4, 0) + '" alt="진위 확인 QR">' +
+          '<div class="t">진위 확인 sihwasan.org/verify<br>' +
+          '확인번호 ' + esc(rec.verify_code) + '</div></div>';
+      } catch (ignore) { /* QR을 못 만들어도 증명서 발급은 막지 않는다 */ }
+    }
+    h += '<div class="cert-top">' + qrHtml +
+      '<div class="c-no">' + esc(rec.doc_no || rec.no || '') + '</div></div>';
     h += '<h2>' + esc(docName) + '</h2>';
 
     if (docName === '직인증명서') {
@@ -133,21 +147,7 @@ var SHSCert = (function () {
       }).join('') + '</div>';
     }
 
-    /* 진위 확인 QR: 카메라로 찍으면 확인 페이지가 열려 발급 대장과 대조한다 */
-    if (rec.verify_code && typeof qrcode === 'function') {
-      try {
-        var vurl = 'https://sihwasan.org/verify.html?c=' + rec.verify_code;
-        var q = qrcode(0, 'M');
-        q.addData(vurl);
-        q.make();
-        h += '<div class="cert-verify">' +
-          '<img src="' + q.createDataURL(4, 2) + '" alt="진위 확인 QR">' +
-          '<div class="t">진위 확인<br>sihwasan.org/verify<br>' +
-          '확인번호 ' + esc(rec.verify_code) + '</div></div>';
-      } catch (ignore) { /* QR을 못 만들어도 증명서 발급은 막지 않는다 */ }
-    }
-    var hasQr = !!(rec.verify_code && typeof qrcode === 'function');
-    h += '<div class="cert-foot' + (hasQr ? ' with-qr' : '') + '">' + esc(OFFICE) + '</div>';
+    h += '<div class="cert-foot">' + esc(OFFICE) + '</div>';
     h += '</div>';
     return h;
   }
