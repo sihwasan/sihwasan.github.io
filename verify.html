@@ -95,6 +95,14 @@ document.addEventListener('DOMContentLoaded', function () {
         '<tr><td>소속 교회</td><td class="left">' + e(d.out_church || '') + '</td></tr>' +
         '<tr><td>발급일</td><td class="left">' + e(dateKo(d.out_issued_on)) + '</td></tr>' +
         '</tbody></table>';
+      /* 직인증명서는 발급 대장에 기록된 직인 그림을 함께 보여 대조하게 한다 */
+      if (d.out_church_seal && String(d.out_church_seal).indexOf('data:image/') === 0) {
+        rowsHtml += '<div style="margin-top:14px">' +
+          '<div style="font-size:0.88rem;color:var(--gray-6);margin-bottom:6px">' +
+          '발급 대장에 기록된 교회 직인입니다. <strong>서류에 찍힌 직인과 같은지</strong> 대조해 주세요.</div>' +
+          '<img src="' + d.out_church_seal + '" alt="발급 대장에 기록된 교회 직인" ' +
+          'style="height:120px;border:1px solid #ddd;background:#fff;padding:6px;border-radius:4px"></div>';
+      }
       if (d.out_void) {
         box.innerHTML = card('void', '발급되었으나 <strong>무효 처리</strong>된 증명서입니다.',
           rowsHtml + (d.out_void_reason

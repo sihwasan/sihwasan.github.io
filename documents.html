@@ -91,8 +91,15 @@ document.addEventListener('DOMContentLoaded', function () {
     '</div>' +
     '<input type="hidden" id="d-reqid" value="">' +
     '<div id="d-reqnote" class="hidden" style="font-size:0.85rem;color:var(--navy);margin-bottom:8px"></div>' +
-    '<div id="d-sealbox" class="hidden" style="margin:8px 0 12px">' +
-    '<div id="d-sealview" style="font-size:0.86rem;color:var(--gray-6)"></div></div>' +
+    '<div id="d-sealbox" class="hidden" style="margin:8px 0 12px;padding:12px;' +
+    'border:1px solid var(--gray-3,#ddd);border-radius:8px">' +
+    '<label style="font-size:0.85rem;font-weight:500;color:var(--gray-7)">' +
+    '교회 직인 스캔·사진 <span class="fail">(필수)</span></label>' +
+    '<div id="d-sealview" style="font-size:0.86rem;color:var(--gray-6);margin:6px 0"></div>' +
+    '<input type="file" id="d-sealfile" accept="image/*"> ' +
+    '<img id="d-sealprev" alt="직인 미리보기" style="display:none;height:72px;' +
+    'border:1px solid var(--gray-3,#ddd);background:#fff;padding:4px;' +
+    'vertical-align:middle;margin-left:8px"></div>' +
     '<div><label style="font-size:0.85rem;font-weight:500;color:var(--gray-7)">날인할 도장</label>' +
     '<div class="seal-pick" id="seal-pick"><span style="color:var(--gray-5)">직인 정보를 불러오는 중...</span></div>' +
     '<p style="font-size:0.8rem;color:var(--gray-5)">등록된 도장은 <a href="settings.html" style="color:var(--navy);text-decoration:underline">관리자 → 직인·도장</a>에서 관리합니다.</p></div>' +
@@ -294,17 +301,17 @@ document.addEventListener('DOMContentLoaded', function () {
         } else if (q.status === '반려') {
           act = '<span style="color:var(--gray-5)">-</span>';
         } else if (q.status === '신청') {
-          act = (canPayChk
+          act = '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button> ' +
+            (canPayChk
               ? '<button class="btn sm" data-rqpaid="' + q.id + '">입금 확인</button> '
               : '<span style="color:var(--gray-5);font-size:0.82rem">간사의 입금 확인 대기</span> ') +
-            '<button class="btn ghost sm" data-rqreview="' + q.id + '">검토·수정</button> ' +
-            '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>';
+            '<button class="btn ghost sm" data-rqreview="' + q.id + '">검토·수정</button>';
         } else if (q.status === '입금확인') {
-          act = (canApprove
+          act = '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button> ' +
+            (canApprove
               ? '<button class="btn sm" data-rqok="' + q.id + '">발급 승인</button> '
               : '<span style="color:var(--gray-5);font-size:0.82rem">서기·노회장의 승인 대기</span> ') +
-            '<button class="btn ghost sm" data-rqreview="' + q.id + '">검토·수정</button> ' +
-            '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>';
+            '<button class="btn ghost sm" data-rqreview="' + q.id + '">검토·수정</button>';
         } else {
           /* 발급승인(또는 예전 상태) — 증명서를 만든다 */
           act = '<button class="btn sm" data-rqfill="' + q.id + '">증명서 발급</button>' +
@@ -630,7 +637,11 @@ document.addEventListener('DOMContentLoaded', function () {
             (d.void_yn ? ' <span class="fail">(무효)</span>' : '') + '</td>' +
             '<td>' + e(d.issued_on) + '</td><td>' + e(d.doc_type) + '</td>' +
             '<td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose || '-') + '</td>' +
-            '<td>' + e(d.issuer_name || '-') + '</td><td>' + e(sealed || '-') + '</td>' +
+            '<td>' + e(d.issuer_name || '-') + '</td><td>' + e(sealed || '-') +
+            (d.church_seal && String(d.church_seal).indexOf('data:image/') === 0
+              ? '<div style="margin-top:4px"><img src="' + d.church_seal + '" alt="교회 직인" ' +
+                'style="height:38px;border:1px solid var(--gray-3,#ddd);background:#fff;padding:2px" ' +
+                'title="발급 대장에 기록된 교회 직인"></div>' : '') + '</td>' +
             '<td><button class="btn sm" data-pdf="' + d.id + '">PDF</button> ' +
             '<a class="btn ghost sm" href="certificate.html?id=' + d.id + '" target="_blank" rel="noopener">열기</a>' +
             (d.void_yn ? '' : ' <button class="btn danger sm" data-void="' + d.id + '">취소</button>') +
@@ -727,9 +738,18 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 직인증명서 ----------
-   * 교회 직인은 인쇄한 뒤 실물 도장을 찍으므로 문서에는 넣지 않는다.
-   * 대신 교회 주소와 담임목사 성명을 명단에서 찾아 채워 준다. */
-  var churchAddr = null;
+   * 서류의 직인 자리는 비워 두고 인쇄한 뒤 실물 도장을 찍는다.
+   * 대신 그 직인의 스캔(사진)을 올려 발급 대장에 함께 기록하고,
+   * 진위 확인 때 서류에 찍힌 직인과 대조할 수 있게 한다.
+   * 담임목사가 내 정보에 등록해 둔 직인이 있으면 그걸 기본으로 쓴다. */
+  var churchAddr = null, churchSeal = null, sealUpload = null;
+
+  function showSealPreview() {
+    var prev = document.getElementById('d-sealprev');
+    var img = sealUpload || churchSeal;
+    if (img) { prev.src = img; prev.style.display = 'inline-block'; }
+    else { prev.removeAttribute('src'); prev.style.display = 'none'; }
+  }
 
   function refreshChurchSeal() {
     var box = document.getElementById('d-sealbox');
@@ -737,11 +757,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!box || !view) return;
     var isSeal = document.getElementById('d-type').value === '직인증명서';
     box.classList.toggle('hidden', !isSeal);
-    if (!isSeal) { churchAddr = null; return; }
+    if (!isSeal) { churchAddr = null; churchSeal = null; return; }
 
     var church = document.getElementById('d-church').value.trim();
-    churchAddr = null;
-    view.innerHTML = '교회 직인 자리는 비워 둡니다. <strong>인쇄한 뒤 그 교회의 실물 직인을 찍어</strong> 주세요.';
+    churchAddr = null; churchSeal = null;
+    view.innerHTML = '서류의 직인 자리는 인쇄한 뒤 실물 도장을 찍습니다. ' +
+      '여기에는 그 직인의 스캔이나 사진을 올려 주세요 — ' +
+      '<strong>발급 대장에 기록되어 진위 확인 때 대조</strong>합니다.';
+    showSealPreview();
     if (!church) return;
     SHSCloud.init().then(function (c) {
       return c.rpc('church_info_of', { p_church: church });
@@ -749,14 +772,47 @@ document.addEventListener('DOMContentLoaded', function () {
       if (r.error) throw r.error;
       var info = (r.data && r.data[0]) || {};
       churchAddr = info.out_address || null;
+      churchSeal = info.out_seal || null;
       /* 담임교역자가 비어 있으면 명단에서 찾은 값으로 채워 준다 */
       var nameEl = document.getElementById('d-name');
       if (info.out_pastor && !nameEl.value.trim()) nameEl.value = info.out_pastor;
+      if (churchSeal && !sealUpload) {
+        view.innerHTML += ' <span style="color:var(--navy)">담임목사께서 내 정보에 등록하신 직인을 찾았습니다. ' +
+          '그대로 쓰거나, 다른 스캔을 올려 바꿀 수 있습니다.</span>';
+      }
       if (!churchAddr) {
         view.innerHTML += ' <span class="fail">교회 주소가 명단에 없습니다.</span>';
       }
+      showSealPreview();
     }).catch(function () {});
   }
+
+  /* 올린 사진은 480px 이하로 줄여 발급 대장에 넣는다 (파일이 너무 크지 않게) */
+  document.getElementById('d-sealfile').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    if (!f) { sealUpload = null; showSealPreview(); return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var max = 480, w = img.width, h = img.height;
+        if (w > max || h > max) {
+          var k = max / Math.max(w, h);
+          w = Math.round(w * k); h = Math.round(h * k);
+        }
+        var cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        var cx = cv.getContext('2d');
+        cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
+        cx.drawImage(img, 0, 0, w, h);
+        sealUpload = cv.toDataURL('image/jpeg', 0.85);
+        showSealPreview();
+      };
+      img.onerror = function () { alert('그림 파일을 읽지 못했습니다.'); };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(f);
+  });
   document.getElementById('d-type').addEventListener('change', refreshChurchSeal);
   document.getElementById('d-church').addEventListener('change', refreshChurchSeal);
   document.getElementById('d-church').addEventListener('blur', refreshChurchSeal);
@@ -814,6 +870,14 @@ document.addEventListener('DOMContentLoaded', function () {
     msg.className = 'form-msg';
     msg.textContent = '발급 중입니다...';
 
+    var sealImg = doc === '직인증명서' ? (sealUpload || churchSeal) : null;
+    if (doc === '직인증명서' && !sealImg) {
+      msg.className = 'form-msg err';
+      msg.textContent = '직인증명서는 직인 스캔(사진)을 올려야 발급할 수 있습니다. ' +
+        '위의 직인 칸에 파일을 올려 주세요.';
+      btn.disabled = false;
+      return;
+    }
     SHSCloud.init().then(function (c) {
       return c.rpc('issue_document', {
         p_request_id: reqId ? parseInt(reqId, 10) : null,
@@ -821,6 +885,7 @@ document.addEventListener('DOMContentLoaded', function () {
         p_purpose: purpose, p_copies: 1, p_body_text: body,
         p_seals: sealMap, p_president: presidentName, p_clerk: clerkName,
         p_session_no: session,
+        p_church_seal: sealImg,
         p_church_addr: doc === '직인증명서' ? churchAddr : null,
         p_doc_no: document.getElementById('d-docno').value.trim() || null
       });
