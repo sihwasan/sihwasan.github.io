@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var sichals = [], sic = null, isOfficer = false, myDuty = '', isAuditor = false;
   var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
+  var churchStaff = [];
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
   var year = new Date().getFullYear();
@@ -102,6 +103,8 @@ document.addEventListener('DOMContentLoaded', function () {
           c.from('sichal_churches').select('*').eq('sichal', NAME).order('sort').order('id'),
           c.from('roster').select('name,church,position,category,note,birth_date,term_until,address,phone,postcode')
             .eq('sichal', NAME).order('category').order('sort'),
+          c.from('church_staff').select('*').order('sort').order('id')
+            .then(function (x) { return x; }, function () { return { data: [] }; }),
           c.from('sichal_docs').select('*').eq('sichal', NAME)
             .order('doc_date', { ascending: false }).order('id', { ascending: false }),
           c.from('sichal_minutes').select('*').eq('sichal', NAME)
@@ -120,12 +123,13 @@ document.addEventListener('DOMContentLoaded', function () {
         if (SHSAuth.canManageMembers(user)) { isOfficer = true; myDuty = myDuty || '노회 관리자'; }
         /* 감사부(감사헌의부) 임원이면 이 시찰의 회의록·회계를 감사할 수 있다 */
         isAuditor = SHSAuth.canManageMembers(user) ||
-                    ((rs[6] && rs[6].data) || []).some(function (m) {
+                    ((rs[7] && rs[7].data) || []).some(function (m) {
                       return m.committee === '감사헌의부' && m.is_officer;
                     });
-        submits = (rs[7] && rs[7].data) || [];
+        submits = (rs[8] && rs[8].data) || [];
         churches = (rs[1] && rs[1].data) || [];
         pastors  = (rs[2] && rs[2].data) || [];
+        churchStaff = (rs[3] && rs[3].data) || [];
         /* 담임목사·주소·연락처는 회원 명단(노회 명단)이 원본이다.
          * 관내 교회 목록에는 명단 내용을 그대로 얹어서 보여 준다. */
         churches.forEach(function (ch) {
@@ -136,13 +140,14 @@ document.addEventListener('DOMContentLoaded', function () {
           })[0];
           if (pr) {
             ch.pastor  = pr.name;
+            ch.pastorPos = pr.position || '목사';
             ch.address = pr.address || ch.address;
             ch.phone   = pr.phone   || ch.phone;
           }
         });
-        docs     = (rs[3] && rs[3].data) || [];
-        minutes  = (rs[4] && rs[4].data) || [];
-        reports  = (rs[5] && rs[5].data) || [];
+        docs     = (rs[4] && rs[4].data) || [];
+        minutes  = (rs[5] && rs[5].data) || [];
+        reports  = (rs[6] && rs[6].data) || [];
         draw();
       });
     }).catch(function (x) {
@@ -326,6 +331,36 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  /* 교회 명부(교회 관리에서 입력)를 상세 표 줄로 만든다.
+   * 시무장로 표시가 있으면 담임은 위임목사로 저절로 표기된다. */
+  function staffRows(ch) {
+    var key = String(ch.name || '').replace(/\s|교회$/g, '');
+    var mine = churchStaff.filter(function (x) {
+      return String(x.church || '').replace(/\s|교회$/g, '') === key;
+    });
+    if (!mine.length) {
+      /* 명부가 없으면 예전 장로 칸(글자)으로 보여 준다 */
+      return '<tr><th>장로</th><td class="left">' + elderList(ch.elders) + '</td></tr>';
+    }
+    function names(role) {
+      return mine.filter(function (x) { return x.role === role; }).map(function (x) {
+        var extra = [];
+        if (x.is_chongdae) extra.push('총대장로');
+        if (x.ordained_on) extra.push('장립 ' + String(x.ordained_on).slice(0, 4) + '년');
+        return e(x.name) + (extra.length
+          ? ' <span style="color:var(--gray-5);font-size:0.85em">(' + extra.join(' · ') + ')</span>' : '');
+      }).join(', ');
+    }
+    var out = '';
+    [['원로목사', '원로목사'], ['부목사', '부목사'], ['시무장로', '시무장로'], ['원로장로', '원로장로']]
+      .forEach(function (r) {
+        var v = names(r[0]);
+        if (v) out += '<tr><th>' + r[1] + '</th><td class="left">' + v + '</td></tr>';
+      });
+    if (!out) out = '<tr><th>장로</th><td class="left"><span style="color:var(--gray-5)">-</span></td></tr>';
+    return out;
+  }
+
   /* 교회 하나를 펼쳐 보여 준다 */
   function showChurch(i, quiet) {
     var ch = churches[i];
@@ -355,12 +390,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (f.k === 'url' && val) {
           val = '<a href="' + e(link) + '" target="_blank" rel="noopener" ' +
                 'style="color:var(--navy);text-decoration:underline">' + e(ch.url) + '</a>';
+        } else if (f.k === 'pastor' && val) {
+          val = e(val) + (ch.pastorPos && ch.pastorPos !== '목사'
+            ? ' <span style="color:var(--gray-5)">(' + e(ch.pastorPos) + ')</span>' : '');
         } else {
           val = val ? e(val) : '<span style="color:var(--gray-5)">-</span>';
         }
         return '<tr><th style="width:120px">' + e(f.t) + '</th><td class="left">' + val + '</td></tr>';
       }).join('') +
-      '<tr><th>장로</th><td class="left">' + elderList(ch.elders) + '</td></tr>' +
+      staffRows(ch) +
       '<tr><th>소속 시찰</th><td class="left">' + e(ch.sichal) + '</td></tr>' +
       '</tbody></table>';
 
