@@ -391,7 +391,12 @@ document.addEventListener('DOMContentLoaded', function () {
           (x.is_chongdae ? ' <span style="color:var(--navy);font-size:0.82rem">(총대장로)</span>' : '') +
           (x.ordained_on ? ' <span style="color:var(--gray-5);font-size:0.82rem">장립 ' +
             e(String(x.ordained_on).slice(0, 10)) + '</span>' : '') + '</td>' +
-          '<td style="width:70px"><button class="btn danger sm" data-cedel="' + x.id +
+          '<td style="width:160px">' +
+          (SHSAuth.canManageMembers(user)
+            ? '<button class="btn ghost sm" data-cechong="' + x.id + '" data-cev="' + (x.is_chongdae ? 1 : 0) +
+              '" data-cen2="' + e(x.name) + '">' + (x.is_chongdae ? '총대 해제' : '총대 지정') + '</button> '
+            : '') +
+          '<button class="btn danger sm" data-cedel="' + x.id +
           '" data-cen="' + e(x.name) + '">삭제</button></td></tr>';
       }).join('') + '</tbody></table>';
   }
@@ -424,6 +429,22 @@ document.addEventListener('DOMContentLoaded', function () {
         SHSCloud.log('create', '교회 장로 추가', ch.name + ' ' + d.role + ' ' + name +
           (d.is_chongdae ? ' (총대장로)' : ''));
         load();
+      });
+    });
+    document.querySelectorAll('button[data-cechong]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var on = b.dataset.cev === '1';
+        if (!confirm(b.dataset.cen2 + ' 장로를 총대장로에서 ' + (on ? '해제' : '지정') + '하시겠습니까?')) return;
+        db().then(function (c) {
+          return c.from('church_staff').update({
+            is_chongdae: !on, updated_at: new Date().toISOString(), updated_by: user.name
+          }).eq('id', parseInt(b.dataset.cechong, 10)).select();
+        }).then(function (r) {
+          var w = SHS.wrote(r);
+          if (!w.ok) { alert(w.why); return; }
+          SHSCloud.log('update', '총대장로 ' + (on ? '해제' : '지정'), ch.name + ' ' + b.dataset.cen2);
+          load();
+        });
       });
     });
     document.querySelectorAll('button[data-cedel]').forEach(function (b) {
