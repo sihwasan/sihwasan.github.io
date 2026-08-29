@@ -523,8 +523,8 @@ document.addEventListener('DOMContentLoaded', function () {
     ov.id = 'ch-modal';
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:300;' +
       'display:flex;align-items:flex-start;justify-content:center;padding:36px 16px;overflow:auto';
-    ov.innerHTML = '<div style="background:#fff;border-radius:8px;max-width:960px;width:100%;' +
-      'box-shadow:0 10px 40px rgba(0,0,0,.25);padding:6px 18px 18px;position:relative">' +
+    ov.innerHTML = '<div style="background:#fff;border-radius:8px;max-width:1040px;width:100%;' +
+      'box-shadow:0 10px 40px rgba(0,0,0,.25);padding:24px 28px 24px;position:relative;overflow:hidden">' +
       '<button id="ch-modal-x" aria-label="닫기" style="position:absolute;top:10px;right:14px;' +
       'border:none;background:none;font-size:1.4rem;color:var(--gray-5);cursor:pointer">&times;</button>' +
       churchEditor() + '</div>';
@@ -544,8 +544,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var staff = chStaffOf(chSel);
     var organized = chOrganized(chSel);
 
-    var h = '<div class="admin-card" id="chv-card" style="margin-top:6px">' +
-      '<h3 style="margin:0 0 4px">' + e(chSel) + '</h3>' +
+    var h = '<div id="chv-card">' +
+      '<h3 style="margin:0 0 4px;color:var(--navy)">' + e(chSel) + '</h3>' +
       '<p style="font-size:0.85rem;color:var(--gray-7);margin:0 0 12px">' +
       (organized ? '조직교회 (시무장로 있음 · 담임은 위임목사로 표기)' : '미조직교회 (시무장로 없음)') + '</p>';
 
@@ -572,10 +572,12 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!staff.length) {
       h += '<p style="color:var(--gray-5)">등록된 교역자·장로가 없습니다. 아래에서 추가해 주세요.</p>';
     } else {
-      h += '<table class="tbl"><thead><tr><th style="width:90px">구분</th><th style="width:110px">성명</th>' +
-        '<th style="width:120px">생년월일</th><th style="width:120px">장립일</th>' +
-        '<th style="width:130px">연락처</th><th style="width:90px">총대장로</th>' +
-        '<th>명단 연동</th><th style="width:70px">관리</th></tr></thead><tbody>';
+      h += '<div style="overflow-x:auto">' +
+        '<table class="tbl" style="min-width:860px"><thead><tr>' +
+        '<th style="width:80px">구분</th><th style="width:120px">성명</th>' +
+        '<th style="width:130px">생년월일</th><th style="width:130px">장립일</th>' +
+        '<th style="width:140px">연락처</th><th style="width:64px">총대</th>' +
+        '<th style="width:120px">명단 연동</th><th style="width:110px">관리</th></tr></thead><tbody>';
       CH_ROLES.forEach(function (role) {
         staff.filter(function (x) { return x.role === role; }).forEach(function (x) {
           var ro = x.roster_id
@@ -584,27 +586,31 @@ document.addEventListener('DOMContentLoaded', function () {
           var isElder = role.indexOf('장로') !== -1;
           h += '<tr data-cs="' + x.id + '">' +
             '<td>' + e(role) + '</td>' +
-            '<td><input type="text" data-cf="name" value="' + e(x.name) + '"></td>' +
-            '<td><input type="date" data-cf="birth_date" value="' + e(x.birth_date || (ro && ro.birth_date) || '') + '"></td>' +
-            '<td>' + (isElder ? '<input type="date" data-cf="ordained_on" value="' + e(x.ordained_on || '') + '">' : '-') + '</td>' +
-            '<td><input type="text" data-cf="phone" value="' + e(x.phone || (ro && ro.phone) || '') + '" placeholder="010-0000-0000"></td>' +
+            '<td><input type="text" data-cf="name" value="' + e(x.name) +
+            '" style="width:100%;min-width:0;box-sizing:border-box"></td>' +
+            '<td><input type="date" data-cf="birth_date" value="' + e(x.birth_date || (ro && ro.birth_date) || '') +
+            '" style="width:100%;min-width:0;box-sizing:border-box"></td>' +
+            '<td>' + (isElder ? '<input type="date" data-cf="ordained_on" value="' + e(x.ordained_on || '') +
+            '" style="width:100%;min-width:0;box-sizing:border-box">' : '-') + '</td>' +
+            '<td><input type="text" data-cf="phone" value="' + e(x.phone || (ro && ro.phone) || '') +
+            '" placeholder="010-0000-0000" style="width:100%;min-width:0;box-sizing:border-box"></td>' +
             '<td>' + (isElder
               ? '<input type="checkbox" data-cf="is_chongdae"' + (x.is_chongdae ? ' checked' : '') + ' style="width:auto">'
               : '-') + '</td>' +
-            '<td style="font-size:0.8rem;color:var(--gray-5)">' +
-            (ro ? '노회 회원 (' + e(ro.position || ro.category || '') + ')' : '명단에 없음') +
+            '<td style="font-size:0.78rem;color:var(--gray-5)">' +
+            (ro ? '노회 회원' + (ro.position ? '<br>(' + e(ro.position) + ')' : '') : '명단에 없음') +
             (isElder && x.is_chongdae && !(ro && ro.category === '장로')
-              ? '<br><span class="fail">총대장로는 노회 명단(장로)에도 있어야 합니다</span>' : '') +
+              ? '<br><span class="fail">명단에 장로로 없음</span>' : '') +
             '</td>' +
-            '<td><button class="btn sm" data-cssave="' + x.id + '">저장</button> ' +
+            '<td style="white-space:nowrap"><button class="btn sm" data-cssave="' + x.id + '">저장</button> ' +
             '<button class="btn danger sm" data-csdel="' + x.id + '" data-csn="' + e(x.name) + '">삭제</button></td>' +
             '</tr>';
         });
       });
-      h += '</tbody></table>';
+      h += '</tbody></table></div>';
     }
 
-    h += '<div class="inline-form" style="margin-top:10px">' +
+    h += '<div class="inline-form" style="margin-top:14px;align-items:flex-end">' +
       '<div class="field" style="flex:0 0 120px"><label>구분</label><select id="cs-role">' +
       CH_ROLES.map(function (r) { return '<option>' + r + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="cs-name"></div>' +
