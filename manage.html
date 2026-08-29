@@ -122,100 +122,111 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 공지사항 ---------- */
   /* ---------- 회기(會期) 설정 ----------
    * 노회는 정기회마다 회기가 바뀐다. 총대 자격처럼 회기로 정하는 일이
-   * 많으므로, 회기 번호와 기간을 여기 한곳에서 정한다. */
+   * 많으므로, 회기 번호와 기간을 여기 한곳에서 정한다.
+   * 목록은 읽기 전용으로 두고, 고치는 일은 팝업에서 한다. */
   function loadTerms() {
     var box = document.getElementById('mg-terms');
     if (!box) return;
     db.from('site_settings').select('value').eq('key', 'sessions').then(function (r) {
       var v = (r.data && r.data[0] && r.data[0].value) || { current: 19, list: [] };
       var list = (v.list || []).slice().sort(function (a, b) { return a.no - b.no; });
+
       var h = '<h2>회기 설정</h2>' +
-        '<p>정기노회마다 바뀌는 회기입니다. 장로 총대 자격과 증명서 발급번호가 이 회기를 따릅니다.</p>' +
-        '<div class="admin-card" style="max-width:720px">' +
-        '<div class="inline-form" style="margin-bottom:10px">' +
-        '<div class="field" style="flex:0 0 160px"><label>현재 회기</label>' +
-        '<select id="tm-cur">' + list.map(function (x) {
-          return '<option value="' + x.no + '"' + (Number(v.current) === Number(x.no) ? ' selected' : '') +
-            '>제' + x.no + '회기</option>';
-        }).join('') + '</select></div>' +
-        '<div class="field"><label>기간</label>' +
-        '<input type="text" id="tm-now" value="" disabled></div>' +
-        '</div>' +
+        '<p>정기노회마다 바뀌는 회기입니다. 장로 총대 자격과 증명서 발급번호가 이 회기를 따릅니다. ' +
+        '<strong>수정</strong>을 누르면 팝업에서 고칠 수 있습니다.</p>' +
         '<table class="tbl"><thead><tr><th style="width:110px">회기</th>' +
-        '<th style="width:180px">시작</th><th style="width:180px">끝</th>' +
-        '<th style="width:80px">관리</th></tr></thead><tbody id="tm-rows">' +
-        list.map(function (x) {
-          return '<tr data-tm="' + x.no + '"><td><strong>제' + x.no + '회기</strong></td>' +
-            '<td><input type="date" data-tf="from" value="' + e(x.from) + '"></td>' +
-            '<td><input type="date" data-tf="to" value="' + e(x.to) + '"></td>' +
-            '<td><button class="btn danger sm" data-tmdel="' + x.no + '">삭제</button></td></tr>';
-        }).join('') + '</tbody></table>' +
-        '<div class="inline-form" style="margin-top:10px">' +
-        '<div class="field" style="flex:0 0 120px"><label>회기 번호</label>' +
-        '<input type="number" id="tm-no" min="1" max="99" value="' +
-        (list.length ? Number(list[list.length - 1].no) + 1 : 19) + '"></div>' +
-        '<div class="field" style="flex:0 0 170px"><label>시작</label><input type="date" id="tm-from"></div>' +
-        '<div class="field" style="flex:0 0 170px"><label>끝</label><input type="date" id="tm-to"></div>' +
-        '<button class="btn sm" id="tm-add" style="align-self:flex-end">회기 추가</button>' +
-        '</div>' +
-        '<button class="btn" id="tm-save">저장</button>' +
-        '<div class="form-msg" id="tm-msg"></div></div>';
+        '<th>기간</th><th style="width:110px">비고</th>' +
+        '<th style="width:80px">관리</th></tr></thead><tbody>';
+      if (!list.length) {
+        h += '<tr><td colspan="4" style="color:var(--gray-5)">등록된 회기가 없습니다.</td></tr>';
+      }
+      list.forEach(function (x) {
+        var isCur = Number(v.current) === Number(x.no);
+        h += '<tr' + (isCur ? ' style="background:var(--gray-1,#f4f6fa)"' : '') + '>' +
+          '<td><strong>제' + x.no + '회기</strong></td>' +
+          '<td>' + e(x.from) + ' ~ ' + e(x.to) + '</td>' +
+          '<td>' + (isCur
+            ? '<span style="display:inline-block;padding:2px 9px;border:1px solid var(--navy);' +
+              'border-radius:20px;font-size:0.76rem;color:var(--navy)">현재 회기</span>' : '-') + '</td>' +
+          '<td><button class="btn sm" data-tmedit="' + x.no + '">수정</button></td></tr>';
+      });
+      h += '</tbody></table>' +
+        '<p style="margin-top:10px"><button class="btn" id="tm-new">회기 추가</button></p>' +
+        '<div class="form-msg" id="tm-msg"></div>';
       box.innerHTML = h;
 
-      function showNow() {
-        var no = document.getElementById('tm-cur').value;
-        var hit = list.filter(function (x) { return String(x.no) === String(no); })[0];
-        document.getElementById('tm-now').value = hit ? hit.from + ' ~ ' + hit.to : '';
-      }
-      showNow();
-      document.getElementById('tm-cur').addEventListener('change', showNow);
-
-      function collect() {
-        var out = [];
-        box.querySelectorAll('#tm-rows tr[data-tm]').forEach(function (tr) {
-          out.push({
-            no: Number(tr.dataset.tm),
-            from: tr.querySelector('[data-tf="from"]').value,
-            to: tr.querySelector('[data-tf="to"]').value
-          });
-        });
-        return out;
-      }
-      function save(next, done) {
+      function save(nextList, nextCur, label) {
+        nextList.sort(function (a, b) { return a.no - b.no; });
         db.from('site_settings').upsert({
           key: 'sessions',
-          value: { current: Number(document.getElementById('tm-cur').value), list: next },
+          value: { current: Number(nextCur), list: nextList },
           updated_at: new Date().toISOString()
         }).then(function (res) {
           var msg = document.getElementById('tm-msg');
           if (res.error) { toast(msg, false, res.error.message); return; }
-          SHSCloud.log('update', '회기 설정 변경',
-            '현재 제' + document.getElementById('tm-cur').value + '회기, 회기 ' + next.length + '개');
-          if (done) done(); else toast(msg, true, '저장되었습니다.');
+          SHSCloud.log('update', '회기 설정 변경', label);
           loadTerms();
         });
       }
 
-      document.getElementById('tm-save').addEventListener('click', function () {
-        save(collect());
-      });
-      box.querySelectorAll('button[data-tmdel]').forEach(function (b) {
+      /* 회기 하나를 팝업에서 고치거나 새로 넣는다 */
+      function openTermEdit(item) {
+        var isNew = !item;
+        var nextNo = list.length ? Number(list[list.length - 1].no) + 1 : 19;
+        var mo = mgModal(
+          '<h4 style="margin:0 0 14px">' +
+          (isNew ? '회기 추가' : '제' + item.no + '회기 수정') + '</h4>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 110px"><label>회기 번호</label>' +
+          '<input type="number" id="tp-no" min="1" max="99" value="' +
+          (isNew ? nextNo : item.no) + '"' + (isNew ? '' : ' disabled') + '></div>' +
+          '<div class="field" style="flex:0 0 170px"><label>시작</label>' +
+          '<input type="date" id="tp-from" value="' + (isNew ? '' : e(item.from)) + '"></div>' +
+          '<div class="field" style="flex:0 0 170px"><label>끝</label>' +
+          '<input type="date" id="tp-to" value="' + (isNew ? '' : e(item.to)) + '"></div>' +
+          '</div>' +
+          '<label style="display:flex;align-items:center;gap:7px;margin:12px 0;font-size:0.9rem">' +
+          '<input type="checkbox" id="tp-cur"' +
+          (!isNew && Number(v.current) === Number(item.no) ? ' checked' : '') + '> 현재 회기로 지정</label>' +
+          '<div style="display:flex;gap:8px;margin-top:14px">' +
+          '<button class="btn" id="tp-save">저장</button>' +
+          (isNew ? '' : '<button class="btn danger" id="tp-del">삭제</button>') +
+          '</div><div class="form-msg" id="tp-msg"></div>', 520);
+
+        mo.ov.querySelector('#tp-save').addEventListener('click', function () {
+          var no = parseInt(mo.ov.querySelector('#tp-no').value, 10);
+          var from = mo.ov.querySelector('#tp-from').value;
+          var to = mo.ov.querySelector('#tp-to').value;
+          var pmsg = mo.ov.querySelector('#tp-msg');
+          if (!no || !from || !to) { toast(pmsg, false, '회기 번호와 기간을 모두 적어 주세요.'); return; }
+          if (to <= from) { toast(pmsg, false, '끝 날짜가 시작보다 빠릅니다.'); return; }
+          if (isNew && list.some(function (x) { return Number(x.no) === no; })) {
+            toast(pmsg, false, '제' + no + '회기가 이미 있습니다. 목록의 수정을 눌러 고쳐 주세요.'); return;
+          }
+          var next = list.filter(function (x) { return Number(x.no) !== no; });
+          next.push({ no: no, from: from, to: to });
+          var cur = mo.ov.querySelector('#tp-cur').checked ? no : Number(v.current);
+          mo.close();
+          save(next, cur, '제' + no + '회기 ' + (isNew ? '추가' : '수정') +
+            (cur === no && Number(v.current) !== no ? ' · 현재 회기로 지정' : ''));
+        });
+        var delBtn = mo.ov.querySelector('#tp-del');
+        if (delBtn) delBtn.addEventListener('click', function () {
+          if (!confirm('제' + item.no + '회기를 지우시겠습니까?')) return;
+          var next = list.filter(function (x) { return Number(x.no) !== Number(item.no); });
+          var cur = Number(v.current) === Number(item.no) && next.length
+            ? next[next.length - 1].no : Number(v.current);
+          mo.close();
+          save(next, cur, '제' + item.no + '회기 삭제');
+        });
+      }
+
+      box.querySelectorAll('button[data-tmedit]').forEach(function (b) {
         b.addEventListener('click', function () {
-          if (!confirm('제' + b.dataset.tmdel + '회기를 지우시겠습니까?')) return;
-          save(collect().filter(function (x) { return String(x.no) !== b.dataset.tmdel; }));
+          openTermEdit(list.filter(function (x) { return String(x.no) === b.dataset.tmedit; })[0]);
         });
       });
-      document.getElementById('tm-add').addEventListener('click', function () {
-        var msg = document.getElementById('tm-msg');
-        var no = parseInt(document.getElementById('tm-no').value, 10);
-        var from = document.getElementById('tm-from').value;
-        var to = document.getElementById('tm-to').value;
-        if (!no || !from || !to) { toast(msg, false, '회기 번호와 기간을 모두 적어 주세요.'); return; }
-        var next = collect().filter(function (x) { return x.no !== no; });
-        next.push({ no: no, from: from, to: to });
-        next.sort(function (a, b) { return a.no - b.no; });
-        save(next);
-      });
+      document.getElementById('tm-new').addEventListener('click', function () { openTermEdit(null); });
     });
   }
 
