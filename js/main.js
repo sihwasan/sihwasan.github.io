@@ -494,8 +494,10 @@
    * 한 번 띄운 알림은 이 기기에서 다시 띄우지 않는다 (알림함에는 그대로 남는다). */
   var TOAST_SEEN_KEY = 'shs_toast_seen_v1';
   function toastLink(n) {
-    if (n.kind === '문의') return 'board.html#inquiry';
-    if (n.kind === '서류') return 'notifications.html';
+    if (n.kind === '문의') {
+      return 'board.html#' +
+        (n.dedupe_key && String(n.dedupe_key).indexOf('inquiry-') === 0 ? n.dedupe_key : 'inquiry');
+    }
     return 'notifications.html';
   }
   function showToasts(rows) {
@@ -522,7 +524,7 @@
         '<span class="nt-kind">' + SHS.esc(n.kind || '알림') + '</span>' +
         '<strong class="nt-title">' + SHS.esc(n.title || '') + '</strong>' +
         '<span class="nt-body">' + SHS.esc(String(n.body || '').slice(0, 90)) + '</span>' +
-        '<span class="nt-go">' + (n.kind === '문의' ? '문의 확인·답장하기' : '알림함에서 보기') + '</span>' +
+        '<span class="nt-go">' + (n.kind === '문의' ? '답장하기' : '알림함에서 보기') + '</span>' +
         '</a>';
       setTimeout(function () { wrap.appendChild(card); }, i * 250);
       card.querySelector('.nt-x').addEventListener('click', function (ev) {

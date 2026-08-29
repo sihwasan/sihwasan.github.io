@@ -140,7 +140,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829f"></script>
+<script src="js/main.js?v=20260829g"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -548,7 +548,28 @@ document.addEventListener('DOMContentLoaded', function () {
       el('iq-view').classList.add('hidden');
     });
 
+    /* 알림의 [답장하기]로 들어오면 (#inquiry-번호) 그 문의를 바로 연다 */
+    function openFromHash() {
+      var m = location.hash.match(/^#inquiry-(\d+)$/);
+      if (!m) return;
+      var tab = document.querySelector('.tabs button[data-tab="inquiry"]');
+      if (tab) tab.click();
+      var id = +m[1];
+      if (byId(id)) {
+        openInquiry(id);
+        var t = el('iqv-atext');
+        if (t) t.focus();
+      }
+    }
+
     loadInquiries();
+    /* 목록을 받아온 뒤에 열어야 하므로 잠시 기다렸다가 연다 */
+    var tryOpen = setInterval(function () {
+      if (!iqRows.length && serverOk()) return;
+      clearInterval(tryOpen);
+      openFromHash();
+    }, 400);
+    setTimeout(function () { clearInterval(tryOpen); }, 8000);
   })();
 
   document.getElementById('btn-submit').addEventListener('click', function () {
