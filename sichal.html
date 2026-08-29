@@ -312,7 +312,6 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="ch-more">' + (canEditCh(ch) ? '누르면 고칠 수 있습니다' : '눌러서 자세히 보기') + '</div>' +
           '</div>';
       }).join('') + '</div>';
-      h += '<div id="ch-view" style="margin-top:16px"></div>';
     }
 
     if (isOfficer) h += churchForm();
@@ -472,8 +471,28 @@ document.addEventListener('DOMContentLoaded', function () {
     var ch = churches[i];
     if (!ch) return;
     openCh = ch.id;
-    var v = document.getElementById('ch-view');
-    if (!v) return;
+
+    /* 팝업으로 보여 준다 — 화면을 아래로 끌고 내려가지 않는다 */
+    var oldMo = document.getElementById('ch-modal');
+    if (oldMo) oldMo.remove();
+    var ov = document.createElement('div');
+    ov.id = 'ch-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:300;' +
+      'display:flex;align-items:flex-start;justify-content:center;padding:36px 16px;overflow:auto';
+    ov.innerHTML = '<div style="background:#fff;border-radius:8px;max-width:820px;width:100%;' +
+      'box-shadow:0 10px 40px rgba(0,0,0,.25);padding:8px 24px 24px;position:relative">' +
+      '<button class="ch-modal-x" aria-label="닫기" style="position:absolute;top:10px;right:14px;' +
+      'border:none;background:none;font-size:1.4rem;color:var(--gray-5);cursor:pointer">&times;</button>' +
+      '<div id="ch-view"></div></div>';
+    document.body.appendChild(ov);
+    function closeChModal() {
+      ov.remove();
+      openCh = null;
+      document.querySelectorAll('.ch-card').forEach(function (c) { c.classList.remove('open'); });
+    }
+    ov.addEventListener('click', function (ev2) { if (ev2.target === ov) closeChModal(); });
+    ov.querySelector('.ch-modal-x').addEventListener('click', closeChModal);
+    var v = ov.querySelector('#ch-view');
 
     document.querySelectorAll('.ch-card').forEach(function (c) {
       c.classList.toggle('open', +c.dataset.chopen === i);
@@ -582,14 +601,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
           SHSCloud.log('delete', '관내 교회 삭제', NAME + ' / ' + ch.name);
-          openCh = null;
+          closeChModal();
           load();
         });
       });
     }
 
     SHS.logAction('view', '관내 교회 열람', NAME + ' / ' + ch.name);
-    if (!quiet) v.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function churchForm() {

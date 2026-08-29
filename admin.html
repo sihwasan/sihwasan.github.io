@@ -653,7 +653,10 @@ document.addEventListener('DOMContentLoaded', function () {
               ? '<br><span class="fail">명단에 장로로 없음</span>' : '') +
             '</td>' +
             '<td style="white-space:nowrap"><button class="btn sm" data-cssave="' + x.id + '">저장</button> ' +
-            '<button class="btn danger sm" data-csdel="' + x.id + '" data-csn="' + e(x.name) + '">삭제</button></td>' +
+            '<button class="btn danger sm" data-csdel="' + x.id + '" data-csn="' + e(x.name) + '">삭제</button>' +
+            (role === '목사' && !ro
+              ? '<div style="margin-top:4px"><button class="btn ghost sm" data-cshead="' + x.id +
+                '" data-csn2="' + e(x.name) + '">담임 지정</button></div>' : '') + '</td>' +
             '</tr>';
         });
       });
@@ -765,6 +768,22 @@ document.addEventListener('DOMContentLoaded', function () {
           var w = SHS.wrote(r);
           if (!w.ok) { alert(w.why); return; }
           SHSCloud.log('update', '교회 명부 수정', chSel + ' ' + x.role + ' ' + d.name);
+          renderChurches();
+          renderRoster();
+        });
+      });
+    });
+
+    /* 담임 지정: 명단에 없는 목사를 회원 명단에 올려 담임으로 연동한다 */
+    box.querySelectorAll('button[data-cshead]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm(b.dataset.csn2 + ' 목사님을 ' + chSel + ' 담임으로 지정할까요? ' +
+          '회원 명단에 목사 회원으로 올라가고, 교회 정보의 담임 칸에 표시됩니다.')) return;
+        SHSCloud.init().then(function (c) {
+          return c.rpc('set_head_pastor', { p_staff_id: parseInt(b.dataset.cshead, 10) });
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('update', '담임목사 지정', chSel + ' 담임 ' + b.dataset.csn2);
           renderChurches();
           renderRoster();
         });
