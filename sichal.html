@@ -358,6 +358,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return mine.filter(function (x) { return x.role === role; }).map(function (x) {
         var extra = [];
         if (x.is_chongdae) extra.push('총대장로');
+        if (x.birth_date) extra.push('생년월일 ' + String(x.birth_date).slice(0, 10));
         if (x.ordained_on) extra.push('장립 ' + String(x.ordained_on).slice(0, 4) + '년');
         return e(x.name) + (extra.length
           ? ' <span style="color:var(--gray-5);font-size:0.85em">(' + extra.join(' · ') + ')</span>' : '');
@@ -412,6 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
         church: ch.name,
         role: document.getElementById('ce-role').value,
         name: name,
+        birth_date: document.getElementById('ce-birth').value || null,
         ordained_on: document.getElementById('ce-ordained').value || null,
         is_chongdae: !!(document.getElementById('ce-chongdae') &&
                         document.getElementById('ce-chongdae').checked),
@@ -420,6 +422,7 @@ document.addEventListener('DOMContentLoaded', function () {
       /* 노회 명단의 같은 이름 장로와 자동으로 짝을 맞춘다 */
       var ro = pastors.filter(function (m) { return m.category === '장로' && m.name === name; })[0];
       if (ro && ro.id) d.roster_id = ro.id;
+      if (!d.birth_date && ro && ro.birth_date) d.birth_date = ro.birth_date;
       msg.className = 'form-msg'; msg.textContent = '추가 중입니다...';
       db().then(function (c) {
         return c.from('church_staff').insert(d).select();
@@ -527,6 +530,7 @@ document.addEventListener('DOMContentLoaded', function () {
           return '<option>' + r2 + '</option>';
         }).join('') + '</select></div>' +
         '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="ce-name"></div>' +
+        '<div class="field" style="flex:0 0 150px"><label>생년월일 (선택)</label><input type="date" id="ce-birth"></div>' +
         '<div class="field" style="flex:0 0 150px"><label>장립일 (선택)</label><input type="date" id="ce-ordained"></div>' +
         (SHSAuth.canManageMembers(user)
           ? '<div class="field" style="flex:0 0 90px"><label>총대장로</label>' +
