@@ -52,6 +52,7 @@
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
       { t: '발급 서류 안내', h: 'request.html#docs' },
+      { t: '증명서 진위 확인', h: 'verify.html' },
       { t: '구비서류 규정', h: 'archive.html#forms' }
     ]},
     { title: '게시판', href: 'board.html', sub: [
@@ -63,6 +64,7 @@
     ]},
     { title: '임원방', href: 'officer.html', sub: [
       { t: '임원 자료실', h: 'officer.html' },
+      { t: '상회비 관리', h: 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC' },
       { t: '노회 회의록', h: 'minutes.html' }
     ]}
   ];
@@ -285,6 +287,7 @@
       '<div>노회 사무실 : 경기도 안산시 단원구 와동공원로1안길 13-7 (반월교회 교육관 1층)</div>' +
       '<div>전화 031-486-9993 / 팩스 031-486-9993</div>' +
       '<div class="f-links"><a href="about.html">노회소개</a><a href="rules-presbytery.html">노회 회칙</a>' +
+      '<a href="verify.html">증명서 진위 확인</a>' +
       '<a href="terms.html"><strong>이용약관</strong></a>' +
       '<a href="privacy.html"><strong>개인정보처리방침</strong></a>' +
       '<a href="https://gapck.org" target="_blank" rel="noopener">대한예수교장로회총회</a></div>' +

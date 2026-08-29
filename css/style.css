@@ -1751,3 +1751,16 @@ td[data-duch]:hover { background: #eef2f8; }
   background: rgba(15,20,30,0.72); color: #fff; font-size: 0.9rem; line-height: 1;
 }
 .up-rot:hover { background: var(--navy); }
+
+/* 대시보드 상회비 요약 */
+.dues-mini { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.9rem; color: var(--gray-7); }
+.dues-mini strong { color: var(--navy); font-size: 1.05rem; }
+.dues-mini-closed {
+  background: var(--red); color: #fff; border-radius: 999px;
+  padding: 2px 12px; font-size: 0.78rem; align-self: center;
+}
+.dues-mini-bar {
+  height: 8px; background: var(--gray-1); border-radius: 999px;
+  overflow: hidden; margin-top: 10px;
+}
+.dues-mini-bar > div { height: 100%; background: var(--navy-light); border-radius: 999px; }

@@ -52,12 +52,61 @@ var SHSBoard = (function () {
       '<div id="dash-sichal"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>' +
       '<div id="dash-com"></div>' +
+      '<div id="dash-dues"></div>' +
       '<div class="dash-cols">' +
       '<section aria-label="신청서류 발급 현황"><h3 class="dash-h">신청서류 발급 현황</h3>' +
       '<div id="dash-doc"><p class="dash-none">불러오는 중...</p></div></section>' +
       '<section aria-label="교회상황 보고서"><h3 class="dash-h">교회상황 보고서</h3>' +
       '<div id="dash-report"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>';
+
+    /* 상회비: 관리자와 회계·부회계에게만 보이는 요약 상자 */
+    (function () {
+      var canDues = SHSAuth.canManageMembers(user) ||
+        (user.role === 'officer' && user.title && user.title.indexOf('회계') !== -1);
+      if (!canDues || !user.cloud) return;
+      var boxD = document.getElementById('dash-dues');
+      boxD.innerHTML = '<div class="dash-cols"><section aria-label="상회비">' +
+        '<h3 class="dash-h">상회비 <a class="more" href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면</a></h3>' +
+        '<div id="dash-dues-body"><p class="dash-none">불러오는 중...</p></div></section></div>';
+      var yr = new Date().getFullYear();
+      var mo = new Date().getMonth() + 1;
+      SHSCloud.init().then(function (c) {
+        return Promise.all([
+          c.from('dues_rates').select('church,monthly_amount').eq('year', yr),
+          c.from('dues_payments').select('church,month,amount').eq('year', yr),
+          c.from('dues_closings').select('year').eq('year', yr)
+        ]);
+      }).then(function (rs) {
+        var rates = rs[0].data || [], pays = rs[1].data || [];
+        var closed = ((rs[2] || {}).data || []).length > 0;
+        var el = document.getElementById('dash-dues-body');
+        if (!rates.length) {
+          el.innerHTML = '<p class="dash-none">' + yr + '년 상회비 설정이 아직 없습니다. ' +
+            '<a href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC" style="color:var(--navy);text-decoration:underline">관리 화면에서 설정</a></p>';
+          return;
+        }
+        var monthly = 0, paid = 0, curCnt = 0;
+        var rateBy = {};
+        rates.forEach(function (r) { monthly += Number(r.monthly_amount || 0); rateBy[r.church] = Number(r.monthly_amount || 0); });
+        pays.forEach(function (p2) {
+          paid += p2.amount != null ? Number(p2.amount) : (rateBy[p2.church] || 0);
+          if (p2.month === mo) curCnt++;
+        });
+        var pct = monthly ? Math.round(paid / (monthly * 12) * 100) : 0;
+        el.innerHTML =
+          '<div class="dues-mini">' +
+          '<span><strong>' + curCnt + '/' + rates.length + '</strong> ' + mo + '월 납부 교회</span>' +
+          '<span><strong>' + paid.toLocaleString('ko-KR') + '만</strong> 올해 납부액</span>' +
+          '<span><strong>' + pct + '%</strong> 연간 납부율</span>' +
+          (closed ? '<span class="dues-mini-closed">' + yr + '년 마감됨</span>' : '') +
+          '</div>' +
+          '<div class="dues-mini-bar"><div style="width:' + Math.min(100, pct) + '%"></div></div>';
+      }).catch(function () {
+        var el = document.getElementById('dash-dues-body');
+        if (el) el.innerHTML = '<p class="dash-none">상회비 현황을 불러오지 못했습니다.</p>';
+      });
+    })();
 
     /* 상비부 부분은 상비부 대시보드를 그대로 쓰되, 내가 맡은 것만 보여 준다.
      * 다른 부서의 일정과 공지까지 여기서 볼 까닭은 없다. */
