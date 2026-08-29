@@ -526,6 +526,61 @@ document.addEventListener('DOMContentLoaded', function () {
   openReqFromHash();
   window.addEventListener('hashchange', openReqFromHash);
 
+  /* ---------- 삭제 기록 ----------
+   * 발급 대장에서 지운 증명서는 이 기록에 남는다.
+   * 기록 자체를 지우는 일은 최고 관리자만 할 수 있다. */
+  function renderDelLog() {
+    var box = document.getElementById('del-log');
+    if (!box) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('doc_deletions').select('*').order('id', { ascending: false }).limit(100);
+    }).then(function (r) {
+      if (r.error) { box.innerHTML = ''; return; }
+      var rows = r.data || [];
+      if (!rows.length) { box.innerHTML = ''; return; }
+      var isSuper = user.role === 'superadmin';
+      box.innerHTML = '<h3 style="margin:0 0 8px">삭제 기록 (' + rows.length + '건)</h3>' +
+        '<p style="font-size:0.84rem;color:var(--gray-5);margin:0 0 10px">' +
+        '발급 대장에서 지운 증명서입니다. 이 기록은 ' +
+        (isSuper ? '최고 관리자인 회원님만 지울 수 있습니다.' : '지울 수 없습니다.') + '</p>' +
+        '<table class="tbl"><thead><tr><th style="width:170px">발급번호</th>' +
+        '<th style="width:110px">서류명</th><th style="width:100px">대상자</th>' +
+        '<th style="width:150px">교회</th><th>사유</th>' +
+        '<th style="width:150px">지운 사람·때</th>' +
+        (isSuper ? '<th style="width:80px">관리</th>' : '') + '</tr></thead><tbody>' +
+        rows.map(function (d) {
+          return '<tr><td>' + e(d.doc_no) + '</td>' +
+            '<td>' + e(d.doc_type || '-') + '</td>' +
+            '<td>' + e(d.name || '-') + '</td>' +
+            '<td>' + e(d.church || '-') + '</td>' +
+            '<td class="left" style="font-size:0.86rem">' + e(d.reason || '-') + '</td>' +
+            '<td style="font-size:0.82rem">' + e(d.deleted_by || '-') +
+            '<div style="color:var(--gray-5)">' +
+            e(String(d.deleted_at || '').replace('T', ' ').slice(0, 16)) + '</div></td>' +
+            (isSuper ? '<td><button class="btn danger sm" data-purge="' + d.id +
+              '" data-pno="' + e(d.doc_no) + '">기록 삭제</button></td>' : '') +
+            '</tr>';
+        }).join('') + '</tbody></table>';
+
+      box.querySelectorAll('button[data-purge]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm(b.dataset.pno + ' 삭제 기록을 지우시겠습니까? 되돌릴 수 없습니다.')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('doc_deletions').delete().eq('id', parseInt(b.dataset.purge, 10)).select();
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            if (!(res.data && res.data.length)) {
+              alert('지우지 못했습니다. 최고 관리자만 지울 수 있습니다.');
+              return;
+            }
+            SHSCloud.log('delete', '증명서 삭제 기록 삭제', b.dataset.pno);
+            renderDelLog();
+          });
+        });
+      });
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
   /* ---------- 발급 대장 (노회 서버에 보관) ---------- */
   function renderLog() {
     var t = document.getElementById('log-table');
@@ -560,8 +615,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
       t.innerHTML = '<p style="font-size:0.86rem;color:var(--gray-6);margin:0 0 10px">' +
         '모두 <strong>' + rows.length + '건</strong>' + (nextInfo ? ' · ' + nextInfo : '') +
-        ' <span style="color:var(--gray-5)">— 번호는 발급할 때 직접 정할 수도 있고, ' +
-        '아래에서 고칠 수도 있습니다.</span></p>' +
+        ' <span style="color:var(--gray-5)">— 번호는 발급할 때 정합니다. ' +
+        '발급한 뒤에는 종이 문서와 어긋나지 않도록 고칠 수 없습니다.</span></p>' +
         '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th>' +
         '<th>대상자</th><th>교회</th><th>용도</th><th>발급자</th><th>날인</th>' +
         '<th style="width:270px">증명서</th></tr></thead><tbody>' +
@@ -572,9 +627,7 @@ document.addEventListener('DOMContentLoaded', function () {
           var kept = window.SHSCerts && SHSCerts.stored(d) && !d.void_yn;
           return '<tr' + (d.void_yn ? ' style="opacity:.55"' : '') + '>' +
             '<td><strong>' + e(d.doc_no) + '</strong>' +
-            (d.void_yn ? ' <span class="fail">(무효)</span>' : '') +
-            '<div><button class="btn ghost sm" data-docno="' + d.id + '" ' +
-            'data-cur="' + e(d.doc_no) + '" style="margin-top:4px">번호 수정</button></div></td>' +
+            (d.void_yn ? ' <span class="fail">(무효)</span>' : '') + '</td>' +
             '<td>' + e(d.issued_on) + '</td><td>' + e(d.doc_type) + '</td>' +
             '<td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose || '-') + '</td>' +
             '<td>' + e(d.issuer_name || '-') + '</td><td>' + e(sealed || '-') + '</td>' +
@@ -585,25 +638,9 @@ document.addEventListener('DOMContentLoaded', function () {
             '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' +
             (kept ? '보관본 있음' : '보관본 없음 · 내려받을 때 새로 만듭니다') + '</div>' +
             '</td></tr>';
-        }).join('') + '</tbody></table>';
-
-      /* 문서번호 고치기 */
-      t.querySelectorAll('button[data-docno]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var cur = b.dataset.cur;
-          var next = prompt('새 문서번호를 적어 주세요.\n같은 번호가 이미 있으면 저장되지 않습니다.', cur);
-          if (next === null) return;
-          next = next.trim();
-          if (!next || next === cur) return;
-          SHSCloud.init().then(function (c) {
-            return c.rpc('set_doc_no', { p_id: parseInt(b.dataset.docno, 10), p_doc_no: next });
-          }).then(function (res) {
-            if (res.error) { alert(res.error.message); return; }
-            SHSCloud.log('update', '문서번호 수정', cur + ' → ' + next);
-            renderLog();
-          });
-        });
-      });
+        }).join('') + '</tbody></table>' +
+        '<div id="del-log" style="margin-top:26px"></div>';
+      renderDelLog();
 
       /* 발급 대장에서 바로 PDF 내려받기 */
       t.querySelectorAll('button[data-pdf]').forEach(function (b) {
@@ -643,9 +680,11 @@ document.addEventListener('DOMContentLoaded', function () {
         b.addEventListener('click', function () {
           var row = rows.filter(function (x) { return String(x.id) === b.dataset.del; })[0];
           var label = row ? row.doc_no + ' ' + row.doc_type + ' (' + row.name + ')' : '발급번호 ' + b.dataset.del;
-          if (!confirm(label + '\n\n이 발급 기록을 완전히 삭제합니다.\n' +
-            '무효 처리와 달리 발급 대장에서 사라지고 신청자도 더 이상 내려받을 수 없습니다.\n' +
+          if (!confirm(label + ' — 이 발급 기록을 삭제합니다. ' +
+            '무효 처리와 달리 발급 대장에서 사라지고 신청자도 더 이상 내려받을 수 없습니다. ' +
             '삭제하시겠습니까?')) return;
+          var why = prompt('삭제 사유를 적어 주세요. (삭제 기록에 남습니다)', '');
+          if (why === null) return;
           /* 발급 기록을 지우기 전에 보관소의 PDF부터 치운다.
            * (무효 처리와 달리 기록 자체가 사라지므로 파일도 남기지 않는다) */
           var gone = (window.SHSCerts && SHSCerts.enabled())
@@ -653,10 +692,11 @@ document.addEventListener('DOMContentLoaded', function () {
           gone.then(function () {
             return SHSCloud.init();
           }).then(function (c) {
-            return c.from('doc_issues').delete().eq('id', parseInt(b.dataset.del, 10));
+            return c.rpc('delete_doc_issue', {
+              p_id: parseInt(b.dataset.del, 10), p_reason: why.trim() || null
+            });
           }).then(function (res) {
             if (res.error) { alert(res.error.message); return; }
-            SHSCloud.log('delete', '증명서 발급 기록 삭제', label + proxyNote);
             renderLog();
             loadRequests();
           });
