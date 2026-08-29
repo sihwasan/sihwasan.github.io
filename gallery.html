@@ -134,6 +134,11 @@
   <img id="lb-img" src="" alt="">
   <button class="lb-nav next" id="lb-next" aria-label="다음 사진">&#8250;</button>
   <div class="lb-cap" id="lb-cap"></div>
+  <div class="lb-tools hidden" id="lb-tools">
+    <button id="lb-rot" title="시계 방향으로 90도 돌리기">&#10227; 회전</button>
+    <button id="lb-rotsave" class="hidden">회전 저장</button>
+    <button id="lb-del" class="danger">삭제</button>
+  </div>
 </div>
 
 <script src="js/auth.js"></script>
@@ -278,15 +283,90 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 큰 사진 보기 ---------- */
-  var lbList = [], lbIdx = 0;
+  var lbList = [], lbIdx = 0, lbRot = 0;
+
+  /* 이 사진을 고칠 수 있는 사람: 올린 본인과 관리자 (서버 정책도 같게 막는다) */
+  function canFix(p) {
+    if (!p || !user || !user.cloud) return false;
+    if (typeof p.id !== 'number') return false;      /* 옛 내장 사진은 제외 */
+    return canManage || (p.author_id && p.author_id === user.id);
+  }
+
   function showLb() {
     if (!lbList.length) return;
     if (lbIdx < 0) lbIdx = lbList.length - 1;
     if (lbIdx >= lbList.length) lbIdx = 0;
     var p = lbList[lbIdx];
-    document.getElementById('lb-img').src = p.image_url;
+    lbRot = 0;
+    var im = document.getElementById('lb-img');
+    im.style.transform = '';
+    im.src = p.image_url;
     document.getElementById('lb-cap').textContent =
       (p.title || '') + ' · ' + (lbIdx + 1) + ' / ' + lbList.length;
+    document.getElementById('lb-tools').classList.toggle('hidden', !canFix(p));
+    document.getElementById('lb-rotsave').classList.add('hidden');
+  }
+
+  /* 돌려 보기: 화면에서만 돌아가고, '회전 저장'을 눌러야 사진이 바뀐다 */
+  function lbApplyRot() {
+    var im = document.getElementById('lb-img');
+    var fit = (lbRot % 180)
+      ? ' scale(' + Math.min(1, (window.innerHeight * 0.88) / im.clientWidth || 1) + ')' : '';
+    im.style.transform = 'rotate(' + lbRot + 'deg)' + fit;
+    document.getElementById('lb-rotsave').classList.toggle('hidden', lbRot === 0);
+  }
+
+  /* 돌려서 저장: 새 파일로 올리고 목록을 바꾼 뒤 옛 파일을 지운다 */
+  function lbRotSave() {
+    var p = lbList[lbIdx];
+    if (!p || !lbRot) return;
+    var btn = document.getElementById('lb-rotsave');
+    btn.disabled = true; btn.textContent = '저장 중...';
+    function done() { btn.disabled = false; btn.textContent = '회전 저장'; }
+    Promise.all([
+      resize(p.image_url, 1400, 0.8, lbRot),
+      resize(p.image_url, 640, 0.72, lbRot)
+    ]).then(function (bs) {
+      return SHSPhotos.putPair(bs[0], bs[1]);
+    }).then(function (u) {
+      return SHSCloud.init().then(function (c) {
+        return c.from('gallery_items')
+          .update({ image_url: u.full, thumb_url: u.thumb })
+          .eq('id', p.id)
+          .then(function (r) {
+            if (r.error) throw r.error;
+            /* 옛 파일은 우리 보관소 것일 때만 지워진다 */
+            return Promise.all([SHSPhotos.remove(p.image_url), SHSPhotos.remove(p.thumb_url)])
+              .then(function () { return u; });
+          });
+      });
+    }).then(function (u) {
+      SHSCloud.log('update', '갤러리 사진 회전', (p.title || '') + ' ' + lbRot + '도');
+      p.image_url = u.full; p.thumb_url = u.thumb;
+      done();
+      showLb();
+      load(true);
+    }).catch(function (err) { done(); alert('저장하지 못했습니다: ' + (err.message || err)); });
+  }
+
+  /* 큰 화면에서 바로 삭제 */
+  function lbDelete() {
+    var p = lbList[lbIdx];
+    if (!p) return;
+    if (!confirm('이 사진을 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('gallery_items').delete().eq('id', p.id);
+    }).then(function (r) {
+      if (r.error) { alert(r.error.message); return; }
+      return Promise.all([SHSPhotos.remove(p.image_url), SHSPhotos.remove(p.thumb_url)])
+        .then(function () {
+          SHSCloud.log('delete', '갤러리 사진 삭제', p.title || String(p.id));
+          lbList.splice(lbIdx, 1);
+          if (!lbList.length) document.getElementById('lightbox').classList.remove('open');
+          else showLb();
+          load(true);
+        });
+    });
   }
   function openLb(list, i) {
     lbList = list || []; lbIdx = i || 0;
@@ -468,6 +548,11 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('lb-close').addEventListener('click', function () { lb.classList.remove('open'); });
   document.getElementById('lb-prev').addEventListener('click', function () { lbIdx--; showLb(); });
   document.getElementById('lb-next').addEventListener('click', function () { lbIdx++; showLb(); });
+  document.getElementById('lb-rot').addEventListener('click', function () {
+    lbRot = (lbRot + 90) % 360; lbApplyRot();
+  });
+  document.getElementById('lb-rotsave').addEventListener('click', lbRotSave);
+  document.getElementById('lb-del').addEventListener('click', lbDelete);
   lb.addEventListener('click', function (ev) { if (ev.target === lb) lb.classList.remove('open'); });
   document.addEventListener('keydown', function (ev) {
     if (!lb.classList.contains('open')) return;
@@ -477,15 +562,26 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   /* ---------- 업로드 ---------- */
-  var picked = [];
+  var picked = [];      /* { file, rot } — rot 은 시계 방향 돌림각 */
   function showPreview() {
-    document.getElementById('up-preview').innerHTML = picked.map(function (f) {
-      return '<img src="' + URL.createObjectURL(f) + '">';
+    var box = document.getElementById('up-preview');
+    box.innerHTML = picked.map(function (pk, i) {
+      return '<span class="up-thumb"><img src="' + URL.createObjectURL(pk.file) +
+        '" style="transform:rotate(' + pk.rot + 'deg)">' +
+        '<button type="button" class="up-rot" data-ri="' + i + '" title="90도 돌리기">&#10227;</button></span>';
     }).join('');
+    box.querySelectorAll('.up-rot').forEach(function (b) {
+      b.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var pk = picked[+b.dataset.ri];
+        pk.rot = (pk.rot + 90) % 360;
+        showPreview();
+      });
+    });
   }
   function addFiles(list) {
     Array.prototype.forEach.call(list, function (f) {
-      if (f.type.indexOf('image/') === 0) picked.push(f);
+      if (f.type.indexOf('image/') === 0) picked.push({ file: f, rot: 0 });
     });
     showPreview();
   }
@@ -505,20 +601,28 @@ document.addEventListener('DOMContentLoaded', function () {
     if (ev.dataTransfer && ev.dataTransfer.files) addFiles(ev.dataTransfer.files);
   });
 
-  /* 웹 사이즈로 축소 (원본 그대로 올리지 않는다) */
-  function resize(file, maxW, quality) {
+  /* 웹 사이즈로 축소 (원본 그대로 올리지 않는다). rot 을 주면 그만큼 돌려서 담는다. */
+  function resize(file, maxW, quality, rot) {
+    rot = ((rot || 0) % 360 + 360) % 360;
     return new Promise(function (resolve, reject) {
       var img = new Image();
+      if (typeof file === 'string') img.crossOrigin = 'anonymous';
       img.onload = function () {
-        var w = img.width, h = img.height;
-        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        var sw = img.naturalWidth || img.width, sh = img.naturalHeight || img.height;
+        /* 돌린 뒤의 가로세로 */
+        var rw = (rot % 180) ? sh : sw, rh = (rot % 180) ? sw : sh;
+        if (rw > maxW) { rh = Math.round(rh * maxW / rw); rw = maxW; }
         var cv = document.createElement('canvas');
-        cv.width = w; cv.height = h;
-        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        cv.width = rw; cv.height = rh;
+        var cx = cv.getContext('2d');
+        cx.translate(rw / 2, rh / 2);
+        cx.rotate(rot * Math.PI / 180);
+        var dw = (rot % 180) ? rh : rw, dh = (rot % 180) ? rw : rh;
+        cx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
         cv.toBlob(function (b) { b ? resolve(b) : reject(new Error('변환 실패')); }, 'image/jpeg', quality);
       };
       img.onerror = function () { reject(new Error('이미지를 읽을 수 없습니다.')); };
-      img.src = URL.createObjectURL(file);
+      img.src = typeof file === 'string' ? file : URL.createObjectURL(file);
     });
   }
 
@@ -558,9 +662,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var chain = Promise.resolve();
     if (picked.length) {
-      picked.forEach(function (f, i) {
+      picked.forEach(function (pk, i) {
         chain = chain.then(function () {
-          return Promise.all([resize(f, 1400, 0.8), resize(f, 640, 0.72)]).then(function (bs) {
+          return Promise.all([
+            resize(pk.file, 1400, 0.8, pk.rot),
+            resize(pk.file, 640, 0.72, pk.rot)
+          ]).then(function (bs) {
             return SHSPhotos.putPair(bs[0], bs[1]);
           }).then(function (u) {
             return SHSCloud.init().then(function (c) {
