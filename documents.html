@@ -28,7 +28,7 @@
 <script src="js/name-picker.js"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
-<script src="js/certificate.js?v=20260829c"></script>
+<script src="js/certificate.js?v=20260829j"></script>
 <script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -89,6 +89,9 @@ document.addEventListener('DOMContentLoaded', function () {
     '</div>' +
     '<input type="hidden" id="d-reqid" value="">' +
     '<div id="d-reqnote" class="hidden" style="font-size:0.85rem;color:var(--navy);margin-bottom:8px"></div>' +
+    '<div id="d-sealbox" class="hidden" style="margin:8px 0 12px">' +
+    '<label style="font-size:0.85rem;font-weight:500;color:var(--gray-7)">교회 직인 (직인증명서에 찍힙니다)</label>' +
+    '<div id="d-sealview" style="font-size:0.86rem;color:var(--gray-5);margin-top:4px"></div></div>' +
     '<div><label style="font-size:0.85rem;font-weight:500;color:var(--gray-7)">날인할 도장</label>' +
     '<div class="seal-pick" id="seal-pick"><span style="color:var(--gray-5)">직인 정보를 불러오는 중...</span></div>' +
     '<p style="font-size:0.8rem;color:var(--gray-5)">등록된 도장은 <a href="settings.html" style="color:var(--navy);text-decoration:underline">관리자 → 직인·도장</a>에서 관리합니다.</p></div>' +
@@ -627,6 +630,51 @@ document.addEventListener('DOMContentLoaded', function () {
     }).catch(function () {});
   }
 
+  /* ---------- 직인증명서: 그 교회의 직인 ----------
+   * 담임목사가 내 정보에 등록한 직인을 서버에서 찾아 온다.
+   * (다른 사람의 직인은 관리자만 볼 수 있도록 서버가 막고 있다) */
+  var churchSeal = null, churchAddr = null;
+
+  function refreshChurchSeal() {
+    var box = document.getElementById('d-sealbox');
+    var view = document.getElementById('d-sealview');
+    if (!box || !view) return;
+    var isSeal = document.getElementById('d-type').value === '직인증명서';
+    box.classList.toggle('hidden', !isSeal);
+    if (!isSeal) { churchSeal = null; return; }
+
+    var church = document.getElementById('d-church').value.trim();
+    churchSeal = null; churchAddr = null;
+    if (!church) {
+      view.innerHTML = '<span style="color:var(--gray-5)">소속 교회를 먼저 적어 주세요.</span>';
+      return;
+    }
+    view.innerHTML = '<span style="color:var(--gray-5)">직인을 불러오는 중...</span>';
+    SHSCloud.init().then(function (c) {
+      return c.rpc('church_info_of', { p_church: church });
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      var info = (r.data && r.data[0]) || {};
+      churchSeal = info.out_seal || null;
+      churchAddr = info.out_address || null;
+      /* 담임교역자와 직위가 비어 있으면 명단에서 찾은 값으로 채워 준다 */
+      var nameEl = document.getElementById('d-name');
+      if (info.out_pastor && !nameEl.value.trim()) nameEl.value = info.out_pastor;
+      view.innerHTML = churchSeal
+        ? '<img src="' + churchSeal + '" alt="' + e(church) + ' 직인" ' +
+          'style="height:74px;border:1px solid var(--gray-3,#ddd);padding:4px;background:#fff;vertical-align:middle">' +
+          ' <span style="color:var(--gray-6)">' + e(church) + ' 직인이 문서에 찍힙니다.</span>'
+        : '<span class="fail">등록된 직인이 없습니다. 담임목사께서 ' +
+          '<a href="mypage.html" style="text-decoration:underline">내 정보</a>에서 교회 직인을 올리셔야 합니다.</span>';
+    }).catch(function (x) {
+      view.innerHTML = '<span class="fail">직인을 불러오지 못했습니다: ' + e((x && x.message) || x) + '</span>';
+    });
+  }
+  document.getElementById('d-type').addEventListener('change', refreshChurchSeal);
+  document.getElementById('d-church').addEventListener('change', refreshChurchSeal);
+  document.getElementById('d-church').addEventListener('blur', refreshChurchSeal);
+  refreshChurchSeal();
+
   document.getElementById('btn-issue').addEventListener('click', function () {
     var msg = document.getElementById('d-msg');
     var btn = document.getElementById('btn-issue');
@@ -637,7 +685,15 @@ document.addEventListener('DOMContentLoaded', function () {
     var purpose = document.getElementById('d-purpose').value;
     var session = parseInt(document.getElementById('d-session').value, 10) || 19;
     var reqId = document.getElementById('d-reqid').value;
-    if (!name || !church) {
+    if (doc === '직인증명서') {
+      if (!church) {
+        msg.className = 'form-msg err';
+        msg.textContent = '교회 이름을 입력해 주세요.';
+        return;
+      }
+      if (!churchSeal && !confirm('이 교회의 직인이 등록되어 있지 않습니다. ' +
+          '직인 자리를 비운 채로 발급할까요?')) return;
+    } else if (!name || !church) {
       msg.className = 'form-msg err';
       msg.textContent = '대상자 성명과 소속 교회를 입력해 주세요.';
       return;
@@ -677,7 +733,10 @@ document.addEventListener('DOMContentLoaded', function () {
         p_request_id: reqId ? parseInt(reqId, 10) : null,
         p_doc_type: doc, p_name: name, p_position: pos, p_church: church,
         p_purpose: purpose, p_copies: 1, p_body_text: body,
-        p_seals: sealMap, p_president: presidentName, p_clerk: clerkName, p_session_no: session
+        p_seals: sealMap, p_president: presidentName, p_clerk: clerkName,
+        p_session_no: session,
+        p_church_seal: doc === '직인증명서' ? churchSeal : null,
+        p_church_addr: doc === '직인증명서' ? churchAddr : null
       });
     }).then(function (res) {
       btn.disabled = false;

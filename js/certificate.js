@@ -55,7 +55,7 @@ var SHSCert = (function () {
       case '대표자증명서':
         return '위 사람은 ' + NOHOE + ' 소속 ' + church + '의 대표자임을 증명합니다.';
       case '직인증명서':
-        return '위 ' + church + '의 직인은 본 노회에 등록된 직인임을 증명합니다.';
+        return '상기 직인은 대한예수교장로회 ' + church + ' 사용 직인임을 증명합니다.';
       case '은퇴목사확인서':
         return '위 사람은 ' + NOHOE + ' 소속 은퇴목사임을 확인합니다.';
       default:
@@ -80,13 +80,34 @@ var SHSCert = (function () {
     }
     h += '<div class="c-no">' + esc(rec.doc_no || rec.no || '') + '</div>';
     h += '<h2>' + esc(docName) + '</h2>';
-    h += '<table class="c-body"><tbody>' +
-      '<tr><td>성　　명</td><td>' + esc(rec.name) + '</td></tr>' +
-      '<tr><td>직　　위</td><td>' + esc(pos) + '</td></tr>' +
-      '<tr><td>소　　속</td><td>대한예수교장로회 ' + esc(rec.church) + '</td></tr>' +
-      '<tr><td>용　　도</td><td>' + esc(rec.purpose || '-') + '</td></tr>' +
-      '</tbody></table>';
-    h += '<div class="c-text">' + esc(body) + '</div>';
+
+    if (docName === '직인증명서') {
+      /* 직인증명서는 사람이 아니라 교회의 직인을 증명한다.
+       * 교회명·주소·담임교역자·직위·용도를 적고, 그 교회의 직인을 함께 보인다. */
+      h += '<table class="c-body"><tbody>' +
+        '<tr><td>교 회 명</td><td>' + esc(rec.church) + '</td></tr>' +
+        '<tr><td>주　　소</td><td>' + esc(rec.church_addr || rec.address || '') + '</td></tr>' +
+        '<tr><td>담임교역자</td><td>' + esc(rec.name) + '</td></tr>' +
+        '<tr><td>직　　위</td><td>' + esc(pos) + '</td></tr>' +
+        '<tr><td>용　　도</td><td>' + esc(rec.purpose || '-') + '</td></tr>' +
+        '</tbody></table>';
+      h += '<div class="c-sealbox">' +
+        '<div class="c-sealbox-t">' + esc(rec.church) + ' 직인</div>' +
+        '<div class="c-sealbox-b">' +
+        (rec.church_seal
+          ? '<img src="' + esc(rec.church_seal) + '" alt="' + esc(rec.church) + ' 직인">'
+          : '<span class="c-sealbox-none">직인을 등록하지 않았습니다</span>') +
+        '</div></div>';
+      h += '<div class="c-text">' + esc(body) + '</div>';
+    } else {
+      h += '<table class="c-body"><tbody>' +
+        '<tr><td>성　　명</td><td>' + esc(rec.name) + '</td></tr>' +
+        '<tr><td>직　　위</td><td>' + esc(pos) + '</td></tr>' +
+        '<tr><td>소　　속</td><td>대한예수교장로회 ' + esc(rec.church) + '</td></tr>' +
+        '<tr><td>용　　도</td><td>' + esc(rec.purpose || '-') + '</td></tr>' +
+        '</tbody></table>';
+      h += '<div class="c-text">' + esc(body) + '</div>';
+    }
     h += '<div class="c-date">' + esc(dateKo(rec.issued_on || rec.date)) + '</div>';
 
     /* 발급 명의 두 줄: 노회 이름(직인) / 노회장 성명(도장) */

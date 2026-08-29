@@ -1840,3 +1840,17 @@ td[data-duch]:hover { background: #eef2f8; }
 .ops-cols { display: grid; gap: 24px 32px; align-items: start; }
 @media (min-width: 1100px) { .ops-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .ops-cols > div > h2:first-child { margin-top: 0; }
+
+/* 직인증명서: 교회 직인을 담는 상자 */
+.c-sealbox { max-width: 300px; margin: 22px auto 18px; text-align: center; }
+.c-sealbox-t {
+  border: 1px solid #333; border-bottom: none; padding: 6px 8px;
+  font-size: 0.94rem; font-weight: 600; background: #f4f4f4;
+}
+.c-sealbox-b {
+  border: 1px solid #333; height: 120px;
+  display: flex; align-items: center; justify-content: center;
+}
+.c-sealbox-b img { max-height: 104px; max-width: 92%; object-fit: contain; }
+.c-sealbox-none { color: #999; font-size: 0.86rem; }
+@media print { .c-sealbox-b { height: 32mm; } }
