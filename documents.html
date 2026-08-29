@@ -24,11 +24,11 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829"></script>
+<script src="js/main.js?v=20260829c"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
-<script src="js/certificate.js"></script>
+<script src="js/certificate.js?v=20260829c"></script>
 <script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -82,6 +82,8 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div class="field"><label>용도</label><select id="d-purpose">' +
     '<option>연말정산용</option><option>은행제출용</option><option>기관제출용</option><option>총회제출용</option><option>회사제출용</option><option>교회제출용</option><option>기타</option>' +
     '</select></div>' +
+    '<div class="field" style="flex:0 0 160px"><label>재직 시작(부임)</label>' +
+    '<input type="date" id="d-served" title="재직증명서의 재직 기간에 쓰입니다"></div>' +
     '<div class="field" style="flex:0 0 90px"><label>회기</label><input type="number" id="d-session" value="19" min="1" max="99"></div>' +
     '<button class="btn" id="btn-issue">발급</button>' +
     '</div>' +
@@ -227,7 +229,10 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('doc_requests').select('*').order('id', { ascending: false }).limit(100),
         c.from('doc_issues').select('id,request_id,doc_no,void_yn')
-          .then(function (x) { return x; }, function (x) { return { error: x }; })
+          .then(function (x) { return x; }, function (x) { return { error: x }; }),
+        /* 재직증명서 처리에 필요한 재직 시작일 (회원 명단이 원본) */
+        c.from('roster').select('name,church,served_from')
+          .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
       var r = rs[0];
@@ -241,6 +246,16 @@ document.addEventListener('DOMContentLoaded', function () {
         if (x.request_id && !x.void_yn && !issued[x.request_id]) issued[x.request_id] = x;
       });
 
+      var rosterRows = (rs[2] && rs[2].data) || [];
+      function servedOf(name, church) {
+        var key = String(church || '').replace(/\s|교회$/g, '');
+        var hit = rosterRows.filter(function (m) {
+          return m.name === name &&
+            String(m.church || '').replace(/\s|교회$/g, '') === key;
+        })[0] || rosterRows.filter(function (m) { return m.name === name; })[0];
+        return hit ? hit.served_from : null;
+      }
+
       var rows = r.data || [];
       if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-5)">접수된 신청이 없습니다.</p>'; return; }
 
@@ -253,6 +268,11 @@ document.addEventListener('DOMContentLoaded', function () {
       var html2 = warn +
         '<table class="tbl"><thead><tr><th>신청일</th><th>신청자</th><th>소속</th><th>서류</th><th>용도</th>' +
         '<th>부수</th><th>요청사항</th><th>상태</th><th style="width:210px">처리</th></tr></thead><tbody>';
+      /* 입금 확인은 간사가, 발급 승인은 서기·노회장이 한다.
+       * 최고관리자는 두 단계를 모두 누를 수 있다. */
+      var canPayChk = user.role === 'staff' || user.role === 'superadmin';
+      var canApprove = ['clerk', 'president', 'superadmin'].indexOf(user.role) !== -1;
+
       rows.forEach(function (q) {
         var iss = issued[q.id];
         var act;
@@ -262,23 +282,44 @@ document.addEventListener('DOMContentLoaded', function () {
             '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:4px">' + e(iss.doc_no) + '</div>';
         } else if (q.status === '반려') {
           act = '<span style="color:var(--gray-5)">-</span>';
+        } else if (q.status === '신청') {
+          act = (canPayChk
+              ? '<button class="btn sm" data-rqpaid="' + q.id + '">입금 확인</button> '
+              : '<span style="color:var(--gray-5);font-size:0.82rem">간사의 입금 확인 대기</span> ') +
+            '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>';
+        } else if (q.status === '입금확인') {
+          act = (canApprove
+              ? '<button class="btn sm" data-rqok="' + q.id + '">발급 승인</button> '
+              : '<span style="color:var(--gray-5);font-size:0.82rem">서기·노회장의 승인 대기</span> ') +
+            '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>';
         } else {
-          /* 아직 증명서가 없으면 상태와 상관없이 발급할 수 있어야 한다.
-           * (예전에 '발급완료'로만 표시한 건도 여기서 다시 발급한다) */
-          act = '<button class="btn sm" data-rqfill="' + q.id + '">증명서 발급</button> ' +
-            (q.status === '신청'
-              ? '<button class="btn danger sm" data-rqrej="' + q.id + '">반려</button>'
-              : '') +
+          /* 발급승인(또는 예전 상태) — 증명서를 만든다 */
+          act = '<button class="btn sm" data-rqfill="' + q.id + '">증명서 발급</button>' +
             (q.status === '발급완료'
               ? '<div style="font-size:0.72rem;color:var(--red);margin-top:4px">증명서 없음 · 발급 필요</div>'
               : '');
         }
+        var servedNote = '';
+        if (q.doc_type === '재직증명서') {
+          var sf = servedOf(q.name, q.church);
+          servedNote = sf
+            ? '<div style="font-size:0.72rem;color:var(--navy)">재직 시작 ' + e(String(sf)) + '</div>'
+            : '<div style="font-size:0.72rem;color:var(--red)">재직 시작일 없음 — 명단 관리에서 입력</div>';
+        }
         html2 += '<tr><td>' + e(String(q.created_at).slice(0, 10)) + '</td>' +
-          '<td>' + e(q.name) + '<div style="font-size:0.75rem;color:var(--gray-5)">' + e(q.position || '') + '</div></td>' +
+          '<td>' + e(q.name) + '<div style="font-size:0.75rem;color:var(--gray-5)">' + e(q.position || '') + '</div>' +
+          servedNote + '</td>' +
           '<td>' + e(q.church || '-') + '</td><td>' + e(q.doc_type) + '</td><td>' + e(q.purpose || '-') + '</td>' +
-          '<td>' + e(q.copies) + '</td><td class="left" style="font-size:0.82rem">' + e(q.memo || '-') + '</td>' +
-          '<td><span class="role-badge">' + e(q.status) + '</span>' +
-          (q.handled_by ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(q.handled_by) + '</div>' : '') + '</td>' +
+          '<td>' + e(q.copies) +
+          (q.amount != null ? '<div style="font-size:0.72rem;color:var(--gray-5)">' +
+            Number(q.amount).toLocaleString('ko-KR') + '원</div>' : '') + '</td>' +
+          '<td class="left" style="font-size:0.82rem">' + e(q.memo || '-') + '</td>' +
+          '<td><span class="role-badge">' +
+          e(q.status === '신청' ? '입금 대기' : q.status) + '</span>' +
+          (q.paid_by ? '<div style="font-size:0.72rem;color:var(--gray-5)">입금 확인 ' + e(q.paid_by) + '</div>' : '') +
+          (q.approved_by ? '<div style="font-size:0.72rem;color:var(--gray-5)">승인 ' + e(q.approved_by) + '</div>' : '') +
+          (!q.paid_by && !q.approved_by && q.handled_by
+            ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(q.handled_by) + '</div>' : '') + '</td>' +
           '<td>' + act + '</td></tr>';
       });
       html2 += '</tbody></table>';
@@ -309,6 +350,7 @@ document.addEventListener('DOMContentLoaded', function () {
               if (ps.options[i].value === q.position) { ps.value = q.position; break; }
             }
           }
+          document.getElementById('d-served').value = servedOf(q.name, q.church) || '';
           /* 이 신청 건과 연결해서 발급한다 (발급하면 신청자에게 바로 전달된다) */
           document.getElementById('d-reqid').value = q.id;
           var note = document.getElementById('d-reqnote');
@@ -321,6 +363,29 @@ document.addEventListener('DOMContentLoaded', function () {
           var tab = panel ? document.querySelector('.section-nav a[href="#' + panel.id + '"]') : null;
           if (tab) tab.click();
           document.getElementById('d-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
+      function runStep(fn, id, doneMsg) {
+        SHSCloud.init().then(function (c) {
+          return c.rpc(fn, { p_id: parseInt(id, 10) });
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('update', doneMsg, '신청번호 ' + id);
+          loadRequests();
+        });
+      }
+      box.querySelectorAll('button[data-rqpaid]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var q = rows.filter(function (x) { return String(x.id) === b.dataset.rqpaid; })[0];
+          var won = q && q.amount != null ? ' (금액 ' + Number(q.amount).toLocaleString('ko-KR') + '원)' : '';
+          if (!confirm('입금을 확인하셨습니까?' + won + ' 확인하면 서기·노회장에게 승인 요청 알림이 갑니다.')) return;
+          runStep('confirm_doc_payment', b.dataset.rqpaid, '서류 신청 입금 확인');
+        });
+      });
+      box.querySelectorAll('button[data-rqok]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('이 신청의 서류 발급을 승인하시겠습니까? 승인하면 신청자와 간사에게 알림이 갑니다.')) return;
+          runStep('approve_doc_request', b.dataset.rqok, '서류 발급 승인');
         });
       });
       box.querySelectorAll('button[data-rqrej]').forEach(function (b) {
@@ -436,19 +501,23 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   renderLog();
 
-  /* 발급 명의로 쓸 노회장 성명 */
-  var presidentName = (function () {
-    var o = (SHSData.officers || []).filter(function (x) { return x.role === '노회장'; })[0];
-    return o ? o.name : '';
-  })();
+  /* 발급 명의로 쓸 노회장·서기 성명 — 모든 증명서에 함께 들어간다 */
+  function officerOf(list, role) {
+    var arr = (list && (list.officers || list)) || [];
+    if (!arr.filter) return null;
+    return arr.filter(function (x) { return x && x.role === role; })[0] || null;
+  }
+  var presidentName = (officerOf(SHSData.officers, '노회장') || {}).name || '';
+  var clerkName = (officerOf(SHSData.officers, '서기') || {}).name || '';
   if (window.SHSCloud && SHSCloud.enabled()) {
     SHSCloud.init().then(function (c) {
       return c.from('site_settings').select('*').eq('key', 'officers').single();
     }).then(function (r) {
       var list = (r.data && r.data.value) || [];
-      var o = (list.officers || list || []).filter
-        ? (list.officers || list).filter(function (x) { return x && x.role === '노회장'; })[0] : null;
+      var o = officerOf(list, '노회장');
       if (o && o.name) presidentName = o.name;
+      var ck = officerOf(list, '서기');
+      if (ck && ck.name) clerkName = ck.name;
     }).catch(function () {});
   }
 
@@ -485,7 +554,14 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    var body = SHSCert.bodyText({ doc_type: doc, church: church, position: pos });
+    var served = document.getElementById('d-served').value || null;
+    if (doc === '재직증명서' && !served) {
+      msg.className = 'form-msg err';
+      msg.textContent = '재직증명서에는 재직 시작(부임)일이 필요합니다. 명단 관리에 입력하거나 여기에 직접 적어 주세요.';
+      btn.disabled = false;
+      return;
+    }
+    var body = SHSCert.bodyText({ doc_type: doc, church: church, position: pos, served_from: served });
     btn.disabled = true;
     msg.className = 'form-msg';
     msg.textContent = '발급 중입니다...';
@@ -495,7 +571,7 @@ document.addEventListener('DOMContentLoaded', function () {
         p_request_id: reqId ? parseInt(reqId, 10) : null,
         p_doc_type: doc, p_name: name, p_position: pos, p_church: church,
         p_purpose: purpose, p_copies: 1, p_body_text: body,
-        p_seals: sealMap, p_president: presidentName, p_session_no: session
+        p_seals: sealMap, p_president: presidentName, p_clerk: clerkName, p_session_no: session
       });
     }).then(function (res) {
       btn.disabled = false;

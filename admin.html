@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829"></script>
+<script src="js/main.js?v=20260829c"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/dashboard.js"></script>
 <script>
@@ -479,6 +479,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td colspan="8"><div class="ro-addr">' +
           '<label>우편번호<input type="text" data-rf="postcode" value="' + e(m.postcode || '') +
           '" placeholder="00000" maxlength="7"></label>' +
+          '<label>재직 시작(부임)<input type="date" data-rf="served_from" value="' + e(m.served_from || '') +
+          '" title="재직증명서의 재직 기간에 쓰입니다"></label>' +
           '<label class="wide">주소<input type="text" data-rf="address" value="' + e(m.address || '') +
           '" placeholder="주소 — 증명서 등 모든 문서에 이 주소가 쓰입니다"></label>' +
           '</div></td></tr>';
@@ -629,6 +631,7 @@ document.addEventListener('DOMContentLoaded', function () {
             phone: v('phone') || null,
             postcode: v('postcode') || null,
             address: v('address') || null,
+            served_from: v('served_from') || null,
             role: g.role, officer_title: g.title
           };
           if (!d.name) {

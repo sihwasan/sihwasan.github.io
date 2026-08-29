@@ -563,7 +563,8 @@
     try { seen = JSON.parse(localStorage.getItem('shs_docreq_seen') || '{}'); } catch (x) {}
 
     function banner(rows) {
-      var fresh = rows.filter(function (r) { return !seen[r.id]; });
+      /* 단계가 바뀌면 다시 알리도록 신청번호+단계로 기억한다 */
+      var fresh = rows.filter(function (r) { return !seen[r.id + ':' + r.status]; });
       if (!fresh.length) return;
       var old = document.getElementById('docreq-banner');
       if (old) old.remove();
@@ -575,7 +576,8 @@
         '<div class="notice-banner" style="border-left:4px solid var(--red)">' +
         '<strong>[서류 신청]</strong> 처리 대기 중인 서류 신청이 ' + fresh.length + '건 있습니다. ' +
         fresh.slice(0, 3).map(function (r) {
-          return SHS.esc(r.name + ' ' + (r.church || '') + ' — ' + r.doc_type);
+          var stage = r.status === '신청' ? '입금 확인' : r.status === '입금확인' ? '발급 승인' : '증명서 발급';
+          return SHS.esc(r.name + ' ' + (r.church || '') + ' — ' + r.doc_type + ' (' + stage + ' 대기)');
         }).join(' / ') +
         ' <a class="btn sm" style="margin-left:8px" href="documents.html#requests">신청 확인</a> ' +
         '<button class="btn ghost sm" id="docreq-hide">나중에 보기</button>' +
@@ -584,16 +586,21 @@
       if (gnb) gnb.insertAdjacentElement('afterend', bar);
       var hide = document.getElementById('docreq-hide');
       if (hide) hide.addEventListener('click', function () {
-        fresh.forEach(function (r) { seen[r.id] = 1; });
+        fresh.forEach(function (r) { seen[r.id + ':' + r.status] = 1; });
         localStorage.setItem('shs_docreq_seen', JSON.stringify(seen));
         bar.remove();
       });
     }
 
+    /* 내 차례인 단계만 알린다: 간사=입금 확인, 서기·노회장=발급 승인,
+     * 승인된 건의 증명서 발급은 발급 권한자 모두. 최고관리자는 전부. */
+    var stages = ['발급승인'];
+    if (u.role === 'staff' || u.role === 'superadmin') stages.push('신청');
+    if (u.role === 'clerk' || u.role === 'president' || u.role === 'superadmin') stages.push('입금확인');
     function poll() {
       SHSCloud.init().then(function (c) {
         if (!c) return null;
-        return c.from('doc_requests').select('*').eq('status', '신청').order('id', { ascending: false });
+        return c.from('doc_requests').select('*').in('status', stages).order('id', { ascending: false });
       }).then(function (r) {
         if (r && r.data && r.data.length) banner(r.data);
       }).catch(function () {});

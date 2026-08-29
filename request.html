@@ -56,10 +56,10 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829"></script>
+<script src="js/main.js?v=20260829c"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
-<script src="js/certificate.js"></script>
+<script src="js/certificate.js?v=20260829c"></script>
 <script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -80,6 +80,61 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var DOCS = ['소속증명서', '재직증명서', '대표자증명서', '직인증명서', '은퇴목사확인서', '기타'];
+  var FEES = {};                                   /* 서류 종류 → 원 */
+  var PAY = { bank: 'NH농협', account: '3511015867663', holder: '시화산노회' };
+  function feeOf(doc) {
+    var v = Number(FEES[doc] != null ? FEES[doc] : FEES['기타']);
+    return isNaN(v) ? 0 : v;
+  }
+  function won(n) { return Number(n || 0).toLocaleString('ko-KR') + '원'; }
+
+  /* ---------- 입금 안내 창 ---------- */
+  function payGuide(docType, copies, amount) {
+    var old = document.getElementById('pay-overlay');
+    if (old) old.remove();
+    var acct = PAY.bank + ' ' + PAY.account + ' (' + PAY.holder + ')';
+    var toss = 'supertoss://send?amount=' + amount +
+      '&bank=' + encodeURIComponent(PAY.bank.replace(/^NH/, '')) +
+      '&accountNo=' + encodeURIComponent(PAY.account);
+    var ov = document.createElement('div');
+    ov.id = 'pay-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:300;' +
+      'display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:8px;max-width:420px;width:100%;padding:26px 24px;box-shadow:0 10px 40px rgba(0,0,0,.25)">' +
+      '<h3 style="margin:0 0 6px;color:var(--navy)">발급 수수료 입금 안내</h3>' +
+      '<p style="font-size:0.88rem;color:var(--gray-7);margin:0 0 14px">' +
+      e(docType) + ' ' + copies + '부 — 수수료 <strong style="color:var(--navy);font-size:1.05rem">' + won(amount) + '</strong></p>' +
+      '<div style="border:1px solid var(--gray-3,#d8dbe2);border-radius:6px;padding:12px 14px;margin-bottom:12px">' +
+      '<div style="font-size:0.8rem;color:var(--gray-5)">입금 계좌</div>' +
+      '<div style="font-size:1rem;font-weight:700;margin:2px 0" id="pay-acct">' + e(acct) + '</div>' +
+      '<button class="btn ghost sm" id="pay-copy">계좌번호 복사</button>' +
+      '</div>' +
+      '<a class="btn" style="width:100%;text-align:center;display:block;box-sizing:border-box" href="' + toss + '">토스로 납부하기</a>' +
+      '<p style="font-size:0.76rem;color:var(--gray-5);margin:8px 0 14px">토스 단추는 토스 앱이 설치된 휴대폰에서 열립니다. ' +
+      '입금자명은 <strong>' + e(user.name) + '</strong>(신청자명)으로 해 주세요. ' +
+      '간사가 입금을 확인하고 서기·노회장이 승인하면 발급됩니다.</p>' +
+      '<button class="btn ghost" style="width:100%" id="pay-close">닫기</button>' +
+      '</div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (ev) { if (ev.target === ov) ov.remove(); });
+    document.getElementById('pay-close').addEventListener('click', function () { ov.remove(); });
+    document.getElementById('pay-copy').addEventListener('click', function () {
+      var btn = this;
+      function ok() { btn.textContent = '복사되었습니다'; setTimeout(function () { btn.textContent = '계좌번호 복사'; }, 1600); }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(PAY.account).then(ok, function () { prompt('계좌번호를 복사하세요', PAY.account); });
+      } else { prompt('계좌번호를 복사하세요', PAY.account); }
+    });
+  }
+
+  /* 진행 상태를 알기 쉬운 말로 */
+  function statusLabel(st) {
+    if (st === '신청') return '입금 대기';
+    if (st === '입금확인') return '입금 확인 · 승인 대기';
+    if (st === '발급승인') return '승인 완료 · 발급 준비';
+    return st;
+  }
   var PURPOSES = ['연말정산용', '은행제출용', '기관제출용', '총회제출용', '회사제출용', '교회제출용', '기타'];
 
   var issued = {};   /* 신청번호 → 발급된 증명서 */
@@ -98,6 +153,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field" style="flex:0 0 170px"><label>용도</label><select id="rq-purpose">' +
       PURPOSES.map(function (d) { return '<option>' + d + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" style="flex:0 0 110px"><label>부수</label><input type="number" id="rq-copies" value="1" min="1" max="10"></div>' +
+      '<div class="field" style="flex:0 0 150px"><label>수수료</label>' +
+      '<input type="text" id="rq-fee" value="" disabled style="font-weight:700;color:var(--navy)"></div>' +
       '</div>' +
       '<div class="inline-form" style="margin-bottom:8px">' +
       '<div class="field"><label>성명</label><input type="text" id="rq-name" value="' + e(user.name) + '"></div>' +
@@ -144,7 +201,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         html += '<tr><td>' + e(String(r.created_at).slice(0, 10)) + '</td><td>' + e(r.doc_type) + '</td>' +
           '<td>' + e(r.purpose || '-') + '</td><td>' + e(r.copies) + '</td>' +
-          '<td><span class="role-badge">' + e(r.status) + '</span></td>' +
+          '<td><span class="role-badge">' + e(statusLabel(r.status)) + '</span>' +
+          (r.status === '신청'
+            ? '<div style="margin-top:4px"><button class="btn ghost sm" data-payinfo="' + r.id + '">입금 안내</button></div>'
+            : '') + '</td>' +
           '<td>' + cell + '</td></tr>';
       });
       html += '</tbody></table>';
@@ -171,6 +231,23 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
+    function syncFee() {
+      var doc = document.getElementById('rq-doc').value;
+      var n = parseInt(document.getElementById('rq-copies').value, 10) || 1;
+      document.getElementById('rq-fee').value = won(feeOf(doc) * n);
+    }
+    document.getElementById('rq-doc').addEventListener('change', syncFee);
+    document.getElementById('rq-copies').addEventListener('input', syncFee);
+    syncFee();
+
+    area.querySelectorAll('button[data-payinfo]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = (lastList || []).filter(function (x) { return String(x.id) === b.dataset.payinfo; })[0];
+        if (!r) return;
+        payGuide(r.doc_type, r.copies || 1, r.amount != null ? r.amount : feeOf(r.doc_type) * (r.copies || 1));
+      });
+    });
+
     document.getElementById('rq-send').addEventListener('click', function () {
       var msg = document.getElementById('rq-msg');
       var d = {
@@ -184,6 +261,7 @@ document.addEventListener('DOMContentLoaded', function () {
         copies: parseInt(document.getElementById('rq-copies').value, 10) || 1,
         memo: document.getElementById('rq-memo').value.trim()
       };
+      d.amount = feeOf(d.doc_type) * d.copies;
       if (!d.name || !d.church) {
         msg.className = 'form-msg err';
         msg.textContent = '성명과 소속 교회를 입력해 주세요.';
@@ -200,16 +278,19 @@ document.addEventListener('DOMContentLoaded', function () {
           return;
         }
         SHSCloud.log('create', '서류 신청', d.doc_type + ' (' + d.name + ', ' + d.church + ', ' + d.purpose + ')');
-        alert('신청이 접수되었습니다. 관리자에게 알림이 전달되었습니다.');
         load();
+        payGuide(d.doc_type, d.copies, d.amount);
       });
     });
   }
 
+  var lastList = [];
   function load() {
     SHSCloud.init().then(function (c) {
       return Promise.all([
         c.from('doc_requests').select('*').eq('user_id', user.id).order('id', { ascending: false }),
+        c.from('site_settings').select('*').in('key', ['doc_fees', 'doc_pay'])
+          .then(function (x) { return x; }, function () { return { data: [] }; }),
         /* 발급된 증명서 (31 증명서 발급을 아직 등록하지 않았으면 조용히 넘어간다)
          * PDF로 다시 그려야 하므로 직인·문구까지 통째로 받아 둔다 */
         c.from('doc_issues').select('*')
@@ -223,11 +304,17 @@ document.addEventListener('DOMContentLoaded', function () {
           ' (08 서류신청 등록이 필요할 수 있습니다)</div>';
         return;
       }
-      issued = {};
+      /* 요금과 입금 계좌 (관리자가 설정 화면에서 정한다) */
       ((rs[1] && rs[1].data) || []).forEach(function (x) {
+        if (x.key === 'doc_fees' && x.value) FEES = x.value;
+        if (x.key === 'doc_pay' && x.value) PAY = x.value;
+      });
+      issued = {};
+      ((rs[2] && rs[2].data) || []).forEach(function (x) {
         if (x.request_id && !issued[x.request_id]) issued[x.request_id] = x;
       });
-      render(r.data || []);
+      lastList = r.data || [];
+      render(lastList);
     });
   }
   load();

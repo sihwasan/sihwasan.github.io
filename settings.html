@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260829"></script>
+<script src="js/main.js?v=20260829c"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -55,7 +55,87 @@ document.addEventListener('DOMContentLoaded', function () {
     '모든 변경은 감사 기록에 남습니다.<br>' +
     '<span style="font-size:0.85rem;color:var(--gray-5)">' +
     '예전에 이 화면에 있던 관리 메뉴는 상단 <strong>관리자</strong> 메뉴로 옮겼습니다.</span></div>' +
-    '<div id="st-seal"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+    '<div id="st-seal"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
+    '<div id="st-fees" style="margin-top:26px"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+
+  /* ---------- 서류 발급 요금·입금 계좌 ---------- */
+  var FEE_DOCS = ['소속증명서', '재직증명서', '대표자증명서', '직인증명서', '은퇴목사확인서', '기타'];
+
+  function loadFees() {
+    var box = document.getElementById('st-fees');
+    SHSCloud.init().then(function (c) {
+      return c.from('site_settings').select('*').in('key', ['doc_fees', 'doc_pay']);
+    }).then(function (r) {
+      if (r.error) {
+        box.innerHTML = '<p style="color:var(--gray-5)">요금 설정을 불러오지 못했습니다: ' + e(r.error.message) + '</p>';
+        return;
+      }
+      var fees = {}, pay = { bank: 'NH농협', account: '3511015867663', holder: '시화산노회' };
+      (r.data || []).forEach(function (x) {
+        if (x.key === 'doc_fees' && x.value) fees = x.value;
+        if (x.key === 'doc_pay' && x.value) pay = x.value;
+      });
+
+      var h = '<h2>서류 발급 요금·입금 계좌</h2>' +
+        '<div class="admin-card" style="max-width:560px">' +
+        '<p style="font-size:0.85rem;color:var(--gray-6);margin-top:0">회원이 서류를 신청할 때 ' +
+        '여기 정한 수수료와 계좌가 입금 안내 창에 나옵니다.</p>' +
+        '<div class="inline-form" style="flex-wrap:wrap">' +
+        FEE_DOCS.map(function (d) {
+          var v = fees[d] != null ? fees[d] : 1000;
+          return '<div class="field" style="flex:0 0 160px"><label>' + e(d) + ' (원)</label>' +
+            '<input type="number" min="0" step="100" data-fee="' + e(d) + '" value="' + Number(v) + '"></div>';
+        }).join('') + '</div>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 120px"><label>은행</label>' +
+        '<input type="text" id="fee-bank" value="' + e(pay.bank || '') + '"></div>' +
+        '<div class="field"><label>계좌번호</label>' +
+        '<input type="text" id="fee-acct" value="' + e(pay.account || '') + '"></div>' +
+        '<div class="field" style="flex:0 0 140px"><label>예금주</label>' +
+        '<input type="text" id="fee-holder" value="' + e(pay.holder || '') + '"></div>' +
+        '</div>' +
+        '<button class="btn" id="fee-save">저장</button>' +
+        '<div class="form-msg" id="fee-msg"></div></div>';
+      box.innerHTML = h;
+
+      document.getElementById('fee-save').addEventListener('click', function () {
+        var msg = document.getElementById('fee-msg');
+        var newFees = {};
+        var bad = false;
+        box.querySelectorAll('input[data-fee]').forEach(function (inp) {
+          var v = parseInt(inp.value, 10);
+          if (isNaN(v) || v < 0) bad = true;
+          newFees[inp.dataset.fee] = v;
+        });
+        var newPay = {
+          bank: document.getElementById('fee-bank').value.trim(),
+          account: document.getElementById('fee-acct').value.trim().replace(/[^0-9-]/g, ''),
+          holder: document.getElementById('fee-holder').value.trim()
+        };
+        if (bad || !newPay.account) {
+          msg.className = 'form-msg err';
+          msg.textContent = '요금은 0 이상 숫자로, 계좌번호는 비우지 말고 적어 주세요.';
+          return;
+        }
+        msg.className = 'form-msg';
+        msg.textContent = '저장 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.from('site_settings').upsert([
+            { key: 'doc_fees', value: newFees, updated_at: new Date().toISOString() },
+            { key: 'doc_pay', value: newPay, updated_at: new Date().toISOString() }
+          ]);
+        }).then(function (res) {
+          if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+          SHSCloud.log('update', '서류 발급 요금·계좌 설정',
+            FEE_DOCS.map(function (d) { return d + ' ' + newFees[d] + '원'; }).join(', ') +
+            ' / ' + newPay.bank + ' ' + newPay.account);
+          msg.className = 'form-msg ok';
+          msg.textContent = '저장되었습니다. 신청 화면에 바로 반영됩니다.';
+        });
+      });
+    });
+  }
+  loadFees();
 
   /* ---------- 직인·도장 ---------- */
   var sealFiles = {};

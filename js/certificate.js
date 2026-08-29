@@ -25,13 +25,33 @@ var SHSCert = (function () {
     return t.getFullYear() + '년 ' + (t.getMonth() + 1) + '월 ' + t.getDate() + '일';
   }
 
+  /* 받침에 따라 '로'/'으로' 를 고른다 (목사로, 직원으로) */
+  function ro(word) {
+    var ch = String(word || '').slice(-1).charCodeAt(0);
+    var jong = ch >= 0xAC00 && ch <= 0xD7A3 ? (ch - 0xAC00) % 28 : 0;
+    return jong && jong !== 8 ? '으로' : '로';   /* ㄹ 받침은 '로' */
+  }
+
+  /* 2001-04-01 → 2001년 4월 */
+  function ymKo(d) {
+    var t = d ? new Date(String(d).length <= 10 ? d + 'T00:00:00' : d) : null;
+    if (!t || isNaN(t)) return '';
+    return t.getFullYear() + '년 ' + (t.getMonth() + 1) + '월';
+  }
+
   /* 서류 종류별 증명 문구 */
   function bodyText(rec) {
     var church = rec.church || '';
     var pos = rec.position || rec.pos || '';
     switch (rec.doc_type || rec.doc) {
       case '재직증명서':
-        return '위 사람은 ' + NOHOE + ' 소속 ' + church + ' ' + pos + '(으)로 재직 중임을 증명합니다.';
+        if (rec.served_from) {
+          var now = new Date();
+          return '위 사람은 본 노회에 소속한 ' + pos + '로서 ' + ymKo(rec.served_from) +
+            '부터 ' + now.getFullYear() + '년 ' + (now.getMonth() + 1) + '월 현재 ' +
+            '대한예수교장로회 ' + church + ' ' + pos + ro(pos) + ' 재직하고 있음을 증명합니다.';
+        }
+        return '위 사람은 ' + NOHOE + ' 소속 ' + church + ' ' + pos + ro(pos) + ' 재직 중임을 증명합니다.';
       case '대표자증명서':
         return '위 사람은 ' + NOHOE + ' 소속 ' + church + '의 대표자임을 증명합니다.';
       case '직인증명서':
@@ -49,8 +69,8 @@ var SHSCert = (function () {
     var pos = rec.position || rec.pos || '';
     var docName = rec.doc_type || rec.doc || '증명서';
     var body = rec.body_text || bodyText(rec);
-    /* 노회장 도장은 발급 명의 줄에 찍으므로 여기서는 뺀다 */
-    var signRows = ['서기', '회록서기'].filter(function (k) {
+    /* 노회장·서기 도장은 발급 명의 줄에 찍으므로 여기서는 뺀다 */
+    var signRows = ['회록서기'].filter(function (k) {
       return seals[k] && seals[k].url;
     });
 
@@ -75,10 +95,16 @@ var SHSCert = (function () {
         ? '<img class="cert-seal" src="' + esc(seals['노회직인'].url) + '" alt="노회 직인">' : '') +
       '</div></div>';
     h += '<div class="cert-issuer-wrap"><div class="c-issuer">노회장' +
-      (rec.president ? ' ' + esc(rec.president) : '') +
+      (rec.president ? ' ' + esc(rec.president) + ' 목사' : '') +
       (seals['노회장'] && seals['노회장'].url
         ? '<img class="cert-seal sm" src="' + esc(seals['노회장'].url) + '" alt="노회장 도장">' : '') +
       '</div></div>';
+    if (rec.clerk) {
+      h += '<div class="cert-issuer-wrap"><div class="c-issuer">서　기 ' + esc(rec.clerk) + ' 목사' +
+        (seals['서기'] && seals['서기'].url
+          ? '<img class="cert-seal sm" src="' + esc(seals['서기'].url) + '" alt="서기 도장">' : '') +
+        '</div></div>';
+    }
 
     if (signRows.length) {
       h += '<div class="cert-signs">' + signRows.map(function (k) {
