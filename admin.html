@@ -383,6 +383,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 총대장로 표시는 노회 명단의 장로와 짝을 이룬다. */
   var chStaff = [], chChurches = [], chRoster = [], chSel = '';
   var chModalOpen = false;
+  var chFilter = { sichal: '', org: '', q: '' };   /* 목록 필터 (시찰·당회·이름) */
   var CH_ROLES = ['목사', '원로목사', '부목사', '시무장로', '원로장로', '은퇴장로', '협동장로'];
 
   function chKey(t) {
@@ -453,13 +454,42 @@ document.addEventListener('DOMContentLoaded', function () {
       '<strong>시무장로가 있는 교회(조직교회)의 담임목사는 명단에 위임목사로 저절로 표기</strong>되고, ' +
       '<strong>총대장로</strong> 표시는 노회 명단의 장로와 짝을 이룹니다.</div>';
 
-    /* ----- 전체 교회 목록 ----- */
+    /* ----- 전체 교회 목록 (시찰·당회·이름으로 거른다) ----- */
+    var shown = chChurches.filter(function (x) {
+      if (chFilter.sichal && (x.sichal || '기타') !== chFilter.sichal) return false;
+      if (chFilter.org === '조직' && !chOrganized(x.name)) return false;
+      if (chFilter.org === '미조직' && chOrganized(x.name)) return false;
+      if (chFilter.q && String(x.name || '').indexOf(chFilter.q) === -1) return false;
+      return true;
+    });
+
+    h += '<div class="inline-form" style="margin-bottom:4px">' +
+      '<div class="field" style="flex:0 0 150px"><label>시찰</label><select id="chf-sichal">' +
+      '<option value="">시찰 전체</option>' +
+      chSichalNames().concat(['기타']).filter(function (n, i, a) { return a.indexOf(n) === i; })
+        .map(function (n) {
+          return '<option' + (chFilter.sichal === n ? ' selected' : '') + '>' + e(n) + '</option>';
+        }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 150px"><label>당회</label><select id="chf-org">' +
+      ['', '조직', '미조직'].map(function (v) {
+        return '<option value="' + v + '"' + (chFilter.org === v ? ' selected' : '') + '>' +
+          (v || '당회 전체') + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 220px"><label>교회 이름</label>' +
+      '<input type="search" id="chf-q" value="' + e(chFilter.q) + '" placeholder="교회 이름으로 찾기"></div>' +
+      '<button class="btn ghost sm" id="chf-clear" style="align-self:flex-end">지우기</button>' +
+      '</div>';
+
     h += '<p style="font-size:0.9rem;color:var(--gray-7)">전체 <strong>' + chChurches.length +
-      '곳</strong> · 당회가 있는 교회(조직교회) <strong>' + orgCnt + '곳</strong></p>';
+      '곳</strong> · 당회가 있는 교회(조직교회) <strong>' + orgCnt + '곳</strong>' +
+      (shown.length !== chChurches.length ? ' · 지금 <strong>' + shown.length + '곳</strong> 표시' : '') + '</p>';
     h += '<table class="tbl"><thead><tr><th style="width:90px">시찰</th><th style="width:170px">교회</th>' +
       '<th style="width:150px">담임</th><th style="width:80px">당회</th>' +
       '<th style="width:110px">교역자·장로</th><th>홈페이지</th><th style="width:70px">관리</th></tr></thead><tbody>';
-    chChurches.forEach(function (x) {
+    if (!shown.length) {
+      h += '<tr><td colspan="7" style="color:var(--gray-5)">조건에 맞는 교회가 없습니다.</td></tr>';
+    }
+    shown.forEach(function (x) {
       var pr = chPastorOf(x.name);
       var cnt = chStaffOf(x.name).length;
       h += '<tr>' +
@@ -491,6 +521,26 @@ document.addEventListener('DOMContentLoaded', function () {
         chModalOpen = true;
         openChurchModal();
       });
+    });
+
+    /* 필터 */
+    document.getElementById('chf-sichal').addEventListener('change', function () {
+      chFilter.sichal = this.value; drawChurches();
+    });
+    document.getElementById('chf-org').addEventListener('change', function () {
+      chFilter.org = this.value; drawChurches();
+    });
+    var chfQ = document.getElementById('chf-q');
+    chfQ.addEventListener('input', function () {
+      chFilter.q = this.value.trim();
+      drawChurches();
+      var q2 = document.getElementById('chf-q');
+      q2.focus();
+      q2.setSelectionRange(q2.value.length, q2.value.length);
+    });
+    document.getElementById('chf-clear').addEventListener('click', function () {
+      chFilter = { sichal: '', org: '', q: '' };
+      drawChurches();
     });
 
     document.getElementById('chn-add').addEventListener('click', function () {
@@ -851,7 +901,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
       /* 부여 등급을 읽기 좋은 말로 */
       function gradeName(v) {
-        var g = parseGrade(v);
+        var t = String(v || '');
+        if (t.indexOf('officer:') === 0) return t.slice(8);   /* 목록에 없는 직책도 이름만 */
+        var g = parseGrade(t);
         return g.title || ROSTER_ROLES[g.role] || g.role || '정회원';
       }
       /* 남은 임기: 장로 총대는 자격 기간, 그 외는 정년(만 70세)까지 */
@@ -1307,6 +1359,26 @@ document.addEventListener('DOMContentLoaded', function () {
    * 총대와 마찬가지로 정기노회에서 선정하므로 같은 모양으로 관리한다. */
   var BKINDS = ['총회 실행위원', '총신대 운영이사', 'GMS 이사', '기독신문 이사'];
 
+  /* 관리 화면 공용 수정 팝업 */
+  function adminModal(inner, maxWidth) {
+    var old = document.getElementById('adm-modal');
+    if (old) old.remove();
+    var ov = document.createElement('div');
+    ov.id = 'adm-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:300;' +
+      'display:flex;align-items:flex-start;justify-content:center;padding:36px 16px;overflow:auto';
+    ov.innerHTML = '<div style="background:#fff;border-radius:8px;max-width:' + (maxWidth || 640) +
+      'px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25);padding:24px 26px;position:relative">' +
+      '<button class="adm-modal-x" aria-label="닫기" style="position:absolute;top:10px;right:14px;' +
+      'border:none;background:none;font-size:1.4rem;color:var(--gray-5);cursor:pointer">&times;</button>' +
+      inner + '</div>';
+    document.body.appendChild(ov);
+    function close() { ov.remove(); }
+    ov.addEventListener('click', function (ev) { if (ev.target === ov) close(); });
+    ov.querySelector('.adm-modal-x').addEventListener('click', close);
+    return { ov: ov, close: close };
+  }
+
   function renderBoards() {
     var box = document.getElementById('board-area');
     if (!box) return;
@@ -1330,19 +1402,14 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '<tr><td colspan="7" style="color:var(--gray-5)">등록된 이사가 없습니다.</td></tr>';
       }
       rows.forEach(function (b) {
-        html += '<tr' + (b.active ? '' : ' style="opacity:.5"') + ' data-brow="' + b.id + '">' +
-          '<td><select data-bf="kind">' + BKINDS.map(function (k) {
-            return '<option' + (b.kind === k ? ' selected' : '') + '>' + e(k) + '</option>';
-          }).join('') + '</select></td>' +
-          '<td><input type="text" data-names="plain" data-bf="name" value="' + e(b.name) + '"></td>' +
-          '<td><select data-bf="position">' + ['목사', '장로'].map(function (k) {
-            return '<option' + (b.position === k ? ' selected' : '') + '>' + k + '</option>';
-          }).join('') + '</select></td>' +
-          '<td><input type="text" data-bf="church" value="' + e(b.church || '') + '"></td>' +
-          '<td><input type="date" data-bf="term_from" value="' + e(b.term_from || '') + '"></td>' +
-          '<td><input type="checkbox" data-bf="active"' + (b.active ? ' checked' : '') + '></td>' +
-          '<td><button class="btn sm" data-bsave="' + b.id + '">저장</button> ' +
-          '<button class="btn danger sm" data-bdel="' + b.id + '" data-bname="' + e(b.name) + '">삭제</button></td>' +
+        html += '<tr' + (b.active ? '' : ' style="opacity:.5"') + '>' +
+          '<td>' + e(b.kind) + '</td>' +
+          '<td><strong>' + e(b.name) + '</strong></td>' +
+          '<td>' + e(b.position || '-') + '</td>' +
+          '<td class="left">' + e(b.church || '-') + '</td>' +
+          '<td>' + e(b.term_from || '-') + '</td>' +
+          '<td>' + (b.active ? '표시' : '<span style="color:var(--gray-5)">숨김</span>') + '</td>' +
+          '<td><button class="btn sm" data-bedit="' + b.id + '">수정</button></td>' +
           '</tr>';
       });
       html += '</tbody></table>';
@@ -1362,40 +1429,70 @@ document.addEventListener('DOMContentLoaded', function () {
       box.innerHTML = html;
       SHSNames.attachAll(box);
 
-      function rowData(tr) {
-        var d = {};
-        tr.querySelectorAll('[data-bf]').forEach(function (el) {
-          d[el.dataset.bf] = el.type === 'checkbox' ? el.checked : (el.value.trim() || null);
-        });
-        d.updated_at = new Date().toISOString();
-        d.updated_by = user.name;
-        return d;
-      }
-
-      box.querySelectorAll('button[data-bsave]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var tr = box.querySelector('tr[data-brow="' + btn.dataset.bsave + '"]');
-          var d = rowData(tr);
-          if (!d.name) { alert('성명을 입력해 주세요.'); return; }
+      function openBoardEdit(b) {
+        var mo = adminModal(
+          '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(b.name) + ' — 이사 정보 수정</h3>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 180px"><label>구분</label><select id="bm-kind">' +
+          BKINDS.map(function (k) {
+            return '<option' + (b.kind === k ? ' selected' : '') + '>' + e(k) + '</option>';
+          }).join('') + '</select></div>' +
+          '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
+          '<input type="text" data-names="plain" id="bm-name" value="' + e(b.name) + '"></div>' +
+          '<div class="field" style="flex:0 0 110px"><label>직분</label><select id="bm-pos">' +
+          ['목사', '장로'].map(function (k) {
+            return '<option' + (b.position === k ? ' selected' : '') + '>' + k + '</option>';
+          }).join('') + '</select></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field"><label>소속 교회</label>' +
+          '<input type="text" id="bm-church" value="' + e(b.church || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 165px"><label>자격 시작</label>' +
+          '<input type="date" id="bm-from" value="' + e(b.term_from || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 110px"><label>조직 페이지 표시</label>' +
+          '<input type="checkbox" id="bm-active"' + (b.active ? ' checked' : '') + ' style="width:auto;margin-top:10px"></div>' +
+          '</div>' +
+          '<div style="margin-top:6px"><button class="btn" id="bm-save">저장</button> ' +
+          '<button class="btn danger" id="bm-del" style="float:right">명단에서 삭제</button></div>' +
+          '<div class="form-msg" id="bm-msg"></div>');
+        SHSNames.attachAll(mo.ov);
+        document.getElementById('bm-save').addEventListener('click', function () {
+          var msg = document.getElementById('bm-msg');
+          var d = {
+            kind: document.getElementById('bm-kind').value,
+            name: document.getElementById('bm-name').value.trim(),
+            position: document.getElementById('bm-pos').value,
+            church: document.getElementById('bm-church').value.trim() || null,
+            term_from: document.getElementById('bm-from').value || null,
+            active: document.getElementById('bm-active').checked,
+            updated_at: new Date().toISOString(), updated_by: user.name
+          };
+          if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명을 입력해 주세요.'; return; }
           SHSCloud.init().then(function (c) {
-            return c.from('board_members').update(d).eq('id', btn.dataset.bsave);
+            return c.from('board_members').update(d).eq('id', b.id);
           }).then(function (res) {
-            if (res.error) { alert(res.error.message); return; }
+            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
             SHSCloud.log('update', '이사 수정', d.kind + ' ' + d.name);
+            mo.close();
             renderBoards();
           });
         });
-      });
-      box.querySelectorAll('button[data-bdel]').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          if (!confirm('"' + btn.dataset.bname + '" 이사를 명단에서 지우시겠습니까?')) return;
+        document.getElementById('bm-del').addEventListener('click', function () {
+          if (!confirm('"' + b.name + '" 이사를 명단에서 지우시겠습니까?')) return;
           SHSCloud.init().then(function (c) {
-            return c.from('board_members').delete().eq('id', btn.dataset.bdel);
+            return c.from('board_members').delete().eq('id', b.id);
           }).then(function (res) {
             if (res.error) { alert(res.error.message); return; }
-            SHSCloud.log('delete', '이사 삭제', btn.dataset.bname);
+            SHSCloud.log('delete', '이사 삭제', b.name);
+            mo.close();
             renderBoards();
           });
+        });
+      }
+      box.querySelectorAll('button[data-bedit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var b = rows.filter(function (x) { return String(x.id) === btn.dataset.bedit; })[0];
+          if (b) openBoardEdit(b);
         });
       });
       document.getElementById('bn-add').addEventListener('click', function () {
@@ -1462,21 +1559,17 @@ document.addEventListener('DOMContentLoaded', function () {
         h += '<h3 style="margin-top:22px">' + e(k) + ' (' + list.length + '명)</h3>';
         if (!list.length) { h += '<p style="color:var(--gray-5)">등록된 총대가 없습니다.</p>'; return; }
         h += '<table class="tbl"><thead><tr><th style="width:110px">성명</th>' +
-          '<th style="width:160px">소속 교회</th><th style="width:110px">직책</th>' +
-          '<th style="width:200px">자격 기간</th><th style="width:170px">비고</th>' +
-          '<th style="width:170px">관리</th></tr></thead><tbody>';
+          '<th style="width:170px">소속 교회</th><th style="width:110px">직책</th>' +
+          '<th style="width:230px">자격 기간</th><th>비고</th>' +
+          '<th style="width:80px">관리</th></tr></thead><tbody>';
         list.forEach(function (d) {
-          h += '<tr data-dg="' + d.id + '">' +
-            '<td><input type="text" data-df="name" value="' + e(d.name) + '"></td>' +
-            '<td><input type="text" data-df="church" value="' + e(d.church || '') + '" placeholder="소속 교회"></td>' +
-            '<td><input type="text" data-df="title" value="' + e(d.title || '') + '" placeholder="자동총대"></td>' +
-            '<td><input type="date" data-df="term_from" value="' + e(d.term_from || '') + '">' +
-            '<input type="date" data-df="term_until" value="' + e(d.term_until || '') + '" style="margin-top:4px">' +
-            '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:2px">' + termCell(d) + '</div></td>' +
-            '<td><input type="text" data-df="note" value="' + e(d.note || '') + '"></td>' +
-            '<td><button class="btn sm" data-dsave="' + d.id + '">저장</button> ' +
-            '<button class="btn ghost sm" data-dswap="' + d.id + '" data-dn="' + e(d.name) + '">교체</button> ' +
-            '<button class="btn danger sm" data-ddel="' + d.id + '" data-dn2="' + e(d.name) + '">삭제</button></td>' +
+          h += '<tr>' +
+            '<td><strong>' + e(d.name) + '</strong></td>' +
+            '<td>' + e(d.church || '-') + '</td>' +
+            '<td>' + e(d.title || '-') + '</td>' +
+            '<td style="font-size:0.85rem">' + termCell(d) + '</td>' +
+            '<td class="left" style="font-size:0.85rem">' + e(d.note || '-') + '</td>' +
+            '<td><button class="btn sm" data-dedit="' + d.id + '">수정</button></td>' +
             '</tr>';
         });
         h += '</tbody></table>';
@@ -1514,67 +1607,86 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<div class="form-msg" id="dg-rowmsg"></div>';
       box.innerHTML = h;
 
-      /* 줄 저장 */
-      box.querySelectorAll('button[data-dsave]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var tr = b.closest('tr');
-          var msg = document.getElementById('dg-rowmsg');
-          function v(fl) { return tr.querySelector('[data-df="' + fl + '"]').value.trim(); }
+      /* ----- 수정 팝업 ----- */
+      function openDelegateEdit(d0) {
+        var mo = adminModal(
+          '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(d0.kind) + ' ' + e(d0.name) + ' — 총대 수정</h3>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
+          '<input type="text" id="dm-name" value="' + e(d0.name) + '"></div>' +
+          '<div class="field"><label>소속 교회</label>' +
+          '<input type="text" id="dm-church" value="' + e(d0.church || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 140px"><label>직책</label>' +
+          '<input type="text" id="dm-title" value="' + e(d0.title || '') + '" placeholder="자동총대"></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 165px"><label>자격 시작</label>' +
+          '<input type="date" id="dm-from" value="' + e(d0.term_from || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 165px"><label>자격 만료</label>' +
+          '<input type="date" id="dm-until" value="' + e(d0.term_until || '') + '"></div>' +
+          '<div class="field"><label>비고</label>' +
+          '<input type="text" id="dm-note" value="' + e(d0.note || '') + '"></div>' +
+          '</div>' +
+          '<div style="margin-top:6px"><button class="btn" id="dm-save">저장</button> ' +
+          '<button class="btn ghost" id="dm-swap">교체</button> ' +
+          '<button class="btn danger" id="dm-del" style="float:right">삭제</button></div>' +
+          '<p style="font-size:0.8rem;color:var(--gray-5);margin:8px 0 0">교체를 누르면 새 총대를 넣고 ' +
+          '이전 총대는 교체 기록으로 남습니다. 삭제는 기록까지 지웁니다.</p>' +
+          '<div class="form-msg" id="dm-msg"></div>');
+        document.getElementById('dm-save').addEventListener('click', function () {
+          var msg = document.getElementById('dm-msg');
           var d = {
-            name: v('name'), church: v('church') || null, title: v('title') || null,
-            term_from: v('term_from') || null, term_until: v('term_until') || null,
-            note: v('note') || null, updated_at: new Date().toISOString(), updated_by: user.name
+            name: document.getElementById('dm-name').value.trim(),
+            church: document.getElementById('dm-church').value.trim() || null,
+            title: document.getElementById('dm-title').value.trim() || null,
+            term_from: document.getElementById('dm-from').value || null,
+            term_until: document.getElementById('dm-until').value || null,
+            note: document.getElementById('dm-note').value.trim() || null,
+            updated_at: new Date().toISOString(), updated_by: user.name
           };
           if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명은 비울 수 없습니다.'; return; }
-          msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
           SHSCloud.init().then(function (c) {
-            return c.from('delegates').update(d).eq('id', b.dataset.dsave);
+            return c.from('delegates').update(d).eq('id', d0.id);
           }).then(function (res) {
             if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
             SHSCloud.log('update', '총대 수정', d.name + ' (' + (d.church || '') + ')');
-            msg.className = 'form-msg ok';
-            msg.textContent = d.name + ' 총대 정보를 저장했습니다.';
+            mo.close();
             renderDelegates();
           });
         });
-      });
-
-      /* 교체 */
-      box.querySelectorAll('button[data-dswap]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var nm = prompt('"' + b.dataset.dn + '" 총대를 대신할 새 총대의 성명을 적어 주세요.', '');
+        document.getElementById('dm-swap').addEventListener('click', function () {
+          var nm = prompt('"' + d0.name + '" 총대를 대신할 새 총대의 성명을 적어 주세요.', '');
           if (nm === null || !nm.trim()) return;
           var ch = prompt('새 총대의 소속 교회를 적어 주세요.', '');
           if (ch === null) return;
-          var msg = document.getElementById('dg-rowmsg');
-          msg.className = 'form-msg'; msg.textContent = '교체 중입니다...';
           SHSCloud.init().then(function (c) {
             return c.rpc('replace_delegate', {
-              p_id: Number(b.dataset.dswap), p_name: nm.trim(),
-              p_church: ch.trim(), p_note: b.dataset.dn + ' 총대 후임'
+              p_id: Number(d0.id), p_name: nm.trim(),
+              p_church: ch.trim(), p_note: d0.name + ' 총대 후임'
             });
           }).then(function (res) {
-            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
-            SHSCloud.log('update', '총대 교체', b.dataset.dn + ' → ' + nm.trim());
-            msg.className = 'form-msg ok';
-            msg.textContent = b.dataset.dn + ' 총대를 ' + nm.trim() + ' 총대로 교체했습니다. ' +
-              '이전 총대는 아래 교체 기록에 남습니다.';
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('update', '총대 교체', d0.name + ' → ' + nm.trim());
+            mo.close();
             renderDelegates();
           });
         });
-      });
-
-      /* 삭제 */
-      box.querySelectorAll('button[data-ddel]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (!confirm('"' + b.dataset.dn2 + '" 총대를 명단에서 삭제하시겠습니까?\n교체가 아니라 기록까지 지웁니다.')) return;
+        document.getElementById('dm-del').addEventListener('click', function () {
+          if (!confirm('"' + d0.name + '" 총대를 명단에서 삭제하시겠습니까? 교체가 아니라 기록까지 지웁니다.')) return;
           SHSCloud.init().then(function (c) {
-            return c.from('delegates').delete().eq('id', b.dataset.ddel);
+            return c.from('delegates').delete().eq('id', d0.id);
           }).then(function (res) {
             if (res.error) { alert(res.error.message); return; }
-            SHSCloud.log('delete', '총대 삭제', b.dataset.dn2);
+            SHSCloud.log('delete', '총대 삭제', d0.name);
+            mo.close();
             renderDelegates();
           });
+        });
+      }
+      box.querySelectorAll('button[data-dedit]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var d0 = live.filter(function (x) { return String(x.id) === b.dataset.dedit; })[0];
+          if (d0) openDelegateEdit(d0);
         });
       });
 
@@ -1786,16 +1898,37 @@ document.addEventListener('DOMContentLoaded', function () {
           '노회 사무실에 문의하여 상비부 등록(03_committees.sql)을 진행해 주세요.</div>';
         return;
       }
-      var html = '';
-      r.data.forEach(function (cm) {
-        html += '<div class="admin-card" style="margin-bottom:16px" data-cmt="' + e(cm.name) + '">' +
-          '<h3 style="margin-top:0">' + e(cm.name) + '</h3>' +
+      var coms = r.data;
+      function nameCount(cm) {
+        var keys = SHS.isBoard(cm.name) ? ['members'] : ['y1', 'y2', 'y3'];
+        var n = 0;
+        keys.forEach(function (k) {
+          n += String(cm[k] || '').split(',').filter(function (x) { return x.trim(); }).length;
+        });
+        return n;
+      }
+      var html = '<table class="tbl"><thead><tr><th style="width:170px">상비부·위원회</th>' +
+        '<th style="width:150px">부장·위원장</th><th style="width:130px">서기</th>' +
+        '<th style="width:130px">회계</th><th style="width:110px">배정 인원</th>' +
+        '<th style="width:80px">관리</th></tr></thead><tbody>' +
+        coms.map(function (cm) {
+          return '<tr><td class="left"><strong>' + e(cm.name) + '</strong></td>' +
+            '<td>' + e(cm.head || '-') + '</td>' +
+            '<td>' + e(cm.clerk || '-') + '</td>' +
+            '<td>' + e(cm.treasurer || '-') + '</td>' +
+            '<td>' + nameCount(cm) + '명</td>' +
+            '<td><button class="btn sm" data-cmedit="' + e(cm.name) + '">수정</button></td></tr>';
+        }).join('') + '</tbody></table>';
+      box.innerHTML = html;
+
+      function openComEdit(cm) {
+        var inner = '<div data-cmt="' + e(cm.name) + '">' +
+          '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(cm.name) + ' — 배정 수정</h3>' +
           '<div class="inline-form" style="margin-bottom:8px">' +
           '<div class="field"><label>' + SHS.headTitle(cm.name) + '</label><input type="text" data-names data-f="head" value="' + e(cm.head || '') + '"></div>' +
           '<div class="field"><label>서기</label><input type="text" data-names data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
           '<div class="field"><label>회계</label><input type="text" data-names data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
           '</div>' +
-          /* 위원회는 년조로 나누지 않고 위원 명단만 둔다 */
           (SHS.isBoard(cm.name)
             ? yearBox('위원', 'members', cm.members)
             : yearBox('1년조', 'y1', cm.y1) +
@@ -1804,14 +1937,22 @@ document.addEventListener('DOMContentLoaded', function () {
           '<button class="btn sm" data-cmsave="' + e(cm.name) + '">저장</button>' +
           '<span class="form-msg" data-cmmsg="' + e(cm.name) + '" style="margin-left:10px"></span>' +
           '</div>';
-      });
-      box.innerHTML = html;
-      box.querySelectorAll('div[data-cmt]').forEach(bindNameRows);
-
-      box.querySelectorAll('button[data-cmsave]').forEach(function (b) {
+        var mo = adminModal(inner, 860);
+        var card0 = mo.ov.querySelector('div[data-cmt]');
+        bindNameRows(card0);
+        mo.ov.querySelector('button[data-cmsave]').addEventListener('click', function () {
+          saveCom(cm.name, card0, mo);
+        });
+      }
+      box.querySelectorAll('button[data-cmedit]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var name = b.dataset.cmsave;
-          var card = box.querySelector('div[data-cmt="' + name + '"]');
+          var cm = coms.filter(function (x) { return x.name === b.dataset.cmedit; })[0];
+          if (cm) openComEdit(cm);
+        });
+      });
+
+      function saveCom(name, card, mo) {
+        {
           var upd = { updated_at: new Date().toISOString() };
           /* 적힌 이름을 회원 명부와 맞춰 늘 같은 모양으로 저장한다.
            * 명부에 없는 이름은 그대로 저장하되 누구인지 알려 준다. */
@@ -1833,7 +1974,7 @@ document.addEventListener('DOMContentLoaded', function () {
             upd[k] = r.value;
             note(r.unknown);
           });
-          var msg = box.querySelector('span[data-cmmsg="' + name + '"]');
+          var msg = card.querySelector('span[data-cmmsg="' + name + '"]');
           SHSCloud.init().then(function (c) {
             return c.from('committees').update(upd).eq('name', name).select();
           }).then(function (res) {
@@ -1844,13 +1985,16 @@ document.addEventListener('DOMContentLoaded', function () {
               return;
             }
             SHSCloud.log('update', '상비부 배정 수정', name);
-            msg.className = miss.length ? 'form-msg err' : 'form-msg ok';
-            msg.textContent = miss.length
-              ? '저장했습니다. 다만 회원 명부에 없는 이름이 있습니다 — ' + miss.join(', ')
-              : '저장되었습니다. (회원 명부와 모두 맞습니다)';
+            if (miss.length) {
+              msg.className = 'form-msg err';
+              msg.textContent = '저장했습니다. 다만 회원 명부에 없는 이름이 있습니다 — ' + miss.join(', ');
+            } else {
+              mo.close();
+              renderCommittees();
+            }
           });
-        });
-      });
+        }
+      }
     });
   }
 
