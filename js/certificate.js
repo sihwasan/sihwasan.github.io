@@ -75,7 +75,7 @@ var SHSCert = (function () {
     });
 
     var h = '<div class="cert-sheet' + (rec.void_yn ? ' cert-void' : '') +
-      (docName === '직인증명서' ? ' cert-seal' : '') + '">';
+      (docName === '직인증명서' ? ' cert-sealdoc' : '') + '">';
     if (rec.void_yn) {
       h += '<div class="cert-void-mark">무효</div>';
     }
@@ -92,12 +92,10 @@ var SHSCert = (function () {
         '<tr><td>직　　위</td><td>' + esc(pos) + '</td></tr>' +
         '<tr><td>용　　도</td><td>' + esc(rec.purpose || '-') + '</td></tr>' +
         '</tbody></table>';
+      /* 교회 직인은 인쇄한 뒤 실물 도장을 찍는다. 상자는 비워 둔다. */
       h += '<div class="c-sealbox">' +
         '<div class="c-sealbox-t">' + esc(rec.church) + ' 직인</div>' +
-        '<div class="c-sealbox-b">' +
-        (rec.church_seal
-          ? '<img src="' + esc(rec.church_seal) + '" alt="' + esc(rec.church) + ' 직인">' : '') +
-        '</div></div>';
+        '<div class="c-sealbox-b"></div></div>';
       h += '<div class="c-text">' + esc(body) + '</div>';
     } else {
       h += '<table class="c-body"><tbody>' +
