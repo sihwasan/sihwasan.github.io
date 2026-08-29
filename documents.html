@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div class="field" style="flex:0 0 160px"><label>재직 시작(부임)</label>' +
     '<input type="date" id="d-served" title="재직증명서의 재직 기간에 쓰입니다"></div>' +
     '<div class="field" style="flex:0 0 90px"><label>회기</label><input type="number" id="d-session" value="19" min="1" max="99"></div>' +
+    '<div class="field" style="flex:0 0 200px"><label>문서번호 (비우면 자동)</label>' +
+    '<input type="text" id="d-docno" placeholder="예: 시화산노 제19-008호"></div>' +
     '<button class="btn" id="btn-issue">발급</button>' +
     '</div>' +
     '<input type="hidden" id="d-reqid" value="">' +
@@ -527,7 +529,23 @@ document.addEventListener('DOMContentLoaded', function () {
         t.innerHTML = '<p style="color:var(--gray-5)">발급 기록이 없습니다.</p>';
         return;
       }
-      t.innerHTML = '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th>' +
+      /* 회기별로 다음에 붙을 번호를 알려 준다 */
+      var bySes = {};
+      rows.forEach(function (d) {
+        var k = d.session_no || 0;
+        bySes[k] = Math.max(bySes[k] || 0, d.seq || 0);
+      });
+      var nextInfo = Object.keys(bySes).sort(function (a, b) { return b - a; }).slice(0, 2)
+        .map(function (k) {
+          return '제' + k + '회기 다음 번호 <strong>시화산노 제' + k + '-' +
+            String(bySes[k] + 1).padStart(3, '0') + '호</strong>';
+        }).join(' · ');
+
+      t.innerHTML = '<p style="font-size:0.86rem;color:var(--gray-6);margin:0 0 10px">' +
+        '모두 <strong>' + rows.length + '건</strong>' + (nextInfo ? ' · ' + nextInfo : '') +
+        ' <span style="color:var(--gray-5)">— 번호는 발급할 때 직접 정할 수도 있고, ' +
+        '아래에서 고칠 수도 있습니다.</span></p>' +
+        '<table class="tbl"><thead><tr><th>발급번호</th><th>발급일</th><th>서류명</th>' +
         '<th>대상자</th><th>교회</th><th>용도</th><th>발급자</th><th>날인</th>' +
         '<th style="width:270px">증명서</th></tr></thead><tbody>' +
         rows.map(function (d) {
@@ -536,7 +554,10 @@ document.addEventListener('DOMContentLoaded', function () {
            * 없으면 예전처럼 그때그때 새로 그려서 내려받는다. */
           var kept = window.SHSCerts && SHSCerts.stored(d) && !d.void_yn;
           return '<tr' + (d.void_yn ? ' style="opacity:.55"' : '') + '>' +
-            '<td>' + e(d.doc_no) + (d.void_yn ? ' <span class="fail">(무효)</span>' : '') + '</td>' +
+            '<td><strong>' + e(d.doc_no) + '</strong>' +
+            (d.void_yn ? ' <span class="fail">(무효)</span>' : '') +
+            '<div><button class="btn ghost sm" data-docno="' + d.id + '" ' +
+            'data-cur="' + e(d.doc_no) + '" style="margin-top:4px">번호 수정</button></div></td>' +
             '<td>' + e(d.issued_on) + '</td><td>' + e(d.doc_type) + '</td>' +
             '<td>' + e(d.name) + '</td><td>' + e(d.church) + '</td><td>' + e(d.purpose || '-') + '</td>' +
             '<td>' + e(d.issuer_name || '-') + '</td><td>' + e(sealed || '-') + '</td>' +
@@ -548,6 +569,24 @@ document.addEventListener('DOMContentLoaded', function () {
             (kept ? '보관본 있음' : '보관본 없음 · 내려받을 때 새로 만듭니다') + '</div>' +
             '</td></tr>';
         }).join('') + '</tbody></table>';
+
+      /* 문서번호 고치기 */
+      t.querySelectorAll('button[data-docno]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var cur = b.dataset.cur;
+          var next = prompt('새 문서번호를 적어 주세요.\n같은 번호가 이미 있으면 저장되지 않습니다.', cur);
+          if (next === null) return;
+          next = next.trim();
+          if (!next || next === cur) return;
+          SHSCloud.init().then(function (c) {
+            return c.rpc('set_doc_no', { p_id: parseInt(b.dataset.docno, 10), p_doc_no: next });
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('update', '문서번호 수정', cur + ' → ' + next);
+            renderLog();
+          });
+        });
+      });
 
       /* 발급 대장에서 바로 PDF 내려받기 */
       t.querySelectorAll('button[data-pdf]').forEach(function (b) {
@@ -736,7 +775,8 @@ document.addEventListener('DOMContentLoaded', function () {
         p_seals: sealMap, p_president: presidentName, p_clerk: clerkName,
         p_session_no: session,
         p_church_seal: doc === '직인증명서' ? churchSeal : null,
-        p_church_addr: doc === '직인증명서' ? churchAddr : null
+        p_church_addr: doc === '직인증명서' ? churchAddr : null,
+        p_doc_no: document.getElementById('d-docno').value.trim() || null
       });
     }).then(function (res) {
       btn.disabled = false;
@@ -746,6 +786,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
       var rec = Array.isArray(res.data) ? res.data[0] : res.data;
+      document.getElementById('d-docno').value = '';
       msg.className = 'form-msg ok';
       msg.innerHTML = e(rec.doc_no) + ' ' + e(rec.doc_type) + '가 발급되었습니다.' +
         (rec.user_id ? ' 신청자에게 알림이 전달되어 홈페이지에서 PDF로 받으실 수 있습니다.' : '') +
