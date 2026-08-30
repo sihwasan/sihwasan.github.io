@@ -53,7 +53,9 @@ var SHSBoard = (function () {
       '<section aria-label="나의 교회"><h3 class="dash-h">나의 교회</h3>' +
       '<div id="dash-church"><p class="dash-none">불러오는 중...</p></div></section>' +
       '<section aria-label="나의 상회비"><h3 class="dash-h">나의 상회비</h3>' +
-      '<div id="dash-mydues"><p class="dash-none">불러오는 중...</p></div></section>' +
+      '<div id="dash-mydues"><p class="dash-none">불러오는 중...</p></div>' +
+      '<h3 class="dash-h" style="margin-top:14px">나의 세례의무금</h3>' +
+      '<div id="dash-mybap"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>') +
       '<div class="dash-cols">' +
       (isSuper ? '' :
@@ -131,6 +133,58 @@ var SHSBoard = (function () {
       }).catch(function () {
         var el = document.getElementById('dash-mydues');
         if (el) el.innerHTML = '<p class="dash-none">상회비 현황을 불러오지 못했습니다.</p>';
+      });
+
+      /* ----- 나의 세례의무금 (해마다 한 번 총회에 내는 세례교인헌금) ----- */
+      SHSCloud.init().then(function (c) {
+        return Promise.all([
+          c.from('bapdues').select('*').in('year', [yr, yr - 1])
+            .then(function (x) { return x; }, function () { return { data: [] }; }),
+          c.from('site_settings').select('*').eq('key', 'bapdues_pay')
+            .then(function (x) { return x; }, function () { return { data: [] }; })
+        ]);
+      }).then(function (rs) {
+        var el = document.getElementById('dash-mybap');
+        if (!el) return;
+        var all = (rs[0] && rs[0].data) || [];
+        var pay = (((rs[1] && rs[1].data) || [])[0] || {}).value || {};
+        function key(s) { return String(s || '').replace(/\s|교회$/g, ''); }
+        var myKey = key(user.church || '');
+        if (!myKey || !all.length) {
+          el.innerHTML = '<p class="dash-none">세례의무금 자료가 아직 없습니다.</p>';
+          return;
+        }
+        var bapYr = all.some(function (b) { return b.year === yr && key(b.church) === myKey; }) ? yr : yr - 1;
+        var mine = all.filter(function (b) { return b.year === bapYr && key(b.church) === myKey; })[0];
+        if (!mine) {
+          el.innerHTML = '<p class="dash-none">우리 교회는 올해 세례의무금 배정에 없습니다. ' +
+            '궁금하신 점은 노회 회계에게 문의해 주세요.</p>';
+          return;
+        }
+        var target = Number(mine.target || 0), paidAmt = Number(mine.paid || 0);
+        var done = target > 0 && paidAmt >= target;
+        var part = paidAmt > 0 && !done;
+        var state = done
+          ? '<span class="mydues-ok" style="display:inline">납부 완료' +
+            (mine.paid_on ? ' (' + SHS.esc(mine.paid_on) + ')' : '') + '</span>'
+          : (part
+            ? '<span style="color:#b0731f">일부 납부 — ' + paidAmt.toLocaleString('ko-KR') + '원 / 잔액 ' +
+              Math.max(0, target - paidAmt).toLocaleString('ko-KR') + '원</span>'
+            : '<span class="mydues-late" style="display:inline;margin:0">미납</span>');
+        el.innerHTML =
+          '<div class="mydues-head"><strong>' + SHS.esc(mine.church) + '</strong>' +
+          ' · ' + bapYr + '년' + (bapYr !== yr ? ' <span style="color:var(--gray-5)">(지난해 배정 기준)</span>' : '') +
+          ' · 세례교인 ' + Number(mine.members || 0) + '명</div>' +
+          '<p style="margin:4px 0">배정액 <strong>' + target.toLocaleString('ko-KR') + '원</strong> — ' + state + '</p>' +
+          (pay.account
+            ? '<p style="font-size:0.85rem;margin:4px 0">납부 계좌: <strong>' +
+              SHS.esc((pay.bank || '') + ' ' + pay.account + ' (' + (pay.holder || '') + ')') + '</strong></p>'
+            : '') +
+          '<p class="mydues-sum" style="margin-top:4px"><span class="mydues-note">해마다 한 번 총회에 내는 세례교인헌금입니다. ' +
+          '납부 확인이 실제와 다르면 노회 회계에게 알려 주세요.</span></p>';
+      }).catch(function () {
+        var el = document.getElementById('dash-mybap');
+        if (el) el.innerHTML = '<p class="dash-none">세례의무금 현황을 불러오지 못했습니다.</p>';
       });
 
       /* ----- 전체 요약 (관리자·회계) ----- */

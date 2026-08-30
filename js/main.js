@@ -68,6 +68,7 @@
     { title: '임원방', href: 'officer.html', sub: [
       { t: '임원 자료실', h: 'officer.html' },
       { t: '상회비 관리', h: 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC' },
+      { t: '세례의무금 관리', h: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC' },
       { t: '노회 회의록', h: 'minutes.html' }
     ]}
   ];

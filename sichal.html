@@ -24,7 +24,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260830a"></script>
+<script src="js/main.js?v=20260830b"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/minutes-box.js"></script>
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var sichals = [], sic = null, isOfficer = false, myDuty = '', isAuditor = false;
   var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
-  var churchStaff = [];
+  var churchStaff = [], bapAll = [];
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
   var year = new Date().getFullYear();
@@ -115,6 +115,9 @@ document.addEventListener('DOMContentLoaded', function () {
           c.rpc('my_committees').then(function (x) { return x; }, function () { return { data: [] }; }),
           /* 노회 서기에게 낸 기록 (45 를 아직 실행하지 않았어도 그냥 넘어간다) */
           c.from('sichal_report_submissions').select('*').eq('sichal', NAME)
+            .then(function (x) { return x; }, function () { return { data: [] }; }),
+          /* 세례의무금 (47 을 아직 실행하지 않았어도 그냥 넘어간다) */
+          c.from('bapdues').select('*').in('year', [year, year - 1])
             .then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
@@ -145,6 +148,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ch.phone   = pr.phone   || ch.phone;
           }
         });
+        bapAll   = (rs[9] && rs[9].data) || [];
         docs     = (rs[4] && rs[4].data) || [];
         minutes  = (rs[5] && rs[5].data) || [];
         reports  = (rs[6] && rs[6].data) || [];
@@ -182,6 +186,34 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>' +
       (sic.area ? '<p class="cm-duty">관할 지역 : ' + e(sic.area) + '</p>' : '') +
       '</div>';
+
+    /* 세례의무금 진행률 — 이 시찰 관내 교회 기준 */
+    (function () {
+      if (!bapAll.length || !churches.length) return;
+      var bapYr = bapAll.some(function (b) { return b.year === year; }) ? year : year - 1;
+      function key(s) { return String(s || '').replace(/\s|교회$/g, ''); }
+      var keys = {};
+      churches.forEach(function (ch) { keys[key(ch.name)] = true; });
+      var mine = bapAll.filter(function (b) { return b.year === bapYr && keys[key(b.church)]; });
+      if (!mine.length) return;
+      var t = 0, p = 0, join = 0;
+      mine.forEach(function (b) {
+        t += Number(b.target || 0); p += Number(b.paid || 0);
+        if (Number(b.paid || 0) > 0) join++;
+      });
+      var pct = t ? Math.round(p / t * 100) : 0;
+      h += '<div class="side-box" style="max-width:720px;margin-bottom:16px"><div class="box-head">' +
+        bapYr + '년 세례의무금 진행률' + (bapYr !== year ? ' (지난해 배정 기준)' : '') + '</div>' +
+        '<div class="box-body">' +
+        '<div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:4px">' +
+        '<span>참여 <strong>' + join + '/' + mine.length + '곳</strong></span>' +
+        '<span>' + p.toLocaleString('ko-KR') + ' / ' + t.toLocaleString('ko-KR') + '원 (<strong>' + pct + '%</strong>)</span></div>' +
+        '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:12px;overflow:hidden">' +
+        '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:var(--navy)"></div></div>' +
+        '<p style="font-size:0.78rem;color:var(--gray-5);margin:6px 0 0">총회에 해마다 한 번 내는 세례교인헌금입니다. ' +
+        '교회별 자세한 내용은 임원방 → 세례의무금 관리에서 보실 수 있습니다.</p>' +
+        '</div></div>';
+    })();
 
     h += '<div class="tabs" id="si-tabs">' +
       '<button class="' + (tab === 'church'  ? 'active' : '') + '" data-t="church">관내 교회 (' + churches.length + ')</button>' +
