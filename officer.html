@@ -1449,7 +1449,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var GLIST = DUES_SICHALS.concat(Object.keys(groups).filter(function (g) {
         return DUES_SICHALS.indexOf(g) === -1;
       })).filter(function (g) { return groups[g]; });
-      var GCOLORS = ['#5d5041', '#b9974e', '#8a7c69', '#a89a86', '#c8b382', '#6e5f4c'];
+      var GCOLORS = ['#b03a3a', '#d97b6c', '#8f2f2f', '#c98a6b', '#e0b1a5', '#7a2a2a'];   /* 막대: 빨강 계열 */
+      var DCOLORS = ['#2e6db4', '#c2503a', '#3f8f5a', '#8a8175', '#d9a33b', '#6b5fa8'];   /* 도넛: 구분 잘 되는 색 */
 
       h += '<h3 style="margin:18px 0 8px">시찰별 진행률</h3>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start">';
@@ -1461,7 +1462,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<span><strong>노회 전체</strong> · 참여 ' + nJoin + '/' + nCh + '곳</span>' +
         '<span><strong>' + wonf(pSum) + ' / ' + wonf(tSum) + '원 (' + Math.round(payPct) + '%)</strong></span></div>' +
         '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:14px;overflow:hidden">' +
-        '<div style="height:100%;width:' + Math.min(100, Math.round(payPct)) + '%;background:var(--navy)"></div></div></div>';
+        '<div style="height:100%;width:' + Math.min(100, Math.round(payPct)) + '%;background:#8f2f2f"></div></div></div>';
       GLIST.forEach(function (g, gi) {
         var gr = groups[g];
         var pct = gr.target ? Math.round(gr.paid / gr.target * 100) : 0;
@@ -1486,7 +1487,7 @@ document.addEventListener('DOMContentLoaded', function () {
           var share = groups[g].target / tSum * 100;
           if (share <= 0) return;
           segs += '<circle r="' + R + '" cx="21" cy="21" fill="transparent" ' +
-            'stroke="' + GCOLORS[gi % GCOLORS.length] + '" stroke-width="7" ' +
+            'stroke="' + DCOLORS[gi % DCOLORS.length] + '" stroke-width="7" ' +
             'stroke-dasharray="' + share.toFixed(2) + ' ' + (CIRC - share).toFixed(2) + '" ' +
             'stroke-dashoffset="' + (25 - acc).toFixed(2) + '" style="cursor:help">' +
             /* 마우스를 올리면 시찰 이름과 금액이 뜬다 */
@@ -1504,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', function () {
           GLIST.map(function (g, gi) {
             var share = tSum ? Math.round(groups[g].target / tSum * 1000) / 10 : 0;
             return '<div style="margin:2px 0"><span style="display:inline-block;width:10px;height:10px;' +
-              'border-radius:3px;background:' + GCOLORS[gi % GCOLORS.length] + ';margin-right:6px"></span>' +
+              'border-radius:3px;background:' + DCOLORS[gi % DCOLORS.length] + ';margin-right:6px"></span>' +
               e(g) + ' <strong>' + share + '%</strong> <span style="color:var(--gray-5)">(' +
               wonf(groups[g].target) + '원)</span></div>';
           }).join('') +
