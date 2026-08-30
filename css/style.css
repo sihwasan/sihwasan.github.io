@@ -2090,3 +2090,13 @@ td[data-duch]:hover { background: #eef2f8; }
 .hero .container {
   transition: opacity 2.6s ease 0.5s, transform 2.6s ease 0.5s, padding-left 2.6s ease-in-out;
 }
+
+/* 모바일 히어로 인트로: 가운데에 그려진 로고가 위로 작아지며 올라가고
+ * 문구가 아래에서 교차하며 나타난다 */
+.hero-logo-draw { transition: left 2.6s ease-in-out, width 2.6s ease-in-out, top 2.6s ease-in-out; }
+@media (max-width: 900px) {
+  .hero-logo-draw { display: block; width: min(48vw, 210px); }
+  .hero.done .hero-logo-draw { left: 50%; top: 110px; width: 88px; }
+  .hero .container { opacity: 0; transform: translateY(50px); }
+  .hero.done .container { opacity: 1; transform: none; padding-top: 190px; }
+}
