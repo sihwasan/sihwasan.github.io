@@ -2323,3 +2323,7 @@ td[data-duch]:hover { background: #eef2f8; }
   .hero.done .hero-line-v { height: 360px; }
   .hero.done .hero-logo-draw { top: 185px; }
 }
+/* 모바일: 완료 상태에서도 위 여백을 줄여 기관명이 선 위에 오게 */
+@media (max-width: 900px) {
+  .hero.done .container { padding-top: 12px; }
+}
