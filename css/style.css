@@ -2238,3 +2238,12 @@ td[data-duch]:hover { background: #eef2f8; }
 .hero-slides { min-height: clamp(120px, 12vw, 160px); }
 /* 기관명: 가로선 위로 확실히 올리고 더 크게 */
 .hero .hero-kicker { top: -56px; font-size: 1.2rem; letter-spacing: 6px; }
+/* 기관명은 가로선 위 여백까지 확실히 올린다 */
+.hero .hero-kicker { top: -84px; }
+/* 로고 크기 10% 축소 */
+.hero-logo-draw { width: min(325px, 47vw); }
+.hero.done .hero-logo-draw { width: 190px; }
+@media (max-width: 900px) {
+  .hero-logo-draw { width: min(43vw, 190px); }
+  .hero.done .hero-logo-draw { width: 97px; }
+}
