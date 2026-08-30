@@ -2128,3 +2128,29 @@ td[data-duch]:hover { background: #eef2f8; }
 @media (min-width: 901px) {
   .hero.done .container { padding-left: 295px; }
 }
+
+/* ----- 장식 선: 가로 → 세로 순서로 그어진다 ----- */
+.hero-line-h, .hero-line-v {
+  position: absolute; z-index: 1; background: rgba(251, 248, 242, 0.7);
+  pointer-events: none;
+}
+.hero-line-h {
+  top: calc(50% - 195px); left: max(60px, calc(50% - 535px));
+  height: 1px; width: 0;
+  transition: width 1.6s ease 0.7s;
+}
+.hero-line-v {
+  top: calc(50% - 195px); left: max(60px, calc(50% - 535px));
+  width: 1px; height: 0;
+  transition: height 1.4s ease 2.0s;
+}
+.hero.done .hero-line-h { width: min(58%, 760px); }
+.hero.done .hero-line-v { height: 390px; }
+@media (max-width: 900px) { .hero-line-h, .hero-line-v { display: none; } }
+
+/* 문구 등장 시점: 가로선과 함께 1) 제목, 이어서 2) 소개, 3) 성구 */
+.hero.done .hero-kicker    { transition-delay: 0.9s; }
+.hero.done h1              { transition-delay: 1.5s; }
+.hero.done .container > p  { transition-delay: 3.2s; }
+.hero.done .hero-verse     { transition-delay: 4.6s; }
+.hero.done .hero-cities    { transition-delay: 5.6s; }
