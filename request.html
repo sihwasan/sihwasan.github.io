@@ -89,6 +89,107 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function won(n) { return Number(n || 0).toLocaleString('ko-KR') + '원'; }
 
+  /* ---------- 교회 직인 사진 ----------
+   * 직인증명서는 교회 직인 사진이 있어야 발급됩니다.
+   * 올린 사진은 내 정보(마이페이지)의 "교회 직인·도장"에 그대로 등록되고,
+   * 서기가 발급할 때 자동으로 불러가 발급 대장에 기록됩니다. */
+  var mySeal = null;   /* 등록된 직인 그림 (data URL) */
+
+  /* 420px 이하로 줄이고 흰 바탕을 투명하게 지운다 (마이페이지와 같은 방식) */
+  function toSeal(f) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(f);
+      img.onload = function () {
+        var MAX = 420;
+        var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        var w = Math.max(1, Math.round(img.naturalWidth * sc));
+        var hh = Math.max(1, Math.round(img.naturalHeight * sc));
+        var cv = document.createElement('canvas');
+        cv.width = w; cv.height = hh;
+        var cx = cv.getContext('2d');
+        cx.drawImage(img, 0, 0, w, hh);
+        URL.revokeObjectURL(url);
+        try {
+          var d = cx.getImageData(0, 0, w, hh);
+          var a = d.data;
+          for (var i = 0; i < a.length; i += 4) {
+            var mn = Math.min(a[i], a[i + 1], a[i + 2]);
+            if (mn > 235) a[i + 3] = 0;                       /* 흰 바탕 */
+            else if (mn > 200) a[i + 3] = Math.round(a[i + 3] * (235 - mn) / 35);
+          }
+          cx.putImageData(d, 0, 0);
+        } catch (x) { /* 못 지워도 그대로 저장한다 */ }
+        resolve(cv.toDataURL('image/png'));
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('그림 파일을 읽지 못했습니다.'));
+      };
+      img.src = url;
+    });
+  }
+
+  /* 파일을 골라 직인으로 저장한다. done(dataUrl)은 저장 성공 뒤 호출 */
+  function pickSeal(done, fail) {
+    var fin = document.createElement('input');
+    fin.type = 'file';
+    fin.accept = 'image/*';
+    fin.addEventListener('change', function () {
+      var f = fin.files && fin.files[0];
+      if (!f) return;
+      if (!/^image\//.test(f.type)) { if (fail) fail('그림 파일만 올릴 수 있습니다.'); return; }
+      toSeal(f).then(function (dataUrl) {
+        if (dataUrl.length > 900000) throw new Error('그림이 너무 큽니다. 더 작은 파일로 올려 주세요.');
+        return SHSCloud.init().then(function (c) {
+          return c.from('member_seals').upsert({
+            user_id: user.id, image: dataUrl, updated_at: new Date().toISOString()
+          });
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          mySeal = dataUrl;
+          SHSCloud.log('update', '교회 직인 등록', user.email + ' (서류 신청 화면)');
+          if (done) done(dataUrl);
+        });
+      }).catch(function (err) {
+        if (fail) fail((err && err.message) || '직인을 올리지 못했습니다.');
+      });
+    });
+    fin.click();
+  }
+
+  /* 직인 업로드 상자를 그린다 (입금 안내 창·신청 내역에서 함께 쓴다) */
+  function sealBoxHtml(idPrefix) {
+    return '<div style="border:1px solid ' + (mySeal ? 'var(--gray-3,#d8dbe2)' : '#d9a33b') + ';border-radius:6px;padding:12px 14px;margin-bottom:12px">' +
+      '<div style="font-size:0.85rem;font-weight:700;color:var(--navy);margin-bottom:4px">교회 직인 사진 ' +
+      (mySeal ? '<span style="color:#2a7a2a">— 등록되어 있습니다</span>' : '<span style="color:#b0731f">— 아직 없습니다</span>') + '</div>' +
+      '<div id="' + idPrefix + '-prev" style="margin-bottom:6px">' +
+      (mySeal ? '<img src="' + mySeal + '" alt="교회 직인" style="max-width:90px;max-height:90px;border:1px solid var(--gray-3,#d8dbe2);border-radius:4px;background:#fff">' : '') +
+      '</div>' +
+      '<p style="font-size:0.78rem;color:var(--gray-7);margin:0 0 8px">직인증명서는 <strong>교회 직인을 찍거나 스캔한 사진</strong>이 있어야 발급됩니다. ' +
+      '올리신 직인은 <strong>내 정보의 교회 직인</strong>으로 자동 등록되고, 서기가 발급할 때 그대로 사용합니다.</p>' +
+      '<button class="btn ' + (mySeal ? 'ghost ' : '') + 'sm" id="' + idPrefix + '-up">' +
+      (mySeal ? '직인 사진 다시 올리기' : '직인 사진 올리기') + '</button>' +
+      '<div class="form-msg" id="' + idPrefix + '-msg"></div></div>';
+  }
+
+  function bindSealBox(idPrefix) {
+    var btn = document.getElementById(idPrefix + '-up');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var msg = document.getElementById(idPrefix + '-msg');
+      pickSeal(function (dataUrl) {
+        var prev = document.getElementById(idPrefix + '-prev');
+        if (prev) prev.innerHTML = '<img src="' + dataUrl + '" alt="교회 직인" style="max-width:90px;max-height:90px;border:1px solid var(--gray-3,#d8dbe2);border-radius:4px;background:#fff">';
+        btn.textContent = '직인 사진 다시 올리기';
+        btn.className = 'btn ghost sm';
+        if (msg) { msg.className = 'form-msg ok'; msg.textContent = '직인이 등록되었습니다. 내 정보의 교회 직인에도 저장되었습니다.'; }
+      }, function (t) {
+        if (msg) { msg.className = 'form-msg err'; msg.textContent = t; }
+      });
+    });
+  }
+
   /* ---------- 입금 안내 창 ---------- */
   function payGuide(docType, copies, amount) {
     var old = document.getElementById('pay-overlay');
@@ -124,11 +225,13 @@ document.addEventListener('DOMContentLoaded', function () {
           '?body=' + encodeURIComponent('[시화산노회 서류 신청] ' + user.name + ' — ' + docType + ' ' + copies + '부 수수료 ' + amount + '원을 입금했습니다. 확인 부탁드립니다.') +
           '">문자 보내기</a></div>'
         : '') +
+      (docType === '직인증명서' ? sealBoxHtml('pay-seal') : '') +
       '<button class="btn ghost" style="width:100%" id="pay-close">닫기</button>' +
       '</div>';
     document.body.appendChild(ov);
     ov.addEventListener('click', function (ev) { if (ev.target === ov) ov.remove(); });
-    document.getElementById('pay-close').addEventListener('click', function () { ov.remove(); });
+    document.getElementById('pay-close').addEventListener('click', function () { ov.remove(); load(); });
+    if (docType === '직인증명서') bindSealBox('pay-seal');
     document.getElementById('pay-copy').addEventListener('click', function () {
       var btn = this;
       function ok() { btn.textContent = '복사되었습니다'; setTimeout(function () { btn.textContent = '계좌번호 복사'; }, 1600); }
@@ -170,6 +273,12 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>성명</label><input type="text" id="rq-name" value="' + e(user.name) + '"></div>' +
       '<div class="field" style="flex:0 0 130px"><label>직분</label><input type="text" id="rq-pos" value="' + e(user.position || '') + '"></div>' +
       '<div class="field"><label>소속 교회</label><input type="text" id="rq-church" value="' + e(user.church || '') + '"></div>' +
+      '</div>' +
+      '<div id="rq-sealhint" class="hidden" style="border:1px solid #d9a33b;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:0.85rem;color:var(--gray-7)">' +
+      '직인증명서는 <strong>교회 직인을 찍거나 스캔한 사진</strong>이 있어야 발급됩니다. ' +
+      (mySeal
+        ? '<span style="color:#2a7a2a">내 정보에 등록된 직인이 있어 그대로 사용됩니다.</span>'
+        : '신청하시면 이어지는 안내 창과 <strong>내 신청 내역</strong>의 단추로 직인 사진을 올리실 수 있으며, 올린 직인은 내 정보에 자동 등록됩니다.') +
       '</div>' +
       '<div class="field"><label>요청 사항 (선택)</label><textarea id="rq-memo" rows="3" placeholder="예: 영문 표기가 필요합니다 / 수령 방법 등"></textarea></div>' +
       '<button class="btn" id="rq-send">신청하기</button>' +
@@ -214,6 +323,14 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><span class="role-badge">' + e(statusLabel(r.status)) + '</span>' +
           (r.status === '신청'
             ? '<div style="margin-top:4px"><button class="btn ghost sm" data-payinfo="' + r.id + '">입금 안내</button></div>'
+            : '') +
+          (r.doc_type === '직인증명서' && !iss && r.status !== '반려' && r.status !== '발급완료'
+            ? '<div style="margin-top:4px"><button class="btn ghost sm" data-sealup="' + r.id + '">' +
+              (mySeal ? '직인 등록됨 · 다시 올리기' : '직인 사진 올리기') + '</button></div>' +
+              (mySeal ? '' : '<div style="font-size:0.72rem;color:#b0731f;margin-top:2px">직인 사진을 올려야 발급됩니다</div>')
+            : '') +
+          ((r.status === '신청' || r.status === '반려') && !iss
+            ? '<div style="margin-top:4px"><button class="btn ghost sm" data-del="' + r.id + '" style="color:#a33">신청 삭제</button></div>'
             : '') + '</td>' +
           '<td>' + cell + '</td></tr>';
       });
@@ -245,10 +362,42 @@ document.addEventListener('DOMContentLoaded', function () {
       var doc = document.getElementById('rq-doc').value;
       var n = parseInt(document.getElementById('rq-copies').value, 10) || 1;
       document.getElementById('rq-fee').value = won(feeOf(doc) * n);
+      var hint = document.getElementById('rq-sealhint');
+      if (hint) hint.classList.toggle('hidden', doc !== '직인증명서');
     }
     document.getElementById('rq-doc').addEventListener('change', syncFee);
     document.getElementById('rq-copies').addEventListener('input', syncFee);
     syncFee();
+
+    /* 직인 사진 올리기 (신청 내역) */
+    area.querySelectorAll('button[data-sealup]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        pickSeal(function () {
+          alert('직인이 등록되었습니다. 내 정보의 교회 직인에도 저장되어, 서기가 발급할 때 그대로 사용합니다.');
+          load();
+        }, function (t) { alert(t); });
+      });
+    });
+
+    /* 신청 삭제 (입금 대기·반려 상태만) */
+    area.querySelectorAll('button[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = (lastList || []).filter(function (x) { return String(x.id) === b.dataset.del; })[0];
+        if (!r) return;
+        if (!confirm(r.doc_type + ' ' + (r.copies || 1) + '부 신청을 삭제하시겠습니까?\n삭제한 신청은 되돌릴 수 없습니다.')) return;
+        b.disabled = true;
+        SHSCloud.init().then(function (c) {
+          return c.from('doc_requests').delete().eq('id', r.id).eq('user_id', user.id);
+        }).then(function (res) {
+          if (res.error) throw res.error;
+          SHSCloud.log('delete', '서류 신청 삭제', r.doc_type + ' (' + r.name + ', ' + (r.purpose || '') + ')');
+          load();
+        }).catch(function (err) {
+          b.disabled = false;
+          alert((err && err.message) || '신청을 삭제하지 못했습니다.');
+        });
+      });
+    });
 
     area.querySelectorAll('button[data-payinfo]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -328,6 +477,9 @@ document.addEventListener('DOMContentLoaded', function () {
          * PDF로 다시 그려야 하므로 직인·문구까지 통째로 받아 둔다 */
         c.from('doc_issues').select('*')
           .order('id', { ascending: false })
+          .then(function (x) { return x; }, function () { return { data: [] }; }),
+        /* 등록된 교회 직인 (직인증명서 안내에 쓴다) */
+        c.from('member_seals').select('image').eq('user_id', user.id)
           .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
@@ -346,6 +498,8 @@ document.addEventListener('DOMContentLoaded', function () {
       ((rs[2] && rs[2].data) || []).forEach(function (x) {
         if (x.request_id && !issued[x.request_id]) issued[x.request_id] = x;
       });
+      var sl = (rs[3] && rs[3].data && rs[3].data[0]) || null;
+      mySeal = sl ? sl.image : null;
       lastList = r.data || [];
       render(lastList);
       openReqFromHash();
