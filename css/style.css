@@ -2259,3 +2259,6 @@ td[data-duch]:hover { background: #eef2f8; }
   width: 4px;
   background: linear-gradient(180deg, rgba(251, 248, 242, 0.7) 65%, rgba(251, 248, 242, 0) 100%);
 }
+/* 세로선 시작점을 헤더에서 떨어뜨림 */
+.hero-line-v { top: calc(50% - 200px); height: 0; }
+.hero.done .hero-line-v { height: 520px; }
