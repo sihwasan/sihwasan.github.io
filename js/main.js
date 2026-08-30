@@ -52,6 +52,7 @@
     ]},
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
+      { t: '신청서류 확인', h: 'request.html#list' },
       { t: '교회상황 보고서', h: 'report.html' },
       { t: '발급 서류 안내', h: 'request.html#docs' },
       { t: '증명서 진위 확인', h: 'verify.html' },

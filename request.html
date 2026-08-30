@@ -56,7 +56,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260830c"></script>
+<script src="js/main.js?v=20260830d"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
 <script src="js/certificate.js?v=20260829p"></script>
@@ -255,7 +255,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function render(myList) {
     pdfRecs = {};
+    /* 주소 뒤 #list(또는 알림에서 온 #docreq-)면 신청 내역만, 아니면 신청 양식만 보여 준다 */
+    var mode = (location.hash === '#list' || /^#docreq-/.test(location.hash)) ? 'list' : 'form';
     var html = '';
+    if (mode === 'form') {
     html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님, 아래에서 필요한 서류를 신청하실 수 있습니다. ' +
       '신청하시면 관리자에게 바로 알림이 전달됩니다.</div>';
 
@@ -283,8 +286,12 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>요청 사항 (선택)</label><textarea id="rq-memo" rows="3" placeholder="예: 영문 표기가 필요합니다 / 수령 방법 등"></textarea></div>' +
       '<button class="btn" id="rq-send">신청하기</button>' +
       '<div class="form-msg" id="rq-msg"></div></div>';
+    html += '<p style="margin-top:14px"><a class="btn ghost sm" href="#list">내 신청 내역 보기 (' + myList.length + '건)</a></p>';
+    }   /* mode === 'form' 끝 */
 
+    if (mode === 'list') {
     html += '<h2>내 신청 내역</h2>';
+    html += '<p style="margin:0 0 14px"><a class="btn ghost sm" href="#" id="rq-toform">&#8592; 새 서류 신청하기</a></p>';
     if (!myList.length) {
       html += '<p style="color:var(--gray-5)">신청 내역이 없습니다.</p>';
     } else {
@@ -336,7 +343,15 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       html += '</tbody></table>';
     }
+    }   /* mode === 'list' 끝 */
     area.innerHTML = html;
+
+    var toForm = document.getElementById('rq-toform');
+    if (toForm) toForm.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      history.replaceState(null, '', location.pathname);
+      render(lastList);
+    });
 
     area.querySelectorAll('button[data-pdf]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -365,9 +380,11 @@ document.addEventListener('DOMContentLoaded', function () {
       var hint = document.getElementById('rq-sealhint');
       if (hint) hint.classList.toggle('hidden', doc !== '직인증명서');
     }
-    document.getElementById('rq-doc').addEventListener('change', syncFee);
-    document.getElementById('rq-copies').addEventListener('input', syncFee);
-    syncFee();
+    if (document.getElementById('rq-doc')) {
+      document.getElementById('rq-doc').addEventListener('change', syncFee);
+      document.getElementById('rq-copies').addEventListener('input', syncFee);
+      syncFee();
+    }
 
     /* 직인 사진 올리기 (신청 내역) */
     area.querySelectorAll('button[data-sealup]').forEach(function (b) {
@@ -407,6 +424,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
+    if (!document.getElementById('rq-send')) return;   /* 신청 내역 모드에서는 여기까지 */
     document.getElementById('rq-send').addEventListener('click', function () {
       var msg = document.getElementById('rq-msg');
       var d = {
@@ -464,7 +482,10 @@ document.addEventListener('DOMContentLoaded', function () {
       } else if (++tries > 20) { clearInterval(timer); }
     }, 300);
   }
-  window.addEventListener('hashchange', openReqFromHash);
+  window.addEventListener('hashchange', function () {
+    render(lastList);          /* #list ↔ 신청 양식 전환 */
+    openReqFromHash();
+  });
 
   var lastList = [];
   function load() {

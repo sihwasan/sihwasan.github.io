@@ -147,7 +147,11 @@ var SHSBoard = (function () {
         showHub(m ? m[1] : null);
       }
       box.querySelectorAll('.hub-card').forEach(function (b) {
-        b.addEventListener('click', function () { location.hash = 'hub-' + b.dataset.hub; });
+        b.addEventListener('click', function () {
+          /* 서류 발급은 서류 신청 화면으로 바로 간다 */
+          if (b.dataset.hub === 'doc') { location.href = 'request.html'; return; }
+          location.hash = 'hub-' + b.dataset.hub;
+        });
       });
       document.getElementById('hub-back').addEventListener('click', function () {
         if (/^#hub-/.test(location.hash)) history.back();
