@@ -2080,3 +2080,8 @@ td[data-duch]:hover { background: #eef2f8; }
 @media (max-width: 900px) {
   .hero .container { opacity: 1; transform: none; }
 }
+/* 로고 최종 위치: 문구 바로 옆에 붙인다 */
+.hero.done .hero-logo-draw { left: max(120px, calc(50% - 440px)); width: 170px; }
+@media (min-width: 901px) {
+  .hero.done .container { padding-left: 260px; }
+}
