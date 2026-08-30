@@ -970,7 +970,10 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.rpc('sichal_finance_detail', { p_year: year, p_sichal: NAME })
           .then(function (x) { return x; }, function () { return { data: [] }; }),
-        c.from('sichal_fees').select('*').eq('year', year).eq('sichal', NAME)
+        c.from('sichal_fees').select('*').eq('year', year).eq('sichal', NAME),
+        /* 시찰회가 따로 정한 회비 (51 을 아직 실행하지 않았어도 넘어간다) */
+        c.from('sichal_fee_rates').select('*').eq('year', year).eq('sichal', NAME)
+          .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
       if (rs[1].error) throw rs[1].error;
@@ -978,6 +981,18 @@ document.addEventListener('DOMContentLoaded', function () {
       ((rs[0] || {}).data || []).forEach(function (d) {
         monthly[String(d.out_church || '').replace(/\s|교회$/g, '')] = Number(d.out_monthly || 0);
       });
+      /* 시찰회가 정한 금액이 있으면 그것이 기준액이다 */
+      var custom = {};
+      ((rs[2] || {}).data || []).forEach(function (d) {
+        custom[String(d.church || '').replace(/\s|교회$/g, '')] = Number(d.amount || 0);
+      });
+      function baseOf(nm) {
+        var k = String(nm).replace(/\s|교회$/g, '');
+        return custom[k] != null ? custom[k] : (monthly[k] || 0);
+      }
+      function isCustom(nm) {
+        return custom[String(nm).replace(/\s|교회$/g, '')] != null;
+      }
       var fees = rs[1].data || [];
       function feeOf(church, half) {
         return fees.filter(function (f) {
@@ -994,8 +1009,10 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       var h = '<div class="notice-banner">시찰회비는 한 해에 <strong>상반기·하반기 두 차례</strong> 내며, ' +
-        '1회분은 <strong>노회 상회비 한 달치</strong>와 같습니다.' +
-        (canFee ? ' 납부를 누르면 기준액으로 기록됩니다.' : ' 입력·수정은 시찰장·서기·회계가 합니다.') +
+        '따로 정하지 않으면 1회분은 <strong>노회 상회비 한 달치</strong>를 기준으로 합니다. ' +
+        '금액은 <strong>시찰회가 정할 수 있습니다</strong>.' +
+        (canFee ? ' 기준액의 수정 단추로 회비를 바꾸고, 납부를 누르면 기준액으로 기록됩니다.'
+                : ' 입력·수정은 시찰장·서기·회계가 합니다.') +
         '</div>';
       h += '<div class="dues-stats" style="margin-bottom:14px">' +
         '<div class="ds"><div class="n">' + n1 + '/' + names.length + '곳</div><div class="l">상반기 납부 (' + sum1.toLocaleString('ko-KR') + '만원)</div></div>' +
@@ -1006,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th class="left">교회</th><th style="width:120px">기준액(만원)</th>' +
         '<th style="width:180px">상반기</th><th style="width:180px">하반기</th></tr></thead><tbody>';
       names.forEach(function (nm) {
-        var base = monthly[String(nm).replace(/\s|교회$/g, '')] || 0;
+        var base = baseOf(nm);
         function cell(half) {
           var f = feeOf(nm, half);
           if (f) {
@@ -1017,12 +1034,42 @@ document.addEventListener('DOMContentLoaded', function () {
             (canFee ? ' <button class="btn sm" data-feepay="' + e(nm) + '" data-fh="' + half + '" data-fa="' + base + '">납부</button>' : '');
         }
         h += '<tr><td class="left"><strong>' + e(nm) + '</strong></td>' +
-          '<td style="text-align:right">' + (base ? base.toLocaleString('ko-KR') : '-') + '</td>' +
+          '<td style="text-align:right">' + (base ? base.toLocaleString('ko-KR') : '-') +
+          (isCustom(nm) ? ' <span style="font-size:0.7rem;color:var(--gray-5)">(시찰 지정)</span>' : '') +
+          (canFee ? ' <button class="btn ghost sm" data-feerate="' + e(nm) + '" data-fb="' + base + '">수정</button>' : '') +
+          '</td>' +
           '<td>' + cell(1) + '</td><td>' + cell(2) + '</td></tr>';
       });
       h += '</tbody></table></div>';
       box.innerHTML = h;
       if (!canFee) return;
+
+      /* 시찰회비 금액 수정 (시찰회가 정한다) */
+      box.querySelectorAll('button[data-feerate]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var nm = b.dataset.feerate;
+          var v = prompt(nm + '의 1회분 시찰회비(만원)를 입력해 주세요.\n' +
+            '비우고 확인하면 노회 상회비 한 달치 기준으로 돌아갑니다.', b.dataset.fb || '');
+          if (v === null) return;
+          v = v.trim();
+          db().then(function (c) {
+            if (v === '') {
+              return c.from('sichal_fee_rates').delete()
+                .eq('year', year).eq('sichal', NAME).eq('church', nm);
+            }
+            return c.from('sichal_fee_rates').upsert({
+              year: year, sichal: NAME, church: nm,
+              amount: parseInt(v, 10) || 0,
+              updated_by: user.name, updated_at: new Date().toISOString()
+            }, { onConflict: 'year,sichal,church' });
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHS.logAction('update', '시찰회비 금액 설정',
+              year + '년 ' + NAME + ' ' + nm + ' ' + (v === '' ? '(기본으로)' : v + '만원'));
+            drawFees();
+          });
+        });
+      });
 
       box.querySelectorAll('button[data-feepay]').forEach(function (b) {
         b.addEventListener('click', function () {
