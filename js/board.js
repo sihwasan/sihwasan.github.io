@@ -380,7 +380,7 @@ var SHSBoard = (function () {
 
         var h = '<div style="border-top:1px solid var(--gray-2,#e8eaef);margin-top:12px;padding-top:10px">' +
           '<div style="font-size:0.85rem;font-weight:700;color:var(--navy);margin-bottom:8px">' +
-          yr + '년 시찰별 납부 현황 <span style="font-weight:400;color:var(--gray-5);font-size:0.76rem">' +
+          yr + '년 납부 현황 <span style="font-weight:400;color:var(--gray-5);font-size:0.76rem">' +
           '시찰 이름을 누르면 교회별 상세가 열립니다</span></div>';
 
         /* 노회 전체 진행률 */
@@ -405,7 +405,8 @@ var SHSBoard = (function () {
           '<span>세례의무금</span><span><strong>' + tBapPct + '%</strong> <span style="color:var(--gray-5)">(' +
           tBapJoin + '/' + tBapN + '곳)</span></span></div>' + bar(tBapPct, '#b9974e') + '</div>' +
           '</div></div>';
-        rows.forEach(function (x) {
+        /* 시찰별 막대는 내가 속한 시찰만 보여 준다 */
+        rows.filter(function (x) { return x.out_sichal === mySic; }).forEach(function (x) {
           /* 상회비: 이번 달까지 부과된 금액 대비 납부율 */
           var duesDue = Number(x.out_dues_plan || 0) / 12 * mo;
           var duesPct = duesDue ? Math.round(Number(x.out_dues_paid || 0) / duesDue * 100) : 0;
