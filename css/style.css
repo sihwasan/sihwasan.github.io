@@ -2250,3 +2250,12 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 선 굵기 10% 확대 */
 .hero-line-h { height: 3.3px; }
 .hero-line-v { width: 3.3px; }
+/* 선 굵기 20% 확대 + 끝부분 페이드아웃 (가로선 오른쪽 · 세로선 아래) */
+.hero-line-h {
+  height: 4px;
+  background: linear-gradient(90deg, rgba(251, 248, 242, 0.7) 65%, rgba(251, 248, 242, 0) 100%);
+}
+.hero-line-v {
+  width: 4px;
+  background: linear-gradient(180deg, rgba(251, 248, 242, 0.7) 65%, rgba(251, 248, 242, 0) 100%);
+}
