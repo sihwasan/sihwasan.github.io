@@ -1891,3 +1891,77 @@ td[data-duch]:hover { background: #eef2f8; }
   .hub-grid > .hub-card:nth-child(even),
   .hub-grid > .hub-card:nth-child(even):hover { transform:none; }
 }
+
+/* =====================================================================
+ * 따뜻한 그레이지 테마 (대시보드 허브와 통일)
+ * 참조: THE HUE — 베이지·타우프 바탕, 크림색 활자, 둥근 모서리.
+ * 남색 변수 자체를 타우프 계열로 옮겨 화면 전체가 한 결이 되게 한다.
+ * ===================================================================== */
+:root {
+  --navy: #5d5041;          /* 주 색 — 짙은 타우프 */
+  --navy-dark: #453b2f;
+  --navy-light: #7a6c59;
+  --accent: #a8813a;
+  --gold: #b9974e;
+  --ink: #3a342c;
+  --gray-7: #5f584d;
+  --gray-5: #8b8275;
+  --gray-3: #cfc6b8;
+  --gray-2: #e8e1d5;
+  --gray-1: #f4efe7;
+  --paper: #f7f3ec;
+  --beige: #b9ac9d;
+  --beige-deep: #a4967f;
+  --cream: #fbf8f2;
+}
+
+/* ----- 위 유틸 바·메뉴 ----- */
+.topbar { background: var(--navy-dark); color: #d8d0c2; }
+.gnb { background: var(--navy); }
+.gnb-sub a:hover { background: var(--gray-1); color: var(--navy); }
+
+/* ----- 메인 히어로: 어두운 밤하늘 → 따뜻한 그레이지 ----- */
+.hero {
+  background: linear-gradient(126deg, #6b5f4f 0%, #8a7c69 52%, #a4967f 100%);
+}
+.hero::before {
+  background: radial-gradient(ellipse 62% 70% at 72% 46%, rgba(251, 248, 242, 0.16), transparent 70%);
+}
+.hero::after {
+  background: linear-gradient(90deg, rgba(58, 49, 38, 0.42) 0%, rgba(58, 49, 38, 0.18) 40%, transparent 66%);
+}
+.hero-canvas { opacity: 0.35; }
+.hero .hero-kicker { color: #efe7d8; }
+.hero p { color: #f0e9dc; }
+.hero .hero-verse { color: #e3d9c6; }
+.city-chip { color: #f3ede1; border-bottom-color: rgba(251, 248, 242, 0.35); }
+.city-chip:hover, .city-chip:focus-visible, .city-chip.on {
+  color: #fff; border-bottom-color: rgba(251, 248, 242, 0.95);
+}
+.hero-cities-note { color: #e6ddcb; }
+.hero-cities-note.on { color: #fdf9ef; }
+.hero.has-image { background: var(--navy-dark); }
+.hero.has-image::before { background: rgba(58, 49, 38, 0.55); }
+
+/* ----- 하위 페이지 머리 ----- */
+.page-head {
+  background: linear-gradient(120deg, #a4967f 0%, #b9ac9d 70%, #c4b8a8 100%);
+  color: #fdfbf6;
+}
+.page-head .crumb { color: #f0e9db; }
+
+/* ----- 표면(카드)들: 크림 바탕 + 둥근 모서리 ----- */
+.side-box, .admin-card, .dash-box, .doc-item, .noti-card {
+  background: var(--cream); border: 1px solid var(--gray-2);
+  border-radius: 14px; overflow: hidden;
+}
+.notice-banner { background: var(--gray-1); border-radius: 12px; }
+.tbl { background: transparent; }
+
+/* ----- 단추: 부드러운 모서리 ----- */
+.btn { border-radius: 8px; }
+.btn:hover { background: var(--navy-dark); border-color: var(--navy-dark); }
+
+/* ----- 발자국 ----- */
+.site-footer { background: #3a332a; color: #b3a996; }
+.site-footer .f-name { color: #ece5d7; }
