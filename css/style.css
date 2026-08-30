@@ -2002,3 +2002,7 @@ td[data-duch]:hover { background: #eef2f8; }
   background: var(--gray-3); transition: background .15s;
 }
 .gal-dots button.on { background: #5d5041; }
+
+/* 히어로와 대시보드 허브 사이 간격 */
+#dash-area { margin: 52px 0 26px; }
+#dash-area .dash-hub { margin-top: 0; }
