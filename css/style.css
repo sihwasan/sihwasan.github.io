@@ -2294,3 +2294,9 @@ td[data-duch]:hover { background: #eef2f8; }
   .hs-slide { font-size: 1.02rem; line-height: 1.55; }
   .hero-slides { min-height: 130px; }
 }
+/* 문구 줄 간격 조정 + 교체 시 겹침 완화 */
+.hs-slide { line-height: 1.5; transition: opacity 1.6s ease; }
+@media (max-width: 900px) {
+  .hs-slide { line-height: 1.45; }
+  .hero-slides { min-height: 150px; }
+}
