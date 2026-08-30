@@ -84,7 +84,8 @@ var SHSBoard = (function () {
       }
       cards += hubCard('doc', '서류 발급', '');
       cards += hubCard('report', '교회상황 보고서', '');
-      cards += hubCard('dues', '상회비 전체', '관리 현황', { hidden: true, cid: 'hub-card-dues' });
+      /* 노회 사무실 계정은 개인 칸이 없으므로 상회비 전체를 카드로 둔다 */
+      if (isSuper) cards += hubCard('dues', '상회비 전체', '관리 현황');
 
       box.innerHTML =
         '<div id="hub-home" class="dash-hub">' +
@@ -108,15 +109,22 @@ var SHSBoard = (function () {
           '<div class="hub-panel hidden" data-hp="mydues">' +
           '<div class="tabs" id="md-tabs" style="margin-bottom:14px">' +
           '<button type="button" class="active" data-mdt="dues">나의 상회비</button>' +
-          '<button type="button" data-mdt="bap">나의 세례의무금</button></div>' +
+          '<button type="button" data-mdt="bap">나의 세례의무금</button>' +
+          '<button type="button" data-mdt="all" id="md-tab-all" class="hidden">상회비 전체</button></div>' +
           '<div id="dash-mydues">' + LOADING + '</div>' +
-          '<div id="dash-mybap" class="hidden">' + LOADING + '</div></div>' +
+          '<div id="dash-mybap" class="hidden">' + LOADING + '</div>' +
+          /* 상회비 전체 (관리자·회계에게만 탭이 열린다) */
+          '<div id="dash-dues-sec" class="hidden">' +
+          '<p class="dash-more" style="margin-top:0"><a href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면으로</a></p>' +
+          '<div id="dash-dues-body">' + LOADING + '</div></div></div>' +
           '<div class="hub-panel hidden" data-hp="com"><div id="dash-com"></div></div>') +
         '<div class="hub-panel hidden" data-hp="doc"><div id="dash-doc">' + LOADING + '</div></div>' +
         '<div class="hub-panel hidden" data-hp="report"><div id="dash-report">' + LOADING + '</div></div>' +
-        '<div class="hub-panel hidden" data-hp="dues"><section id="dash-dues-sec" class="hidden">' +
-        '<p class="dash-more" style="margin-top:0"><a href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면으로</a></p>' +
-        '<div id="dash-dues-body">' + LOADING + '</div></section></div>' +
+        (isSuper
+          ? '<div class="hub-panel hidden" data-hp="dues"><div id="dash-dues-sec" class="hidden">' +
+            '<p class="dash-more" style="margin-top:0"><a href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면으로</a></p>' +
+            '<div id="dash-dues-body">' + LOADING + '</div></div></div>'
+          : '') +
         '</div>';
 
       var HUB_TITLES = {
@@ -157,6 +165,8 @@ var SHSBoard = (function () {
           b.classList.add('active');
           document.getElementById('dash-mydues').classList.toggle('hidden', b.dataset.mdt !== 'dues');
           document.getElementById('dash-mybap').classList.toggle('hidden', b.dataset.mdt !== 'bap');
+          var allSec = document.getElementById('dash-dues-sec');
+          if (allSec) allSec.classList.toggle('hidden', b.dataset.mdt !== 'all');
         });
       });
 
@@ -186,10 +196,13 @@ var SHSBoard = (function () {
        * 아닌 회원에게는 나의 시찰이 줄 전체를 쓴다. */
       var sicSec = document.getElementById('dash-sichal-sec');
       if (canDues) {
-        var duesSec = document.getElementById('dash-dues-sec');
-        if (duesSec) duesSec.classList.remove('hidden');
-        var duesCard = document.getElementById('hub-card-dues');
-        if (duesCard) duesCard.classList.remove('hidden');
+        /* 관리자·회계에게 '상회비 전체' 탭을 연다 (내용은 탭을 눌러야 보인다) */
+        var duesTab = document.getElementById('md-tab-all');
+        if (duesTab) duesTab.classList.remove('hidden');
+        if (isSuper) {
+          var duesSec = document.getElementById('dash-dues-sec');
+          if (duesSec) duesSec.classList.remove('hidden');
+        }
       } else if (sicSec) sicSec.classList.add('span2');
       var yr = new Date().getFullYear();
       var mo = new Date().getMonth() + 1;
