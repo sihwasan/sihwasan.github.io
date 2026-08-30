@@ -4,7 +4,7 @@
  * 항상 서버를 먼저 확인하므로(network-first) 수정한 내용이 곧바로 반영된다.
  */
 
-var CACHE = 'shs-v1';
+var CACHE = 'shs-v2';
 
 self.addEventListener('install', function (e) {
   self.skipWaiting();

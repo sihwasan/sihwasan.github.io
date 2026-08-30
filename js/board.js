@@ -125,6 +125,10 @@ var SHSBoard = (function () {
        * <뒤로 가기>를 눌러도 이전 단계(허브)로 돌아온다. */
       function showHub(id) {
         var panel = id && box.querySelector('.hub-panel[data-hp="' + id + '"]');
+        /* 상세를 보는 동안에는 아래 갤러리 등 다른 섹션이 따라붙지 않게 감춘다 */
+        document.querySelectorAll('.home-gallery').forEach(function (g2) {
+          g2.classList.toggle('hidden', !!panel);
+        });
         if (!panel) {
           document.getElementById('hub-detail').classList.add('hidden');
           document.getElementById('hub-home').classList.remove('hidden');
