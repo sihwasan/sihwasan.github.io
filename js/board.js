@@ -522,11 +522,11 @@ var SHSBoard = (function () {
           '<div style="flex:1 1 130px;min-width:120px">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
           '<span>상회비</span><span><strong>' + tDuesPct + '%</strong> <span style="color:var(--gray-5)">(' +
-          wonf(tDuesPaid) + '만원)</span></span></div>' + bar(tDuesPct, '#5d5041') + '</div>' +
+          wonf(tDuesPaid) + '만원)</span></span></div>' + bar(tDuesPct, '#b03a3a') + '</div>' +
           '<div style="flex:1 1 130px;min-width:120px">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
           '<span>세례의무금</span><span><strong>' + tBapPct + '%</strong> <span style="color:var(--gray-5)">(' +
-          tBapJoin + '/' + tBapN + '곳)</span></span></div>' + bar(tBapPct, '#b9974e') + '</div>' +
+          tBapJoin + '/' + tBapN + '곳)</span></span></div>' + bar(tBapPct, '#d97b6c') + '</div>' +
           '</div></div>';
         /* 시찰별 막대는 내가 속한 시찰만 보여 준다 */
         rows.filter(function (x) { return x.out_sichal === mySic; }).forEach(function (x) {
@@ -545,11 +545,11 @@ var SHSBoard = (function () {
             '<div style="flex:1 1 130px;min-width:120px">' +
             '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
             '<span>상회비</span><span>' + duesPct + '% <span style="color:var(--gray-5)">(' +
-            wonf(x.out_dues_paid) + '만원)</span></span></div>' + bar(duesPct, '#5d5041') + '</div>' +
+            wonf(x.out_dues_paid) + '만원)</span></span></div>' + bar(duesPct, '#b03a3a') + '</div>' +
             '<div style="flex:1 1 130px;min-width:120px">' +
             '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
             '<span>세례의무금</span><span>' + bapPct + '% <span style="color:var(--gray-5)">(' +
-            x.out_bap_join + '/' + x.out_bap_churches + '곳)</span></span></div>' + bar(bapPct, '#b9974e') + '</div>' +
+            x.out_bap_join + '/' + x.out_bap_churches + '곳)</span></span></div>' + bar(bapPct, '#d97b6c') + '</div>' +
             '</div>' +
             '<div class="hidden" data-sicdetail="' + esc(x.out_sichal) + '" style="margin-top:6px"></div>' +
             '</div>';
