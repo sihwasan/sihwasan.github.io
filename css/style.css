@@ -2226,3 +2226,5 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 문구 위치 정리: 세로선은 로고와 문구 사이 한가운데로, 문구는 선 오른쪽에서 시작 */
 .hero-line-v { left: max(352px, calc(50% - 324px)); }
 .hero-slides { min-height: clamp(180px, 19vw, 240px); }
+/* 고정 기관명(대한예수교장로회(합동)) 크기 확대 */
+.hero .hero-kicker { font-size: 1.05rem; letter-spacing: 5px; }
