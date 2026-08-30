@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var sichals = [], sic = null, isOfficer = false, myDuty = '', isAuditor = false;
   var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
-  var churchStaff = [], bapAll = [];
+  var churchStaff = [], bapAll = [], sicFin = [];
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
   var year = new Date().getFullYear();
@@ -118,6 +118,9 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (x) { return x; }, function () { return { data: [] }; }),
           /* 세례의무금 (47 을 아직 실행하지 않았어도 그냥 넘어간다) */
           c.from('bapdues').select('*').in('year', [year, year - 1])
+            .then(function (x) { return x; }, function () { return { data: [] }; }),
+          /* 시찰별 상회비·세례의무금 요약 (49 를 아직 실행하지 않았어도 넘어간다) */
+          c.rpc('sichal_finance', { p_year: year })
             .then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
@@ -149,6 +152,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         });
         bapAll   = (rs[9] && rs[9].data) || [];
+        sicFin   = (rs[10] && rs[10].data) || [];
         docs     = (rs[4] && rs[4].data) || [];
         minutes  = (rs[5] && rs[5].data) || [];
         reports  = (rs[6] && rs[6].data) || [];
@@ -187,31 +191,51 @@ document.addEventListener('DOMContentLoaded', function () {
       (sic.area ? '<p class="cm-duty">관할 지역 : ' + e(sic.area) + '</p>' : '') +
       '</div>';
 
-    /* 세례의무금 진행률 — 이 시찰 관내 교회 기준 */
+    /* 상회비 · 세례의무금 진행률 — 노회 전체와 이 시찰 (49 sichal_finance) */
     (function () {
-      if (!bapAll.length || !churches.length) return;
-      var bapYr = bapAll.some(function (b) { return b.year === year; }) ? year : year - 1;
-      function key(s) { return String(s || '').replace(/\s|교회$/g, ''); }
-      var keys = {};
-      churches.forEach(function (ch) { keys[key(ch.name)] = true; });
-      var mine = bapAll.filter(function (b) { return b.year === bapYr && keys[key(b.church)]; });
-      if (!mine.length) return;
-      var t = 0, p = 0, join = 0;
-      mine.forEach(function (b) {
-        t += Number(b.target || 0); p += Number(b.paid || 0);
-        if (Number(b.paid || 0) > 0) join++;
+      if (!sicFin.length) return;
+      var mo = new Date().getMonth() + 1;
+      function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
+      function bar(pct, color) {
+        return '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:10px;overflow:hidden">' +
+          '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + '"></div></div>';
+      }
+      function rowHtml(label, duesPlan, duesPaid, bapTarget, bapPaid, bapJoin, bapN) {
+        var duesDue = Number(duesPlan || 0) / 12 * mo;
+        var duesPct = duesDue ? Math.round(Number(duesPaid || 0) / duesDue * 100) : 0;
+        var bapPct = Number(bapTarget || 0) ? Math.round(Number(bapPaid || 0) / Number(bapTarget) * 100) : 0;
+        return '<div style="margin-bottom:12px">' +
+          '<div style="font-size:0.88rem;font-weight:700;color:var(--navy);margin-bottom:4px">' + e(label) + '</div>' +
+          '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
+          '<div style="flex:1 1 220px;min-width:200px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--gray-6)">' +
+          '<span>상회비</span><span><strong>' + duesPct + '%</strong> <span style="color:var(--gray-5)">(' +
+          wonf(duesPaid) + '만원)</span></span></div>' + bar(duesPct, '#b03a3a') + '</div>' +
+          '<div style="flex:1 1 220px;min-width:200px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--gray-6)">' +
+          '<span>세례의무금</span><span><strong>' + bapPct + '%</strong> <span style="color:var(--gray-5)">(' +
+          wonf(bapPaid) + ' / ' + wonf(bapTarget) + '원 · ' + bapJoin + '/' + bapN + '곳)</span></span></div>' +
+          bar(bapPct, '#d97b6c') + '</div>' +
+          '</div></div>';
+      }
+      var tDP = 0, tDA = 0, tBT = 0, tBP = 0, tBJ = 0, tBN = 0;
+      sicFin.forEach(function (x) {
+        tDP += Number(x.out_dues_plan || 0); tDA += Number(x.out_dues_paid || 0);
+        tBT += Number(x.out_bap_target || 0); tBP += Number(x.out_bap_paid || 0);
+        tBJ += Number(x.out_bap_join || 0); tBN += Number(x.out_bap_churches || 0);
       });
-      var pct = t ? Math.round(p / t * 100) : 0;
-      h += '<div class="side-box" style="max-width:720px;margin-bottom:16px"><div class="box-head">' +
-        bapYr + '년 세례의무금 진행률' + (bapYr !== year ? ' (지난해 배정 기준)' : '') + '</div>' +
+      var mineFin = sicFin.filter(function (x) { return x.out_sichal === NAME; })[0];
+      h += '<div class="side-box" style="max-width:860px;margin-bottom:16px"><div class="box-head">' +
+        year + '년 상회비 · 세례의무금 진행률</div>' +
         '<div class="box-body">' +
-        '<div style="display:flex;justify-content:space-between;font-size:0.88rem;margin-bottom:4px">' +
-        '<span>참여 <strong>' + join + '/' + mine.length + '곳</strong></span>' +
-        '<span>' + p.toLocaleString('ko-KR') + ' / ' + t.toLocaleString('ko-KR') + '원 (<strong>' + pct + '%</strong>)</span></div>' +
-        '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:12px;overflow:hidden">' +
-        '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:var(--navy)"></div></div>' +
-        '<p style="font-size:0.78rem;color:var(--gray-5);margin:6px 0 0">총회에 해마다 한 번 내는 세례교인헌금입니다. ' +
-        '교회별 자세한 내용은 임원방 → 세례의무금 관리에서 보실 수 있습니다.</p>' +
+        rowHtml('노회 전체', tDP, tDA, tBT, tBP, tBJ, tBN) +
+        (mineFin
+          ? rowHtml(NAME, mineFin.out_dues_plan, mineFin.out_dues_paid,
+              mineFin.out_bap_target, mineFin.out_bap_paid,
+              mineFin.out_bap_join, mineFin.out_bap_churches)
+          : '') +
+        '<p style="font-size:0.78rem;color:var(--gray-5);margin:0">상회비는 이번 달까지 부과된 금액 대비, ' +
+        '세례의무금은 올해 목표금액 대비 납부율입니다. 교회별 자세한 내용은 임원방에서 보실 수 있습니다.</p>' +
         '</div></div>';
     })();
 
