@@ -2277,3 +2277,6 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 세로선 시작을 기관명 글자 '위쪽 끝'에 정확히 맞춤 */
 .hero-line-v { top: calc(50% - 161px); }
 .hero.done .hero-line-v { height: 481px; }
+/* 세로선을 기관명 글자 높이까지 위로 연장 */
+.hero-line-v { top: calc(50% - 201px); }
+.hero.done .hero-line-v { height: 521px; }
