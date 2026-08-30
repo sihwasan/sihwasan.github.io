@@ -2100,3 +2100,9 @@ td[data-duch]:hover { background: #eef2f8; }
   .hero .container { opacity: 0; transform: translateY(50px); }
   .hero.done .container { opacity: 1; transform: none; padding-top: 190px; }
 }
+/* 최종 로고 크기를 조금 더 키움 */
+.hero.done .hero-logo-draw { width: 210px; }
+@media (max-width: 900px) {
+  .hero.done .hero-logo-draw { width: 108px; }
+  .hero.done .container { padding-top: 210px; }
+}
