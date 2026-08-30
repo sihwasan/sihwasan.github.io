@@ -11,7 +11,7 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260830j">
+<link rel="stylesheet" href="css/style.css?v=20260830k">
 </head>
 <body>
 
@@ -20,17 +20,39 @@
   <div class="hero-logo-draw" id="hero-logo-draw" aria-hidden="true">
     <svg viewBox="0 0 1064 1576" fill="none">
       <defs>
-        <linearGradient id="hd-gl" x1="0" y1="0" x2="1" y2="0.3">
-          <stop offset="0" stop-color="#7fd0f8"/><stop offset="0.55" stop-color="#38b1f0"/>
-          <stop offset="1" stop-color="#1b7fbd"/>
+        <!-- 금속 질감: 밝음-어두움이 번갈아 흐르는 띠 그라데이션 -->
+        <linearGradient id="hd-gl" x1="0" y1="0" x2="1" y2="0.35">
+          <stop offset="0" stop-color="#eaf7ff"/><stop offset="0.18" stop-color="#5ec2f6"/>
+          <stop offset="0.38" stop-color="#1587cf"/><stop offset="0.55" stop-color="#66c4f4"/>
+          <stop offset="0.74" stop-color="#0b568c"/><stop offset="0.9" stop-color="#2f9ada"/>
+          <stop offset="1" stop-color="#0a4a7a"/>
         </linearGradient>
-        <linearGradient id="hd-gr" x1="1" y1="0" x2="0" y2="0.3">
-          <stop offset="0" stop-color="#b6e05e"/><stop offset="0.55" stop-color="#8cc81e"/>
-          <stop offset="1" stop-color="#5f9110"/>
+        <linearGradient id="hd-gr" x1="1" y1="0" x2="0" y2="0.35">
+          <stop offset="0" stop-color="#f0fadb"/><stop offset="0.18" stop-color="#aadb4a"/>
+          <stop offset="0.38" stop-color="#6ba110"/><stop offset="0.55" stop-color="#b3e055"/>
+          <stop offset="0.74" stop-color="#47700a"/><stop offset="0.9" stop-color="#8cc81e"/>
+          <stop offset="1" stop-color="#3d6108"/>
         </linearGradient>
+        <!-- 십자가: 은빛 금속 -->
         <linearGradient id="hd-gc" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dcd4c4"/>
+          <stop offset="0" stop-color="#ffffff"/><stop offset="0.3" stop-color="#d9dee2"/>
+          <stop offset="0.5" stop-color="#f6f8fa"/><stop offset="0.72" stop-color="#a7b0b7"/>
+          <stop offset="1" stop-color="#e9edf0"/>
         </linearGradient>
+        <!-- 흐르는 광택 -->
+        <linearGradient id="hd-gs" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+          <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.55"/>
+          <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.85"/>
+          <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.55"/>
+          <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+        </linearGradient>
+        <clipPath id="hd-clip">
+          <path d="M133 248 Q105 242 105 272 L105 1162 Q105 1192 133 1186 L530 1104 L530 322 Z"/>
+          <path d="M891 288 Q919 282 919 312 L919 1296 Q919 1326 891 1320 L530 1230 L530 382 Z"/>
+          <path d="M458 388 h88 v716 h-88 Z"/>
+          <path d="M275 597 h474 v86 h-474 Z"/>
+        </clipPath>
       </defs>
       <!-- 바닥 그림자 -->
       <ellipse class="hd-x" cx="512" cy="1512" rx="380" ry="42" fill="#3a3126" data-fo="0.28"/>
@@ -45,6 +67,11 @@
         d="M891 288 Q919 282 919 312 L919 1296 Q919 1326 891 1320 L530 1230 L530 382 Z"/>
       <path class="hd-p" data-fill="url(#hd-gc)" data-fo="0.96" d="M458 388 h88 v716 h-88 Z"/>
       <path class="hd-p" data-fill="url(#hd-gc)" data-fo="0.96" d="M275 597 h474 v86 h-474 Z"/>
+      <!-- 금속 위를 흐르는 광택 -->
+      <g clip-path="url(#hd-clip)">
+        <rect class="hd-sheen" x="-500" y="120" width="360" height="1300"
+          fill="url(#hd-gs)" transform="skewX(-18)"/>
+      </g>
     </svg>
   </div>
   <div class="container">

@@ -2047,3 +2047,14 @@ td[data-duch]:hover { background: #eef2f8; }
   from { transform: rotateY(-24deg) rotateX(7deg); }
   to   { transform: rotateY(-8deg)  rotateX(4deg); }
 }
+/* 금속 광택: 완성된 뒤 로고 위를 빛줄기가 주기적으로 스친다 */
+.hero-logo-draw .hd-sheen { opacity: 0; }
+.hero-logo-draw svg.is3d .hd-sheen {
+  opacity: 1;
+  animation: hero-logo-sheen 3.8s ease-in-out 0.6s infinite;
+}
+@keyframes hero-logo-sheen {
+  0%   { transform: skewX(-18deg) translateX(0); }
+  55%  { transform: skewX(-18deg) translateX(1900px); }
+  100% { transform: skewX(-18deg) translateX(1900px); }
+}
