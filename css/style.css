@@ -2181,3 +2181,19 @@ td[data-duch]:hover { background: #eef2f8; }
 .hero.done .container > p  { transition-delay: 3.4s; }
 .hero.done .hero-verse     { transition-delay: 7.0s; }
 .hero.done .hero-cities    { transition-delay: 10.4s; }
+
+/* ----- 문구 회전 슬롯: 같은 자리·같은 크기(제목 크기)에서 교체 ----- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; }
+.hero-slides { position: relative; min-height: clamp(170px, 24vw, 240px); max-width: 720px; }
+.hs-slide {
+  position: absolute; top: 0; left: 0; right: 0; margin: 0;
+  font-family: 'Noto Serif KR', serif;
+  font-size: 2.7rem; font-weight: 700; line-height: 1.35; color: #fff;
+  opacity: 0; transition: opacity 2.6s ease;
+}
+.hs-slide.on { opacity: 1; }
+@media (max-width: 900px) {
+  .hs-slide { font-size: 1.55rem; }
+  .hero-slides { min-height: 150px; }
+}

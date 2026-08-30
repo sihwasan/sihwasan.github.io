@@ -11,7 +11,7 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260831g">
+<link rel="stylesheet" href="css/style.css?v=20260831h">
 </head>
 <body>
 
@@ -31,10 +31,13 @@
   <div class="hero-line-v" aria-hidden="true"></div>
   <div class="container">
     <div class="hero-kicker">대한예수교장로회(합동)</div>
-    <h1>시화산노회가 하나 됨을 이루고<br>함께 지어져 가는 교회를 세웁니다</h1>
-    <p>화성, 안산, 시흥, 수원, 용인, 오산 지역의 교회들이 그리스도 안에서 한 몸을 이루어
-       복음 전파와 교회 섬김의 사명을 감당하고 있습니다.</p>
-    <div class="hero-verse">"그의 안에서 건물마다 서로 연결하여 주 안에서 성전이 되어 가고" (엡 2:21)</div>
+    <!-- 세 문구가 같은 자리·같은 크기에서 차례로 교체된다 -->
+    <h1 class="sr-only">시화산노회가 하나 됨을 이루고 함께 지어져 가는 교회를 세웁니다</h1>
+    <div class="hero-slides" id="hero-slides" aria-hidden="true">
+      <div class="hs-slide">시화산노회가 하나 됨을 이루고<br>함께 지어져 가는 교회를 세웁니다</div>
+      <div class="hs-slide">화성, 안산, 시흥, 수원, 용인, 오산 지역의 교회들이 그리스도 안에서 한 몸을 이루어 복음 전파와 교회 섬김의 사명을 감당하고 있습니다.</div>
+      <div class="hs-slide">"그의 안에서 건물마다 서로 연결하여<br>주 안에서 성전이 되어 가고" (엡 2:21)</div>
+    </div>
     <div class="hero-cities">
       <div class="chips" role="group" aria-label="시화산을 이루는 세 지역">
         <button type="button" class="city-chip" data-city="si" aria-pressed="false"><b class="syl">시</b>흥</button>
@@ -141,6 +144,32 @@
   });
   /* 다 그려지면 잠시 보여 준 뒤 왼쪽으로 옮겨 가며 문구가 나타난다 */
   setTimeout(finish, delay + 700);
+})();
+
+/* 문구 회전 — 앞 문구가 사라지면 같은 자리·같은 크기로 다음 문구가 나타난다 */
+(function () {
+  var box = document.getElementById('hero-slides');
+  var hero = document.querySelector('.hero');
+  if (!box || !hero) return;
+  var slides = [].slice.call(box.querySelectorAll('.hs-slide'));
+  if (!slides.length) return;
+  var cur = 0;
+  function show(i) {
+    slides.forEach(function (s, j) { s.classList.toggle('on', j === i); });
+    cur = i;
+  }
+  function rotate() { show((cur + 1) % slides.length); }
+  function start() {
+    show(0);
+    setInterval(rotate, 8000);   /* 한 문구를 8초씩 보여 준다 */
+  }
+  /* 로고 인트로가 끝나기를 기다렸다가 시작한다 */
+  var t = setInterval(function () {
+    if (hero.classList.contains('done')) {
+      clearInterval(t);
+      setTimeout(start, 1200);
+    }
+  }, 200);
 })();
 </script>
 <script>
