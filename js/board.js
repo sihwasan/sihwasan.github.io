@@ -121,9 +121,15 @@ var SHSBoard = (function () {
         sichal: '나의 시찰 · 납부 현황', mydues: '나의 상회비 · 세례의무금',
         com: '내가 맡은 부서', doc: '서류 발급', report: '교회상황 보고서', dues: '상회비 전체'
       };
-      function openHub(id) {
-        var panel = box.querySelector('.hub-panel[data-hp="' + id + '"]');
-        if (!panel) return;
+      /* 상세로 들어가면 주소 뒤에 #hub-항목 이 붙어, 브라우저의
+       * <뒤로 가기>를 눌러도 이전 단계(허브)로 돌아온다. */
+      function showHub(id) {
+        var panel = id && box.querySelector('.hub-panel[data-hp="' + id + '"]');
+        if (!panel) {
+          document.getElementById('hub-detail').classList.add('hidden');
+          document.getElementById('hub-home').classList.remove('hidden');
+          return;
+        }
         document.getElementById('hub-home').classList.add('hidden');
         document.getElementById('hub-detail').classList.remove('hidden');
         box.querySelectorAll('.hub-panel').forEach(function (p) {
@@ -132,13 +138,19 @@ var SHSBoard = (function () {
         document.getElementById('hub-detail-title').textContent = HUB_TITLES[id] || '';
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
+      function hubFromHash() {
+        var m = (location.hash || '').match(/^#hub-([a-z]+)$/);
+        showHub(m ? m[1] : null);
+      }
       box.querySelectorAll('.hub-card').forEach(function (b) {
-        b.addEventListener('click', function () { openHub(b.dataset.hub); });
+        b.addEventListener('click', function () { location.hash = 'hub-' + b.dataset.hub; });
       });
       document.getElementById('hub-back').addEventListener('click', function () {
-        document.getElementById('hub-detail').classList.add('hidden');
-        document.getElementById('hub-home').classList.remove('hidden');
+        if (/^#hub-/.test(location.hash)) history.back();
+        else showHub(null);
       });
+      window.addEventListener('hashchange', hubFromHash);
+      hubFromHash();
     }
 
     /* 상회비: 정회원 모두에게 '나의 교회 납부 현황'을,
