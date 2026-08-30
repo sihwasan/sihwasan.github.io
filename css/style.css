@@ -2272,3 +2272,5 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 세로선 시작을 기관명 글자 상단과 맞춤 */
 .hero-line-v { top: calc(50% - 180px); }
 .hero.done .hero-line-v { height: 500px; }
+/* 기관명을 약 2mm(8px) 아래로 */
+.hero .hero-kicker { top: -76px; }
