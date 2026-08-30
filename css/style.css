@@ -2327,3 +2327,10 @@ td[data-duch]:hover { background: #eef2f8; }
 @media (max-width: 900px) {
   .hero.done .container { padding-top: 12px; }
 }
+/* 모바일: 구성 전체를 조금 더 위로 */
+@media (max-width: 900px) {
+  .hero-slides { margin-top: 22px; }
+  .hero-line-h { top: 44px; }
+  .hero-line-v { top: 16px; }
+  .hero.done .hero-logo-draw { top: 158px; }
+}
