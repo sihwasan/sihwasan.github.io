@@ -2262,3 +2262,10 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 세로선 시작점을 헤더에서 떨어뜨림 */
 .hero-line-v { top: calc(50% - 200px); height: 0; }
 .hero.done .hero-line-v { height: 520px; }
+/* 로고 크기 10% 추가 축소 */
+.hero-logo-draw { width: min(293px, 42vw); }
+.hero.done .hero-logo-draw { width: 171px; }
+@media (max-width: 900px) {
+  .hero-logo-draw { width: min(39vw, 171px); }
+  .hero.done .hero-logo-draw { width: 87px; }
+}
