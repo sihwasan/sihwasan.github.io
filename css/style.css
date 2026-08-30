@@ -2022,3 +2022,13 @@ td[data-duch]:hover { background: #eef2f8; }
 .notice-banner { background: #f1e9db; border: 1px solid #ddd1bd; }
 .tbl th { border-bottom-color: #c9bda8; color: var(--gray-7); }
 .tbl td { border-bottom: 1px solid #e3dac9; }
+
+/* 히어로 로고 스케치 애니메이션 */
+.hero-logo-draw {
+  position: absolute; z-index: 1; pointer-events: auto; cursor: pointer;
+  right: 7%; top: 50%; transform: translateY(-50%);
+  width: 240px; opacity: 0.95;
+}
+.hero-logo-draw svg { width: 100%; height: auto; display: block;
+  filter: drop-shadow(0 6px 24px rgba(40, 33, 24, 0.25)); }
+@media (max-width: 900px) { .hero-logo-draw { display: none; } }
