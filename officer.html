@@ -1312,6 +1312,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 보기는 임원 누구나, 고치기는 상회비와 같은 권한(관리자·회계·부회계). */
   var bapYear = new Date().getFullYear();
   var bapRows = [], bapPrev = [], bapSichalMap = {}, bapPay = {}, bapPastorMap = {}, bapDeadlines = {};
+  var bapEditing = null;   /* 지금 수정 중인 줄의 id (수정 단추를 눌러야 열린다) */
 
   function bapBox() { return document.getElementById('bap-area'); }
   function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
@@ -1529,8 +1530,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var badge = done ? '<span class="role-badge" style="color:#2a7a2a;border-color:#2a7a2a">완납</span>'
           : (part ? '<span class="role-badge" style="color:#b0731f;border-color:#b0731f">일부</span>'
                   : '<span class="role-badge" style="color:var(--gray-5)">미납</span>');
-        if (canEdit) {
-          h += '<tr data-bap="' + r.id + '" data-church="' + e(r.church) + '">' +
+        if (canEdit && String(bapEditing) === String(r.id)) {
+          /* 수정 단추를 누른 줄만 입력칸이 열린다 */
+          h += '<tr data-bap="' + r.id + '" data-church="' + e(r.church) + '" style="background:var(--gray-1,#f4efe7)">' +
             '<td class="left"><strong>' + e(r.church) + '</strong></td>' +
             '<td>' + e(bapSichalOf(r.church)) + '</td>' +
             '<td data-pastor="' + e(pastor) + '">' + (pastor ? e(pastor) : '<span style="color:var(--gray-5)">명단에 없음</span>') + '</td>' +
@@ -1539,15 +1541,23 @@ document.addEventListener('DOMContentLoaded', function () {
             '<td><input type="number" data-f="paid" value="' + Number(r.paid || 0) + '" style="width:110px;text-align:right" step="1000"></td>' +
             '<td>' + badge + '</td>' +
             '<td><button class="btn sm" data-bpsave="' + r.id + '">저장</button> ' +
-            '<button class="btn ghost sm" data-bpdel="' + r.id + '">삭제</button></td></tr>';
+            '<button class="btn ghost sm" data-bpcancel="' + r.id + '">취소</button> ' +
+            '<button class="btn ghost sm" data-bpdel="' + r.id + '" style="color:#a33">삭제</button></td></tr>';
         } else {
-          h += '<tr><td class="left"><strong>' + e(r.church) + '</strong></td>' +
+          h += '<tr data-bap="' + r.id + '"><td class="left"><strong>' + e(r.church) + '</strong></td>' +
             '<td>' + e(bapSichalOf(r.church)) + '</td>' +
             '<td>' + e(pastor || '-') + '</td>' +
             '<td style="text-align:right">' + wonf(r.members) + '</td>' +
             '<td style="text-align:right">' + wonf(r.target) + '</td>' +
             '<td style="text-align:right">' + wonf(r.paid) + '</td>' +
-            '<td>' + badge + '</td></tr>';
+            '<td>' + badge + '</td>' +
+            (canEdit
+              ? '<td><button class="btn ghost sm" data-bpedit="' + r.id + '">수정</button>' +
+                (!done && Number(r.target || 0) > 0
+                  ? ' <button class="btn sm" data-bpfull="' + r.id + '">완납</button>'
+                  : '') + '</td>'
+              : '') +
+            '</tr>';
         }
       });
       h += '<tr><th class="left">합계</th><th></th><th></th><th style="text-align:right">' + wonf(mSum) + '</th>' +
@@ -1583,8 +1593,8 @@ document.addEventListener('DOMContentLoaded', function () {
     box.innerHTML = h;
 
     /* ----- 동작 ----- */
-    box.querySelector('#bp-prev').addEventListener('click', function () { bapYear--; loadBap(); });
-    box.querySelector('#bp-next').addEventListener('click', function () { bapYear++; loadBap(); });
+    box.querySelector('#bp-prev').addEventListener('click', function () { bapYear--; bapEditing = null; loadBap(); });
+    box.querySelector('#bp-next').addEventListener('click', function () { bapYear++; bapEditing = null; loadBap(); });
 
     var dlBtn = box.querySelector('#bp-dlsave');
     if (dlBtn) dlBtn.addEventListener('click', function () {
@@ -1621,6 +1631,40 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
+    box.querySelectorAll('button[data-bpedit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        bapEditing = b.dataset.bpedit;
+        renderBap();
+        var tr = box.querySelector('tr[data-bap="' + bapEditing + '"]');
+        if (tr) tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    box.querySelectorAll('button[data-bpcancel]').forEach(function (b) {
+      b.addEventListener('click', function () { bapEditing = null; renderBap(); });
+    });
+
+    /* 완납: 목표 금액 전액이 오늘 납입된 것으로 저장한다 */
+    box.querySelectorAll('button[data-bpfull]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var r = bapRows.filter(function (x) { return String(x.id) === b.dataset.bpfull; })[0];
+        if (!r) return;
+        if (!confirm(r.church + ' — 목표 금액 ' + wonf(r.target) + '원 전액을 납입 완료로 저장할까요?')) return;
+        b.disabled = true;
+        SHSCloud.init().then(function (c) {
+          return c.from('bapdues').update({
+            paid: r.target,
+            paid_on: r.paid_on || new Date().toISOString().slice(0, 10),
+            updated_at: new Date().toISOString()
+          }).eq('id', r.id);
+        }).then(function (res) {
+          if (res.error) { b.disabled = false; alert(res.error.message); return; }
+          bapEditing = null;
+          SHSCloud.log('update', '세례의무금 완납 처리', bapYear + '년 ' + r.church + ' ' + r.target + '원');
+          loadBap();
+        });
+      });
+    });
+
     box.querySelectorAll('button[data-bpsave]').forEach(function (b) {
       b.addEventListener('click', function () {
         var tr = box.querySelector('tr[data-bap="' + b.dataset.bpsave + '"]');
@@ -1640,6 +1684,7 @@ document.addEventListener('DOMContentLoaded', function () {
           return c.from('bapdues').update(d).eq('id', b.dataset.bpsave);
         }).then(function (res) {
           if (res.error) { alert(res.error.message); return; }
+          bapEditing = null;
           SHSCloud.log('update', '세례의무금 수정',
             bapYear + '년 ' + church + ' 목표 ' + d.target + '원 · 납입 ' + d.paid + '원');
           loadBap();
@@ -1656,6 +1701,7 @@ document.addEventListener('DOMContentLoaded', function () {
           return c.from('bapdues').delete().eq('id', b.dataset.bpdel);
         }).then(function (res) {
           if (res.error) { alert(res.error.message); return; }
+          bapEditing = null;
           SHSCloud.log('delete', '세례의무금 삭제', bapYear + '년 ' + church);
           loadBap();
         });
