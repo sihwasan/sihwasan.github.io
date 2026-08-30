@@ -1010,9 +1010,7 @@ document.addEventListener('DOMContentLoaded', function () {
         function cell(half) {
           var f = feeOf(nm, half);
           if (f) {
-            return '<span style="color:#2a7a2a;font-weight:700">납부</span> ' +
-              '<span style="font-size:0.76rem;color:var(--gray-5)">' +
-              Number(f.amount || 0) + '만원 · ' + e(f.paid_on || '') + '</span>' +
+            return '<span style="color:#2a7a2a;font-weight:700">납부</span>' +
               (canFee ? ' <button class="btn ghost sm" data-feedel="' + f.id + '" data-fc="' + e(nm) + '">취소</button>' : '');
           }
           return '<span style="color:#b0731f">미납</span>' +
