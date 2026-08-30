@@ -1455,6 +1455,13 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start">';
 
       h += '<div style="flex:1 1 420px;max-width:720px">';
+      /* 노회 전체 진행률 */
+      h += '<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--gray-2,#e8eaef)">' +
+        '<div style="display:flex;justify-content:space-between;font-size:0.9rem;margin-bottom:2px">' +
+        '<span><strong>노회 전체</strong> · 참여 ' + nJoin + '/' + nCh + '곳</span>' +
+        '<span><strong>' + wonf(pSum) + ' / ' + wonf(tSum) + '원 (' + Math.round(payPct) + '%)</strong></span></div>' +
+        '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:14px;overflow:hidden">' +
+        '<div style="height:100%;width:' + Math.min(100, Math.round(payPct)) + '%;background:var(--navy)"></div></div></div>';
       GLIST.forEach(function (g, gi) {
         var gr = groups[g];
         var pct = gr.target ? Math.round(gr.paid / gr.target * 100) : 0;

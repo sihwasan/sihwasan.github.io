@@ -382,6 +382,29 @@ var SHSBoard = (function () {
           '<div style="font-size:0.85rem;font-weight:700;color:var(--navy);margin-bottom:8px">' +
           yr + '년 시찰별 납부 현황 <span style="font-weight:400;color:var(--gray-5);font-size:0.76rem">' +
           '시찰 이름을 누르면 교회별 상세가 열립니다</span></div>';
+
+        /* 노회 전체 진행률 */
+        var tDuesPlan = 0, tDuesPaid = 0, tBapTarget = 0, tBapPaid = 0, tBapJoin = 0, tBapN = 0;
+        rows.forEach(function (x) {
+          tDuesPlan += Number(x.out_dues_plan || 0); tDuesPaid += Number(x.out_dues_paid || 0);
+          tBapTarget += Number(x.out_bap_target || 0); tBapPaid += Number(x.out_bap_paid || 0);
+          tBapJoin += Number(x.out_bap_join || 0); tBapN += Number(x.out_bap_churches || 0);
+        });
+        var tDuesDue = tDuesPlan / 12 * mo;
+        var tDuesPct = tDuesDue ? Math.round(tDuesPaid / tDuesDue * 100) : 0;
+        var tBapPct = tBapTarget ? Math.round(tBapPaid / tBapTarget * 100) : 0;
+        h += '<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--gray-2,#e8eaef)">' +
+          '<span style="font-size:0.85rem;font-weight:700;color:var(--navy)">노회 전체</span>' +
+          '<div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">' +
+          '<div style="flex:1 1 130px;min-width:120px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
+          '<span>상회비</span><span><strong>' + tDuesPct + '%</strong> <span style="color:var(--gray-5)">(' +
+          wonf(tDuesPaid) + '만원)</span></span></div>' + bar(tDuesPct, '#1f3a63') + '</div>' +
+          '<div style="flex:1 1 130px;min-width:120px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
+          '<span>세례의무금</span><span><strong>' + tBapPct + '%</strong> <span style="color:var(--gray-5)">(' +
+          tBapJoin + '/' + tBapN + '곳)</span></span></div>' + bar(tBapPct, '#b9974e') + '</div>' +
+          '</div></div>';
         rows.forEach(function (x) {
           /* 상회비: 이번 달까지 부과된 금액 대비 납부율 */
           var duesDue = Number(x.out_dues_plan || 0) / 12 * mo;
