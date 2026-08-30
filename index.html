@@ -11,20 +11,40 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260830i">
+<link rel="stylesheet" href="css/style.css?v=20260830j">
 </head>
 <body>
 
 <section class="hero">
   <!-- 로고를 스케치하듯 선으로 그려 나가는 연출 (마우스를 얹으면 다시 그린다) -->
   <div class="hero-logo-draw" id="hero-logo-draw" aria-hidden="true">
-    <svg viewBox="0 0 1024 1536" fill="none">
-      <path class="hd-p" data-fill="#38b1f0" data-fo="0.55"
+    <svg viewBox="0 0 1064 1576" fill="none">
+      <defs>
+        <linearGradient id="hd-gl" x1="0" y1="0" x2="1" y2="0.3">
+          <stop offset="0" stop-color="#7fd0f8"/><stop offset="0.55" stop-color="#38b1f0"/>
+          <stop offset="1" stop-color="#1b7fbd"/>
+        </linearGradient>
+        <linearGradient id="hd-gr" x1="1" y1="0" x2="0" y2="0.3">
+          <stop offset="0" stop-color="#b6e05e"/><stop offset="0.55" stop-color="#8cc81e"/>
+          <stop offset="1" stop-color="#5f9110"/>
+        </linearGradient>
+        <linearGradient id="hd-gc" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dcd4c4"/>
+        </linearGradient>
+      </defs>
+      <!-- 바닥 그림자 -->
+      <ellipse class="hd-x" cx="512" cy="1512" rx="380" ry="42" fill="#3a3126" data-fo="0.28"/>
+      <!-- 문 두께(측면) — 색이 입혀질 때 함께 나타나 입체감을 준다 -->
+      <path class="hd-x" fill="#0e5f92" data-fo="0.85"
+        d="M105 272 Q105 242 133 248 L530 322 L530 352 L133 278 Q125 276 125 292 L125 1160 L105 1162 Z"/>
+      <path class="hd-x" fill="#4a7410" data-fo="0.85"
+        d="M919 312 Q919 282 891 288 L530 382 L530 412 L891 318 Q899 316 899 332 L899 1294 L919 1296 Z"/>
+      <path class="hd-p" data-fill="url(#hd-gl)" data-fo="0.92"
         d="M133 248 Q105 242 105 272 L105 1162 Q105 1192 133 1186 L530 1104 L530 322 Z"/>
-      <path class="hd-p" data-fill="#8cc81e" data-fo="0.5"
+      <path class="hd-p" data-fill="url(#hd-gr)" data-fo="0.9"
         d="M891 288 Q919 282 919 312 L919 1296 Q919 1326 891 1320 L530 1230 L530 382 Z"/>
-      <path class="hd-p" data-fill="#ffffff" data-fo="0.9" d="M458 388 h88 v716 h-88 Z"/>
-      <path class="hd-p" data-fill="#ffffff" data-fo="0.9" d="M275 597 h474 v86 h-474 Z"/>
+      <path class="hd-p" data-fill="url(#hd-gc)" data-fo="0.96" d="M458 388 h88 v716 h-88 Z"/>
+      <path class="hd-p" data-fill="url(#hd-gc)" data-fo="0.96" d="M275 597 h474 v86 h-474 Z"/>
     </svg>
   </div>
   <div class="container">
@@ -108,7 +128,8 @@
   if (!wrap) return;
   var hero = document.querySelector('.hero');
   if (hero && hero.classList.contains('has-image')) { wrap.style.display = 'none'; return; }
-  var paths = [].slice.call(wrap.querySelectorAll('.hd-p'));
+  var paths = [].slice.call(wrap.querySelectorAll('.hd-p'));      /* 선으로 그리는 면 */
+  var extras = [].slice.call(wrap.querySelectorAll('.hd-x'));     /* 두께·그림자 (색 단계에서만) */
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var busy = false;
 
@@ -119,6 +140,7 @@
     p.style.fill = p.dataset.fill;
     p.style.fillOpacity = '0';
   });
+  extras.forEach(function (p) { p.style.fillOpacity = '0'; });
 
   var svg = wrap.querySelector('svg');
 
@@ -126,6 +148,7 @@
     if (busy) return;
     busy = true;
     svg.style.animation = 'none';
+    svg.classList.remove('is3d');
     var delay = 300;
     /* 1) 색 없이 선만 천천히 그린다 */
     paths.forEach(function (p) {
@@ -142,24 +165,31 @@
       setTimeout(function () { p.style.strokeDashoffset = '0'; }, 30);
       delay += dur * 1000 * 0.85;
     });
-    /* 2) 다 그려지면 로고가 한 바퀴 돌며 색이 입혀진다 */
+    extras.forEach(function (p) { p.style.transition = 'none'; p.style.fillOpacity = '0'; });
+    /* 2) 다 그려지면 로고가 한 바퀴 돌며 색과 두께가 입혀진다 */
     var spinAt = delay + 400;
     setTimeout(function () {
       svg.getBoundingClientRect();
       svg.style.animation = 'hero-logo-spin 2.2s ease-in-out';
-      paths.forEach(function (p) {
-        p.style.transition = 'fill-opacity 1.8s ease 0.3s';
+      paths.concat(extras).forEach(function (p) {
+        p.style.transition = 'fill-opacity 1.8s ease 0.3s, stroke-opacity 1.8s ease 0.3s';
         p.style.fillOpacity = p.dataset.fo;
       });
+      /* 색이 입혀지면 스케치 선은 옅어진다 */
+      paths.forEach(function (p) { p.style.strokeOpacity = '0.25'; });
     }, spinAt);
+    /* 3) 회전이 끝나면 비스듬한 3D 자세로 자리를 잡는다 */
     setTimeout(function () {
       svg.style.animation = 'none';
+      svg.classList.add('is3d');
       busy = false;
-    }, spinAt + 2600);
+    }, spinAt + 2300);
   }
 
   if (reduce) {
-    paths.forEach(function (p) { p.style.fillOpacity = p.dataset.fo; p.style.strokeOpacity = '0.9'; });
+    paths.concat(extras).forEach(function (p) { p.style.fillOpacity = p.dataset.fo; });
+    paths.forEach(function (p) { p.style.strokeOpacity = '0.25'; });
+    svg.classList.add('is3d');
   } else {
     play();
     if (hero) hero.addEventListener('mouseenter', play);
