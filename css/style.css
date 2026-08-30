@@ -2247,3 +2247,6 @@ td[data-duch]:hover { background: #eef2f8; }
   .hero-logo-draw { width: min(43vw, 190px); }
   .hero.done .hero-logo-draw { width: 97px; }
 }
+/* 선 굵기 10% 확대 */
+.hero-line-h { height: 3.3px; }
+.hero-line-v { width: 3.3px; }
