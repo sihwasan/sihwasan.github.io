@@ -2218,3 +2218,6 @@ td[data-duch]:hover { background: #eef2f8; }
 .hero.done .hero-logo-draw { left: max(110px, calc(50% - 455px)); }
 /* 문구는 가로로 넓게 (컨테이너 폭을 그대로 쓴다) */
 .hero-slides { width: 100%; }
+/* 문구를 로고 세로 중앙에 맞추고, 2번 문구는 작게 해 줄 수를 맞춘다 */
+.hs-slide { top: 50%; transform: translateY(-50%); }
+.hs-slide.hs-small { font-size: clamp(1.15rem, 2vw, 1.8rem); line-height: 1.6; }
