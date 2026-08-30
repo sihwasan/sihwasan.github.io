@@ -2308,3 +2308,7 @@ td[data-duch]:hover { background: #eef2f8; }
   .hero-line-h { top: calc(50% - 138px); }
   .hero-line-v { top: calc(50% - 168px); }
 }
+/* 모바일: 로고를 올려 문구 블록의 세로 중앙과 맞춤 */
+@media (max-width: 900px) {
+  .hero.done .hero-logo-draw { top: 37%; }
+}
