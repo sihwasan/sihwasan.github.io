@@ -37,9 +37,111 @@ var SHSBoard = (function () {
      * 개인 칸은 빼고 노회 전체 정보만 보여 준다. */
     var isSuper = user.role === 'superadmin';
 
+    /* ---------- 화면 얼개 ----------
+     * 전체 대시보드(full)는 카드 허브형 — 항목 카드를 누르면 상세가 열린다.
+     * 메인 화면 요약은 예전 그대로 촘촘한 표 형태를 쓴다. */
+    var LOADING = '<p class="dash-none">불러오는 중...</p>';
+
+    /* 선으로 그린 아이콘 (참조 디자인풍) */
+    function hicon(d) {
+      return '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.7" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+    }
+    var HICONS = {
+      noti: hicon('<path d="M24 8a10 10 0 0 0-10 10v7l-4 6h28l-4-6v-7a10 10 0 0 0-10-10z"/><path d="M20 33a4 4 0 0 0 8 0"/><circle cx="33" cy="11" r="4"/>'),
+      notice: hicon('<path d="M8 20v8h6l14 8V12l-14 8H8z"/><path d="M33 18a8 8 0 0 1 0 12"/><path d="M37 14a14 14 0 0 1 0 20"/>'),
+      sched: hicon('<rect x="8" y="12" width="32" height="28" rx="3"/><path d="M8 20h32M16 8v8M32 8v8"/><path d="M15 27h4M22 27h4M29 27h4M15 33h4M22 33h4"/>'),
+      church: hicon('<path d="M10 40V24l14-10 14 10v16"/><path d="M24 6v8M20 10h8"/><path d="M20 40v-8a4 4 0 0 1 8 0v8"/><path d="M6 40h36"/>'),
+      sichal: hicon('<path d="M24 42s-13-11.5-13-21a13 13 0 0 1 26 0c0 9.5-13 21-13 21z"/><circle cx="24" cy="21" r="5"/>'),
+      mydues: hicon('<circle cx="20" cy="20" r="11"/><path d="M15 20h10M15 24h10M17 15l3 6 3-6"/><path d="M31 15a11 11 0 1 1-9 17"/>'),
+      com: hicon('<circle cx="17" cy="17" r="6"/><circle cx="33" cy="19" r="5"/><path d="M6 38a11 11 0 0 1 22 0"/><path d="M28 38a9 9 0 0 1 14-7"/>'),
+      doc: hicon('<path d="M14 6h14l8 8v28H14z"/><path d="M28 6v8h8"/><path d="M19 22h10M19 28h10M19 34h6"/>'),
+      report: hicon('<rect x="12" y="8" width="24" height="34" rx="3"/><path d="M19 6h10v6H19z"/><path d="M18 22h12M18 28h12M18 34h8"/>'),
+      dues: hicon('<path d="M8 40h32"/><rect x="11" y="26" width="6" height="14"/><rect x="21" y="18" width="6" height="22"/><rect x="31" y="10" width="6" height="30"/>')
+    };
+
+    function hubCard(id, title, sub, extra) {
+      return '<button type="button" class="hub-card' + (extra && extra.hidden ? ' hidden' : '') +
+        '" data-hub="' + id + '"' + (extra && extra.cid ? ' id="' + extra.cid + '"' : '') + '>' +
+        (extra && extra.badge ? '<span class="hub-badge hidden" id="' + extra.badge + '"></span>' : '') +
+        HICONS[id] +
+        '<span class="hc-t"><span>' + title +
+        (sub ? '<span class="hc-s">' + sub + '</span>' : '') + '</span>' +
+        '<span class="hc-arrow">&#8594;</span></span></button>';
+    }
+
+    if (full) {
+      var cards = '';
+      cards += hubCard('noti', '나의 알림', '', { badge: 'hub-badge-noti' });
+      cards += hubCard('notice', '노회 공지', '');
+      cards += hubCard('sched', '노회 일정', '');
+      if (!isSuper) {
+        cards += hubCard('church', '나의 교회', '');
+        cards += hubCard('sichal', '나의 시찰', '납부 현황');
+        cards += hubCard('mydues', '나의 상회비', '세례의무금');
+        cards += hubCard('com', '내가 맡은 부서', '');
+      }
+      cards += hubCard('doc', '서류 발급', '');
+      cards += hubCard('report', '교회상황 보고서', '');
+      cards += hubCard('dues', '상회비 전체', '관리 현황', { hidden: true, cid: 'hub-card-dues' });
+
+      box.innerHTML =
+        '<div id="hub-home" class="dash-hub">' +
+        '<div class="hub-left">' +
+        '<div class="hub-label">&#10013; Dashboard</div>' +
+        '<h2 class="hub-title">' + esc(SHS.honorific(user)) + ',<br>시화산노회의 <strong>소식과 현황</strong>을<br>확인해보세요.</h2>' +
+        '<p class="hub-sub">알림 · 일정 · 납부 현황 · 서류를 한자리에 모았습니다.</p>' +
+        '</div>' +
+        '<div class="hub-grid">' + cards + '</div>' +
+        '</div>' +
+        '<div id="hub-detail" class="hidden">' +
+        '<div class="hub-detail-head">' +
+        '<button type="button" class="btn ghost sm" id="hub-back">&#8592; 대시보드</button>' +
+        '<h2 id="hub-detail-title" style="margin:0"></h2></div>' +
+        '<div class="hub-panel hidden" data-hp="noti"><div id="dash-noti"></div></div>' +
+        '<div class="hub-panel hidden" data-hp="notice"><div id="dash-notice">' + LOADING + '</div></div>' +
+        '<div class="hub-panel hidden" data-hp="sched"><div id="dash-sched">' + LOADING + '</div></div>' +
+        (isSuper ? '' :
+          '<div class="hub-panel hidden" data-hp="church"><div id="dash-church">' + LOADING + '</div></div>' +
+          '<div class="hub-panel hidden" data-hp="sichal"><div id="dash-sichal">' + LOADING + '</div></div>' +
+          '<div class="hub-panel hidden" data-hp="mydues"><div id="dash-mydues">' + LOADING + '</div>' +
+          '<h3 class="dash-h" style="margin-top:14px">나의 세례의무금</h3>' +
+          '<div id="dash-mybap">' + LOADING + '</div></div>' +
+          '<div class="hub-panel hidden" data-hp="com"><div id="dash-com"></div></div>') +
+        '<div class="hub-panel hidden" data-hp="doc"><div id="dash-doc">' + LOADING + '</div></div>' +
+        '<div class="hub-panel hidden" data-hp="report"><div id="dash-report">' + LOADING + '</div></div>' +
+        '<div class="hub-panel hidden" data-hp="dues"><section id="dash-dues-sec" class="hidden">' +
+        '<p class="dash-more" style="margin-top:0"><a href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면으로</a></p>' +
+        '<div id="dash-dues-body">' + LOADING + '</div></section></div>' +
+        '</div>';
+
+      var HUB_TITLES = {
+        noti: '나의 알림', notice: '노회 공지', sched: '노회 일정', church: '나의 교회',
+        sichal: '나의 시찰 · 납부 현황', mydues: '나의 상회비 · 세례의무금',
+        com: '내가 맡은 부서', doc: '서류 발급', report: '교회상황 보고서', dues: '상회비 전체'
+      };
+      function openHub(id) {
+        var panel = box.querySelector('.hub-panel[data-hp="' + id + '"]');
+        if (!panel) return;
+        document.getElementById('hub-home').classList.add('hidden');
+        document.getElementById('hub-detail').classList.remove('hidden');
+        box.querySelectorAll('.hub-panel').forEach(function (p) {
+          p.classList.toggle('hidden', p.dataset.hp !== id);
+        });
+        document.getElementById('hub-detail-title').textContent = HUB_TITLES[id] || '';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      box.querySelectorAll('.hub-card').forEach(function (b) {
+        b.addEventListener('click', function () { openHub(b.dataset.hub); });
+      });
+      document.getElementById('hub-back').addEventListener('click', function () {
+        document.getElementById('hub-detail').classList.add('hidden');
+        document.getElementById('hub-home').classList.remove('hidden');
+      });
+    } else {
     box.innerHTML =
       '<div class="section-title"><h2>대시보드</h2>' +
-      (full ? '' : '<a class="more" href="dashboard.html">전체 보기</a>') +
+      '<a class="more" href="dashboard.html">전체 보기</a>' +
       '</div>' +
       '<div id="dash-noti"></div>' +
       '<div class="dash-cols">' +
@@ -72,6 +174,7 @@ var SHSBoard = (function () {
       '<section aria-label="교회상황 보고서"><h3 class="dash-h">교회상황 보고서</h3>' +
       '<div id="dash-report"><p class="dash-none">불러오는 중...</p></div></section>' +
       '</div>';
+    }
 
     /* 상회비: 정회원 모두에게 '나의 교회 납부 현황'을,
      * 관리자와 회계·부회계에게는 노회 전체 요약을 함께 보여 준다.
@@ -83,8 +186,12 @@ var SHSBoard = (function () {
       /* 관리자·회계에게는 나의 시찰 옆에 전체 요약 칸을 연다.
        * 아닌 회원에게는 나의 시찰이 줄 전체를 쓴다. */
       var sicSec = document.getElementById('dash-sichal-sec');
-      if (canDues) document.getElementById('dash-dues-sec').classList.remove('hidden');
-      else if (sicSec) sicSec.classList.add('span2');
+      if (canDues) {
+        var duesSec = document.getElementById('dash-dues-sec');
+        if (duesSec) duesSec.classList.remove('hidden');
+        var duesCard = document.getElementById('hub-card-dues');
+        if (duesCard) duesCard.classList.remove('hidden');
+      } else if (sicSec) sicSec.classList.add('span2');
       var yr = new Date().getFullYear();
       var mo = new Date().getMonth() + 1;
 
@@ -486,6 +593,12 @@ var SHSBoard = (function () {
     function drawNoti(rows) {
       var el = document.getElementById('dash-noti');
       var unread = rows.filter(function (n) { return !n.read_at; });
+      /* 허브 카드의 안 읽은 알림 수 배지 */
+      var badge = document.getElementById('hub-badge-noti');
+      if (badge) {
+        badge.textContent = unread.length;
+        badge.classList.toggle('hidden', !unread.length);
+      }
       var h = '<div class="noti-card' + (unread.length ? ' has' : '') + '">' +
         '<div class="noti-card-head"><span class="n-label">나의 알림</span>' +
         (unread.length
