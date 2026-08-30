@@ -2200,3 +2200,6 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 장식 선을 조금 더 굵게 */
 .hero-line-h { height: 3px; }
 .hero-line-v { width: 3px; }
+/* 회전 문구 크기·영역 보정: 세 문구 모두 같은 크기, 긴 문구도 잘리지 않게 */
+.hero-slides { max-width: none; min-height: clamp(200px, 26vw, 290px); }
+.hs-slide { font-size: clamp(1.5rem, 3.2vw, 2.7rem); }
