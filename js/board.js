@@ -36,6 +36,7 @@ var SHSBoard = (function () {
     /* 최고관리자(노회 사무실 계정)는 소속 교회·시찰·부서가 없으므로
      * 개인 칸은 빼고 노회 전체 정보만 보여 준다. */
     var isSuper = user.role === 'superadmin';
+    var hubSicLink = null;   /* 나의 시찰 화면 주소 (drawMine에서 채운다) */
 
     /* ---------- 화면 얼개 ----------
      * 전체 대시보드(full)는 카드 허브형 — 항목 카드를 누르면 상세가 열린다.
@@ -174,6 +175,8 @@ var SHSBoard = (function () {
         b.addEventListener('click', function () {
           /* 서류 발급은 서류 신청 화면으로 바로 간다 */
           if (b.dataset.hub === 'doc') { location.href = 'request.html'; return; }
+          /* 나의 시찰은 그 시찰 화면으로 바로 간다 */
+          if (b.dataset.hub === 'sichal' && hubSicLink) { location.href = hubSicLink; return; }
           location.hash = 'hub-' + b.dataset.hub;
         });
       });
@@ -411,6 +414,7 @@ var SHSBoard = (function () {
       var row = churches.filter(function (x) { return x.name === myChurch; })[0] || null;
       var sic = String(sicName || (row && row.sichal) || '');
       var link = 'sichal.html?s=' + encodeURIComponent(sic);
+      if (sic) hubSicLink = link + '#church';
 
       /* 나의 교회 (최고관리자 화면에는 이 칸이 없다) */
       var el = document.getElementById('dash-church');
