@@ -2312,3 +2312,14 @@ td[data-duch]:hover { background: #eef2f8; }
 @media (max-width: 900px) {
   .hero.done .hero-logo-draw { top: 37%; }
 }
+/* 모바일: 구성 전체를 위로 — 히어로를 상단 정렬로 바꾸고 좌표를 올린다 */
+@media (max-width: 900px) {
+  .hero { align-items: flex-start; }
+  .hero .container { padding-top: 12px; }
+  .hero .hero-kicker { top: 0; }
+  .hero-slides { margin-top: 46px; }
+  .hero-line-h { top: 66px; }
+  .hero-line-v { top: 36px; }
+  .hero.done .hero-line-v { height: 360px; }
+  .hero.done .hero-logo-draw { top: 185px; }
+}
