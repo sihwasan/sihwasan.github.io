@@ -2203,3 +2203,5 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 회전 문구 크기·영역 보정: 세 문구 모두 같은 크기, 긴 문구도 잘리지 않게 */
 .hero-slides { max-width: none; min-height: clamp(200px, 26vw, 290px); }
 .hs-slide { font-size: clamp(1.5rem, 3.2vw, 2.7rem); }
+/* 회전 문구가 절대배치라 컨테이너가 좁아지지 않도록 폭을 고정 */
+.hero .container { width: 100%; }
