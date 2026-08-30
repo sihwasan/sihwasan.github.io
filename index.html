@@ -11,7 +11,7 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260830c">
+<link rel="stylesheet" href="css/style.css?v=20260830d">
 </head>
 <body>
 
@@ -73,31 +73,13 @@
     <div id="home-committees"></div>
   </section>
 
-  <nav class="quick-links" aria-label="주요 바로가기">
-    <a href="organization.html#members">
-      <div class="q-title">회원명단</div>
-      <div class="q-desc">노회 소속 목사와 총대 장로 명단을 확인합니다.</div>
-    </a>
-    <a href="rules-presbytery.html">
-      <div class="q-title">노회 회칙</div>
-      <div class="q-desc">노회규칙 전문과 각종 내규를 열람합니다.</div>
-    </a>
-    <a href="archive.html#resolutions">
-      <div class="q-title">결의사항</div>
-      <div class="q-desc">지난 회기 임원회와 정기노회의 결의사항입니다.</div>
-    </a>
-    <a href="request.html">
-      <div class="q-title">서류 발급</div>
-      <div class="q-desc">소속·재직·대표자 증명서 등 각종 서류를 신청하고 발급받습니다.</div>
-    </a>
-  </nav>
-
   <section class="home-gallery" aria-label="갤러리">
-    <div class="section-title">
-      <h2>갤러리</h2>
-      <a class="more" href="gallery.html">더보기</a>
+    <div class="gal-head">
+      <div class="gal-kicker">ALBUM &amp; NEWS</div>
+      <h2 class="gal-title">시화산 갤러리</h2>
+      <p class="gal-sub">사진과 짧은 글로 전하는 노회의 일상.</p>
     </div>
-    <div class="grid" id="home-gallery"></div>
+    <div class="gal-carousel" id="home-gallery"></div>
   </section>
 </main>
 
@@ -131,20 +113,54 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="schedule-item"><span class="d">' + e(s.date) + '</span><span class="t">' + e(s.title) + '</span></div>');
     });
   }
+  /* ---------- 갤러리: 큰 사진 넘김(캐러셀) ---------- */
+  var galTimer = null;
+  function galDate(s) {
+    var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? m[1] + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일' : '';
+  }
   function renderGallery(list) {
     var g = document.getElementById('home-gallery');
-    g.innerHTML = '';
-    /* 최근 사진 40장 가운데 4장을 무작위로 골라, 올 때마다 다른 사진이 보이게 한다 */
-    var pool = list.slice(0, 40);
-    for (var i = pool.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    if (!g) return;
+    var pool = list.filter(function (p) { return p.img || p.thumb; }).slice(0, 12);
+    if (!pool.length) { g.innerHTML = ''; return; }
+    if (galTimer) { clearInterval(galTimer); galTimer = null; }
+
+    g.innerHTML = pool.map(function (p, i) {
+      var cap = [galDate(p.taken), p.category].filter(Boolean).join(' · ');
+      return '<a class="gal-slide' + (i === 0 ? ' on' : '') + '" data-gi="' + i + '" ' +
+        'href="gallery.html#albums">' +
+        '<img src="' + e(p.img || p.thumb) + '" alt="' + e(p.title || '') + '" loading="lazy">' +
+        '<span class="gal-cap"><strong>' + e(p.title || '') + '</strong>' +
+        (cap ? '<span>' + e(cap) + '</span>' : '') + '</span></a>';
+    }).join('') +
+      '<button type="button" class="gal-nav prev" aria-label="이전 사진">&#8249;</button>' +
+      '<button type="button" class="gal-nav next" aria-label="다음 사진">&#8250;</button>' +
+      '<div class="gal-dots">' + pool.map(function (p, i) {
+        return '<button type="button" data-gd="' + i + '"' + (i === 0 ? ' class="on"' : '') +
+          ' aria-label="' + (i + 1) + '번째 사진"></button>';
+      }).join('') + '</div>';
+
+    var cur = 0;
+    function show(i) {
+      cur = (i + pool.length) % pool.length;
+      g.querySelectorAll('.gal-slide').forEach(function (s2) {
+        s2.classList.toggle('on', Number(s2.dataset.gi) === cur);
+      });
+      g.querySelectorAll('.gal-dots button').forEach(function (d) {
+        d.classList.toggle('on', Number(d.dataset.gd) === cur);
+      });
     }
-    pool.slice(0, 4).forEach(function (p) {
-      g.insertAdjacentHTML('beforeend',
-        '<a href="gallery.html' + (p.id != null ? '?photo=' + encodeURIComponent(p.id) : '') + '">' +
-        '<img src="' + e(p.thumb) + '" alt="' + e(p.title) + '"></a>');
+    g.querySelector('.gal-nav.prev').addEventListener('click', function () { show(cur - 1); restart(); });
+    g.querySelector('.gal-nav.next').addEventListener('click', function () { show(cur + 1); restart(); });
+    g.querySelectorAll('.gal-dots button').forEach(function (d) {
+      d.addEventListener('click', function () { show(Number(d.dataset.gd)); restart(); });
     });
+    function restart() {
+      if (galTimer) clearInterval(galTimer);
+      galTimer = setInterval(function () { show(cur + 1); }, 5000);
+    }
+    restart();
   }
 
   /* ---------- 나의 알림 ---------- */
@@ -244,7 +260,10 @@ document.addEventListener('DOMContentLoaded', function () {
       c.from('gallery_items').select('*').order('sort').order('id', { ascending: false }).limit(40)
         .then(function (r) {
           if (r.data && r.data.length) {
-            renderGallery(r.data.map(function (g) { return { id: g.id, thumb: g.thumb_url, title: g.title }; }));
+            renderGallery(r.data.map(function (g) {
+              return { id: g.id, img: g.image_url || g.thumb_url, thumb: g.thumb_url,
+                title: g.title, taken: g.taken, category: g.category };
+            }));
           }
         });
       /* 나의 알림 */
