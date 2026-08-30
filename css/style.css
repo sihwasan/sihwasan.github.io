@@ -2032,3 +2032,9 @@ td[data-duch]:hover { background: #eef2f8; }
 .hero-logo-draw svg { width: 100%; height: auto; display: block;
   filter: drop-shadow(0 6px 24px rgba(40, 33, 24, 0.25)); }
 @media (max-width: 900px) { .hero-logo-draw { display: none; } }
+/* 로고가 한 바퀴 돌며 색이 입혀지는 회전 */
+.hero-logo-draw { perspective: 900px; }
+@keyframes hero-logo-spin {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(360deg); }
+}
