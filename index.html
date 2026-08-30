@@ -11,7 +11,7 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260831h">
+<link rel="stylesheet" href="css/style.css?v=20260831i">
 </head>
 <body>
 
@@ -119,17 +119,34 @@
   }
   var paths = [].slice.call(wrap.querySelectorAll('.hd-p'));
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var FILLS = ['#38b1f0', '#8cc81e', '#ffffff', '#ffffff'];
+  var FILL_OP = ['0.88', '0.85', '0.95', '0.95'];
 
-  paths.forEach(function (p) {
+  paths.forEach(function (p, i) {
     p.style.stroke = '#fdfbf7';
     p.style.strokeWidth = '10';
     p.style.strokeLinejoin = 'round';
-    p.style.fill = 'none';
+    p.style.fill = FILLS[i] || '#ffffff';
+    p.style.fillOpacity = '0';
   });
 
-  function finish() { hero.classList.add('done'); }
+  /* 선 모션이 모두 끝난 뒤 로고에 서서히 색이 입혀진다 */
+  function colorize() {
+    paths.forEach(function (p, i) {
+      p.style.transition = 'fill-opacity 3s ease';
+      p.style.fillOpacity = FILL_OP[i] || '0.9';
+    });
+  }
+  function finish() {
+    hero.classList.add('done');
+    setTimeout(colorize, 4200);   /* 가로선(0.7~2.3s)·세로선(2.0~3.4s)이 끝난 뒤 */
+  }
 
-  if (reduce) { finish(); return; }
+  if (reduce) {
+    hero.classList.add('done');
+    paths.forEach(function (p, i) { p.style.fillOpacity = FILL_OP[i] || '0.9'; });
+    return;
+  }
 
   var delay = 300;
   paths.forEach(function (p) {

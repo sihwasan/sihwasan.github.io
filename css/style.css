@@ -2197,3 +2197,6 @@ td[data-duch]:hover { background: #eef2f8; }
   .hs-slide { font-size: 1.55rem; }
   .hero-slides { min-height: 150px; }
 }
+/* 장식 선을 조금 더 굵게 */
+.hero-line-h { height: 3px; }
+.hero-line-v { width: 3px; }
