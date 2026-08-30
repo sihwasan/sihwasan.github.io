@@ -2236,3 +2236,5 @@ td[data-duch]:hover { background: #eef2f8; }
   line-height: 1.6;
 }
 .hero-slides { min-height: clamp(120px, 12vw, 160px); }
+/* 기관명: 가로선 위로 확실히 올리고 더 크게 */
+.hero .hero-kicker { top: -56px; font-size: 1.2rem; letter-spacing: 6px; }
