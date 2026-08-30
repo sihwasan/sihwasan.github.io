@@ -2334,3 +2334,7 @@ td[data-duch]:hover { background: #eef2f8; }
   .hero-line-v { top: 16px; }
   .hero.done .hero-logo-draw { top: 158px; }
 }
+/* 모바일: 로고를 조금 더 위로 */
+@media (max-width: 900px) {
+  .hero.done .hero-logo-draw { top: 138px; }
+}
