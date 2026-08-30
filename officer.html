@@ -1311,7 +1311,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 교회마다 세례교인수·목표액·납입액을 관리하고 시찰별 진행률을 본다.
    * 보기는 임원 누구나, 고치기는 상회비와 같은 권한(관리자·회계·부회계). */
   var bapYear = new Date().getFullYear();
-  var bapRows = [], bapPrev = [], bapSichalMap = {}, bapPay = {}, bapPastorMap = {};
+  var bapRows = [], bapPrev = [], bapSichalMap = {}, bapPay = {}, bapPastorMap = {}, bapDeadlines = {};
 
   function bapBox() { return document.getElementById('bap-area'); }
   function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
@@ -1330,7 +1330,7 @@ document.addEventListener('DOMContentLoaded', function () {
         c.from('bapdues').select('*').eq('year', bapYear).order('sort').order('id'),
         c.from('bapdues').select('*').eq('year', bapYear - 1).order('sort').order('id'),
         c.from('sichal_churches').select('sichal,name'),
-        c.from('site_settings').select('*').eq('key', 'bapdues_pay')
+        c.from('site_settings').select('*').in('key', ['bapdues_pay', 'bapdues_deadline'])
           .then(function (x) { return x; }, function () { return { data: [] }; }),
         /* 담임교역자는 회원 명단(노회 명단)과 연동한다 */
         c.from('roster').select('name,church,category').eq('category', '목사')
@@ -1342,8 +1342,11 @@ document.addEventListener('DOMContentLoaded', function () {
       bapPrev = (rs[1].data) || [];
       bapSichalMap = {};
       ((rs[2] || {}).data || []).forEach(function (x) { bapSichalMap[chkey(x.name)] = x.sichal; });
-      var st = ((rs[3] || {}).data || [])[0];
-      bapPay = (st && st.value) || {};
+      bapPay = {}; bapDeadlines = {};
+      ((rs[3] || {}).data || []).forEach(function (x) {
+        if (x.key === 'bapdues_pay' && x.value) bapPay = x.value;
+        if (x.key === 'bapdues_deadline' && x.value) bapDeadlines = x.value;
+      });
       bapPastorMap = {};
       ((rs[4] || {}).data || []).forEach(function (x) {
         var k = chkey(x.church);
@@ -1373,6 +1376,33 @@ document.addEventListener('DOMContentLoaded', function () {
       '<strong>' + bapYear + '년</strong>' +
       '<button class="btn ghost sm" id="bp-next">&#8250;</button>' +
       '</div></div>';
+
+    /* ----- 시행기한 (총회 공문의 납부 기한) ----- */
+    var dl = bapDeadlines[String(bapYear)] || '';
+    var dlLeft = null;
+    if (dl) {
+      dlLeft = Math.round((new Date(dl + 'T00:00:00') - new Date().setHours(0, 0, 0, 0)) / 86400000);
+    }
+    if (dl) {
+      var dld = new Date(dl + 'T00:00:00');
+      h += '<div class="notice-banner" style="border-left:4px solid ' +
+        (dlLeft < 0 ? '#a33' : (dlLeft <= 14 ? '#d9a33b' : 'var(--navy)')) + '">' +
+        '<strong>시행기한</strong> — ' + bapYear + '년 세례의무금은 <strong>' +
+        dld.getFullYear() + '년 ' + (dld.getMonth() + 1) + '월 ' + dld.getDate() + '일</strong>까지 납부를 완료해야 합니다. ' +
+        (dlLeft > 0 ? '<strong style="color:' + (dlLeft <= 14 ? '#b0731f' : 'var(--navy)') + '">' + dlLeft + '일 남았습니다.</strong>'
+          : (dlLeft === 0 ? '<strong style="color:#a33">오늘이 기한입니다.</strong>'
+                          : '<strong style="color:#a33">기한이 ' + (-dlLeft) + '일 지났습니다.</strong>')) +
+        '</div>';
+    }
+    if (canDues) {
+      h += '<div class="inline-form" style="margin-bottom:12px">' +
+        '<div class="field" style="flex:0 0 190px"><label>' + bapYear + '년 시행기한 (총회 공문)</label>' +
+        '<input type="date" id="bp-deadline" value="' + e(dl) + '"></div>' +
+        '<div class="field" style="flex:0 0 110px"><label>&nbsp;</label>' +
+        '<button class="btn ghost sm" id="bp-dlsave">기한 저장</button></div>' +
+        '<div class="field"><label>&nbsp;</label><div class="form-msg" id="bp-dlmsg"></div></div>' +
+        '</div>';
+    }
 
     if (provisional) {
       h += '<div class="notice-banner">' + bapYear + '년 배정이 아직 없어 <strong>' + (bapYear - 1) +
@@ -1548,6 +1578,24 @@ document.addEventListener('DOMContentLoaded', function () {
     /* ----- 동작 ----- */
     box.querySelector('#bp-prev').addEventListener('click', function () { bapYear--; loadBap(); });
     box.querySelector('#bp-next').addEventListener('click', function () { bapYear++; loadBap(); });
+
+    var dlBtn = box.querySelector('#bp-dlsave');
+    if (dlBtn) dlBtn.addEventListener('click', function () {
+      var msg = document.getElementById('bp-dlmsg');
+      var v = document.getElementById('bp-deadline').value;
+      var next = {};
+      Object.keys(bapDeadlines).forEach(function (k) { next[k] = bapDeadlines[k]; });
+      if (v) next[String(bapYear)] = v;
+      else delete next[String(bapYear)];
+      SHSCloud.init().then(function (c) {
+        return c.from('site_settings').upsert({ key: 'bapdues_deadline', value: next });
+      }).then(function (res) {
+        if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+        SHSCloud.log('update', '세례의무금 시행기한 저장', bapYear + '년 ' + (v || '(삭제)'));
+        bapDeadlines = next;
+        renderBap();
+      });
+    });
 
     var cpBtn = box.querySelector('#bp-copy');
     if (cpBtn) cpBtn.addEventListener('click', function () {

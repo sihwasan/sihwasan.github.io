@@ -140,14 +140,18 @@ var SHSBoard = (function () {
         return Promise.all([
           c.from('bapdues').select('*').in('year', [yr, yr - 1])
             .then(function (x) { return x; }, function () { return { data: [] }; }),
-          c.from('site_settings').select('*').eq('key', 'bapdues_pay')
+          c.from('site_settings').select('*').in('key', ['bapdues_pay', 'bapdues_deadline'])
             .then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
         var el = document.getElementById('dash-mybap');
         if (!el) return;
         var all = (rs[0] && rs[0].data) || [];
-        var pay = (((rs[1] && rs[1].data) || [])[0] || {}).value || {};
+        var pay = {}, deadlines = {};
+        ((rs[1] && rs[1].data) || []).forEach(function (x) {
+          if (x.key === 'bapdues_pay' && x.value) pay = x.value;
+          if (x.key === 'bapdues_deadline' && x.value) deadlines = x.value;
+        });
         function key(s) { return String(s || '').replace(/\s|교회$/g, ''); }
         var myKey = key(user.church || '');
         if (!myKey || !all.length) {
@@ -176,6 +180,19 @@ var SHSBoard = (function () {
           ' · ' + bapYr + '년' + (bapYr !== yr ? ' <span style="color:var(--gray-5)">(지난해 배정 기준)</span>' : '') +
           ' · 세례교인 ' + Number(mine.members || 0) + '명</div>' +
           '<p style="margin:4px 0">배정액 <strong>' + target.toLocaleString('ko-KR') + '원</strong> — ' + state + '</p>' +
+          (function () {
+            /* 시행기한과 남은 기간 (총회 공문) */
+            var dl = deadlines[String(bapYr)];
+            if (!dl) return '';
+            var dld = new Date(dl + 'T00:00:00');
+            var left = Math.round((dld - new Date().setHours(0, 0, 0, 0)) / 86400000);
+            var dlTxt = dld.getFullYear() + '년 ' + (dld.getMonth() + 1) + '월 ' + dld.getDate() + '일';
+            if (done) return '<p style="font-size:0.85rem;margin:4px 0;color:var(--gray-5)">시행기한 ' + dlTxt + '</p>';
+            return '<p style="font-size:0.85rem;margin:4px 0">시행기한 <strong>' + dlTxt + '</strong> — ' +
+              (left > 0 ? '<strong style="color:' + (left <= 14 ? '#b0731f' : 'var(--navy)') + '">' + left + '일 남음</strong>'
+                : (left === 0 ? '<strong style="color:#a33">오늘까지</strong>'
+                              : '<strong style="color:#a33">' + (-left) + '일 지남</strong>')) + '</p>';
+          })() +
           (pay.account
             ? '<p style="font-size:0.85rem;margin:4px 0">납부 계좌: <strong>' +
               SHS.esc((pay.bank || '') + ' ' + pay.account + ' (' + (pay.holder || '') + ')') + '</strong></p>'
