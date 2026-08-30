@@ -70,7 +70,8 @@ var SHSBoard = (function () {
         '<span class="hc-arrow">&#8594;</span></span></button>';
     }
 
-    if (full) {
+    /* 메인 화면과 전체 대시보드 모두 카드 허브형으로 그린다 */
+    {
       var cards = '';
       cards += hubCard('noti', '나의 알림', '', { badge: 'hub-badge-noti' });
       cards += hubCard('notice', '노회 공지', '');
@@ -138,42 +139,6 @@ var SHSBoard = (function () {
         document.getElementById('hub-detail').classList.add('hidden');
         document.getElementById('hub-home').classList.remove('hidden');
       });
-    } else {
-    box.innerHTML =
-      '<div class="section-title"><h2>대시보드</h2>' +
-      '<a class="more" href="dashboard.html">전체 보기</a>' +
-      '</div>' +
-      '<div id="dash-noti"></div>' +
-      '<div class="dash-cols">' +
-      '<section aria-label="노회 공지"><h3 class="dash-h">노회 공지</h3>' +
-      '<div id="dash-notice"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '<section aria-label="노회 일정"><h3 class="dash-h">노회 일정</h3>' +
-      '<div id="dash-sched"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '</div>' +
-      (isSuper ? '' :
-      '<div class="dash-cols">' +
-      '<section aria-label="나의 교회"><h3 class="dash-h">나의 교회</h3>' +
-      '<div id="dash-church"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '<section aria-label="나의 상회비"><h3 class="dash-h">나의 상회비</h3>' +
-      '<div id="dash-mydues"><p class="dash-none">불러오는 중...</p></div>' +
-      '<h3 class="dash-h" style="margin-top:14px">나의 세례의무금</h3>' +
-      '<div id="dash-mybap"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '</div>') +
-      '<div class="dash-cols">' +
-      (isSuper ? '' :
-      '<section aria-label="나의 시찰" id="dash-sichal-sec"><h3 class="dash-h">나의 시찰</h3>' +
-      '<div id="dash-sichal"><p class="dash-none">불러오는 중...</p></div></section>') +
-      '<section aria-label="상회비 전체" id="dash-dues-sec" class="hidden' + (isSuper ? ' span2' : '') + '">' +
-      '<h3 class="dash-h">상회비 전체 <a class="more" href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면</a></h3>' +
-      '<div id="dash-dues-body"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '</div>' +
-      (isSuper ? '' : '<div id="dash-com"></div>') +
-      '<div class="dash-cols">' +
-      '<section aria-label="신청서류 발급 현황"><h3 class="dash-h">신청서류 발급 현황</h3>' +
-      '<div id="dash-doc"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '<section aria-label="교회상황 보고서"><h3 class="dash-h">교회상황 보고서</h3>' +
-      '<div id="dash-report"><p class="dash-none">불러오는 중...</p></div></section>' +
-      '</div>';
     }
 
     /* 상회비: 정회원 모두에게 '나의 교회 납부 현황'을,
