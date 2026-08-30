@@ -2085,3 +2085,8 @@ td[data-duch]:hover { background: #eef2f8; }
 @media (min-width: 901px) {
   .hero.done .container { padding-left: 260px; }
 }
+/* 이동은 천천히, 문구는 이동과 교차하며 서서히 */
+.hero-logo-draw { transition: left 2.6s ease-in-out, width 2.6s ease-in-out; }
+.hero .container {
+  transition: opacity 2.6s ease 0.5s, transform 2.6s ease 0.5s, padding-left 2.6s ease-in-out;
+}
