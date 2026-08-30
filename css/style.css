@@ -2205,3 +2205,16 @@ td[data-duch]:hover { background: #eef2f8; }
 .hs-slide { font-size: clamp(1.5rem, 3.2vw, 2.7rem); }
 /* 회전 문구가 절대배치라 컨테이너가 좁아지지 않도록 폭을 고정 */
 .hero .container { width: 100%; }
+
+/* 히어로 손질: 기관명은 가로선 위에 고정, 선은 더 길게, 로고-선 간격 확대 */
+.hero .hero-kicker {
+  position: relative; top: -34px;
+  opacity: 1; transition: none;   /* 처음부터 고정 표시 */
+}
+.hero-line-h { left: max(60px, calc(50% - 560px)); }
+.hero.done .hero-line-h { width: min(84%, 1150px); }
+.hero-line-v { top: calc(50% - 255px); left: max(335px, calc(50% - 290px)); }
+.hero.done .hero-line-v { height: 565px; }
+.hero.done .hero-logo-draw { left: max(110px, calc(50% - 455px)); }
+/* 문구는 가로로 넓게 (컨테이너 폭을 그대로 쓴다) */
+.hero-slides { width: 100%; }
