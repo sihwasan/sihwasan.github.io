@@ -11,7 +11,7 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260830e">
+<link rel="stylesheet" href="css/style.css?v=20260830f">
 </head>
 <body>
 
@@ -122,7 +122,12 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderGallery(list) {
     var g = document.getElementById('home-gallery');
     if (!g) return;
-    var pool = list.filter(function (p) { return p.img || p.thumb; }).slice(0, 12);
+    /* 전체 사진을 무작위 순서로 섞어 돌린다 */
+    var pool = list.filter(function (p) { return p.img || p.thumb; });
+    for (var si = pool.length - 1; si > 0; si--) {
+      var sj = Math.floor(Math.random() * (si + 1));
+      var st = pool[si]; pool[si] = pool[sj]; pool[sj] = st;
+    }
     if (!pool.length) { g.innerHTML = ''; return; }
     if (galTimer) { clearInterval(galTimer); galTimer = null; }
 
@@ -136,10 +141,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }).join('') +
       '<button type="button" class="gal-nav prev" aria-label="이전 사진">&#8249;</button>' +
       '<button type="button" class="gal-nav next" aria-label="다음 사진">&#8250;</button>' +
-      '<div class="gal-dots">' + pool.map(function (p, i) {
-        return '<button type="button" data-gd="' + i + '"' + (i === 0 ? ' class="on"' : '') +
-          ' aria-label="' + (i + 1) + '번째 사진"></button>';
-      }).join('') + '</div>';
+      (pool.length > 12
+        ? '<div class="gal-dots"><span class="gal-count" id="gal-count">1 / ' + pool.length + '</span></div>'
+        : '<div class="gal-dots">' + pool.map(function (p, i) {
+            return '<button type="button" data-gd="' + i + '"' + (i === 0 ? ' class="on"' : '') +
+              ' aria-label="' + (i + 1) + '번째 사진"></button>';
+          }).join('') + '</div>');
 
     var cur = 0;
     function show(i) {
@@ -150,6 +157,8 @@ document.addEventListener('DOMContentLoaded', function () {
       g.querySelectorAll('.gal-dots button').forEach(function (d) {
         d.classList.toggle('on', Number(d.dataset.gd) === cur);
       });
+      var cnt = g.querySelector('#gal-count');
+      if (cnt) cnt.textContent = (cur + 1) + ' / ' + pool.length;
     }
     g.querySelector('.gal-nav.prev').addEventListener('click', function () { show(cur - 1); restart(); });
     g.querySelector('.gal-nav.next').addEventListener('click', function () { show(cur + 1); restart(); });
