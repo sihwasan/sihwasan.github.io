@@ -1450,7 +1450,10 @@ document.addEventListener('DOMContentLoaded', function () {
           segs += '<circle r="' + R + '" cx="21" cy="21" fill="transparent" ' +
             'stroke="' + GCOLORS[gi % GCOLORS.length] + '" stroke-width="7" ' +
             'stroke-dasharray="' + share.toFixed(2) + ' ' + (CIRC - share).toFixed(2) + '" ' +
-            'stroke-dashoffset="' + (25 - acc).toFixed(2) + '"></circle>';
+            'stroke-dashoffset="' + (25 - acc).toFixed(2) + '" style="cursor:help">' +
+            /* 마우스를 올리면 시찰 이름과 금액이 뜬다 */
+            '<title>' + e(g) + ' — 목표 ' + wonf(groups[g].target) + '원 · 납입 ' +
+            wonf(groups[g].paid) + '원 (비중 ' + (Math.round(share * 10) / 10) + '%)</title></circle>';
           acc += share;
         });
         h += '<div style="flex:0 0 auto;text-align:center">' +
