@@ -2007,3 +2007,18 @@ td[data-duch]:hover { background: #eef2f8; }
 #dash-area { margin: 52px 0 26px; }
 #dash-area .dash-hub { margin-top: 0; }
 .gal-count { font-size: 0.82rem; color: var(--gray-5); letter-spacing: 1px; }
+
+/* 카드 대비 강화: 흰 바탕 + 뚜렷한 테두리·그림자로 시안성을 높인다 */
+.side-box, .admin-card, .dash-box, .doc-item, .noti-card, .db-card {
+  background: #ffffff;
+  border: 1px solid #d3c7b4;
+  box-shadow: 0 3px 14px rgba(93, 80, 65, 0.10);
+}
+.side-box:hover, .doc-item:hover, .db-card:hover {
+  box-shadow: 0 6px 20px rgba(93, 80, 65, 0.16);
+}
+.doc-item .d-name { color: var(--ink); font-size: 1.05rem; }
+.doc-item .d-desc { color: var(--gray-7); }
+.notice-banner { background: #f1e9db; border: 1px solid #ddd1bd; }
+.tbl th { border-bottom-color: #c9bda8; color: var(--gray-7); }
+.tbl td { border-bottom: 1px solid #e3dac9; }
