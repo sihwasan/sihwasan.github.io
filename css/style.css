@@ -2300,3 +2300,11 @@ td[data-duch]:hover { background: #eef2f8; }
   .hs-slide { line-height: 1.45; }
   .hero-slides { min-height: 150px; }
 }
+/* 모바일 세로 정렬: 기관명·문구는 내리고 로고는 올려 문구와 중앙을 맞춘다 */
+@media (max-width: 900px) {
+  .hero .hero-kicker { top: -26px; }
+  .hero-slides { margin-top: 28px; }
+  .hero.done .hero-logo-draw { top: 51%; }
+  .hero-line-h { top: calc(50% - 138px); }
+  .hero-line-v { top: calc(50% - 168px); }
+}
