@@ -338,8 +338,10 @@ document.addEventListener('DOMContentLoaded', function () {
           (ch.pastor ? '담임 ' + e(ch.pastor) + '<br>' : '') +
           (ch.address ? e(ch.address) + '<br>' : '') +
           (ch.phone ? '전화 ' + e(ch.phone) + '<br>' : '') +
-          (link ? '<span class="ch-has">홈페이지 있음</span>' :
-            '<span style="color:var(--gray-5);font-size:0.8rem">홈페이지가 등록되지 않았습니다.</span>') +
+          (link
+            ? '<a class="btn ghost sm" href="' + e(link) + '" target="_blank" rel="noopener" ' +
+              'data-chlink style="margin-top:2px">홈페이지로 이동 &#8599;</a>'
+            : '<span style="color:var(--gray-5);font-size:0.8rem">홈페이지가 등록되지 않았습니다.</span>') +
           '</div>' +
           '<div class="ch-more">' + (canEditCh(ch) ? '누르면 고칠 수 있습니다' : '눌러서 자세히 보기') + '</div>' +
           '</div>';
@@ -350,6 +352,11 @@ document.addEventListener('DOMContentLoaded', function () {
     box.innerHTML = h;
     SHSNames.attachAll(box);
     if (isOfficer) bindChurchForm();
+
+    /* 홈페이지 이동 링크는 카드 열기와 겹치지 않게 한다 */
+    box.querySelectorAll('a[data-chlink]').forEach(function (a) {
+      a.addEventListener('click', function (ev) { ev.stopPropagation(); });
+    });
 
     box.querySelectorAll('[data-chopen]').forEach(function (el) {
       function go() { showChurch(+el.dataset.chopen); }
