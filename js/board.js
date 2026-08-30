@@ -324,10 +324,121 @@ var SHSBoard = (function () {
         '<div><dt>서기</dt><dd>' + esc((s2 && s2.clerk) || '-') + '</dd></div>' +
         '<div><dt>회계</dt><dd>' + esc((s2 && s2.treasurer) || '-') + '</dd></div>' +
         '<div><dt>관내 교회</dt><dd>' + cnt + '곳</dd></div>' +
-        '</dl></div>' +
+        '</dl>' +
+        '<div id="dash-sicfin"><p class="dash-none">시찰별 납부 현황을 불러오는 중...</p></div>' +
+        '</div>' +
         '<div class="dash-more"><a href="' + link + '#church">시찰 화면으로</a>' +
         ' · <a href="' + link + '#doc">자료실</a>' +
         ' · <a href="' + link + '#minutes">회의록</a></div>';
+      loadSicFin(sic);
+    }
+
+    /* ---------- 시찰별 납부 현황 (상회비 · 세례의무금) ----------
+     * 서버 함수(49 sichal_finance)가 시찰별로 모아 준다.
+     * 시찰 이름을 누르면 그 시찰의 교회별 상세가 열린다. */
+    function loadSicFin(mySic) {
+      var box = document.getElementById('dash-sicfin');
+      if (!box) return;
+      var yr = new Date().getFullYear();
+      var mo = new Date().getMonth() + 1;
+      var ORDER = ['북부시찰', '상록시찰', '남부시찰', '기타'];
+
+      function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
+      function bar(pct, color) {
+        return '<div style="background:var(--gray-2,#e8eaef);border-radius:3px;height:7px;overflow:hidden">' +
+          '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + '"></div></div>';
+      }
+
+      SHSCloud.init().then(function (c) {
+        return c.rpc('sichal_finance', { p_year: yr });
+      }).then(function (r) {
+        var rows = (r && r.data) || [];
+        if (r && r.error) throw r.error;
+        if (!rows.length) { box.innerHTML = ''; return; }
+        function ord(s) { var i = ORDER.indexOf(s); return i < 0 ? 99 : i; }
+        rows.sort(function (a, b) {
+          return ord(a.out_sichal) - ord(b.out_sichal) ||
+            String(a.out_sichal).localeCompare(b.out_sichal, 'ko');
+        });
+
+        var h = '<div style="border-top:1px solid var(--gray-2,#e8eaef);margin-top:12px;padding-top:10px">' +
+          '<div style="font-size:0.85rem;font-weight:700;color:var(--navy);margin-bottom:8px">' +
+          yr + '년 시찰별 납부 현황 <span style="font-weight:400;color:var(--gray-5);font-size:0.76rem">' +
+          '시찰 이름을 누르면 교회별 상세가 열립니다</span></div>';
+        rows.forEach(function (x) {
+          /* 상회비: 이번 달까지 부과된 금액 대비 납부율 */
+          var duesDue = Number(x.out_dues_plan || 0) / 12 * mo;
+          var duesPct = duesDue ? Math.round(Number(x.out_dues_paid || 0) / duesDue * 100) : 0;
+          var bapPct = Number(x.out_bap_target || 0)
+            ? Math.round(Number(x.out_bap_paid || 0) / Number(x.out_bap_target) * 100) : 0;
+          var isMine = x.out_sichal === mySic;
+          h += '<div style="margin-bottom:9px' + (isMine ? ';background:var(--gray-1,#f4f6fa);border-radius:6px;padding:6px 8px' : '') + '">' +
+            '<a href="#" data-sicfin="' + esc(x.out_sichal) + '" ' +
+            'style="font-size:0.85rem;font-weight:700;color:var(--navy);text-decoration:underline">' +
+            esc(x.out_sichal) + '</a>' +
+            (isMine ? ' <span style="font-size:0.72rem;color:var(--gold,#b9974e)">나의 시찰</span>' : '') +
+            '<div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">' +
+            '<div style="flex:1 1 130px;min-width:120px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
+            '<span>상회비</span><span>' + duesPct + '% <span style="color:var(--gray-5)">(' +
+            wonf(x.out_dues_paid) + '만원)</span></span></div>' + bar(duesPct, '#1f3a63') + '</div>' +
+            '<div style="flex:1 1 130px;min-width:120px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
+            '<span>세례의무금</span><span>' + bapPct + '% <span style="color:var(--gray-5)">(' +
+            x.out_bap_join + '/' + x.out_bap_churches + '곳)</span></span></div>' + bar(bapPct, '#b9974e') + '</div>' +
+            '</div>' +
+            '<div class="hidden" data-sicdetail="' + esc(x.out_sichal) + '" style="margin-top:6px"></div>' +
+            '</div>';
+        });
+        h += '<p style="font-size:0.7rem;color:var(--gray-5);margin:2px 0 0">상회비는 이번 달까지 부과된 금액 대비, ' +
+          '세례의무금은 올해 목표금액 대비 납부율입니다.</p></div>';
+        box.innerHTML = h;
+
+        box.querySelectorAll('a[data-sicfin]').forEach(function (a) {
+          a.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            var name = a.dataset.sicfin;
+            var det = box.querySelector('[data-sicdetail="' + name + '"]');
+            if (!det) return;
+            if (!det.classList.contains('hidden')) { det.classList.add('hidden'); return; }
+            det.classList.remove('hidden');
+            if (det.dataset.loaded) return;
+            det.innerHTML = '<p class="dash-none">불러오는 중...</p>';
+            SHSCloud.init().then(function (c) {
+              return c.rpc('sichal_finance_detail', { p_year: yr, p_sichal: name });
+            }).then(function (r2) {
+              det.dataset.loaded = '1';
+              var list = (r2 && r2.data) || [];
+              if (!list.length) { det.innerHTML = '<p class="dash-none">자료가 없습니다.</p>'; return; }
+              var t = '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.78rem">' +
+                '<thead><tr><th class="left">교회</th><th>상회비<br>(납부/이번 달)</th>' +
+                '<th>세례의무금<br>(납입/목표)</th><th>상태</th></tr></thead><tbody>';
+              list.forEach(function (d) {
+                var bapDone = Number(d.out_bap_target) > 0 && Number(d.out_bap_paid) >= Number(d.out_bap_target);
+                var bapPart = Number(d.out_bap_paid) > 0 && !bapDone;
+                var late = Math.max(0, mo - Number(d.out_months || 0));
+                t += '<tr><td class="left">' + esc(d.out_church) + '</td>' +
+                  '<td>' + d.out_months + '/' + mo + '개월' +
+                  (Number(d.out_monthly) ? ' · ' + wonf(d.out_dues_paid) + '만원' : '') + '</td>' +
+                  '<td>' + wonf(d.out_bap_paid) + ' / ' + wonf(d.out_bap_target) + '원</td>' +
+                  '<td>' +
+                  (late > 0 ? '<span style="color:#b0731f">상회비 ' + late + '개월 미납</span>'
+                            : '<span style="color:#2a7a2a">상회비 완납</span>') + '<br>' +
+                  (bapDone ? '<span style="color:#2a7a2a">세례의무금 완납</span>'
+                    : (bapPart ? '<span style="color:#b0731f">세례의무금 일부</span>'
+                               : '<span style="color:var(--gray-5)">세례의무금 미납</span>')) +
+                  '</td></tr>';
+              });
+              t += '</tbody></table></div>';
+              det.innerHTML = t;
+            }).catch(function () {
+              det.innerHTML = '<p class="dash-none">상세를 불러오지 못했습니다.</p>';
+            });
+          });
+        });
+      }).catch(function () {
+        box.innerHTML = '';
+      });
     }
 
     /* ---------- 나의 알림 ---------- */
