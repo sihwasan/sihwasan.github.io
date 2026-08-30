@@ -105,9 +105,12 @@ var SHSBoard = (function () {
         (isSuper ? '' :
           '<div class="hub-panel hidden" data-hp="church"><div id="dash-church">' + LOADING + '</div></div>' +
           '<div class="hub-panel hidden" data-hp="sichal"><div id="dash-sichal">' + LOADING + '</div></div>' +
-          '<div class="hub-panel hidden" data-hp="mydues"><div id="dash-mydues">' + LOADING + '</div>' +
-          '<h3 class="dash-h" style="margin-top:14px">나의 세례의무금</h3>' +
-          '<div id="dash-mybap">' + LOADING + '</div></div>' +
+          '<div class="hub-panel hidden" data-hp="mydues">' +
+          '<div class="tabs" id="md-tabs" style="margin-bottom:14px">' +
+          '<button type="button" class="active" data-mdt="dues">나의 상회비</button>' +
+          '<button type="button" data-mdt="bap">나의 세례의무금</button></div>' +
+          '<div id="dash-mydues">' + LOADING + '</div>' +
+          '<div id="dash-mybap" class="hidden">' + LOADING + '</div></div>' +
           '<div class="hub-panel hidden" data-hp="com"><div id="dash-com"></div></div>') +
         '<div class="hub-panel hidden" data-hp="doc"><div id="dash-doc">' + LOADING + '</div></div>' +
         '<div class="hub-panel hidden" data-hp="report"><div id="dash-report">' + LOADING + '</div></div>' +
@@ -146,6 +149,17 @@ var SHSBoard = (function () {
         var m = (location.hash || '').match(/^#hub-([a-z]+)$/);
         showHub(m ? m[1] : null);
       }
+      /* 상회비 · 세례의무금 탭 전환 */
+      var mdTabs = document.getElementById('md-tabs');
+      if (mdTabs) mdTabs.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          mdTabs.querySelectorAll('button').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          document.getElementById('dash-mydues').classList.toggle('hidden', b.dataset.mdt !== 'dues');
+          document.getElementById('dash-mybap').classList.toggle('hidden', b.dataset.mdt !== 'bap');
+        });
+      });
+
       box.querySelectorAll('.hub-card').forEach(function (b) {
         b.addEventListener('click', function () {
           /* 서류 발급은 서류 신청 화면으로 바로 간다 */
