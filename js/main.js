@@ -313,7 +313,7 @@
     });
     var meta = document.createElement('meta');
     meta.name = 'theme-color';
-    meta.content = '#17335f';
+    meta.content = '#5d5041';
     document.head.appendChild(meta);
 
     if ('serviceWorker' in navigator && location.protocol === 'https:') {

@@ -483,7 +483,7 @@ var SHSBoard = (function () {
           '<div style="flex:1 1 130px;min-width:120px">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
           '<span>상회비</span><span><strong>' + tDuesPct + '%</strong> <span style="color:var(--gray-5)">(' +
-          wonf(tDuesPaid) + '만원)</span></span></div>' + bar(tDuesPct, '#1f3a63') + '</div>' +
+          wonf(tDuesPaid) + '만원)</span></span></div>' + bar(tDuesPct, '#5d5041') + '</div>' +
           '<div style="flex:1 1 130px;min-width:120px">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
           '<span>세례의무금</span><span><strong>' + tBapPct + '%</strong> <span style="color:var(--gray-5)">(' +
@@ -506,7 +506,7 @@ var SHSBoard = (function () {
             '<div style="flex:1 1 130px;min-width:120px">' +
             '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
             '<span>상회비</span><span>' + duesPct + '% <span style="color:var(--gray-5)">(' +
-            wonf(x.out_dues_paid) + '만원)</span></span></div>' + bar(duesPct, '#1f3a63') + '</div>' +
+            wonf(x.out_dues_paid) + '만원)</span></span></div>' + bar(duesPct, '#5d5041') + '</div>' +
             '<div style="flex:1 1 130px;min-width:120px">' +
             '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
             '<span>세례의무금</span><span>' + bapPct + '% <span style="color:var(--gray-5)">(' +

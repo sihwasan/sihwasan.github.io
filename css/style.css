@@ -1965,3 +1965,8 @@ td[data-duch]:hover { background: #eef2f8; }
 /* ----- 발자국 ----- */
 .site-footer { background: #3a332a; color: #b3a996; }
 .site-footer .f-name { color: #ece5d7; }
+
+/* 히어로 정리: 그라데이션·인터랙티브 별자리 제거, 단색 그레이지 */
+.hero { background: #8a7c69; }
+.hero::before, .hero::after { display: none; }
+.hero-canvas, .hero-cities-note { display: none; }
