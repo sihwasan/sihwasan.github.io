@@ -2058,3 +2058,25 @@ td[data-duch]:hover { background: #eef2f8; }
   55%  { transform: skewX(-18deg) translateX(1900px); }
   100% { transform: skewX(-18deg) translateX(1900px); }
 }
+
+/* ---------- 히어로 인트로 시퀀스 ----------
+ * 로고가 가운데에서 크게 그려진 뒤 왼쪽으로 작아지며 옮겨 가고,
+ * 문구가 왼쪽에서부터 서서히 나타난다. */
+.hero-logo-draw {
+  right: auto; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, 52vw);
+  transition: left 1.4s ease, width 1.4s ease;
+}
+.hero.done .hero-logo-draw { left: 14%; width: 170px; }
+.hero .container {
+  opacity: 0; transform: translateX(-70px);
+  transition: opacity 1.5s ease 0.5s, transform 1.5s ease 0.5s;
+}
+.hero.done .container { opacity: 1; transform: none; }
+@media (min-width: 901px) {
+  .hero.done .container { padding-left: 300px; }
+}
+@media (max-width: 900px) {
+  .hero .container { opacity: 1; transform: none; }
+}

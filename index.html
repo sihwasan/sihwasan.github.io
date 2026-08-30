@@ -11,61 +11,19 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260830k">
+<link rel="stylesheet" href="css/style.css?v=20260830l">
 </head>
 <body>
 
 <section class="hero">
-  <!-- 로고를 스케치하듯 선으로 그려 나가는 연출 (마우스를 얹으면 다시 그린다) -->
+  <!-- 로고를 스케치하듯 선으로만 그려 나가는 연출.
+       가운데에서 크게 그려진 뒤, 왼쪽으로 작아지며 옮겨 가고 문구가 나타난다. -->
   <div class="hero-logo-draw" id="hero-logo-draw" aria-hidden="true">
-    <svg viewBox="0 0 1064 1576" fill="none">
-      <defs>
-        <!-- 부드러운 음영 그라데이션 -->
-        <linearGradient id="hd-gl" x1="0" y1="0" x2="1" y2="0.35">
-          <stop offset="0" stop-color="#8ed4f8"/><stop offset="0.55" stop-color="#38b1f0"/>
-          <stop offset="1" stop-color="#0e6aa8"/>
-        </linearGradient>
-        <linearGradient id="hd-gr" x1="1" y1="0" x2="0" y2="0.35">
-          <stop offset="0" stop-color="#b9e264"/><stop offset="0.55" stop-color="#8cc81e"/>
-          <stop offset="1" stop-color="#527d0c"/>
-        </linearGradient>
-        <!-- 십자가: 은은한 은빛 -->
-        <linearGradient id="hd-gc" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c3cad0"/>
-        </linearGradient>
-        <!-- 흐르는 광택 -->
-        <linearGradient id="hd-gs" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
-          <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.55"/>
-          <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.85"/>
-          <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.55"/>
-          <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-        </linearGradient>
-        <clipPath id="hd-clip">
-          <path d="M133 248 Q105 242 105 272 L105 1162 Q105 1192 133 1186 L530 1104 L530 322 Z"/>
-          <path d="M891 288 Q919 282 919 312 L919 1296 Q919 1326 891 1320 L530 1230 L530 382 Z"/>
-          <path d="M458 388 h88 v716 h-88 Z"/>
-          <path d="M275 597 h474 v86 h-474 Z"/>
-        </clipPath>
-      </defs>
-      <!-- 바닥 그림자 -->
-      <ellipse class="hd-x" cx="512" cy="1512" rx="380" ry="42" fill="#3a3126" data-fo="0.28"/>
-      <!-- 문 두께(측면) — 색이 입혀질 때 함께 나타나 입체감을 준다 -->
-      <path class="hd-x" fill="#0e5f92" data-fo="0.85"
-        d="M105 272 Q105 242 133 248 L530 322 L530 352 L133 278 Q125 276 125 292 L125 1160 L105 1162 Z"/>
-      <path class="hd-x" fill="#4a7410" data-fo="0.85"
-        d="M919 312 Q919 282 891 288 L530 382 L530 412 L891 318 Q899 316 899 332 L899 1294 L919 1296 Z"/>
-      <path class="hd-p" data-fill="url(#hd-gl)" data-fo="0.92"
-        d="M133 248 Q105 242 105 272 L105 1162 Q105 1192 133 1186 L530 1104 L530 322 Z"/>
-      <path class="hd-p" data-fill="url(#hd-gr)" data-fo="0.9"
-        d="M891 288 Q919 282 919 312 L919 1296 Q919 1326 891 1320 L530 1230 L530 382 Z"/>
-      <path class="hd-p" data-fill="url(#hd-gc)" data-fo="0.96" d="M458 388 h88 v716 h-88 Z"/>
-      <path class="hd-p" data-fill="url(#hd-gc)" data-fo="0.96" d="M275 597 h474 v86 h-474 Z"/>
-      <!-- 금속 위를 흐르는 광택 -->
-      <g clip-path="url(#hd-clip)">
-        <rect class="hd-sheen" x="-500" y="120" width="360" height="1300"
-          fill="url(#hd-gs)" transform="skewX(-18)"/>
-      </g>
+    <svg viewBox="0 0 1024 1536" fill="none">
+      <path class="hd-p" d="M133 248 Q105 242 105 272 L105 1162 Q105 1192 133 1186 L530 1104 L530 322 Z"/>
+      <path class="hd-p" d="M891 288 Q919 282 919 312 L919 1296 Q919 1326 891 1320 L530 1230 L530 382 Z"/>
+      <path class="hd-p" d="M458 388 h88 v716 h-88 Z"/>
+      <path class="hd-p" d="M275 597 h474 v86 h-474 Z"/>
     </svg>
   </div>
   <div class="container">
@@ -142,80 +100,45 @@
 <script src="js/dashboard.js"></script>
 <script src="js/board.js?v=20260830p"></script>
 <script>
-/* 히어로 로고 스케치 애니메이션 — 선을 하나씩 그은 뒤 은은하게 색을 채운다.
- * 히어로에 마우스를 얹으면 처음부터 다시 그린다. */
+/* 히어로 인트로 — 가운데에서 로고를 선으로만 그리고,
+ * 완성되면 로고가 왼쪽으로 작아지며 옮겨 가고 문구가 서서히 나타난다. */
 (function () {
   var wrap = document.getElementById('hero-logo-draw');
-  if (!wrap) return;
   var hero = document.querySelector('.hero');
-  if (hero && hero.classList.contains('has-image')) { wrap.style.display = 'none'; return; }
-  var paths = [].slice.call(wrap.querySelectorAll('.hd-p'));      /* 선으로 그리는 면 */
-  var extras = [].slice.call(wrap.querySelectorAll('.hd-x'));     /* 두께·그림자 (색 단계에서만) */
+  if (!wrap || !hero) return;
+  if (hero.classList.contains('has-image')) {
+    wrap.style.display = 'none';
+    hero.classList.add('done');
+    return;
+  }
+  var paths = [].slice.call(wrap.querySelectorAll('.hd-p'));
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var busy = false;
+  var small = window.matchMedia && matchMedia('(max-width: 900px)').matches;
 
   paths.forEach(function (p) {
     p.style.stroke = '#fdfbf7';
     p.style.strokeWidth = '10';
     p.style.strokeLinejoin = 'round';
-    p.style.fill = p.dataset.fill;
-    p.style.fillOpacity = '0';
+    p.style.fill = 'none';
   });
-  extras.forEach(function (p) { p.style.fillOpacity = '0'; });
 
-  var svg = wrap.querySelector('svg');
+  function finish() { hero.classList.add('done'); }
 
-  function play() {
-    if (busy) return;
-    busy = true;
-    svg.style.animation = 'none';
-    svg.classList.remove('is3d');
-    var delay = 300;
-    /* 1) 색 없이 선만 천천히 그린다 */
-    paths.forEach(function (p) {
-      var L = p.getTotalLength();
-      p.style.transition = 'none';
-      p.style.strokeDasharray = L + ' ' + L;
-      p.style.strokeDashoffset = L;
-      p.style.fillOpacity = '0';
-      p.style.strokeOpacity = '0.9';
-      /* 강제로 한 번 그려 두고 전환을 건다 */
-      p.getBoundingClientRect();
-      var dur = Math.min(3.4, Math.max(1.6, L / 1200));
-      p.style.transition = 'stroke-dashoffset ' + dur + 's ease-in-out ' + (delay / 1000) + 's';
-      setTimeout(function () { p.style.strokeDashoffset = '0'; }, 30);
-      delay += dur * 1000 * 0.85;
-    });
-    extras.forEach(function (p) { p.style.transition = 'none'; p.style.fillOpacity = '0'; });
-    /* 2) 다 그려지면 로고가 한 바퀴 돌며 색과 두께가 입혀진다 */
-    var spinAt = delay + 400;
-    setTimeout(function () {
-      svg.getBoundingClientRect();
-      svg.style.animation = 'hero-logo-spin 2.2s ease-in-out';
-      paths.concat(extras).forEach(function (p) {
-        p.style.transition = 'fill-opacity 1.8s ease 0.3s, stroke-opacity 1.8s ease 0.3s';
-        p.style.fillOpacity = p.dataset.fo;
-      });
-      /* 색이 입혀지면 스케치 선은 옅어진다 */
-      paths.forEach(function (p) { p.style.strokeOpacity = '0.25'; });
-    }, spinAt);
-    /* 3) 회전이 끝나면 비스듬한 3D 자세로 자리를 잡는다 */
-    setTimeout(function () {
-      svg.style.animation = 'none';
-      svg.classList.add('is3d');
-      busy = false;
-    }, spinAt + 2300);
-  }
+  if (reduce || small) { finish(); return; }
 
-  if (reduce) {
-    paths.concat(extras).forEach(function (p) { p.style.fillOpacity = p.dataset.fo; });
-    paths.forEach(function (p) { p.style.strokeOpacity = '0.25'; });
-    svg.classList.add('is3d');
-  } else {
-    play();
-    if (hero) hero.addEventListener('mouseenter', play);
-    wrap.addEventListener('click', play);
-  }
+  var delay = 300;
+  paths.forEach(function (p) {
+    var L = p.getTotalLength();
+    p.style.strokeDasharray = L + ' ' + L;
+    p.style.strokeDashoffset = L;
+    p.getBoundingClientRect();
+    var dur = Math.min(3.0, Math.max(1.4, L / 1400));
+    p.style.transition = 'stroke-dashoffset ' + dur + 's ease-in-out ' + (delay / 1000) + 's';
+    setTimeout(function () { p.style.strokeDashoffset = '0'; }, 30);
+    delay += dur * 1000 * 0.85;
+  });
+  /* 다 그려지면 잠시 보여 준 뒤 왼쪽으로 옮겨 가며 문구가 나타난다 */
+  setTimeout(finish, delay + 700);
 })();
 </script>
 <script>
