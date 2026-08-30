@@ -2230,3 +2230,9 @@ td[data-duch]:hover { background: #eef2f8; }
 .hero .hero-kicker { font-size: 1.05rem; letter-spacing: 5px; }
 /* 가로선을 기관명 아래로 내림 */
 .hero-line-h { top: calc(50% - 158px); }
+/* 세 문구 모두 2번 문구 크기로 통일 */
+.hs-slide, .hs-slide.hs-small {
+  font-size: clamp(1.15rem, 2vw, 1.8rem);
+  line-height: 1.6;
+}
+.hero-slides { min-height: clamp(120px, 12vw, 160px); }
