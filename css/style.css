@@ -2280,3 +2280,17 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 세로선을 기관명 글자 높이까지 위로 연장 */
 .hero-line-v { top: calc(50% - 201px); }
 .hero.done .hero-line-v { height: 521px; }
+
+/* ----- 모바일 히어로: PC와 같은 구성(기관명·선·왼쪽 로고·오른쪽 문구) ----- */
+@media (max-width: 900px) {
+  .hero-line-h, .hero-line-v { display: block; }
+  .hero-line-h { top: calc(50% - 148px); left: 16px; }
+  .hero.done .hero-line-h { width: 90%; }
+  .hero-line-v { top: calc(50% - 172px); left: 106px; }
+  .hero.done .hero-line-v { height: 400px; }
+  .hero .hero-kicker { top: -58px; font-size: 0.82rem; letter-spacing: 3px; }
+  .hero.done .hero-logo-draw { left: 58px; top: 50%; width: 87px; }
+  .hero.done .container { padding-top: 54px; padding-left: 122px; }
+  .hs-slide { font-size: 1.02rem; line-height: 1.55; }
+  .hero-slides { min-height: 130px; }
+}
