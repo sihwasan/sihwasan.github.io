@@ -2168,3 +2168,16 @@ td[data-duch]:hover { background: #eef2f8; }
   transition: height 1.4s ease 2.0s;
 }
 .hero.done .hero-line-v { height: 460px; }
+/* 문구는 제자리에서(이동 없이) 같은 크기로 나타나고,
+ * 2·3번 문구는 세 배 느리게 스며든다 */
+.hero .hero-kicker, .hero h1, .hero .container > p,
+.hero .hero-verse, .hero .hero-cities { transform: none; }
+.hero.done .hero-kicker, .hero.done h1 { transition: opacity 1.6s ease; }
+.hero.done .container > p, .hero.done .hero-verse, .hero.done .hero-cities {
+  transition: opacity 4.8s ease;
+}
+.hero.done .hero-kicker    { transition-delay: 0.9s; }
+.hero.done h1              { transition-delay: 1.5s; }
+.hero.done .container > p  { transition-delay: 3.4s; }
+.hero.done .hero-verse     { transition-delay: 7.0s; }
+.hero.done .hero-cities    { transition-delay: 10.4s; }
