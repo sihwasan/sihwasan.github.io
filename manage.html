@@ -28,7 +28,7 @@
 <script src="js/main.js?v=20260830b"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/audit-view.js"></script>
-<script src="js/ops-panel.js?v=20260830b"></script>
+<script src="js/ops-panel.js?v=20260830c"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -66,40 +66,24 @@ document.addEventListener('DOMContentLoaded', function () {
     '모든 수정 내역은 감사 기록에 남습니다.</div>' +
     '<div class="tabs">' +
     '<button class="active" data-tab="mg-notice">공지사항</button>' +
-    '<button data-tab="mg-sched">노회 일정</button>' +
+    '<button data-tab="mg-sched">운영일정 관리</button>' +
     '<button data-tab="mg-hero">메인 화면</button>' +
     '<button data-tab="mg-gallery">갤러리</button>' +
     '<button data-tab="mg-ops">노회 운영</button>' +
-    '<button data-tab="mg-links">그 외 관리</button>' +
     '</div>' +
     '<div class="tab-panel active" id="mg-notice"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
-    '<div class="tab-panel" id="mg-sched"></div>' +
+    /* 운영일정 관리: 메인 화면 노회 일정 + 정기노회 일정·기준일을 한 곳에서 다룬다 */
+    '<div class="tab-panel" id="mg-sched">' +
+    '<div id="mg-schedlist"></div>' +
+    '<div id="mg-schedops"><p style="color:var(--gray-5)">불러오는 중...</p></div></div>' +
     '<div class="tab-panel" id="mg-hero"></div>' +
     '<div class="tab-panel" id="mg-gallery"></div>' +
+    /* 노회 운영: 시스템 운영(알림 설정·매뉴얼·권한 위임·감사)을 위에,
+     * 회기·임원 명부·증경단을 아래에 둔다 */
     '<div class="tab-panel" id="mg-ops">' +
-    '<div class="ops-cols"><div id="mg-terms"></div>' +
-    '<div id="mg-officers"></div></div>' +
-    '<div id="mg-opsbody"><p style="color:var(--gray-5)">불러오는 중...</p></div></div>' +
-    /* 예전에는 여기에 다른 관리 화면으로 가는 바로가기 카드가 있었으나,
-     * 같은 곳을 상단 '관리자' 메뉴가 이미 가리키고 있어 길이 두 갈래가
-     * 되어 있었다. 이제 어디서 하는 일인지만 적어 둔다. */
-    '<div class="tab-panel" id="mg-links">' +
-    '<h2>그 외 관리</h2>' +
-    '<p>이 화면에서 다루지 않는 일은 상단 <strong>관리자</strong> 메뉴에서 처리합니다.</p>' +
-    '<div class="doc-list">' +
-    '<div class="doc-item"><div class="d-name">회원명단·시찰·상비부</div>' +
-    '<div class="d-desc">조직 페이지에 나오는 목사·장로 명단, 시찰 구성, 상비부 배정입니다.<br>' +
-    '관리자 → <strong>회원 관리</strong></div></div>' +
-    '<div class="doc-item"><div class="d-name">회칙 개정 반영</div>' +
-    '<div class="d-desc">노회규칙과 각 위원회 내규의 조문을 화면에서 직접 고칩니다.<br>' +
-    '관리자 → <strong>자료·회칙 관리</strong>의 회칙 개정 반영 탭</div></div>' +
-    '<div class="doc-item"><div class="d-name">감사 기록</div>' +
-    '<div class="d-desc">모든 수정 내역을 확인합니다.<br>' +
-    '관리자 → <strong>시스템 운영</strong>의 감독 (감사 기록) 탭</div></div>' +
-    '<div class="doc-item"><div class="d-name">게시판 글 관리</div>' +
-    '<div class="d-desc">자유게시판 글은 상단 <strong>게시판</strong>에서 관리자 권한으로 ' +
-    '직접 삭제할 수 있습니다.</div></div>' +
-    '</div></div>';
+    '<div id="mg-opsbody"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
+    '<div class="ops-cols" style="margin-top:22px"><div id="mg-terms"></div>' +
+    '<div id="mg-officers"></div></div></div>';
 
   /* 탭 전환 (main.js의 탭 코드는 페이지 로드 시점에 실행되므로 여기서 직접 연결) */
   area.querySelectorAll('.tabs button').forEach(function (b) {
@@ -117,6 +101,7 @@ document.addEventListener('DOMContentLoaded', function () {
     loadNotices(); loadSchedule(); loadHero(); loadOfficers(); loadGallery();
     loadTerms();
     SHSOps.mount(document.getElementById('mg-opsbody'), user);
+    SHSOps.mountSchedule(document.getElementById('mg-schedops'), user);
   });
 
   /* ---------- 공지사항 ---------- */
@@ -380,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function loadSchedule() {
     db.from('site_schedule').select('*').order('sort').then(function (r) {
-      var box = document.getElementById('mg-sched');
+      var box = document.getElementById('mg-schedlist');
       if (r.error) { box.innerHTML = '<div class="notice-banner">불러오기 실패: ' + e(r.error.message) + '</div>'; return; }
       var rows = r.data || [];
       if (rows.length) {

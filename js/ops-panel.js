@@ -36,20 +36,18 @@ var SHSOps = (function () {
   /* 권한 위임(이·취임)은 노회장과 최고관리자만 다룬다 */
   var canHand = user.role === 'president' || user.role === 'superadmin';
 
+  /* 운영 일정·정기노회 일정은 사이트 관리 → 운영일정 관리 탭으로 통합되었다
+   * (mountSchedule 참조) */
   area.innerHTML =
     '<div class="tabs">' +
-    '<button class="active" data-tab="ops-alert">시스템 알림</button>' +
+    '<button class="active" data-tab="ops-alert">시스템 알림 설정</button>' +
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
-    '<button data-tab="ops-sched">운영 일정</button>' +
-    '<button data-tab="ops-meet">정기노회 일정</button>' +
     (canHand ? '<button data-tab="ops-hand">권한 위임</button>' : '') +
     '<button data-tab="ops-aw">감사 기간</button>' +
     (canAudit ? '<button data-tab="ops-audit">감독 (감사 기록)</button>' : '') +
     '</div>' +
     '<div class="tab-panel active" id="ops-alert"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     '<div class="tab-panel" id="ops-manual"></div>' +
-    '<div class="tab-panel" id="ops-sched"></div>' +
-    '<div class="tab-panel" id="ops-meet"></div>' +
     (canHand ? '<div class="tab-panel" id="ops-hand"></div>' : '') +
     '<div class="tab-panel" id="ops-aw"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     (canAudit ? '<div class="tab-panel" id="ops-audit"></div>' : '');
@@ -87,7 +85,7 @@ var SHSOps = (function () {
 
   SHSCloud.init().then(function (c) {
     db = c;
-    loadAlerts(); loadManual(); loadSchedule(); loadMeetings(); loadAuditWindow();
+    loadAlerts(); loadManual(); loadAuditWindow();
     if (canHand) loadHandover();
   });
 
@@ -331,7 +329,26 @@ var SHSOps = (function () {
     });
   }
 
-  /* ---------- 시스템 알림 (현재 표시 중 + 전체 규칙) ---------- */
+  /* ---------- 시스템 알림 설정 (현재 표시 중 + 전체 규칙 + 그룹 발송) ----------
+   * 대상 그룹은 명부와 연동된다 (48_notify_groups.sql):
+   *   시찰장·시찰 서기  — 시찰 명부(sichals)와 지정 시찰 임원
+   *   상비부장·상비부 서기 — 상비부·위원회 명부(committees)와 지정 임원
+   *   임원·관리자·간사   — 계정 등급 */
+  var OPS_GROUPS = ['간사', '관리자', '임원', '시찰장', '시찰 서기', '상비부장', '상비부 서기', '전 회원'];
+
+  function sendToGroup(group, title, body, done) {
+    db.rpc('send_notice_to_group', {
+      p_group: group, p_kind: '운영', p_title: title, p_body: body
+    }).then(function (res) {
+      if (res.error) { done(false, res.error.message); return; }
+      var n = Number(res.data || 0);
+      SHSCloud.log('create', '그룹 알림 발송', group + ' — ' + title + ' (' + n + '명)');
+      done(true, n > 0
+        ? group + ' ' + n + '명에게 알림함으로 보냈습니다.'
+        : '보낼 대상이 없거나, 같은 제목을 방금 이미 보냈습니다.');
+    });
+  }
+
   function loadAlerts() {
     Promise.all([
       db.from('ops_notices').select('*').order('sort'),
@@ -351,10 +368,30 @@ var SHSOps = (function () {
           html += '<div class="side-box" style="margin-bottom:14px;border-left:4px solid var(--accent)">' +
             '<div class="box-head">' + e(n.title) + ' <span style="font-weight:400;font-size:0.8rem;color:var(--gray-5)">(대상: ' + e(n.audience) + ' / ' + e(n.period) + ')</span></div>' +
             '<div class="box-body"><p>' + e(n.message || '') + '</p>' +
-            '<button class="btn ghost sm" data-opsdone="' + n.doneKey + '">이번 회기 처리 완료 (알림 끄기)</button>' +
+            '<button class="btn ghost sm" data-opsdone="' + n.doneKey + '">이번 회기 처리 완료 (알림 끄기)</button> ' +
+            (OPS_GROUPS.indexOf(n.audience) !== -1
+              ? '<button class="btn sm" data-opssend="' + e(n.audience) + '" data-st="' + e(n.title) +
+                '" data-sb="' + e(n.message || '') + '">' + e(n.audience) + '에게 알림함으로 보내기</button>'
+              : '') +
+            '<span class="form-msg" style="display:inline-block;margin-left:8px" data-sendmsg="' + e(n.title) + '"></span>' +
             '</div></div>';
         });
       }
+
+      /* 그룹을 골라 알림함으로 바로 보내기 (명부 연동) */
+      html += '<h2>그룹에게 알림 보내기</h2>' +
+        '<p style="font-size:0.88rem;color:var(--gray-7)">대상은 명부와 연동됩니다 — ' +
+        '시찰장·시찰 서기는 시찰 명부에서, 상비부장·상비부 서기는 상비부·위원회 명부에서, ' +
+        '임원·관리자는 계정 등급에서 찾아 보냅니다.</p>' +
+        '<div class="admin-card" style="max-width:820px">' +
+        '<div class="inline-form" style="margin-bottom:8px">' +
+        '<div class="field" style="flex:0 0 150px"><label>대상</label><select id="gs-aud">' +
+        OPS_GROUPS.map(function (g) { return '<option>' + g + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label>제목</label><input type="text" id="gs-title"></div>' +
+        '</div>' +
+        '<div class="field"><label>내용</label><textarea id="gs-body" rows="3"></textarea></div>' +
+        '<button class="btn" id="gs-send">알림함으로 보내기</button>' +
+        '<div class="form-msg" id="gs-msg"></div></div>';
 
       html += '<h2>등록된 알림 규칙</h2>';
       html += '<table class="tbl"><thead><tr><th>제목</th><th>대상</th><th>표시 기준</th><th>사용</th>' +
@@ -372,7 +409,8 @@ var SHSOps = (function () {
         html += '<h3>알림 규칙 추가</h3>' +
           '<div class="admin-card" style="max-width:820px"><div class="inline-form" style="margin-bottom:8px">' +
           '<div class="field"><label>제목</label><input type="text" id="op-title"></div>' +
-          '<div class="field" style="flex:0 0 110px"><label>대상</label><input type="text" id="op-aud" value="간사"></div>' +
+          '<div class="field" style="flex:0 0 130px"><label>대상 (명부 연동)</label><select id="op-aud">' +
+          OPS_GROUPS.map(function (g) { return '<option>' + g + '</option>'; }).join('') + '</select></div>' +
           '<div class="field" style="flex:0 0 170px"><label>기준</label><select id="op-rule">' +
           '<option value="spring">봄 정기노회</option><option value="fall">가을 정기노회</option>' +
           '<option value="before_spring">봄 노회 전</option><option value="before_fall">가을 노회 전</option>' +
@@ -385,6 +423,40 @@ var SHSOps = (function () {
           '<button class="btn" id="op-add">추가</button><div class="form-msg" id="op-addmsg"></div></div>';
       }
       box.innerHTML = html;
+
+      /* 표시 중인 알림을 그 대상 그룹에게 알림함으로 보내기 */
+      box.querySelectorAll('button[data-opssend]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var aud = b.dataset.opssend;
+          if (!confirm(aud + ' 그룹에게 "' + b.dataset.st + '" 알림을 보내시겠습니까?')) return;
+          b.disabled = true;
+          var m = box.querySelector('[data-sendmsg="' + b.dataset.st + '"]');
+          sendToGroup(aud, b.dataset.st, b.dataset.sb, function (ok, t) {
+            b.disabled = false;
+            if (m) { m.className = 'form-msg ' + (ok ? 'ok' : 'err'); m.style.display = 'inline-block'; m.textContent = t; }
+            else alert(t);
+          });
+        });
+      });
+
+      /* 그룹에게 바로 보내기 */
+      var gsBtn = document.getElementById('gs-send');
+      if (gsBtn) gsBtn.addEventListener('click', function () {
+        var msg = document.getElementById('gs-msg');
+        var aud = document.getElementById('gs-aud').value;
+        var title = document.getElementById('gs-title').value.trim();
+        var body = document.getElementById('gs-body').value.trim();
+        if (!title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
+        if (!confirm(aud + ' 그룹에게 "' + title + '" 알림을 보내시겠습니까?')) return;
+        gsBtn.disabled = true;
+        msg.className = 'form-msg'; msg.textContent = '보내는 중입니다...';
+        sendToGroup(aud, title, body, function (ok, t) {
+          gsBtn.disabled = false;
+          msg.className = 'form-msg ' + (ok ? 'ok' : 'err');
+          msg.textContent = t;
+          if (ok) { document.getElementById('gs-title').value = ''; document.getElementById('gs-body').value = ''; }
+        });
+      });
 
       box.querySelectorAll('button[data-opsdone]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -508,6 +580,28 @@ var SHSOps = (function () {
       });
     });
   }
+
+  }
+
+  /* ================= 운영일정 관리 =================
+   * 사이트 관리 → 운영일정 관리 탭에서 부른다.
+   * 정기노회 일정(확정되면 40일 전 알림)과 정기노회 기준일을 함께 다룬다. */
+  function mountSchedule(area, user) {
+    if (!area) return;
+    var e = SHS.esc;
+    if (!user || !SHSAuth.canManageMembers(user) || !user.cloud) {
+      area.innerHTML = '<div class="notice-banner">운영일정 관리는 관리자 등급이 ' +
+        '서버 로그인(구글 또는 이메일) 후 볼 수 있습니다.</div>';
+      return;
+    }
+    var isSuper = user.role === 'superadmin';
+    var db = null;
+
+    area.innerHTML = '<div id="ops-meet"></div><div id="ops-sched" style="margin-top:22px"></div>';
+    SHSCloud.init().then(function (c) {
+      db = c;
+      loadMeetings(); loadSchedule();
+    });
 
   /* ---------- 정기노회 일정 (날짜·장소 확정 → 40일 전 알림) ---------- */
   function loadMeetings() {
@@ -697,5 +791,5 @@ var SHSOps = (function () {
   }
   }
 
-  return { mount: mount };
+  return { mount: mount, mountSchedule: mountSchedule };
 })();
