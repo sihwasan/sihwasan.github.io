@@ -2221,3 +2221,5 @@ td[data-duch]:hover { background: #eef2f8; }
 /* 문구를 로고 세로 중앙에 맞추고, 2번 문구는 작게 해 줄 수를 맞춘다 */
 .hs-slide { top: 50%; transform: translateY(-50%); }
 .hs-slide.hs-small { font-size: clamp(1.15rem, 2vw, 1.8rem); line-height: 1.6; }
+/* 로고 입체감: 절제된 음영 + 부드러운 그림자 */
+.hero-logo-draw svg { filter: drop-shadow(0 12px 28px rgba(40, 33, 24, 0.35)); }

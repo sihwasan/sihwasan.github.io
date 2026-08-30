@@ -11,7 +11,7 @@
 <meta property="og:description" content="화성·안산·시흥·수원·용인·오산 지역 교회들이 하나 됨을 이루는 시화산노회 공식 홈페이지입니다.">
 <meta property="og:url" content="https://sihwasan.org/">
 <meta property="og:image" content="https://sihwasan.org/images/logo.svg">
-<link rel="stylesheet" href="css/style.css?v=20260831m">
+<link rel="stylesheet" href="css/style.css?v=20260831n">
 </head>
 <body>
 
@@ -20,6 +20,18 @@
        가운데에서 크게 그려진 뒤, 왼쪽으로 작아지며 옮겨 가고 문구가 나타난다. -->
   <div class="hero-logo-draw" id="hero-logo-draw" aria-hidden="true">
     <svg viewBox="0 0 1024 1536" fill="none">
+      <defs>
+        <!-- 은은한 음영만 주는 절제된 그라데이션 -->
+        <linearGradient id="hg-l" x1="0" y1="0" x2="1" y2="0.25">
+          <stop offset="0" stop-color="#4fbdf4"/><stop offset="1" stop-color="#2b9fe0"/>
+        </linearGradient>
+        <linearGradient id="hg-r" x1="1" y1="0" x2="0" y2="0.25">
+          <stop offset="0" stop-color="#9ad335"/><stop offset="1" stop-color="#7cb515"/>
+        </linearGradient>
+        <linearGradient id="hg-c" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eceee9"/>
+        </linearGradient>
+      </defs>
       <path class="hd-p" d="M133 248 Q105 242 105 272 L105 1162 Q105 1192 133 1186 L530 1104 L530 322 Z"/>
       <path class="hd-p" d="M891 288 Q919 282 919 312 L919 1296 Q919 1326 891 1320 L530 1230 L530 382 Z"/>
       <path class="hd-p" d="M458 388 h88 v716 h-88 Z"/>
@@ -119,7 +131,7 @@
   }
   var paths = [].slice.call(wrap.querySelectorAll('.hd-p'));
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var FILLS = ['#38b1f0', '#8cc81e', '#ffffff', '#ffffff'];
+  var FILLS = ['url(#hg-l)', 'url(#hg-r)', 'url(#hg-c)', 'url(#hg-c)'];
   var FILL_OP = ['0.88', '0.85', '0.95', '0.95'];
 
   paths.forEach(function (p, i) {
