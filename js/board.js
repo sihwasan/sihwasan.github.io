@@ -70,7 +70,8 @@ var SHSBoard = (function () {
       doc: hicon('<path d="M14 6h14l8 8v28H14z"/><path d="M28 6v8h8"/><path d="M19 22h10M19 28h10M19 34h6"/>'),
       report: hicon('<rect x="12" y="8" width="24" height="34" rx="3"/><path d="M19 6h10v6H19z"/><path d="M18 22h12M18 28h12M18 34h8"/>'),
       dues: hicon('<path d="M8 40h32"/><rect x="11" y="26" width="6" height="14"/><rect x="21" y="18" width="6" height="22"/><rect x="31" y="10" width="6" height="30"/>'),
-      me: hicon('<circle cx="24" cy="17" r="8"/><path d="M9 41a15 15 0 0 1 30 0"/>')
+      me: hicon('<circle cx="24" cy="17" r="8"/><path d="M9 41a15 15 0 0 1 30 0"/>'),
+      schedmgr: hicon('<rect x="8" y="12" width="32" height="28" rx="3"/><path d="M8 20h32M16 8v8M32 8v8"/><path d="M24 26v8M20 30h8"/>')
     };
 
     function hubCard(id, title, sub, extra) {
@@ -98,6 +99,8 @@ var SHSBoard = (function () {
       cards += hubCard('doc', '서류 발급', '');
       cards += hubCard('report', '교회상황 보고서', '');
       cards += hubCard('me', '내 정보', '사진 · 도장 · 연락처');
+      /* 노회장·서기·간사에게는 노회 일정관리 카드를 함께 둔다 */
+      if (SHSAuth.canManageMembers(user)) cards += hubCard('schedmgr', '노회 일정관리', '달력 · 임직식');
       /* 노회 사무실 계정은 개인 칸이 없으므로 상회비 전체를 카드로 둔다 */
       if (isSuper) cards += hubCard('dues', '상회비 전체', '관리 현황');
 
@@ -108,6 +111,7 @@ var SHSBoard = (function () {
         '<div class="hub-label">&#10013; Dashboard</div>' +
         '<h2 class="hub-title">' + esc(SHS.honorific(user)) + ',<br>시화산노회의 <strong>소식과 현황</strong>을<br>확인해보세요.</h2>' +
         '<p class="hub-sub">알림 · 일정 · 납부 현황 · 서류를 한자리에 모았습니다.</p>' +
+        '<div id="hub-cal" class="hidden" style="margin-top:22px"></div>' +
         '</div>' +
         '<div class="hub-grid">' + cards + '</div>' +
         '</div>' +
@@ -209,8 +213,86 @@ var SHSBoard = (function () {
         }).catch(function () {});
       })();
 
+      /* 노회장·서기·간사에게는 왼쪽에 이달 일정 달력을 보여 준다.
+       * 날짜를 누르면 노회 일정관리(schedule.html)의 그날로 간다. */
+      (function () {
+        if (!SHSAuth.canManageMembers(user) || !user.cloud) return;
+        var slot = document.getElementById('hub-cal');
+        if (!slot) return;
+        var calY = new Date().getFullYear(), calM = new Date().getMonth();
+        var evrows = [];
+        function pad2(n) { return String(n).padStart(2, '0'); }
+        function rowDate(x) {
+          if (x.event_date) return x.event_date;
+          var m = String(x.date_label || '').match(/^(\d{1,2})\.(\d{1,2})$/);
+          return m ? (new Date().getFullYear() + '-' + pad2(m[1]) + '-' + pad2(m[2])) : '';
+        }
+        function draw() {
+          var first = new Date(calY, calM, 1);
+          var start = first.getDay();
+          var days = new Date(calY, calM + 1, 0).getDate();
+          var nowD = new Date();
+          var todayS = nowD.getFullYear() + '-' + pad2(nowD.getMonth() + 1) + '-' + pad2(nowD.getDate());
+          var byDate = {};
+          evrows.forEach(function (x) {
+            var d = rowDate(x);
+            if (d) (byDate[d] = byDate[d] || []).push(x);
+          });
+          var h = '<div style="background:rgba(255,255,255,0.55);border-radius:14px;padding:14px 16px;' +
+            'max-width:420px;box-shadow:0 4px 14px rgba(0,0,0,0.08)">' +
+            '<div style="display:flex;align-items:center;margin-bottom:8px">' +
+            '<button type="button" class="btn ghost sm" data-hc="p" style="padding:2px 9px">&#8249;</button>' +
+            '<strong style="flex:1;text-align:center">' + calY + '년 ' + (calM + 1) + '월</strong>' +
+            '<button type="button" class="btn ghost sm" data-hc="n" style="padding:2px 9px">&#8250;</button></div>' +
+            '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:0.82rem;text-align:center">' +
+            '<thead><tr>' + ['일','월','화','수','목','금','토'].map(function (w, i) {
+              return '<th style="padding:3px 0;font-weight:600;' + (i === 0 ? 'color:#c0392b' : '') + '">' + w + '</th>';
+            }).join('') + '</tr></thead><tbody><tr>';
+          var cell = 0;
+          for (var i = 0; i < start; i++) { h += '<td></td>'; cell++; }
+          for (var d = 1; d <= days; d++) {
+            var ds = calY + '-' + pad2(calM + 1) + '-' + pad2(d);
+            var evs = byDate[ds] || [];
+            h += '<td data-hd="' + ds + '" title="' + SHS.esc(evs.map(function (x) { return x.title; }).join('\n')) + '" ' +
+              'style="padding:4px 0;cursor:pointer;border-radius:8px;' +
+              (ds === todayS ? 'outline:2px solid var(--accent,#b08d3e);outline-offset:-2px;' : '') +
+              (cell % 7 === 0 ? 'color:#c0392b;' : '') + '">' + d +
+              (evs.length ? '<div style="line-height:0.5;font-size:1rem;color:#b03a2e">&#8226;</div>'
+                          : '<div style="line-height:0.5;font-size:1rem;visibility:hidden">&#8226;</div>') +
+              '</td>';
+            cell++;
+            if (cell % 7 === 0 && d < days) h += '</tr><tr>';
+          }
+          while (cell % 7 !== 0) { h += '<td></td>'; cell++; }
+          h += '</tr></tbody></table>' +
+            '<p style="margin:8px 0 0;text-align:right;font-size:0.82rem">' +
+            '<a href="schedule.html" style="text-decoration:underline">노회 일정관리 &#8594;</a></p></div>';
+          slot.innerHTML = h;
+          slot.classList.remove('hidden');
+          slot.querySelector('[data-hc="p"]').addEventListener('click', function () {
+            calM--; if (calM < 0) { calM = 11; calY--; } draw();
+          });
+          slot.querySelector('[data-hc="n"]').addEventListener('click', function () {
+            calM++; if (calM > 11) { calM = 0; calY++; } draw();
+          });
+          slot.querySelectorAll('td[data-hd]').forEach(function (td) {
+            td.addEventListener('click', function () {
+              location.href = 'schedule.html#d=' + td.dataset.hd;
+            });
+          });
+        }
+        SHSCloud.init().then(function (c) {
+          return c.from('site_schedule').select('id,title,event_date,date_label,kind');
+        }).then(function (r) {
+          evrows = (r && r.data) || [];
+          draw();
+        }).catch(function () {});
+      })();
+
       box.querySelectorAll('.hub-card').forEach(function (b) {
         b.addEventListener('click', function () {
+          /* 노회 일정관리는 그 화면으로 바로 간다 */
+          if (b.dataset.hub === 'schedmgr') { location.href = 'schedule.html'; return; }
           /* 서류 발급은 서류 신청 화면으로 바로 간다 */
           if (b.dataset.hub === 'doc') { location.href = 'request.html'; return; }
           /* 내 정보는 내 정보 화면으로 바로 간다 */

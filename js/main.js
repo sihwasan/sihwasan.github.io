@@ -126,6 +126,18 @@
     if (admin) list.insertBefore(li, admin); else list.appendChild(li);
   }
 
+  /* 노회장·서기·간사에게 임원방 하위에 <노회 일정관리>를 붙인다 */
+  function addScheduleMenu() {
+    var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
+    if (!links.length) return;
+    var sub = links[0].parentNode.querySelector('.gnb-sub');
+    if (!sub || sub.querySelector('a[href="schedule.html"]')) return;
+    var a = document.createElement('a');
+    a.href = 'schedule.html';
+    a.textContent = '노회 일정관리';
+    sub.insertBefore(a, sub.firstChild.nextSibling);   /* 임원 자료실 다음 자리 */
+  }
+
   function addAdminMenu() {
     var list = document.querySelector('.gnb-list');
     if (!list || document.getElementById('gnb-admin')) return;
@@ -440,7 +452,10 @@
         if (isActiveMember(toCloudUser(p))) addDashMenu();
 
         /* 관리자에게 관리자 메뉴를 붙인다 */
-        if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) addAdminMenu();
+        if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) {
+          addAdminMenu();
+          addScheduleMenu();
+        }
 
         /* 내가 맡은 상비부는 대시보드에서 본다. 상단 메뉴에 따로 두지 않는다. */
         SHSCloud.init().then(function (c) {

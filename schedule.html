@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노회 일정관리 - 시화산노회</title>
+<link rel="stylesheet" href="css/style.css?v=20260831zl">
+<style>
+/* 일정 달력 */
+.sc-cal { width:100%; border-collapse:collapse; table-layout:fixed; background:#fff;
+  border:1px solid var(--gray-3,#ddd); }
+.sc-cal th { padding:8px 0; font-size:0.84rem; color:var(--gray-6);
+  border-bottom:1px solid var(--gray-3,#ddd); background:var(--gray-1,#f7f5f0); font-weight:600; }
+.sc-cal th.sun, .sc-cal td.sun .sc-day { color:#c0392b; }
+.sc-cal td { vertical-align:top; height:96px; border:1px solid var(--gray-2,#eee);
+  padding:4px 5px; cursor:pointer; transition:background .12s; }
+.sc-cal td:hover { background:var(--gray-1,#f7f5f0); }
+.sc-cal td.other { background:#fafafa; color:var(--gray-4); cursor:default; }
+.sc-cal td.today { outline:2px solid var(--accent,#b08d3e); outline-offset:-2px; }
+.sc-day { font-size:0.82rem; font-weight:600; }
+.sc-ev { display:block; margin-top:3px; padding:2px 5px; border-radius:4px;
+  font-size:0.72rem; line-height:1.35; background:var(--navy,#4b3f33); color:#fff;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sc-ev.k임직식 { background:#8e44ad; }
+.sc-ev.k정기노회 { background:#b03a2e; }
+.sc-ev.k총회 { background:#1f618d; }
+.sc-ev.k임원회의 { background:#7d6608; }
+.sc-ev.k상비부일정 { background:#1e8449; }
+.sc-head { display:flex; align-items:center; gap:12px; margin:0 0 10px; }
+.sc-head h2 { margin:0; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>노회 일정관리</h1>
+    <div class="crumb">홈 &gt; 임원방 &gt; 노회 일정관리</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="sc-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20260901a"></script>
+<script src="js/ops-panel.js?v=20260830c"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('sc-area');
+  var e = SHS.esc;
+
+  if (!user || !SHSAuth.canManageMembers(user)) {
+    area.innerHTML =
+      '<div class="notice-banner">노회 일정관리는 <strong>노회장·서기·간사</strong>가 이용할 수 있습니다.' +
+      (user ? '' : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') + '</div>';
+    return;
+  }
+  if (!user.cloud) {
+    area.innerHTML =
+      '<div class="notice-banner">일정이 서버에 저장되어 모든 회원에게 보이므로 서버 로그인이 필요합니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var db = null;
+  var events = [];      /* site_schedule 전체 */
+  var roster = [];      /* 임직식 대상자 선택용 노회 명단 */
+  var now = new Date();
+  var calY = now.getFullYear(), calM = now.getMonth();   /* 보고 있는 달 */
+
+  /* 주소에 #d=2026-10-12 가 붙어 오면 그 달을 편다 (대시보드 달력에서 넘어옴) */
+  var hm = location.hash.match(/d=(\d{4})-(\d{2})-(\d{2})/);
+  if (hm) { calY = Number(hm[1]); calM = Number(hm[2]) - 1; }
+
+  var KINDS = ['정기노회', '임원회의', '상비부 일정', '임직식', '총회', '기타'];
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function ymd(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+  function labelOf(s) {
+    var p = String(s || '').split('-');
+    return p.length === 3 ? (parseInt(p[1], 10) + '.' + parseInt(p[2], 10)) : '';
+  }
+  function sortOf(s) { return parseInt(String(s || '').replace(/-/g, ''), 10) || 0; }
+  function dateOfRow(row) {
+    if (row.event_date) return row.event_date;
+    var m = String(row.date_label || '').match(/^(\d{1,2})\.(\d{1,2})$/);
+    if (!m) return '';
+    return new Date().getFullYear() + '-' + pad2(m[1]) + '-' + pad2(m[2]);
+  }
+
+  area.innerHTML =
+    '<div class="notice-banner">여기서 등록한 일정은 <strong>메인 화면·대시보드의 노회 일정</strong>에 그대로 공지됩니다. ' +
+    '달력에서 <strong>날짜를 누르면</strong> 일정을 넣거나 고칠 수 있습니다. ' +
+    '<strong>임직식</strong>(목사 위임·장로 장립)은 회원 명단과 연동되어 위임일·장립일이 명단에 기록됩니다.</div>' +
+    '<div class="sc-head">' +
+    '<button class="btn ghost sm" id="sc-prev">&#8592; 이전 달</button>' +
+    '<h2 id="sc-title" style="min-width:170px;text-align:center"></h2>' +
+    '<button class="btn ghost sm" id="sc-next">다음 달 &#8594;</button>' +
+    '<button class="btn ghost sm" id="sc-today" style="margin-left:auto">오늘</button></div>' +
+    '<div style="overflow-x:auto"><div style="min-width:640px" id="sc-calbox"></div></div>' +
+    '<h2 style="margin-top:30px">등록된 일정</h2>' +
+    '<div id="sc-list"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
+    '<div id="sc-ops" style="margin-top:34px"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+
+  /* ---------- 팝업 ---------- */
+  function modal(html) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;' +
+      'display:flex;align-items:flex-start;justify-content:center;padding:40px 14px;overflow:auto';
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border-radius:10px;max-width:640px;width:100%;' +
+      'padding:24px;box-shadow:0 12px 32px rgba(0,0,0,0.25)';
+    card.innerHTML = html;
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
+    wrap.addEventListener('click', function (ev) { if (ev.target === wrap) close(); });
+    function close() { wrap.remove(); }
+    return { close: close, el: card };
+  }
+
+  /* ---------- 달력 ---------- */
+  function drawCal() {
+    document.getElementById('sc-title').textContent = calY + '년 ' + (calM + 1) + '월';
+    var first = new Date(calY, calM, 1);
+    var start = first.getDay();
+    var days = new Date(calY, calM + 1, 0).getDate();
+    var todayS = ymd(now.getFullYear(), now.getMonth(), now.getDate());
+
+    var byDate = {};
+    events.forEach(function (x) {
+      var d = dateOfRow(x);
+      if (!d) return;
+      (byDate[d] = byDate[d] || []).push(x);
+    });
+
+    var h = '<table class="sc-cal"><thead><tr>' +
+      ['일', '월', '화', '수', '목', '금', '토'].map(function (w, i) {
+        return '<th' + (i === 0 ? ' class="sun"' : '') + '>' + w + '</th>';
+      }).join('') + '</tr></thead><tbody><tr>';
+    var cell = 0;
+    for (var i = 0; i < start; i++) { h += '<td class="other"></td>'; cell++; }
+    for (var d = 1; d <= days; d++) {
+      var ds = ymd(calY, calM, d);
+      var evs = byDate[ds] || [];
+      h += '<td data-day="' + ds + '" class="' +
+        (cell % 7 === 0 ? 'sun ' : '') + (ds === todayS ? 'today' : '') + '">' +
+        '<span class="sc-day">' + d + '</span>' +
+        evs.map(function (x) {
+          return '<span class="sc-ev k' + e(String(x.kind || '').replace(/\s/g, '')) + '">' +
+            e(x.title) + '</span>';
+        }).join('') + '</td>';
+      cell++;
+      if (cell % 7 === 0 && d < days) h += '</tr><tr>';
+    }
+    while (cell % 7 !== 0) { h += '<td class="other"></td>'; cell++; }
+    h += '</tr></tbody></table>';
+    document.getElementById('sc-calbox').innerHTML = h;
+
+    document.querySelectorAll('#sc-calbox td[data-day]').forEach(function (td) {
+      td.addEventListener('click', function () { openDay(td.dataset.day); });
+    });
+  }
+
+  /* ---------- 하루 보기: 그날 일정 + 추가 ---------- */
+  function openDay(ds) {
+    var evs = events.filter(function (x) { return dateOfRow(x) === ds; });
+    var mo = modal(
+      '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(ds) + ' 일정</h3>' +
+      (evs.length
+        ? evs.map(function (x) {
+            return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;' +
+              'border-bottom:1px solid var(--gray-2,#eee)">' +
+              '<span style="flex:0 0 auto;font-size:0.78rem;padding:2px 8px;border-radius:10px;' +
+              'background:var(--gray-1,#f2efe9)">' + e(x.kind || '일정') + '</span>' +
+              '<span style="flex:1">' + e(x.title) + '</span>' +
+              '<button class="btn sm" data-dedit="' + x.id + '">수정</button>' +
+              '<button class="btn danger sm" data-ddel="' + x.id + '">삭제</button></div>';
+          }).join('')
+        : '<p style="color:var(--gray-5)">등록된 일정이 없습니다.</p>') +
+      '<p style="margin-top:16px"><button class="btn" id="day-add">이 날짜에 일정 추가</button></p>');
+
+    mo.el.querySelector('#day-add').addEventListener('click', function () {
+      mo.close(); openEdit(null, ds);
+    });
+    mo.el.querySelectorAll('[data-dedit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var x = events.filter(function (v) { return String(v.id) === b.dataset.dedit; })[0];
+        mo.close(); if (x) openEdit(x, dateOfRow(x));
+      });
+    });
+    mo.el.querySelectorAll('[data-ddel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var x = events.filter(function (v) { return String(v.id) === b.dataset.ddel; })[0];
+        if (!x || !confirm('일정 "' + x.title + '" 을(를) 삭제하시겠습니까?')) return;
+        db.from('site_schedule').delete().eq('id', x.id).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('delete', '노회 일정 삭제', x.title);
+          mo.close(); reload();
+        });
+      });
+    });
+  }
+
+  /* ---------- 일정 입력·수정 ---------- */
+  function openEdit(x, ds) {
+    var isNew = !x;
+    x = x || {};
+    var meta = x.meta || {};
+    var kindNow = x.kind || '정기노회';
+    if (KINDS.indexOf(kindNow) === -1) kindNow = '기타';
+
+    /* 임직식 대상자 목록: 위임은 목사 계열, 장립은 명단 전체에서 고른다 */
+    function targets(sub) {
+      var PASTOR = ['목사', '위임목사', '부목사', '강도사', '전도사', '원로목사', '은퇴목사', '무임목사'];
+      return roster.filter(function (m) {
+        if (m.active === false) return false;
+        if (sub === '목사 위임') return PASTOR.indexOf(m.category) !== -1 || PASTOR.indexOf(m.position) !== -1;
+        return true;
+      });
+    }
+    function targetOptions(sub, selId) {
+      return '<option value="">— 회원 명단에서 선택 —</option>' +
+        targets(sub).map(function (m) {
+          return '<option value="' + m.id + '"' + (String(selId) === String(m.id) ? ' selected' : '') + '>' +
+            e(m.name) + ' (' + e(m.church || '-') + ' · ' + e(m.category || m.position || '') + ')</option>';
+        }).join('') +
+        '<option value="__etc"' + (selId === '__etc' ? ' selected' : '') + '>명단에 없음 (직접 입력)</option>';
+    }
+
+    var mo = modal(
+      '<h3 style="margin:0 0 14px;color:var(--navy)">' + (isNew ? '일정 추가' : '일정 수정') + '</h3>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 170px"><label>날짜</label>' +
+      '<input type="date" id="ev-date" value="' + e(ds || '') + '"></div>' +
+      '<div class="field"><label>행사</label><select id="ev-kind">' +
+      KINDS.map(function (k) {
+        return '<option' + (k === kindNow ? ' selected' : '') + '>' + k + '</option>';
+      }).join('') + '</select></div></div>' +
+      /* 기타: 행사명 직접 입력 */
+      '<div class="field hidden" id="ev-etcwrap"><label>행사명</label>' +
+      '<input type="text" id="ev-etc" value="' + (kindNow === '기타' ? e(x.title || '') : '') + '" placeholder="행사명"></div>' +
+      /* 임직식: 종류·대상자 */
+      '<div id="ev-ordwrap" class="hidden">' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 170px"><label>임직 종류</label><select id="ev-ordsub">' +
+      ['목사 위임', '장로 장립'].map(function (s) {
+        return '<option' + (meta.sub === s ? ' selected' : '') + '>' + s + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field"><label>대상자</label><select id="ev-target"></select></div></div>' +
+      '<div class="inline-form hidden" id="ev-etcperson">' +
+      '<div class="field"><label>성명</label><input type="text" id="ev-pname" value="' + e(meta.person || '') + '"></div>' +
+      '<div class="field"><label>교회</label><input type="text" id="ev-pchurch" value="' + e(meta.church || '') + '"></div></div>' +
+      '<p style="font-size:0.8rem;color:var(--gray-5);margin:2px 0 10px">저장하면 회원 명단에 ' +
+      '<strong>목사 위임 → 위임일(직분 위임목사)</strong>, <strong>장로 장립 → 장립일</strong>이 함께 기록됩니다.</p></div>' +
+      '<div class="field"><label>내용·장소 (선택)</label>' +
+      '<input type="text" id="ev-note" value="' + (kindNow === '기타' ? '' : e(x.title || '')) + '" ' +
+      'placeholder="예: 제20회기 가을 정기노회 (수암제일교회)"></div>' +
+      '<div style="margin-top:8px"><button class="btn" id="ev-save">저장</button></div>' +
+      '<div class="form-msg" id="ev-msg"></div>');
+
+    var kindSel = mo.el.querySelector('#ev-kind');
+    var tgtSel = mo.el.querySelector('#ev-target');
+    function refreshKind() {
+      var k = kindSel.value;
+      mo.el.querySelector('#ev-etcwrap').classList.toggle('hidden', k !== '기타');
+      mo.el.querySelector('#ev-ordwrap').classList.toggle('hidden', k !== '임직식');
+      if (k === '임직식') refreshTargets();
+    }
+    function refreshTargets() {
+      var sub = mo.el.querySelector('#ev-ordsub').value;
+      tgtSel.innerHTML = targetOptions(sub, meta.roster_id || (meta.person && !meta.roster_id ? '__etc' : ''));
+      refreshEtcPerson();
+    }
+    function refreshEtcPerson() {
+      mo.el.querySelector('#ev-etcperson').classList.toggle('hidden', tgtSel.value !== '__etc');
+    }
+    kindSel.addEventListener('change', refreshKind);
+    mo.el.querySelector('#ev-ordsub').addEventListener('change', refreshTargets);
+    tgtSel.addEventListener('change', refreshEtcPerson);
+    refreshKind();
+
+    mo.el.querySelector('#ev-save').addEventListener('click', function () {
+      var msg = mo.el.querySelector('#ev-msg');
+      function err(t) { msg.className = 'form-msg err'; msg.textContent = t; }
+      var date = mo.el.querySelector('#ev-date').value;
+      var kind = kindSel.value;
+      var note = mo.el.querySelector('#ev-note').value.trim();
+      if (!date) { err('날짜를 골라 주세요.'); return; }
+
+      var title = '';
+      var newMeta = null;
+      var sync = null;    /* 회원 명단 연동 작업 */
+
+      if (kind === '기타') {
+        title = mo.el.querySelector('#ev-etc').value.trim();
+        if (!title) { err('행사명을 입력해 주세요.'); return; }
+        if (note) title += ' — ' + note;
+      } else if (kind === '임직식') {
+        var sub = mo.el.querySelector('#ev-ordsub').value;
+        var person = '', church = '', rid = null;
+        if (tgtSel.value === '__etc') {
+          person = mo.el.querySelector('#ev-pname').value.trim();
+          church = mo.el.querySelector('#ev-pchurch').value.trim();
+          if (!person) { err('대상자 성명을 입력해 주세요.'); return; }
+        } else if (tgtSel.value) {
+          rid = Number(tgtSel.value);
+          var m = roster.filter(function (v) { return v.id === rid; })[0];
+          person = m ? m.name : ''; church = m ? (m.church || '') : '';
+        } else { err('대상자를 골라 주세요.'); return; }
+        newMeta = { sub: sub, person: person, church: church, roster_id: rid };
+        title = '임직식 — ' + person + ' ' + (sub === '목사 위임' ? '목사 위임' : '장로 장립') +
+          (church ? ' (' + church + ')' : '') + (note ? ' · ' + note : '');
+
+        /* 회원 명단(roster) 연동: 위임일·장립일 기록 */
+        if (sub === '장로 장립') {
+          if (rid) {
+            sync = function (c) {
+              return c.from('roster').update({ ordained_on: date }).eq('id', rid).then(function () {
+                /* 교회 DB(church_staff)에도 같은 분이 있으면 장립일을 맞춰 준다 */
+                return c.from('church_staff').update({ ordained_on: date })
+                  .eq('name', person).eq('church', church);
+              });
+            };
+          } else if (church) {
+            /* 명단에 없는 새 장로: 교회 DB(원본)에 시무장로로 올린다 */
+            sync = function (c) {
+              return c.from('church_staff').insert({
+                church: church, name: person, role: '시무장로', ordained_on: date, sort: 100000
+              });
+            };
+          }
+        } else if (sub === '목사 위임' && rid) {
+          sync = function (c) {
+            return c.from('roster').update({ position: '위임목사', served_from: date }).eq('id', rid);
+          };
+        }
+      } else {
+        title = note || kind;
+      }
+
+      var row = {
+        title: title, kind: kind, meta: newMeta,
+        event_date: date, date_label: labelOf(date), sort: sortOf(date)
+      };
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      SHSCloud.init().then(function (c) {
+        var q = isNew ? c.from('site_schedule').insert(row)
+                      : c.from('site_schedule').update(row).eq('id', x.id);
+        return q.then(function (r) {
+          if (r.error) throw r.error;
+          return sync ? sync(c) : null;
+        });
+      }).then(function (r) {
+        if (r && r.error) throw r.error;
+        SHSCloud.log(isNew ? 'create' : 'update', '노회 일정 ' + (isNew ? '추가' : '수정'),
+          labelOf(date) + ' ' + title +
+          (newMeta ? ' [명단 연동 ' + newMeta.sub + ' ' + newMeta.person + ']' : ''));
+        mo.close(); reload();
+      }).catch(function (er) { err(er.message || String(er)); });
+    });
+  }
+
+  /* ---------- 등록된 일정 목록 ---------- */
+  function drawList() {
+    var box = document.getElementById('sc-list');
+    var rows = events.slice().sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); });
+    var h = '<table class="tbl" style="max-width:880px"><thead><tr>' +
+      '<th style="width:120px">날짜</th><th style="width:120px">행사</th>' +
+      '<th>내용</th><th style="width:130px">관리</th></tr></thead><tbody>';
+    if (!rows.length) h += '<tr><td colspan="4" style="color:var(--gray-5)">등록된 일정이 없습니다.</td></tr>';
+    rows.forEach(function (x) {
+      h += '<tr><td>' + e(dateOfRow(x) || x.date_label || '-') + '</td>' +
+        '<td>' + e(x.kind || '-') + '</td>' +
+        '<td class="left">' + e(x.title) + '</td>' +
+        '<td><button class="btn sm" data-ledit="' + x.id + '">수정</button> ' +
+        '<button class="btn danger sm" data-ldel="' + x.id + '">삭제</button></td></tr>';
+    });
+    h += '</tbody></table>';
+    box.innerHTML = h;
+    box.querySelectorAll('[data-ledit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var x = events.filter(function (v) { return String(v.id) === b.dataset.ledit; })[0];
+        if (x) openEdit(x, dateOfRow(x));
+      });
+    });
+    box.querySelectorAll('[data-ldel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var x = events.filter(function (v) { return String(v.id) === b.dataset.ldel; })[0];
+        if (!x || !confirm('일정 "' + x.title + '" 을(를) 삭제하시겠습니까?')) return;
+        db.from('site_schedule').delete().eq('id', x.id).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('delete', '노회 일정 삭제', x.title);
+          reload();
+        });
+      });
+    });
+  }
+
+  function reload() {
+    db.from('site_schedule').select('*').order('sort').then(function (r) {
+      if (r.error) {
+        document.getElementById('sc-list').innerHTML =
+          '<div class="notice-banner">불러오지 못했습니다: ' + e(r.error.message) + '</div>';
+        return;
+      }
+      events = r.data || [];
+      drawCal(); drawList();
+    });
+  }
+
+  document.getElementById('sc-prev').addEventListener('click', function () {
+    calM--; if (calM < 0) { calM = 11; calY--; } drawCal();
+  });
+  document.getElementById('sc-next').addEventListener('click', function () {
+    calM++; if (calM > 11) { calM = 0; calY++; } drawCal();
+  });
+  document.getElementById('sc-today').addEventListener('click', function () {
+    calY = now.getFullYear(); calM = now.getMonth(); drawCal();
+  });
+
+  SHSCloud.init().then(function (c) {
+    db = c;
+    reload();
+    c.from('roster').select('id,name,church,category,position,active').order('name')
+      .then(function (r) { roster = (r && r.data) || []; });
+    /* 정기노회 일정(40일 전 알림)·기준일 — 사이트 관리에서 옮겨 왔다 */
+    SHSOps.mountSchedule(document.getElementById('sc-ops'), user);
+  });
+ });
+});
+</script>
+</body>
+</html>

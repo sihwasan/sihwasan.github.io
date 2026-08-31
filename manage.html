@@ -25,7 +25,7 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
-<script src="js/main.js?v=20260831e"></script>
+<script src="js/main.js?v=20260901a"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/audit-view.js"></script>
 <script src="js/ops-panel.js?v=20260830c"></script>
@@ -63,19 +63,15 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 화면 구성 ---------- */
   area.innerHTML =
     '<div class="notice-banner">이 화면에서 수정하고 <strong>저장</strong>을 누르면 즉시 홈페이지에 반영됩니다. ' +
-    '모든 수정 내역은 감사 기록에 남습니다.</div>' +
+    '모든 수정 내역은 감사 기록에 남습니다. ' +
+    '운영일정 관리는 <a href="schedule.html" style="text-decoration:underline"><strong>노회 일정관리</strong></a>로 옮겼습니다.</div>' +
     '<div class="tabs">' +
     '<button class="active" data-tab="mg-notice">공지사항</button>' +
-    '<button data-tab="mg-sched">운영일정 관리</button>' +
     '<button data-tab="mg-hero">메인 화면</button>' +
     '<button data-tab="mg-gallery">갤러리</button>' +
     '<button data-tab="mg-ops">노회 운영</button>' +
     '</div>' +
     '<div class="tab-panel active" id="mg-notice"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
-    /* 운영일정 관리: 메인 화면 노회 일정 + 정기노회 일정·기준일을 한 곳에서 다룬다 */
-    '<div class="tab-panel" id="mg-sched">' +
-    '<div id="mg-schedlist"></div>' +
-    '<div id="mg-schedops"><p style="color:var(--gray-5)">불러오는 중...</p></div></div>' +
     '<div class="tab-panel" id="mg-hero"></div>' +
     '<div class="tab-panel" id="mg-gallery"></div>' +
     /* 노회 운영: 시스템 운영(알림 설정·매뉴얼·권한 위임·감사)을 위에,
@@ -98,10 +94,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   SHSCloud.init().then(function (c) {
     db = c;
-    loadNotices(); loadSchedule(); loadHero(); loadOfficers(); loadGallery();
+    loadNotices(); loadHero(); loadOfficers(); loadGallery();
     loadTerms();
     SHSOps.mount(document.getElementById('mg-opsbody'), user);
-    SHSOps.mountSchedule(document.getElementById('mg-schedops'), user);
   });
 
   /* ---------- 공지사항 ---------- */
