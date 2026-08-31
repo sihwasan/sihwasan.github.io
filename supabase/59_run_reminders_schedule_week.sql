@@ -1,0 +1,2 @@
+-- run_reminders에 (3) 노회 일정 1주 전 전 회원 알림 추가 (2026-09-01)
+-- 전체 정의는 Supabase migration 'run_reminders_schedule_week' 참조
