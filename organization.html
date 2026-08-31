@@ -752,7 +752,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   SHSCloud.init().then(function (c) {
     return Promise.all([
-      c.from('sichal_churches').select('sichal,name,url').order('sichal').order('sort'),
+      c.from('sichal_churches').select('sichal,name,url,pastor').order('sichal').order('sort'),
       c.from('church_staff').select('church,role,name')
         .then(function (x) { return x; }, function () { return { data: [] }; }),
       c.from('roster').select('name,church,category,position')
@@ -821,7 +821,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 (pr.position && pr.position !== '목사'
                   ? ' <span style="color:var(--gray-5);font-size:0.82rem">(' + e(pr.position) + ')</span>'
                   : ' 목사')
-                : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+                : (c2.pastor
+                  ? e(c2.pastor).replace(/\(([^)]+)\)/,
+                      '<span style="color:var(--gray-5);font-size:0.82rem">($1)</span>')
+                  : '<span style="color:var(--gray-5)">-</span>')) + '</td>' +
               '<td>' + (org ? '조직' : '<span style="color:var(--gray-5)">미조직</span>') + '</td>' +
               '<td class="left">' + (c2.url
                 ? '<a href="' + e(c2.url) + '" target="_blank" rel="noopener" style="color:var(--navy);text-decoration:underline">' + e(c2.url) + '</a>'
