@@ -228,12 +228,18 @@ var SHSBoard = (function () {
         var months = Object.keys(paid).length;
         var sum = 0;
         rows.forEach(function (x) { if (x.out_month) sum += Number(x.out_amount || 0); });
+        /* 납부한 달은 동그라미 아래에 입금일(월.일)을 함께 보여 준다 */
+        function payDay(pd) {
+          var mt = String(pd.out_paid_on || '').match(/^\d{4}-(\d{2})-(\d{2})/);
+          return mt ? (Number(mt[1]) + '.' + Number(mt[2])) : '';
+        }
         var dots = '';
         for (var m = 1; m <= 12; m++) {
           var pd = paid[m];
-          dots += '<span class="md-dot' + (pd ? ' on' : '') + (m === mo ? ' cur' : '') + '"' +
-            (pd ? ' title="' + m + '월 ' + Number(pd.out_amount || 0) + '만원 (' + (pd.out_paid_on || '') + ')"'
-                : ' title="' + m + '월 미납"') + '>' + m + '</span>';
+          dots += '<span class="md-cell"><span class="md-dot' + (pd ? ' on' : '') + (m === mo ? ' cur' : '') + '"' +
+            (pd ? ' title="' + m + '월 ' + Number(pd.out_amount || 0) + '만원 납부 (' + (pd.out_paid_on || '') + ')"'
+                : ' title="' + m + '월 미납"') + '>' + m + '</span>' +
+            '<span class="md-date">' + (pd ? payDay(pd) : '') + '</span></span>';
         }
         /* 이번 달까지 안 낸 달을 미납으로 본다 */
         var lateMonths = [];
