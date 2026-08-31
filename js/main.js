@@ -41,7 +41,6 @@
     { title: '자료실', href: 'archive.html', sub: [
       { t: '청원서 작성', h: 'petition.html' },
       { t: '나의 서류', h: 'mydocs.html' },
-      { t: '자료 목록', h: 'archive.html' },
       { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
       { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
       { t: '고시 모의고사', h: 'exam.html' }
