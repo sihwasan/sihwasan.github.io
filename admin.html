@@ -1580,7 +1580,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('church_staff').select('*').order('church').order('sort'),
         c.from('sichal_churches').select('name,sichal'),
-        c.from('roster').select('id,name,church,category')
+        c.from('roster').select('id,name,church,category,birth_date,ordained_on')
       ]);
     }).then(function (rs) {
       if (rs[0].error) {
@@ -1605,6 +1605,18 @@ document.addEventListener('DOMContentLoaded', function () {
           '교회 관리에서 ' + title + '를 입력하면 이 명단에 자동으로 모입니다. ' +
           '생년월일·장립일은 여기서 바로 고칠 수 있습니다.</div>';
         h += '<p style="font-size:0.88rem;color:var(--gray-7)">모두 <strong>' + list.length + '명</strong></p>';
+        /* 시찰별·교회별 검색 */
+        var sicNames = [];
+        list.forEach(function (x) {
+          var s2 = sicOf[x.church];
+          if (s2 && sicNames.indexOf(s2) === -1) sicNames.push(s2);
+        });
+        h += '<div class="inline-form" style="margin-bottom:10px;max-width:640px">' +
+          '<div class="field" style="flex:0 0 160px"><label>시찰</label>' +
+          '<select data-sefsic><option value="">시찰 전체</option>' +
+          sicNames.map(function (s2) { return '<option>' + e(s2) + '</option>'; }).join('') + '</select></div>' +
+          '<div class="field"><label>검색</label>' +
+          '<input type="text" data-sefq placeholder="교회·성명으로 찾기"></div></div>';
         h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th style="width:50px">번호</th>' +
           '<th style="width:100px">시찰</th><th style="width:160px">교회</th>' +
           (roles.length > 1 ? '<th style="width:90px">구분</th>' : '') +
@@ -1618,54 +1630,47 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         list.forEach(function (x, i) {
           var linked = rosterHit(x);
-          h += '<tr><td>' + (i + 1) + '</td>' +
+          /* 날짜는 교회 명부 기록을 먼저, 없으면 연동된 노회 명단 기록을 보여 준다 */
+          var birth = x.birth_date || (linked && linked.birth_date) || '';
+          var ord = x.ordained_on || (linked && linked.ordained_on) || '';
+          h += '<tr data-sesic="' + e(sicOf[x.church] || '') + '" data-sefind="' + e(x.church + ' ' + x.name) + '">' +
+            '<td>' + (i + 1) + '</td>' +
             '<td>' + e(sicOf[x.church] || '-') + '</td>' +
             '<td class="left">' + e(x.church) + '</td>' +
             (roles.length > 1 ? '<td>' + e(x.role) + '</td>' : '') +
             '<td><strong>' + e(x.name) + '</strong></td>' +
-            '<td><input type="date" id="se-b-' + x.id + '" value="' + e(x.birth_date || '') + '"></td>' +
-            '<td><input type="date" id="se-o-' + x.id + '" value="' + e(x.ordained_on || '') + '"></td>' +
+            '<td>' + (birth ? e(birth) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td>' + (ord ? e(ord) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             (withRosterLink
               ? '<td>' + (linked
                   ? '<span class="pass">연동됨</span>'
                   : '<button class="btn ghost sm" data-selink="' + x.id + '">명단에 추가</button>') + '</td>'
               : '') +
-            '<td><button class="btn sm" data-sesave="' + x.id + '">저장</button> ' +
-            '<button class="btn ghost sm" data-seedit="' + x.id + '">수정</button></td></tr>';
+            '<td><button class="btn sm" data-seedit="' + x.id + '">수정</button></td></tr>';
         });
         h += '</tbody></table></div>';
         box.innerHTML = h;
 
-        box.querySelectorAll('[data-sesave]').forEach(function (b) {
-          b.addEventListener('click', function () {
-            var id = Number(b.dataset.sesave);
-            var x = staff.filter(function (s2) { return s2.id === id; })[0];
-            var birth = document.getElementById('se-b-' + id).value || null;
-            var ord = document.getElementById('se-o-' + id).value || null;
-            SHSCloud.init().then(function (c) {
-              return c.from('church_staff').update({
-                birth_date: birth, ordained_on: ord, updated_at: new Date().toISOString(), updated_by: user.name
-              }).eq('id', id).then(function (r2) {
-                if (r2.error) throw r2.error;
-                var linked = rosterHit(x);
-                if (!linked) return r2;
-                /* 노회 명단과 연결되어 있으면 생년월일을 함께 맞춘다 */
-                return c.from('roster').update({ birth_date: birth, ordained_on: ord }).eq('id', linked.id);
-              });
-            }).then(function (r2) {
-              if (r2 && r2.error) { alert(r2.error.message); return; }
-              SHSCloud.log('update', title + ' 정보 수정', x.name + ' (' + x.church + ')');
-              b.textContent = '저장됨';
-              setTimeout(function () { b.textContent = '저장'; }, 1500);
-            }).catch(function (err) { alert(err.message || err); });
-          });
-        });
         box.querySelectorAll('[data-seedit]').forEach(function (b) {
           b.addEventListener('click', function () {
             var x = staff.filter(function (s2) { return s2.id === Number(b.dataset.seedit); })[0];
             if (x) openStaffEdit(x);
           });
         });
+        /* 시찰별·교회별 검색 */
+        function applySeFilter() {
+          var sic = box.querySelector('[data-sefsic]').value;
+          var q = (box.querySelector('[data-sefq]').value || '').trim();
+          box.querySelectorAll('tr[data-sefind]').forEach(function (tr) {
+            var ok = (!sic || tr.dataset.sesic === sic) &&
+                     (!q || tr.dataset.sefind.indexOf(q) !== -1);
+            tr.hidden = !ok;
+          });
+        }
+        var fs = box.querySelector('[data-sefsic]');
+        var fq = box.querySelector('[data-sefq]');
+        if (fs) fs.addEventListener('change', applySeFilter);
+        if (fq) fq.addEventListener('input', applySeFilter);
         box.querySelectorAll('[data-selink]').forEach(function (b) {
           b.addEventListener('click', function () {
             var x = staff.filter(function (s2) { return s2.id === Number(b.dataset.selink); })[0];
@@ -1691,6 +1696,12 @@ document.addEventListener('DOMContentLoaded', function () {
       /* 수정 팝업: 교회 DB(church_staff)가 원본이며, 연동된 노회 명단도 함께 갱신한다 */
       function openStaffEdit(x) {
         var ROLES = ['시무장로', '원로장로', '은퇴장로'];
+        /* 교회 명부에 날짜가 없으면 연동된 노회 명단 기록으로 미리 채운다 */
+        var lk = rosterHit(x);
+        if (lk) {
+          if (!x.birth_date && lk.birth_date) x.birth_date = lk.birth_date;
+          if (!x.ordained_on && lk.ordained_on) x.ordained_on = lk.ordained_on;
+        }
         var mo = adminModal(
           '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(x.name) + ' — 장로 정보 수정</h3>' +
           '<div class="inline-form">' +
