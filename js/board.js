@@ -91,7 +91,7 @@ var SHSBoard = (function () {
       if (!isSuper) {
         cards += hubCard('church', '나의 교회', '');
         cards += hubCard('sichal', '나의 시찰');
-        cards += hubCard('mydues', '나의 상회비', '세례의무금');
+        cards += hubCard('mydues', '나의 상회비', '상회비 · 세례의무금');
         cards += hubCard('com', '내가 맡은 부서', '');
       }
       cards += hubCard('doc', '서류 발급', '');
