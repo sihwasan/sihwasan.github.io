@@ -171,6 +171,8 @@ body.pt-embed main { padding-top: 10px; }
     <h3 id="pt-title"></h3>
     <div class="pt-form" id="pt-form"></div>
     <div class="pt-actions">
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;cursor:pointer">
+        <input type="checkbox" id="pt-sealon" checked style="width:auto"> 당회장 도장 찍기</label>
       <button class="btn" id="pt-print">인쇄</button>
       <button class="btn" id="pt-pdf">PDF 저장</button>
       <button class="btn" id="pt-save">저장하기</button>
@@ -214,8 +216,11 @@ body.pt-embed main { padding-top: 10px; }
   }
   /* (인) 자리: 도장이 등록되어 있으면 함께 찍어 보여 준다 */
   function inMark() {
-    var s = viewSeal || sealImg;
-    return '<span class="inwrap">(인)' + (s ? '<img class="pt-seal" src="' + s + '" alt="도장">' : '') + '</span>';
+    var s = sealOn ? (viewSeal || sealImg) : null;
+    return '<span class="inwrap">(인)' + (s
+      ? '<img class="pt-seal" src="' + s + '" alt="도장" title="끌어서 위치를 옮길 수 있습니다" ' +
+        'style="left:' + (-8 + sealPos.dx) + 'px;margin-top:' + (-23 + sealPos.dy) + 'px">'
+      : '') + '</span>';
   }
   /* ___교회   당회장___(인) 서명줄 */
   function signChurch(church, role, name) {
@@ -760,6 +765,8 @@ body.pt-embed main { padding-top: 10px; }
   var user = null;
   var sealImg = null;     /* 내 도장 PNG (내 정보의 교회 직인·도장) */
   var viewSeal = null;    /* 받은 청원서를 열람할 때 제출자의 도장 */
+  var sealOn = true;      /* 당회장 도장을 찍을지 (선택사항) */
+  var sealPos = { dx: 0, dy: 0 };   /* 미리보기에서 끌어 옮긴 도장 위치 */
 
   function cloudOn() {
     return user && user.cloud && window.SHSCloud && SHSCloud.enabled();
@@ -969,7 +976,42 @@ body.pt-embed main { padding-top: 10px; }
   }
 
   function renderPaper() {
+    /* 저장된 청원서에는 도장 사용 여부·위치도 함께 담겨 있다 */
+    if (data._seal) {
+      sealOn = data._seal.on !== false;
+      sealPos = { dx: Number(data._seal.dx) || 0, dy: Number(data._seal.dy) || 0 };
+    }
+    var chk = document.getElementById('pt-sealon');
+    if (chk) chk.checked = sealOn;
     document.getElementById('pt-paper').innerHTML = cur.render(data);
+    bindSealDrag();
+  }
+
+  /* 미리보기의 도장을 끌어서 원하는 자리에 찍는다.
+   * 위치는 data._seal 에 저장되어 인쇄·PDF·저장본에 그대로 적용된다. */
+  function bindSealDrag() {
+    document.querySelectorAll('#pt-paper .pt-seal').forEach(function (img) {
+      img.style.cursor = 'move';
+      img.style.touchAction = 'none';
+      img.addEventListener('pointerdown', function (ev) {
+        ev.preventDefault();
+        var sx = ev.clientX, sy = ev.clientY;
+        var base = { dx: sealPos.dx, dy: sealPos.dy };
+        function onMove(e2) {
+          sealPos.dx = base.dx + (e2.clientX - sx);
+          sealPos.dy = base.dy + (e2.clientY - sy);
+          img.style.left = (-8 + sealPos.dx) + 'px';
+          img.style.marginTop = (-23 + sealPos.dy) + 'px';
+        }
+        function onUp() {
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          data._seal = { on: sealOn, dx: sealPos.dx, dy: sealPos.dy };
+        }
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      });
+    });
   }
 
   /* ----- PDF 저장 ----- */
@@ -1410,7 +1452,15 @@ body.pt-embed main { padding-top: 10px; }
   document.getElementById('pt-send').addEventListener('click', sendToSichal);
   document.getElementById('pt-clear').addEventListener('click', function () {
     data = {}; editingId = null; viewSeal = null; msg('');
+    sealOn = true; sealPos = { dx: 0, dy: 0 };
     renderForm(); renderPaper();
+  });
+
+  /* 당회장 도장 찍기 켜고 끄기 */
+  document.getElementById('pt-sealon').addEventListener('change', function () {
+    sealOn = this.checked;
+    data._seal = { on: sealOn, dx: sealPos.dx, dy: sealPos.dy };
+    renderPaper();
   });
 
   /* 구비서류 안내 박스 안에 끼워 넣어 보여 줄 때 */
