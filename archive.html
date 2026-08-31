@@ -145,13 +145,33 @@ document.addEventListener('DOMContentLoaded', function () {
     var h = '<h2 id="sec-구비서류-안내">구비서류 안내</h2>' +
       '<p>노회에 청원할 때에는 노회규칙 제36조에 따라 규정된 서식대로 <strong>당회장이 시찰회에 제출하여 진단받은 후</strong> ' +
       '노회 서기에게 접수하여야 합니다.</p>' +
-      '<p style="font-size:0.86rem;color:var(--gray-5)">청원 이름에 마우스를 올리시면 ' +
-      '그 청원이 무엇이고 언제 하는 것인지 설명이 나타납니다. (휴대폰에서는 눌러 주세요)</p>' +
+      '<p style="font-size:0.86rem;color:var(--gray-5)">청원 이름을 <strong>누르시면</strong> ' +
+      '그 청원이 무엇인지, 어떤 서류를 준비하고 어떤 서식을 작성하면 되는지 안내가 펼쳐집니다.</p>' +
       '<table class="tbl"><thead><tr><th style="width:230px">청원 구분</th><th>구비서류</th></tr></thead><tbody>';
     SHSForms.list.forEach(function (f, i) {
-      h += '<tr><td class="left">' +
+      h += '<tr class="fx-row" data-fx="' + i + '" style="cursor:pointer"><td class="left">' +
         '<span class="hint-word" data-form="' + i + '" tabindex="0">' + e(f.name) + '</span>' +
         '</td><td class="left">' + e(f.papers) + '</td></tr>';
+      /* 눌렀을 때 펼쳐지는 작성 안내 */
+      var papers = String(f.papers || '').split(/, ?/).filter(Boolean);
+      h += '<tr class="fx-detail" data-fxd="' + i + '" hidden><td colspan="2" class="left" ' +
+        'style="background:var(--gray-1);padding:16px 20px">' +
+        '<p style="margin:0 0 6px"><strong>무엇인가</strong> — ' + f.what + '</p>' +
+        '<p style="margin:0 0 12px"><strong>언제 하나</strong> — ' + f.when + '</p>' +
+        '<p style="margin:0 0 6px"><strong>준비할 서류</strong></p>' +
+        '<ul style="list-style:none;margin:0 0 14px;padding:0">' +
+        papers.map(function (x) {
+          return '<li style="margin:3px 0">&#10003; ' + e(x) + '</li>';
+        }).join('') + '</ul>' +
+        (f.forms && f.forms.length
+          ? '<p style="margin:0 0 8px"><strong>서식 작성·출력</strong> — 아래 버튼을 누르면 ' +
+            '청원서 작성 페이지에서 해당 서식이 열립니다. 내용을 채워 인쇄하거나 PDF로 저장하세요.</p>' +
+            f.forms.map(function (x) {
+              return '<a class="btn sm" style="margin:0 6px 6px 0" href="petition.html?form=' +
+                encodeURIComponent(x.f) + '">' + e(x.t) + '</a>';
+            }).join('')
+          : '') +
+        '</td></tr>';
     });
     return h + '</tbody></table><div id="ar-tip" class="hint-bubble" hidden></div>';
   }
@@ -181,15 +201,20 @@ document.addEventListener('DOMContentLoaded', function () {
       el.addEventListener('mouseleave', hide);
       el.addEventListener('focus', function () { show(el); });
       el.addEventListener('blur', hide);
-      el.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        if (!tip.hidden && tip.dataset.for === el.dataset.form) { hide(); return; }
-        tip.dataset.for = el.dataset.form;
-        show(el);
+    });
+    window.addEventListener('scroll', hide, { passive: true });
+
+    /* 청원 줄을 누르면 작성 안내가 펼쳐진다 */
+    area.querySelectorAll('.fx-row').forEach(function (tr) {
+      tr.addEventListener('click', function () {
+        hide();
+        var d = area.querySelector('.fx-detail[data-fxd="' + tr.dataset.fx + '"]');
+        if (!d) return;
+        var open = d.hidden;
+        area.querySelectorAll('.fx-detail').forEach(function (x) { x.hidden = true; });
+        d.hidden = !open;
       });
     });
-    document.addEventListener('click', hide);
-    window.addEventListener('scroll', hide, { passive: true });
   }
 
   /* ---------- 고시 모의고사 안내 ---------- */

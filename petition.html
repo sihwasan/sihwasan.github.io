@@ -1131,6 +1131,13 @@
     renderForm(); renderPaper();
   });
 
+  /* 구비서류 안내에서 ?form=아이디 로 들어오면 그 서식을 바로 연다 */
+  var fm = location.search.match(/[?&]form=([a-z]+)/);
+  if (fm) {
+    var f0 = FORMS.filter(function (x) { return x.id === fm[1]; })[0];
+    if (f0) cur = f0;
+  }
+
   renderMenu(); renderForm(); renderPaper();
   if (window.SHS && SHS.getUser) {
     SHS.getUser().then(function (u) {
