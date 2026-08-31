@@ -72,14 +72,36 @@
 </div>
 
 <main class="page-body container" id="main">
-  <!-- 보고서 종류 탭: 교회상황은 이 화면, 나머지는 청원서의 해당 서식으로 간다 -->
-  <div class="tabs" style="margin-bottom:16px">
-    <button type="button" class="active">교회상황 보고서</button>
-    <button type="button" onclick="location.href='petition.html?form=sichalreport'">시찰보고서</button>
-    <button type="button" onclick="location.href='petition.html?form=deptreport'">부 사업보고서</button>
-    <button type="button" onclick="location.href='petition.html?form=deptorg'">부 조직 보고서</button>
+  <!-- 보고서 종류 탭: 교회상황은 이 화면에서, 나머지 보고서 서식은 이 자리에 바로 열린다 -->
+  <div class="tabs" style="margin-bottom:16px" id="rp-tabs">
+    <button type="button" class="active" data-rt="">교회상황 보고서</button>
+    <button type="button" data-rt="sichalreport">시찰보고서</button>
+    <button type="button" data-rt="deptreport">부 사업보고서</button>
+    <button type="button" data-rt="deptorg">부 조직 보고서</button>
   </div>
   <div id="rp-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+  <div id="rp-embed" class="hidden">
+    <iframe id="rp-embed-frame" title="보고서 작성" style="width:100%;height:1700px;border:0;background:transparent"></iframe>
+  </div>
+  <script>
+  /* 탭 전환: 교회상황은 이 화면, 나머지는 청원 서식을 이 자리에 끼워 보여 준다 */
+  document.addEventListener('DOMContentLoaded', function () {
+    var tabs = document.querySelectorAll('#rp-tabs button');
+    tabs.forEach(function (b) {
+      b.addEventListener('click', function () {
+        tabs.forEach(function (x) { x.classList.toggle('active', x === b); });
+        var f = b.dataset.rt;
+        document.getElementById('rp-area').classList.toggle('hidden', !!f);
+        document.getElementById('rp-embed').classList.toggle('hidden', !f);
+        if (f) {
+          var fr = document.getElementById('rp-embed-frame');
+          var src = 'petition.html?embed=1&form=' + f;
+          if (fr.getAttribute('src') !== src) fr.setAttribute('src', src);
+        }
+      });
+    });
+  });
+  </script>
 </main>
 
 <div id="sheet-wrap"></div>

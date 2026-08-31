@@ -814,7 +814,11 @@ body.pt-embed main { padding-top: 10px; }
   function renderMenu() {
     var box = document.getElementById('pt-menu');
     var cats = [];
-    FORMS.forEach(function (f) { if (cats.indexOf(f.cat) === -1) cats.push(f.cat); });
+    /* 보고서 서식은 자료실 → 보고서 화면으로 옮겼다. 여기 메뉴에는 청원만 남긴다 */
+    FORMS.forEach(function (f) {
+      if (f.cat === '보고서') return;
+      if (cats.indexOf(f.cat) === -1) cats.push(f.cat);
+    });
     box.innerHTML = cats.map(function (c) {
       var on = cur.cat === c;
       return '<div class="ptm"><button type="button" class="' + (on ? 'on' : '') + '">' + e(c) + '</button><ul>' +
@@ -1427,7 +1431,10 @@ body.pt-embed main { padding-top: 10px; }
     /* 1단계: 청원 종류(분류) */
     function step1() {
       var cats = [];
-      FORMS.forEach(function (f) { if (cats.indexOf(f.cat) === -1) cats.push(f.cat); });
+      FORMS.forEach(function (f) {
+        if (f.cat === '보고서') return;   /* 보고서는 자료실 → 보고서에서 작성한다 */
+        if (cats.indexOf(f.cat) === -1) cats.push(f.cat);
+      });
       var mo = modal('<h3>청원서류 작성 도우미</h3>' +
         '<p>1단계 — 어떤 종류의 청원입니까?</p>' + stepBtns(cats));
       mo.querySelectorAll('[data-wz]').forEach(function (b, i) {
