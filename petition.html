@@ -88,7 +88,7 @@
 }
 #pt-paper h1.pt-title {
   text-align: center; font-size: 26px; letter-spacing: 6px; margin: 0 0 8px;
-  text-decoration: underline; text-underline-offset: 8px; font-weight: 700; color: #111;
+  font-weight: 700; color: #111;
 }
 #pt-paper .pt-sub { text-align: center; font-size: 14px; margin: 0 0 26px; }
 #pt-paper .pt-date { margin: 20px 0 6px; }
@@ -114,12 +114,8 @@
 }
 #pt-paper .pv.s { min-width: 50px; }
 #pt-paper .pv.l { min-width: 160px; }
-/* 제목 속 빈칸: 값이 채워지면 제목 밑줄을 그대로 따르고,
- * 비어 있을 때만 같은 높이에 빈 밑줄을 긋는다 */
+/* 제목에는 밑줄을 긋지 않는다 (제목 속 빈칸 포함) */
 #pt-paper h1.pt-title .pv { border-bottom: none; }
-#pt-paper h1.pt-title .pv:empty {
-  border-bottom: 2px solid #111; padding-bottom: 8px; min-width: 120px;
-}
 #pt-paper .dash { border: none; border-top: 2px dashed #666; margin: 34px 0; }
 #pt-paper .sec2 h1.pt-title { margin-top: 6px; }
 #pt-paper table.roster { border-collapse: collapse; width: 100%; margin: 10px 0; }
