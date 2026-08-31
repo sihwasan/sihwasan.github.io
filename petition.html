@@ -850,69 +850,40 @@
     }).then(function (r) {
       if (r.error) throw r.error;
       editingId = r.data.id;
-      msg('저장했습니다. 아래 내 청원서에서 언제든 다시 열 수 있습니다.');
-      renderForm(); renderPaper(); loadMine();
+      msg('저장했습니다. 나의 서류에서 언제든 다시 열 수 있습니다.');
+      renderForm(); renderPaper();
     }).catch(function (err) { msg('저장하지 못했습니다: ' + (err.message || err), true); });
   }
 
+  /* 저장·전달한 청원서 목록은 "나의 서류"에서 본다 */
   function loadMine() {
     var box = document.getElementById('pt-mine');
     if (!cloudOn()) {
-      box.innerHTML = '<h2>내 청원서</h2><div class="notice-banner">로그인하시면 작성한 청원서를 ' +
-        '저장해 두고 다시 열어 고치거나 삭제할 수 있습니다. ' +
+      box.innerHTML = '<div class="notice-banner">로그인하시면 작성한 청원서를 저장해 두고 ' +
+        '<strong>나의 서류</strong>에서 다시 열어 고치거나 삭제할 수 있습니다. ' +
         '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
       return;
     }
-    SHSCloud.init().then(function (c) {
-      return c.from('petitions').select('*').order('updated_at', { ascending: false });
-    }).then(function (r) {
-      if (r.error) throw r.error;
-      var rows = r.data || [];
-      var h = '<h2>내 청원서 (' + rows.length + ')</h2>';
-      if (!rows.length) {
-        h += '<p style="color:var(--gray-5)">저장한 청원서가 없습니다. 작성 후 <strong>저장하기</strong>를 눌러 보세요.</p>';
-        box.innerHTML = h;
-        return;
-      }
-      h += '<div style="overflow-x:auto"><table class="tbl pt-mine-tbl" style="max-width:940px"><thead><tr>' +
-        '<th>제목</th><th style="width:160px">마지막 수정</th><th style="width:170px">관리</th>' +
-        '</tr></thead><tbody>';
-      rows.forEach(function (p) {
-        h += '<tr><td class="left">' + e(p.title) + '</td>' +
-          '<td>' + e(String(p.updated_at).replace('T', ' ').slice(0, 16)) + '</td>' +
-          '<td><button class="btn sm" data-ptopen="' + p.id + '">열기·수정</button>' +
-          '<button class="btn danger sm" data-ptdel="' + p.id + '" data-ptn="' + e(p.title) + '">삭제</button></td></tr>';
-      });
-      h += '</tbody></table></div>';
-      box.innerHTML = h;
+    box.innerHTML = '<p style="font-size:0.9rem;color:var(--gray-7)">저장하거나 시찰로 보낸 청원서는 ' +
+      '<a href="mydocs.html" style="color:var(--navy);text-decoration:underline"><strong>나의 서류</strong></a>에서 ' +
+      '열람·수정·삭제하실 수 있습니다.</p>';
+  }
 
-      box.querySelectorAll('[data-ptopen]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var p = rows.filter(function (x) { return String(x.id) === b.dataset.ptopen; })[0];
-          if (!p) return;
-          var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
-          if (!f) { alert('이 서식은 더 이상 지원되지 않습니다.'); return; }
-          cur = f; data = p.data || {}; editingId = p.id; viewSeal = null; msg('');
-          renderMenu(); renderForm(); renderPaper();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-      });
-      box.querySelectorAll('[data-ptdel]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (!confirm('「' + b.dataset.ptn + '」을(를) 삭제할까요?')) return;
-          SHSCloud.init().then(function (c) {
-            return c.from('petitions').delete().eq('id', b.dataset.ptdel);
-          }).then(function (r2) {
-            if (r2.error) { alert(r2.error.message); return; }
-            if (String(editingId) === b.dataset.ptdel) { editingId = null; renderForm(); }
-            loadMine();
-          });
-        });
-      });
-    }).catch(function (err) {
-      box.innerHTML = '<h2>내 청원서</h2><div class="notice-banner">불러오지 못했습니다: ' +
-        e(err.message || err) + '</div>';
-    });
+  /* mydocs.html 에서 "열기·수정"으로 들어오면 그 청원서를 불러온다 */
+  function openFromUrl() {
+    var m = location.search.match(/[?&]open=(\d+)/);
+    if (!m || !cloudOn()) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('petitions').select('*').eq('id', m[1]).single();
+    }).then(function (r) {
+      if (r.error || !r.data) return;
+      var p = r.data;
+      var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
+      if (!f) return;
+      cur = f; data = p.data || {}; editingId = p.id; viewSeal = null;
+      renderMenu(); renderForm(); renderPaper();
+      msg('나의 서류에서 「' + p.title + '」을(를) 불러왔습니다. 고친 뒤 저장하기를 누르면 갱신됩니다.');
+    }).catch(function () {});
   }
 
   /* 메뉴 밖을 누르면 열린 드롭다운을 닫는다 */
@@ -1064,8 +1035,7 @@
         }).then(function (r) {
           if (r.error) throw r.error;
           wrap.remove();
-          msg(sc + ' 서기에게 전달했습니다. 처리 상황은 아래 보낸 청원서에서 보실 수 있습니다.');
-          loadSent();
+          msg(sc + ' 서기에게 전달했습니다. 처리 상황은 나의 서류에서 보실 수 있습니다.');
         }).catch(function (err) {
           wrap.querySelector('#ptm-msg').textContent = '전달하지 못했습니다: ' + (err.message || err);
         });
@@ -1080,43 +1050,6 @@
       if (s) { askSichalAndSend(); return; }
       askSeal().then(function (saved) { if (saved) askSichalAndSend(); });
     });
-  }
-
-  /* ----- 보낸 청원서 ----- */
-  function loadSent() {
-    var box = document.getElementById('pt-sent');
-    if (!cloudOn()) { box.innerHTML = ''; return; }
-    SHSCloud.init().then(function (c) {
-      return c.from('petition_submissions').select('*')
-        .eq('user_id', user.id).order('created_at', { ascending: false });
-    }).then(function (r) {
-      var rows = r.data || [];
-      if (!rows.length) { box.innerHTML = ''; return; }
-      var h = '<h2>보낸 청원서 (' + rows.length + ')</h2>' +
-        '<div style="overflow-x:auto"><table class="tbl" style="max-width:940px"><thead><tr>' +
-        '<th>제목</th><th style="width:110px">시찰</th><th style="width:150px">보낸 날</th>' +
-        '<th style="width:100px">상태</th><th style="width:90px">관리</th></tr></thead><tbody>';
-      rows.forEach(function (p) {
-        var st = p.status === '접수' ? '<span class="pass">접수</span>'
-          : p.status === '반려' ? '<span class="fail">반려</span>' : e(p.status);
-        h += '<tr><td class="left">' + e(p.title) +
-          (p.note ? '<br><small style="color:var(--gray-5)">' + e(p.note) + '</small>' : '') + '</td>' +
-          '<td>' + e(p.sichal) + '</td>' +
-          '<td>' + e(String(p.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
-          '<td>' + st + '</td>' +
-          '<td>' + (p.status === '제출됨'
-            ? '<button class="btn danger sm" data-ptsdel="' + p.id + '">회수</button>' : '') + '</td></tr>';
-      });
-      box.innerHTML = h + '</tbody></table></div>';
-      box.querySelectorAll('[data-ptsdel]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          if (!confirm('전달을 회수(삭제)할까요?')) return;
-          SHSCloud.init().then(function (c) {
-            return c.from('petition_submissions').delete().eq('id', b.dataset.ptsdel);
-          }).then(function () { loadSent(); });
-        });
-      });
-    }).catch(function () {});
   }
 
   /* ----- 받은 청원서 (시찰장·서기·관리자) ----- */
@@ -1202,7 +1135,7 @@
   if (window.SHS && SHS.getUser) {
     SHS.getUser().then(function (u) {
       user = u;
-      loadMine(); loadSeal(); loadSent(); loadInbox();
+      loadMine(); loadSeal(); loadInbox(); openFromUrl();
     });
   } else {
     loadMine();
