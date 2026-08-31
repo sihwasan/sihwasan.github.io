@@ -1712,6 +1712,29 @@ input.dp-bad { border-color: var(--red); }
 .dues-chart .dc-l { font-size: 0.74rem; color: var(--gray-7); margin-top: 5px; }
 .dues-chart .cur .dc-l { font-weight: 700; color: var(--navy); }
 
+/* 시찰별 진행 그래프 */
+.dues-sc-chart {
+  border: 1px solid var(--gray-2); border-radius: 10px;
+  padding: 14px 16px; margin: 14px 0;
+}
+.dues-sc-chart .dsc-title { font-weight: 700; margin-bottom: 10px; }
+.dues-sc-chart .dsc-title span { font-weight: 400; font-size: 0.8rem; color: var(--gray-5); }
+.dues-sc-chart .dsc-row { display: flex; align-items: center; gap: 12px; margin: 7px 0; }
+.dues-sc-chart .dsc-name { width: 70px; flex: none; font-size: 0.85rem; color: var(--gray-7); }
+.dues-sc-chart .dsc-track {
+  flex: 1; height: 14px; background: var(--gray-1); border-radius: 7px; overflow: hidden;
+}
+.dues-sc-chart .dsc-bar { height: 100%; background: var(--navy-light); border-radius: 7px; transition: width .3s; }
+.dues-sc-chart .dsc-val { width: 150px; flex: none; font-size: 0.8rem; color: var(--gray-7); text-align: right; }
+
+/* 완납/미납 필터와 검색 */
+.dues-filter { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 16px 0 4px; }
+.dues-filter .dues-ftabs { margin-bottom: 0; }
+.dues-filter input[type="search"] {
+  border: 1px solid var(--gray-2); border-radius: 8px; padding: 7px 12px;
+  font-size: 0.88rem; min-width: 190px;
+}
+
 /* 교회 × 월 납부표 */
 .dues-tbl { font-size: 0.85rem; }
 .dues-tbl th.cur, .dues-tbl td.cur { background: rgba(176, 141, 62, 0.08); }
