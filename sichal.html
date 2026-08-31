@@ -247,17 +247,17 @@ document.addEventListener('DOMContentLoaded', function () {
         '</div></div>';
     })();
 
-    /* 회계 관리·회의록·교회상황 보고서는 자기 시찰만 볼 수 있다.
+    /* 시찰 자료실·회계 관리·회의록·교회상황 보고서는 자기 시찰만 볼 수 있다.
      * (시찰 임원·노회 관리자이거나, 내 교회가 이 시찰 소속일 때) */
     var myOwnSichal = isOfficer || churches.some(function (x) { return x.name === myChurch; });
-    if (!myOwnSichal && (tab === 'ledger' || tab === 'minutes' || tab === 'report')) tab = 'church';
+    if (!myOwnSichal && (tab === 'doc' || tab === 'ledger' || tab === 'minutes' || tab === 'report')) tab = 'church';
 
     h += '<div class="tabs" id="si-tabs">' +
       '<button class="' + (tab === 'church'  ? 'active' : '') + '" data-t="church">관내 교회 (' + churches.length + ')</button>' +
       '<button class="' + (tab === 'pastor'  ? 'active' : '') + '" data-t="pastor">목회자 명단 (' + pastors.length + ')</button>' +
-      '<button class="' + (tab === 'doc'     ? 'active' : '') + '" data-t="doc">시찰 자료실 (' + docs.length + ')</button>' +
       (myOwnSichal
-        ? '<button class="' + (tab === 'minutes' ? 'active' : '') + '" data-t="minutes">회의록 (' + minutes.length + ')</button>' +
+        ? '<button class="' + (tab === 'doc'     ? 'active' : '') + '" data-t="doc">시찰 자료실 (' + docs.length + ')</button>' +
+          '<button class="' + (tab === 'minutes' ? 'active' : '') + '" data-t="minutes">회의록 (' + minutes.length + ')</button>' +
           '<button class="' + (tab === 'ledger'  ? 'active' : '') + '" data-t="ledger">' + e(NAME) + ' 회계 관리</button>' +
           '<button class="' + (tab === 'report'  ? 'active' : '') + '" data-t="report">교회상황 보고서</button>'
         : '') +
