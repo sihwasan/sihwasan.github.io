@@ -46,7 +46,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 분류. 순서대로 위쪽 띠에 나타난다. */
   var SECTIONS = [
-    { key: '서식',     desc: '노회에 올리는 각종 청원 서식입니다.' },
+    { key: '서식', label: '청원서 작성',
+      desc: '노회에 올리는 각종 청원 서식을 홈페이지에서 바로 작성해 인쇄·저장할 수 있습니다.' },
     { key: '고시',     desc: '목사·장로·전도사·목사후보생 고시 모의고사입니다.' },
     { key: '회의자료', desc: '정기노회 회의순서(노회 책자)와 각 부 보고서 등 회의에 쓰인 자료입니다.' },
     { key: '결의사항', desc: '정기노회와 임원회에서 결의한 내용입니다.' },
@@ -290,9 +291,24 @@ document.addEventListener('DOMContentLoaded', function () {
        * 임원회의록·회의록·공문·회계는 임원만, 증명서 발급대장과 대외비 문서는
        * 관리자만 볼 수 있으므로, 그 아래 사람에게는 목록 자체를 보이지 않는다. */
       if (list.length && !list.some(function (a) { return canOpen(a.access); })) return;
-      html += '<h2>' + e(s.key) + '</h2>' +
-        '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>' +
-        levelNote(list);
+      html += '<h2>' + e(s.label || s.key) + '</h2>' +
+        '<p style="color:var(--gray-5);font-size:0.88rem">' + e(s.desc) + '</p>';
+      /* 청원서 작성: 작성 도구가 바로 보이고, 기존 서식 파일은 접어 둔다 */
+      if (s.key === '서식') {
+        html += '<div class="admin-card" style="max-width:720px">' +
+          '<h3 style="margin-top:0">청원서 온라인 작성</h3>' +
+          '<p style="font-size:0.9rem;color:var(--gray-7)">청빙·고시·이명·연기·보고서 등 22종 청원 서식을 ' +
+          '골라 내용을 입력하면 완성된 청원서를 <strong>인쇄</strong>하거나 <strong>PDF로 저장</strong>할 수 있고, ' +
+          '로그인하시면 작성한 청원서를 저장해 두었다가 다시 고쳐 쓸 수 있습니다.</p>' +
+          '<a class="btn" href="petition.html">청원서 작성하러 가기</a></div>';
+        if (list.length) {
+          html += '<details style="margin:14px 0 0;max-width:900px">' +
+            '<summary style="cursor:pointer;color:var(--gray-7);font-size:0.9rem">기존 서식 파일 보기 (' +
+            list.length + '건)</summary>' + levelNote(list) + itemRows(list, s.key) + '</details>';
+        }
+        return;
+      }
+      html += levelNote(list);
       /* 고시 분류는 올려 둔 자료가 없으면 목록을 비우고 모의고사 안내만 보인다 */
       if (s.key !== '고시' || list.length) html += itemRows(list, s.key);
       if (s.key === '고시') html += examHtml();

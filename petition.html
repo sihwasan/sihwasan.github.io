@@ -12,16 +12,39 @@
 <meta property="og:url" content="https://sihwasan.org/petition.html">
 <link rel="stylesheet" href="css/style.css?v=20260831zj">
 <style>
-/* ----- 작성 화면 ----- */
-.pt-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
-.pt-pick button {
-  border: 1px solid var(--gray-2); background: var(--white); border-radius: 8px;
-  padding: 8px 14px; font-size: 0.88rem; cursor: pointer; color: var(--ink);
+/* ----- 청원서 종류 메뉴 (마우스를 올리면 하위 서식이 열린다) ----- */
+.pt-menu {
+  display: flex; flex-wrap: wrap; background: var(--navy);
+  border-radius: 10px; padding: 0 6px; margin: 14px 0 22px;
 }
-.pt-pick button:hover { background: var(--gray-1); }
-.pt-pick button.active { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 700; }
-.pt-cat { flex-basis: 100%; font-size: 0.8rem; color: var(--gray-5); margin: 6px 0 -2px; font-weight: 700; }
-.pt-form { display: flex; flex-wrap: wrap; gap: 12px; max-width: 900px; margin-bottom: 18px; }
+.pt-menu .ptm { position: relative; }
+.pt-menu .ptm > button {
+  background: none; border: none; color: #fff; padding: 13px 18px;
+  font-size: 0.94rem; font-weight: 600; cursor: pointer; border-radius: 10px 10px 0 0;
+}
+.pt-menu .ptm:hover > button, .pt-menu .ptm > button.on { background: var(--navy-dark); }
+.pt-menu .ptm ul {
+  display: none; position: absolute; left: 0; top: 100%; z-index: 80;
+  min-width: 250px; margin: 0; padding: 6px 0; list-style: none;
+  background: var(--white); border: 1px solid var(--gray-2); border-radius: 0 0 10px 10px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+}
+.pt-menu .ptm:hover ul, .pt-menu .ptm.open ul { display: block; }
+.pt-menu .ptm ul button {
+  display: block; width: 100%; text-align: left; background: none; border: none;
+  padding: 10px 16px; font-size: 0.9rem; color: var(--ink); cursor: pointer;
+}
+.pt-menu .ptm ul button:hover { background: var(--gray-1); }
+.pt-menu .ptm ul button.active { color: var(--navy); font-weight: 700; background: var(--gray-1); }
+
+/* ----- 입력 박스 ----- */
+.pt-card {
+  border: 1px solid var(--gray-2); border-radius: 12px; background: var(--white);
+  padding: 20px 22px; max-width: 940px; margin-bottom: 26px;
+}
+.pt-card h3 { margin: 0 0 14px; }
+.pt-card h3 small { font-weight: 400; font-size: 0.8rem; color: var(--gray-5); margin-left: 8px; }
+.pt-form { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .pt-form .field { flex: 1 1 200px; }
 .pt-form .field.wide { flex: 1 1 100%; }
 .pt-form label { display: block; font-size: 0.82rem; color: var(--gray-7); margin-bottom: 4px; }
@@ -30,7 +53,8 @@
   padding: 8px 10px; font-size: 0.92rem; font-family: inherit; background: var(--white);
 }
 .pt-form textarea { min-height: 70px; resize: vertical; }
-.pt-actions { display: flex; gap: 10px; margin: 6px 0 22px; }
+.pt-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pt-mine-tbl td .btn { margin-right: 4px; }
 
 /* ----- 미리보기 (A4 느낌) ----- */
 #pt-paper {
@@ -74,12 +98,14 @@
 
 /* ----- 인쇄: 종이만 나온다 ----- */
 @media print {
-  body > *:not(#pt-print-wrap) { display: none !important; }
-  #pt-print-wrap { display: block !important; }
-  #pt-paper { border: none; box-shadow: none; padding: 0; max-width: none; margin: 0; }
+  body * { visibility: hidden; }
+  #pt-paper, #pt-paper * { visibility: visible; }
+  #pt-paper {
+    position: absolute; left: 0; top: 0; width: 100%;
+    border: none; box-shadow: none; padding: 0; margin: 0; max-width: none;
+  }
   @page { size: A4 portrait; margin: 18mm 16mm; }
 }
-#pt-print-wrap { display: block; }
 </style>
 </head>
 <body>
@@ -92,16 +118,28 @@
 </div>
 
 <main class="page-body container" id="main">
-  <p>작성할 서식을 고르고 내용을 입력하면 아래에 완성된 청원서가 보입니다.
-    <strong>인쇄</strong>를 누르면 종이 서식 그대로 출력되며, 도장(인) 자리는 비워져 있으니 출력 후 날인해 주세요.</p>
+  <p>위 메뉴에서 청원서 종류에 마우스를 올려 서식을 고르고, 내용을 입력하면 아래에 완성된 청원서가 보입니다.
+    <strong>인쇄</strong>·<strong>PDF 저장</strong>으로 출력하고, <strong>저장하기</strong>를 누르면
+    작성한 청원서가 내 계정에 보관되어 언제든 다시 열어 고칠 수 있습니다.
+    도장(인) 자리는 비워져 있으니 출력 후 날인해 주세요.</p>
 
-  <div class="pt-pick" id="pt-pick"></div>
-  <div class="pt-form" id="pt-form"></div>
-  <div class="pt-actions">
-    <button class="btn" id="pt-print">인쇄</button>
-    <button class="btn ghost" id="pt-clear">입력 지우기</button>
+  <nav class="pt-menu" id="pt-menu" aria-label="청원서 종류"></nav>
+
+  <div class="pt-card">
+    <h3 id="pt-title"></h3>
+    <div class="pt-form" id="pt-form"></div>
+    <div class="pt-actions">
+      <button class="btn" id="pt-print">인쇄</button>
+      <button class="btn" id="pt-pdf">PDF 저장</button>
+      <button class="btn" id="pt-save">저장하기</button>
+      <button class="btn ghost" id="pt-clear">입력 지우기</button>
+      <span class="form-msg" id="pt-msg" style="margin:0"></span>
+    </div>
   </div>
 
+  <div id="pt-mine"></div>
+
+  <h2 style="margin-top:8px">미리보기</h2>
   <div id="pt-print-wrap"><div id="pt-paper"></div></div>
 </main>
 
@@ -639,42 +677,66 @@
   /* ================= 화면 구성 ================= */
   var cur = FORMS[0];
   var data = {};
+  var editingId = null;   /* 저장한 청원서를 다시 열어 고치는 중이면 그 id */
+  var user = null;
 
-  function renderPick() {
-    var box = document.getElementById('pt-pick');
+  function cloudOn() {
+    return user && user.cloud && window.SHSCloud && SHSCloud.enabled();
+  }
+  function msg(t, err) {
+    var m = document.getElementById('pt-msg');
+    m.className = 'form-msg' + (err ? ' err' : '');
+    m.textContent = t || '';
+  }
+
+  /* 헤더 메뉴: 청원서 종류를 나열하고, 마우스를 올리면 하위 서식이 나온다 */
+  function renderMenu() {
+    var box = document.getElementById('pt-menu');
     var cats = [];
     FORMS.forEach(function (f) { if (cats.indexOf(f.cat) === -1) cats.push(f.cat); });
-    var h = '';
-    cats.forEach(function (c) {
-      h += '<div class="pt-cat">' + e(c) + '</div>';
-      FORMS.filter(function (f) { return f.cat === c; }).forEach(function (f) {
-        h += '<button data-pt="' + f.id + '"' + (cur.id === f.id ? ' class="active"' : '') + '>' +
-          e(f.title) + '</button>';
+    box.innerHTML = cats.map(function (c) {
+      var on = cur.cat === c;
+      return '<div class="ptm"><button type="button" class="' + (on ? 'on' : '') + '">' + e(c) + '</button><ul>' +
+        FORMS.filter(function (f) { return f.cat === c; }).map(function (f) {
+          return '<li><button type="button" data-pt="' + f.id + '"' +
+            (cur.id === f.id ? ' class="active"' : '') + '>' + e(f.title) + '</button></li>';
+        }).join('') + '</ul></div>';
+    }).join('');
+    /* 휴대폰처럼 마우스가 없는 화면에서는 눌러서 연다 */
+    box.querySelectorAll('.ptm > button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var wrap = b.parentElement;
+        box.querySelectorAll('.ptm').forEach(function (x) { if (x !== wrap) x.classList.remove('open'); });
+        wrap.classList.toggle('open');
       });
     });
-    box.innerHTML = h;
-    box.querySelectorAll('button').forEach(function (b) {
+    box.querySelectorAll('ul button').forEach(function (b) {
       b.addEventListener('click', function () {
         cur = FORMS.filter(function (f) { return f.id === b.dataset.pt; })[0];
-        data = {};
-        renderPick(); renderForm(); renderPaper();
+        data = {}; editingId = null; msg('');
+        renderMenu(); renderForm(); renderPaper();
       });
     });
   }
 
   function renderForm() {
+    document.getElementById('pt-title').innerHTML = e(cur.title) +
+      '<small>' + e(cur.cat) + (editingId ? ' · 저장한 청원서를 고치는 중' : '') + '</small>';
     var box = document.getElementById('pt-form');
     var h = '';
     cur.fields.forEach(function (f) {
       h += '<div class="field' + (f.cls === 'wide' || f.type === 'textarea' ? ' wide' : '') + '">' +
         '<label for="ptf-' + f.k + '">' + e(f.label) + '</label>';
+      var v = e(data[f.k] || '');
       if (f.type === 'select') {
         h += '<select id="ptf-' + f.k + '" data-ptf="' + f.k + '"><option value=""></option>' +
-          f.opt.map(function (o) { return '<option>' + e(o) + '</option>'; }).join('') + '</select>';
+          f.opt.map(function (o) {
+            return '<option' + (o === data[f.k] ? ' selected' : '') + '>' + e(o) + '</option>';
+          }).join('') + '</select>';
       } else if (f.type === 'textarea') {
-        h += '<textarea id="ptf-' + f.k + '" data-ptf="' + f.k + '"></textarea>';
+        h += '<textarea id="ptf-' + f.k + '" data-ptf="' + f.k + '">' + v + '</textarea>';
       } else {
-        h += '<input type="' + (f.type || 'text') + '" id="ptf-' + f.k + '" data-ptf="' + f.k + '">';
+        h += '<input type="' + (f.type || 'text') + '" id="ptf-' + f.k + '" data-ptf="' + f.k + '" value="' + v + '">';
       }
       h += '</div>';
     });
@@ -696,12 +758,135 @@
     document.getElementById('pt-paper').innerHTML = cur.render(data);
   }
 
+  /* ----- PDF 저장 ----- */
+  var pdfLoading = null;
+  function loadPdfTool() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (pdfLoading) return pdfLoading;
+    pdfLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+      sc.onload = function () { resolve(window.html2pdf); };
+      sc.onerror = function () { pdfLoading = null; reject(new Error('PDF 도구를 불러오지 못했습니다.')); };
+      document.head.appendChild(sc);
+    });
+    return pdfLoading;
+  }
+  function savePdf() {
+    var btn = document.getElementById('pt-pdf');
+    btn.disabled = true; btn.textContent = '만드는 중...';
+    function done() { btn.disabled = false; btn.textContent = 'PDF 저장'; }
+    var stage = document.createElement('div');
+    stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:760px;background:#fff';
+    stage.innerHTML = '<div style="padding:10px">' + cur.render(data) + '</div>';
+    stage.querySelector('div').style.cssText += ";font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.9;color:#111";
+    document.body.appendChild(stage);
+    loadPdfTool().then(function (html2pdf) {
+      return html2pdf().set({
+        margin: 12,
+        filename: cur.title + '.pdf',
+        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(stage.firstChild).save();
+    }).then(function () { stage.remove(); done(); })
+      .catch(function (err) { stage.remove(); done(); alert(err.message || err); });
+  }
+
+  /* ----- 저장하기 / 내 청원서 ----- */
+  function mineTitle() {
+    var extra = data.church || data.name || data.sichal || data.dept || '';
+    return cur.title + (extra ? ' — ' + extra : '');
+  }
+  function saveMine() {
+    if (!cloudOn()) { msg('저장하시려면 구글 또는 이메일 계정으로 로그인해 주세요.', true); return; }
+    msg('저장하는 중...');
+    SHSCloud.init().then(function (c) {
+      var row = { form_id: cur.id, form_title: cur.title, title: mineTitle(),
+                  data: data, updated_at: new Date().toISOString() };
+      if (editingId) return c.from('petitions').update(row).eq('id', editingId).select('id').single();
+      return c.from('petitions').insert(row).select('id').single();
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      editingId = r.data.id;
+      msg('저장했습니다. 아래 내 청원서에서 언제든 다시 열 수 있습니다.');
+      renderForm(); renderPaper(); loadMine();
+    }).catch(function (err) { msg('저장하지 못했습니다: ' + (err.message || err), true); });
+  }
+
+  function loadMine() {
+    var box = document.getElementById('pt-mine');
+    if (!cloudOn()) {
+      box.innerHTML = '<h2>내 청원서</h2><div class="notice-banner">로그인하시면 작성한 청원서를 ' +
+        '저장해 두고 다시 열어 고치거나 삭제할 수 있습니다. ' +
+        '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return c.from('petitions').select('*').order('updated_at', { ascending: false });
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      var rows = r.data || [];
+      var h = '<h2>내 청원서 (' + rows.length + ')</h2>';
+      if (!rows.length) {
+        h += '<p style="color:var(--gray-5)">저장한 청원서가 없습니다. 작성 후 <strong>저장하기</strong>를 눌러 보세요.</p>';
+        box.innerHTML = h;
+        return;
+      }
+      h += '<div style="overflow-x:auto"><table class="tbl pt-mine-tbl" style="max-width:940px"><thead><tr>' +
+        '<th>제목</th><th style="width:160px">마지막 수정</th><th style="width:170px">관리</th>' +
+        '</tr></thead><tbody>';
+      rows.forEach(function (p) {
+        h += '<tr><td class="left">' + e(p.title) + '</td>' +
+          '<td>' + e(String(p.updated_at).replace('T', ' ').slice(0, 16)) + '</td>' +
+          '<td><button class="btn sm" data-ptopen="' + p.id + '">열기·수정</button>' +
+          '<button class="btn danger sm" data-ptdel="' + p.id + '" data-ptn="' + e(p.title) + '">삭제</button></td></tr>';
+      });
+      h += '</tbody></table></div>';
+      box.innerHTML = h;
+
+      box.querySelectorAll('[data-ptopen]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var p = rows.filter(function (x) { return String(x.id) === b.dataset.ptopen; })[0];
+          if (!p) return;
+          var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
+          if (!f) { alert('이 서식은 더 이상 지원되지 않습니다.'); return; }
+          cur = f; data = p.data || {}; editingId = p.id; msg('');
+          renderMenu(); renderForm(); renderPaper();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+      box.querySelectorAll('[data-ptdel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('「' + b.dataset.ptn + '」을(를) 삭제할까요?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('petitions').delete().eq('id', b.dataset.ptdel);
+          }).then(function (r2) {
+            if (r2.error) { alert(r2.error.message); return; }
+            if (String(editingId) === b.dataset.ptdel) { editingId = null; renderForm(); }
+            loadMine();
+          });
+        });
+      });
+    }).catch(function (err) {
+      box.innerHTML = '<h2>내 청원서</h2><div class="notice-banner">불러오지 못했습니다: ' +
+        e(err.message || err) + '</div>';
+    });
+  }
+
   document.getElementById('pt-print').addEventListener('click', function () { window.print(); });
+  document.getElementById('pt-pdf').addEventListener('click', savePdf);
+  document.getElementById('pt-save').addEventListener('click', saveMine);
   document.getElementById('pt-clear').addEventListener('click', function () {
-    data = {}; renderForm(); renderPaper();
+    data = {}; editingId = null; msg('');
+    renderForm(); renderPaper();
   });
 
-  renderPick(); renderForm(); renderPaper();
+  renderMenu(); renderForm(); renderPaper();
+  if (window.SHS && SHS.getUser) {
+    SHS.getUser().then(function (u) { user = u; loadMine(); });
+  } else {
+    loadMine();
+  }
 })();
 </script>
 </body>
