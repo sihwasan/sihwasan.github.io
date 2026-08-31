@@ -1630,7 +1630,8 @@ document.addEventListener('DOMContentLoaded', function () {
                   ? '<span class="pass">연동됨</span>'
                   : '<button class="btn ghost sm" data-selink="' + x.id + '">명단에 추가</button>') + '</td>'
               : '') +
-            '<td><button class="btn sm" data-sesave="' + x.id + '">저장</button></td></tr>';
+            '<td><button class="btn sm" data-sesave="' + x.id + '">저장</button> ' +
+            '<button class="btn ghost sm" data-seedit="' + x.id + '">수정</button></td></tr>';
         });
         h += '</tbody></table></div>';
         box.innerHTML = h;
@@ -1659,6 +1660,12 @@ document.addEventListener('DOMContentLoaded', function () {
             }).catch(function (err) { alert(err.message || err); });
           });
         });
+        box.querySelectorAll('[data-seedit]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var x = staff.filter(function (s2) { return s2.id === Number(b.dataset.seedit); })[0];
+            if (x) openStaffEdit(x);
+          });
+        });
         box.querySelectorAll('[data-selink]').forEach(function (b) {
           b.addEventListener('click', function () {
             var x = staff.filter(function (s2) { return s2.id === Number(b.dataset.selink); })[0];
@@ -1677,6 +1684,89 @@ document.addEventListener('DOMContentLoaded', function () {
               SHSCloud.log('create', '시무장로 명단 연동 추가', x.name + ' (' + x.church + ')');
               renderServingElders();
             }).catch(function (err) { alert(err.message || err); });
+          });
+        });
+      }
+
+      /* 수정 팝업: 교회 DB(church_staff)가 원본이며, 연동된 노회 명단도 함께 갱신한다 */
+      function openStaffEdit(x) {
+        var ROLES = ['시무장로', '원로장로', '은퇴장로'];
+        var mo = adminModal(
+          '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(x.name) + ' — 장로 정보 수정</h3>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 130px"><label>성명</label>' +
+          '<input type="text" id="sem-name" value="' + e(x.name) + '"></div>' +
+          '<div class="field" style="flex:0 0 130px"><label>구분</label><select id="sem-role">' +
+          ROLES.map(function (r0) {
+            return '<option' + (x.role === r0 ? ' selected' : '') + '>' + r0 + '</option>';
+          }).join('') + '</select></div>' +
+          '<div class="field"><label>교회</label>' +
+          '<input type="text" id="sem-church" value="' + e(x.church || '') + '"></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 160px"><label>생년월일</label>' +
+          '<input type="date" id="sem-birth" value="' + e(x.birth_date || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 160px"><label>장립일</label>' +
+          '<input type="date" id="sem-ord" value="' + e(x.ordained_on || '') + '"></div>' +
+          '<div class="field"><label>연락처</label>' +
+          '<input type="text" id="sem-phone" value="' + e(x.phone || '') + '" placeholder="010-0000-0000"></div>' +
+          '</div>' +
+          '<div class="field"><label>비고</label>' +
+          '<input type="text" id="sem-note" value="' + e(x.note || '') + '"></div>' +
+          '<p style="font-size:0.8rem;color:var(--gray-5)">저장하면 교회 DB(교회 관리 명부)가 고쳐지고, ' +
+          '노회 명단과 연동된 분은 명단도 함께 갱신됩니다.</p>' +
+          '<div style="margin-top:6px"><button class="btn" id="sem-save">저장</button> ' +
+          '<button class="btn danger" id="sem-del" style="float:right">명부에서 삭제</button></div>' +
+          '<div class="form-msg" id="sem-msg"></div>');
+
+        document.getElementById('sem-save').addEventListener('click', function () {
+          var msg = document.getElementById('sem-msg');
+          var d = {
+            name: document.getElementById('sem-name').value.trim(),
+            role: document.getElementById('sem-role').value,
+            church: document.getElementById('sem-church').value.trim(),
+            birth_date: document.getElementById('sem-birth').value || null,
+            ordained_on: document.getElementById('sem-ord').value || null,
+            phone: document.getElementById('sem-phone').value.trim() || null,
+            note: document.getElementById('sem-note').value.trim() || null,
+            updated_at: new Date().toISOString(), updated_by: user.name
+          };
+          if (!d.name || !d.church) {
+            msg.className = 'form-msg err';
+            msg.textContent = '성명과 교회를 입력해 주세요.';
+            return;
+          }
+          msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+          var linked = rosterHit(x);
+          SHSCloud.init().then(function (c) {
+            return c.from('church_staff').update(d).eq('id', x.id).then(function (r2) {
+              if (r2.error) throw r2.error;
+              if (!linked) return r2;
+              return c.from('roster').update({
+                name: d.name, church: d.church, position: d.role,
+                birth_date: d.birth_date, ordained_on: d.ordained_on, phone: d.phone
+              }).eq('id', linked.id);
+            });
+          }).then(function (r2) {
+            if (r2 && r2.error) { msg.className = 'form-msg err'; msg.textContent = r2.error.message; return; }
+            SHSCloud.log('update', '장로 정보 수정(교회 DB 연동)', d.name + ' (' + d.church + ')');
+            mo.close();
+            renderServingElders();
+          }).catch(function (err) {
+            msg.className = 'form-msg err'; msg.textContent = err.message || String(err);
+          });
+        });
+
+        document.getElementById('sem-del').addEventListener('click', function () {
+          if (!confirm(x.name + ' 장로를 교회 명부에서 삭제할까요? 되돌릴 수 없습니다.\n' +
+            '(노회 명단에 있는 기록은 회원 신상관리에서 따로 정리합니다)')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('church_staff').delete().eq('id', x.id);
+          }).then(function (r2) {
+            if (r2.error) { alert(r2.error.message); return; }
+            SHSCloud.log('delete', '장로 명부 삭제', x.name + ' (' + x.church + ')');
+            mo.close();
+            renderServingElders();
           });
         });
       }
