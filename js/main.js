@@ -223,7 +223,10 @@
     NAV.forEach(function (m) {
       /* sichal.html?s=북부시찰 처럼 물음표가 붙은 주소도 알아보게 한다 */
       var active = (here === m.href.split('?')[0] || m.sub.some(function (s) {
-        return s.h.split('#')[0].split('?')[0] === here;
+        var page = s.h.split('#')[0].split('?')[0];
+        /* 대시보드는 상단에 제 메뉴가 따로 생기므로 여기서는 켜지 않는다 (중복 선택 방지) */
+        if (page === 'dashboard.html') return false;
+        return page === here;
       })) ? ' active' : '';
       html += '<li class="gnb-item' + active + '"><a href="' + m.href + '">' + m.title + '</a><div class="gnb-sub">';
       m.sub.forEach(function (s) { html += '<a href="' + s.h + '">' + s.t + '</a>'; });
