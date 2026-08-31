@@ -61,8 +61,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var pendings = visible.filter(function (p) { return p.role === 'pending'; });
 
       var html = '';
-      html += '<div class="notice-banner">서버에 등록된 실제 회원 목록입니다. ' +
-        '승인대기 회원의 정회원 설정과 회원명단 관리 권한: <strong>관리자 (노회장, 서기, 간사)</strong></div>';
+      html += '<div class="notice-banner">본 회원 신상은 <strong>관리자(노회장, 서기, 간사)</strong>만 열람 가능합니다.</div>';
 
       if (pendings.length) {
         html += '<h2>승인대기 회원</h2>';
@@ -144,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '</div><div class="form-msg" id="mu-msg"></div></div>';
 
       /* 노회 명단·상비부 관리 영역 */
-      html += '<h2>노회 명단 관리</h2>';
+      html += '<h2>회원 신상관리</h2>';
       html += '<p>가입 시 등급 자동 부여의 기준이 되는 명단입니다. 성명과 소속 교회가 이 명단과 일치하면 해당 등급이 자동으로 부여됩니다.</p>';
       html += '<div id="roster-area"><p style="color:var(--gray-5)">명단을 불러오는 중...</p></div>';
       html += '<h2>교회 관리</h2>';
@@ -1692,7 +1691,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!nm) { say('성명을 입력해 주세요.', true); return; }
         var hit = rows.filter(function (m) { return m.name === nm; });
         if (!hit.length) {
-          say(nm + ' 님이 노회 명단에 없습니다. 노회 명단 관리에서 먼저 추가해 주세요.', true);
+          say(nm + ' 님이 노회 명단에 없습니다. 회원 신상관리에서 먼저 추가해 주세요.', true);
           return;
         }
         saveRec(hit[0].id, patchOf(document.getElementById(dateId).value || null), label);
@@ -1735,7 +1734,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var rows = r.data || [];
       if (!rows.length) {
         box.innerHTML = '<p style="color:var(--gray-5)">등록된 장로가 없습니다. ' +
-          '노회 명단 관리에서 직분을 <strong>장로</strong>로 지정해 주세요.</p>';
+          '회원 신상관리에서 직분을 <strong>장로</strong>로 지정해 주세요.</p>';
         return;
       }
 
