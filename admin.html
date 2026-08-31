@@ -989,6 +989,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:110px">성명</th><th style="width:110px">직분</th>' +
         '<th>소속 교회</th><th style="width:110px">시찰</th>' +
         '<th style="width:120px">임직일자</th>' +
+        '<th style="width:120px">재직일(부임)</th>' +
         '<th style="width:130px">남은 임기</th><th style="width:130px">부여 등급</th>' +
         '<th style="width:80px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
@@ -1010,6 +1011,9 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td>' + e(m.sichal || '-') + '</td>' +
           '<td>' + (m.ordained_on
             ? e(m.ordained_on)
+            : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+          '<td>' + (m.served_from
+            ? e(m.served_from)
             : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td>' + remainLabel(m) + '</td>' +
           '<td>' + e(gradeName(rosterGrade(m))) + '</td>' +
