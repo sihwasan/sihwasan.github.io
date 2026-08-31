@@ -749,7 +749,9 @@
           return '<li><button type="button" data-pt="' + f.id + '"' +
             (cur.id === f.id ? ' class="active"' : '') + '>' + e(f.title) + '</button></li>';
         }).join('') + '</ul></div>';
-    }).join('');
+    }).join('') +
+      '<div class="ptm" style="margin-left:auto"><a href="mydocs.html" ' +
+      'style="display:block;color:#fff;padding:13px 18px;font-size:0.94rem;font-weight:600;text-decoration:none">나의 서류</a></div>';
     /* 휴대폰처럼 마우스가 없는 화면에서는 눌러서 연다 */
     box.querySelectorAll('.ptm > button').forEach(function (b) {
       b.addEventListener('click', function (ev) {
