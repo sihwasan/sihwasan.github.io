@@ -56,10 +56,13 @@
 .pt-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .pt-mine-tbl td .btn { margin-right: 4px; }
 
-/* 서명란에 찍히는 도장 */
+/* 서명란에 찍히는 도장 — (인) 글자 위에 정확히 겹쳐 찍는다.
+ * 예전에는 음수 여백으로 붙였는데, 이름 칸이 비어 줄이 길어지면
+ * 도장이 다음 줄로 밀려 엉뚱한 자리에 찍혔다. */
+#pt-paper .inwrap { position: relative; white-space: nowrap; }
 #pt-paper .pt-seal {
-  height: 46px; width: auto; vertical-align: middle;
-  margin-left: -38px; position: relative; top: -2px; opacity: 0.92;
+  height: 46px; width: auto; opacity: 0.92;
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
 }
 
 /* 도장 등록·시찰 선택 작은 창 */
@@ -207,7 +210,7 @@ body.pt-embed main { padding-top: 10px; }
   /* (인) 자리: 도장이 등록되어 있으면 함께 찍어 보여 준다 */
   function inMark() {
     var s = viewSeal || sealImg;
-    return '(인)' + (s ? '<img class="pt-seal" src="' + s + '" alt="도장">' : '');
+    return '<span class="inwrap">(인)' + (s ? '<img class="pt-seal" src="' + s + '" alt="도장">' : '') + '</span>';
   }
   /* ___교회   당회장___(인) 서명줄 */
   function signChurch(church, role, name) {
