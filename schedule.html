@@ -270,6 +270,13 @@ document.addEventListener('DOMContentLoaded', function () {
       KINDS.map(function (k) {
         return '<option' + (k === kindNow ? ' selected' : '') + '>' + k + '</option>';
       }).join('') + '</select></div></div>' +
+      /* 정기노회: 회기·봄가을 선택 → 내용에 자동 반영 */
+      '<div class="inline-form hidden" id="ev-seswrap">' +
+      '<div class="field" style="flex:0 0 170px"><label>회기</label><select id="ev-ses"></select></div>' +
+      '<div class="field" style="flex:0 0 130px"><label>봄·가을</label><select id="ev-season">' +
+      '<option>봄</option><option>가을</option></select></div>' +
+      '<div class="field" style="align-self:flex-end;font-size:0.78rem;color:var(--gray-5);margin-bottom:8px">' +
+      '고르면 아래 내용에 자동으로 들어갑니다.</div></div>' +
       /* 수양회: 행사명·장소·대상·회비 */
       '<div id="ev-retwrap" class="hidden">' +
       '<div class="inline-form">' +
@@ -326,25 +333,57 @@ document.addEventListener('DOMContentLoaded', function () {
      * 날짜의 달로 봄·가을을 가른다. 자동으로 넣은 글만 바꾸므로
      * 직접 고친 내용은 그대로 둔다. */
     var noteEl = mo.el.querySelector('#ev-note');
-    var lastAuto = '';
-    function autoNote() {
+    var sesSel = mo.el.querySelector('#ev-ses');
+    var seasonSel = mo.el.querySelector('#ev-season');
+
+    /* 회기 선택지: 현재 회기 앞뒤로 넉넉히 둔다. 기본은 다음 회기. */
+    (function () {
+      var cur = Number((SESSIONS && SESSIONS.current) || 20);
+      var pick = cur + 1;
+      var m2 = String(x.title || '').match(/제(\d+)회/);
+      if (m2) pick = Number(m2[1]);
+      var h2 = '';
+      for (var n = Math.max(1, cur - 2); n <= cur + 4; n++) {
+        h2 += '<option value="' + n + '"' + (n === pick ? ' selected' : '') + '>제' + n + '회기</option>';
+      }
+      sesSel.innerHTML = h2;
+      if (/봄/.test(x.title || '')) seasonSel.value = '봄';
+      else if (/가을/.test(x.title || '')) seasonSel.value = '가을';
+    })();
+
+    function sesText() {
+      return '제' + sesSel.value + '회기 ' + seasonSel.value + ' 정기노회';
+    }
+    /* 회기·봄가을을 고르면 내용의 정기노회 문구를 갈아 끼운다.
+     * 장소 등 뒤에 덧붙인 내용은 그대로 둔다. */
+    function applySes() {
       if (kindSel.value !== '정기노회') return;
-      var cur = Number((SESSIONS && SESSIONS.current) || 0);
-      if (!cur) return;
-      var d = mo.el.querySelector('#ev-date').value;
-      var mon = d ? Number(d.split('-')[1]) : 0;
-      var season = mon ? (mon >= 8 || mon <= 1 ? '가을' : '봄') : '';
-      var text = '제' + (cur + 1) + '회기 ' + (season ? season + ' ' : '') + '정기노회';
-      if (!noteEl.value.trim() || noteEl.value === lastAuto) {
-        noteEl.value = text;
-        lastAuto = text;
+      var v = noteEl.value.trim();
+      if (!v) { noteEl.value = sesText(); return; }
+      if (/제\d+회(기)?[^(]*정기노회/.test(v)) {
+        noteEl.value = v.replace(/제\d+회(기)?\s*[^(]*?정기노회/, sesText());
+      } else {
+        noteEl.value = sesText() + ' ' + v;
       }
     }
+    function autoNote() {
+      if (kindSel.value !== '정기노회') return;
+      /* 날짜의 달로 봄·가을을 짐작해 준다 (직접 바꿀 수 있다) */
+      var d = mo.el.querySelector('#ev-date').value;
+      var mon = d ? Number(d.split('-')[1]) : 0;
+      if (mon && !(x.title && /봄|가을/.test(x.title))) {
+        seasonSel.value = (mon >= 8 || mon <= 1) ? '가을' : '봄';
+      }
+      if (!noteEl.value.trim()) noteEl.value = sesText();
+    }
+    sesSel.addEventListener('change', applySes);
+    seasonSel.addEventListener('change', applySes);
     function refreshKind() {
       var k = kindSel.value;
       mo.el.querySelector('#ev-etcwrap').classList.toggle('hidden', k !== '기타');
       mo.el.querySelector('#ev-ordwrap').classList.toggle('hidden', k !== '임직식');
       mo.el.querySelector('#ev-retwrap').classList.toggle('hidden', k !== '수양회');
+      mo.el.querySelector('#ev-seswrap').classList.toggle('hidden', k !== '정기노회');
       refreshEtcPerson();
       autoNote();
     }
