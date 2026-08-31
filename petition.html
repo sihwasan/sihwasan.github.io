@@ -832,20 +832,18 @@
     var btn = document.getElementById('pt-pdf');
     btn.disabled = true; btn.textContent = '만드는 중...';
     function done() { btn.disabled = false; btn.textContent = 'PDF 저장'; }
-    var stage = document.createElement('div');
-    stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:760px;background:#fff';
-    stage.innerHTML = '<div style="padding:10px">' + cur.render(data) + '</div>';
-    stage.querySelector('div').style.cssText += ";font-family:'Noto Sans KR',sans-serif;font-size:15px;line-height:1.9;color:#111";
-    document.body.appendChild(stage);
+    /* 화면에 보이는 미리보기를 그대로 뜬다.
+     * (화면 밖 복사본으로 만들면 스타일이 빠져 빈 PDF가 나온다) */
+    var paper = document.getElementById('pt-paper');
     loadPdfTool().then(function (html2pdf) {
       return html2pdf().set({
-        margin: 12,
+        margin: 10,
         filename: cur.title + '.pdf',
-        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: -window.scrollY },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(stage.firstChild).save();
-    }).then(function () { stage.remove(); done(); })
-      .catch(function (err) { stage.remove(); done(); alert(err.message || err); });
+      }).from(paper).save();
+    }).then(function () { done(); })
+      .catch(function (err) { done(); alert(err.message || err); });
   }
 
   /* ----- 저장하기 / 내 청원서 ----- */
