@@ -1740,6 +1740,7 @@ input.dp-bad { border-color: var(--red); }
 
 /* 교회 × 월 납부표 */
 .dues-tbl { font-size: 0.85rem; }
+.dues-tbl .dues-date { display: block; font-size: 0.62rem; color: var(--gray-5); line-height: 1.2; }
 .dues-tbl th.cur, .dues-tbl td.cur { background: rgba(176, 141, 62, 0.08); }
 .dues-tbl .dues-sc td {
   background: var(--gray-1); color: var(--navy); font-weight: 700;

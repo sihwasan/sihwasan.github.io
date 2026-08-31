@@ -789,16 +789,28 @@ document.addEventListener('DOMContentLoaded', function () {
     return pay.amount != null ? Number(pay.amount) : Number(rate.monthly_amount || 0);
   }
 
-  /* 경과 개월: 올해면 이번 달까지, 지난해면 12개월, 다음 해면 12개월 기준 */
-  function duesElapsed() {
+  /* 회계연도(회기)는 4월에 시작해 다음 해 3월에 끝난다.
+   * 저장은 달력 월(1~12) 그대로 두고, 보여 주는 순서만 회기 순으로 편다. */
+  var DUES_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  function fiscalYearNow() {
     var now = new Date();
-    if (duesYear === now.getFullYear()) return now.getMonth() + 1;
-    return 12;
+    return now.getMonth() + 1 >= 4 ? now.getFullYear() : now.getFullYear() - 1;
   }
-  /* 완납 = 경과한 달을 모두 납부한 교회 */
+  /* 경과 개월: 이번 회기면 4월부터 이번 달까지 몇 달째인지, 지난 회기면 12개월 */
+  function duesElapsed() {
+    if (duesYear !== fiscalYearNow()) return 12;
+    return DUES_MONTHS.indexOf(new Date().getMonth() + 1) + 1;
+  }
+  /* 입금일 짧은 표기: 2026-08-31 → 8.31 */
+  function payDateLabel(p2) {
+    var s = String(p2.paid_on || '');
+    var mt = s.match(/^\d{4}-(\d{2})-(\d{2})/);
+    return mt ? (Number(mt[1]) + '.' + Number(mt[2])) : '';
+  }
+  /* 완납 = 회기에서 경과한 달을 모두 납부한 교회 */
   function isFullPaid(r) {
     var el = duesElapsed();
-    for (var m = 1; m <= el; m++) if (!payOf(r.church, m)) return false;
+    for (var i = 0; i < el; i++) if (!payOf(r.church, DUES_MONTHS[i])) return false;
     return true;
   }
   /* 시찰별 진행 통계 */
@@ -824,7 +836,8 @@ document.addEventListener('DOMContentLoaded', function () {
   function sichalChartHtml() {
     var el = duesElapsed();
     var h = '<div class="dues-sc-chart">' +
-      '<div class="dsc-title">시찰별 진행 상황 <span>(' + duesYear + '년 ' + el + '월 기준)</span></div>';
+      '<div class="dsc-title">시찰별 진행 상황 <span>(' + duesYear + '년 회기 4월 시작 · ' +
+      el + '개월 경과 기준)</span></div>';
     sichalStats().forEach(function (s) {
       h += '<div class="dsc-row" title="' + e(s.sc) + ': 예정 ' + manwon(s.expected) + '원 중 ' + manwon(s.paid) + '원 납부">' +
         '<div class="dsc-name">' + e(s.sc) + '</div>' +
@@ -838,7 +851,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderDues() {
     var box = duesBox();
     var now = new Date();
-    var curMonth = duesYear === now.getFullYear() ? now.getMonth() + 1 : 0;
+    var curMonth = duesYear === fiscalYearNow() ? now.getMonth() + 1 : 0;
 
     /* ----- 머리: 연도 고르기와 보기 전환 ----- */
     var h = '<div class="dues-head">' +
@@ -909,7 +922,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ----- 그래프: 달마다 납부한 교회 수 ----- */
     h += '<div class="dues-chart">';
-    for (var m = 1; m <= 12; m++) {
+    DUES_MONTHS.forEach(function (m) {
       var cnt = 0, amt = 0;
       duesRates.forEach(function (r) {
         var p2 = payOf(r.church, m);
@@ -921,7 +934,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="dc-v">' + (cnt || '') + '</div>' +
         '<div class="dc-track"><div class="dc-bar" style="height:' + pct + '%"></div></div>' +
         '<div class="dc-l">' + m + '월</div></div>';
-    }
+    });
     h += '</div>';
     h += '<p style="font-size:0.82rem;color:var(--gray-5)">막대는 그 달에 상회비를 낸 교회 수입니다. ' +
       '막대에 마우스를 올리면 납부 교회 수와 금액이 보입니다.</p>';
@@ -940,7 +953,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>' +
       '<input type="search" id="du-q" placeholder="교회·교역자 검색" value="' + e(duesQuery) + '">' +
       '</div>' +
-      '<p style="font-size:0.78rem;color:var(--gray-5);margin:4px 0 8px">완납은 ' + elNow + '월까지 모두 납부한 교회, 미납은 밀린 달이 있는 교회입니다.</p>';
+      '<p style="font-size:0.78rem;color:var(--gray-5);margin:4px 0 8px">회기는 4월에 시작합니다. ' +
+      '완납은 4월부터 ' + DUES_MONTHS[elNow - 1] + '월까지 모두 납부한 교회, 미납은 밀린 달이 있는 교회입니다.</p>';
 
     /* ----- 교회별 × 월별 납부표 ----- */
     function rowVisible(r) {
@@ -955,7 +969,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     h += '<div style="overflow-x:auto"><table class="tbl dues-tbl"><thead><tr>' +
       '<th style="min-width:110px">교회</th><th style="width:64px">월액</th>';
-    for (m = 1; m <= 12; m++) h += '<th class="' + (m === curMonth ? 'cur' : '') + '">' + m + '</th>';
+    DUES_MONTHS.forEach(function (m) {
+      h += '<th class="' + (m === curMonth ? 'cur' : '') + '">' + m + '</th>';
+    });
     h += '<th style="width:90px">납부 합계</th></tr></thead><tbody>';
 
     var shown = 0;
@@ -971,14 +987,14 @@ document.addEventListener('DOMContentLoaded', function () {
         h += '<tr><td class="left">' + e(r.church) +
           (r.pastor ? ' <span class="dues-pastor">' + e(r.pastor) + '</span>' : '') + '</td>' +
           '<td>' + manwon(r.monthly_amount) + '</td>';
-        for (m = 1; m <= 12; m++) {
+        DUES_MONTHS.forEach(function (m) {
           var p2 = payOf(r.church, m);
           if (p2) { sum += paidAmount(r, p2); months++; }
           h += '<td class="dues-cell' + (p2 ? ' paid' : '') + (m === curMonth ? ' cur' : '') + '"' +
             (canDues && !duesClosed ? ' data-duch="' + e(r.church) + '" data-dum="' + m + '"' : '') +
             (p2 ? ' title="' + e(String(p2.paid_on || '')) + ' 납부 ' + manwon(paidAmount(r, p2)) + '원"' : '') +
-            '>' + (p2 ? '●' : '·') + '</td>';
-        }
+            '>' + (p2 ? '●<span class="dues-date">' + payDateLabel(p2) + '</span>' : '·') + '</td>';
+        });
         h += '<td>' + months + '개월 · ' + manwon(sum) + '</td></tr>';
       });
     });
@@ -1184,7 +1200,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="' + td + '">교회</th>' +
         '<th style="' + td + 'width:54px">교역자</th>' +
         '<th style="' + td + 'width:34px">월액</th>';
-      for (var m = 1; m <= 12; m++) o += '<th style="' + td + 'width:22px">' + m + '</th>';
+      DUES_MONTHS.forEach(function (m) { o += '<th style="' + td + 'width:22px">' + m + '</th>'; });
       return o + '<th style="' + td + 'width:52px">합계</th></tr>';
     }
 
@@ -1202,11 +1218,12 @@ document.addEventListener('DOMContentLoaded', function () {
         '<td style="' + td + '">' + e(r.church) + '</td>' +
         '<td style="' + td + '">' + e(r.pastor || '') + '</td>' +
         '<td style="' + td + 'text-align:right">' + Number(r.monthly_amount || 0) + '</td>';
-      for (var m2 = 1; m2 <= 12; m2++) {
+      DUES_MONTHS.forEach(function (m2) {
         var p2 = payOf(r.church, m2);
         if (p2) sum += paidAmount(r, p2);
-        o += '<td style="' + td + 'text-align:center">' + (p2 ? '●' : '') + '</td>';
-      }
+        o += '<td style="' + td + 'text-align:center">' + (p2
+          ? '●<div style="font-size:7px;color:#666;line-height:1">' + payDateLabel(p2) + '</div>' : '') + '</td>';
+      });
       return o + '<td style="' + td + 'text-align:right">' + sum + '</td></tr>';
     }
 
@@ -1229,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', function () {
         /* 시찰별 진행 그래프 */
         var elP = duesElapsed();
         pg += '<div style="border:1px solid #ccc;border-radius:6px;padding:8px 10px;margin:0 0 10px">' +
-          '<p style="font-size:11px;font-weight:700;margin:0 0 6px">시찰별 진행 상황 (' + elP + '월 기준)</p>';
+          '<p style="font-size:11px;font-weight:700;margin:0 0 6px">시찰별 진행 상황 (회기 4월 시작 · ' + elP + '개월 경과 기준)</p>';
         sichalStats().forEach(function (s) {
           pg += '<div style="display:flex;align-items:center;gap:8px;margin:3px 0">' +
             '<span style="font-size:10px;width:60px;flex:none">' + e(s.sc) + '</span>' +
