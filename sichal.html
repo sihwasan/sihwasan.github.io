@@ -238,8 +238,12 @@ document.addEventListener('DOMContentLoaded', function () {
               mineFin.out_bap_target, mineFin.out_bap_paid,
               mineFin.out_bap_join, mineFin.out_bap_churches)
           : '') +
-        '<p style="font-size:0.78rem;color:var(--gray-5);margin:0">상회비는 이번 달까지 부과된 금액 대비, ' +
-        '세례의무금은 올해 목표금액 대비 납부율입니다. 교회별 자세한 내용은 임원방에서 보실 수 있습니다.</p>' +
+        '<p style="font-size:0.78rem;color:var(--gray-5);margin:0 0 8px">상회비는 이번 달까지 부과된 금액 대비, ' +
+        '세례의무금은 올해 목표금액 대비 납부율입니다.</p>' +
+        (mineFin && (isOfficer || churches.some(function (x) { return x.name === myChurch; }))
+          ? '<button class="btn ghost sm" id="si-findetail">상회비·세례의무금 상세보기</button>' +
+            '<div id="si-findetail-body" class="hidden" style="margin-top:10px"></div>'
+          : '') +
         '</div></div>';
     })();
 
@@ -253,6 +257,50 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div><div id="si-body"></div>';
 
     area.innerHTML = h;
+
+    /* 본인 시찰 상회비·세례의무금 교회별 상세보기 */
+    var fdBtn = document.getElementById('si-findetail');
+    if (fdBtn) fdBtn.addEventListener('click', function () {
+      var body = document.getElementById('si-findetail-body');
+      if (!body.classList.contains('hidden')) { body.classList.add('hidden'); return; }
+      body.classList.remove('hidden');
+      if (body.dataset.loaded) return;
+      body.innerHTML = '<p style="color:var(--gray-5)">불러오는 중...</p>';
+      SHSCloud.init().then(function (c) {
+        return c.rpc('sichal_finance_detail', { p_year: fyYear, p_sichal: NAME });
+      }).then(function (r) {
+        body.dataset.loaded = '1';
+        var list = (r && r.data) || [];
+        if (!list.length) { body.innerHTML = '<p style="color:var(--gray-5)">자료가 없습니다.</p>'; return; }
+        function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
+        var t = '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.84rem">' +
+          '<thead><tr><th class="left">교회</th><th style="width:80px">월액</th>' +
+          '<th style="width:130px">상회비 납부</th><th style="width:110px">상회비 상태</th>' +
+          '<th style="width:150px">세례의무금</th><th style="width:110px">세례의무금 상태</th></tr></thead><tbody>';
+        list.forEach(function (d) {
+          var late = Math.max(0, fyElapsed - Number(d.out_months || 0));
+          var bapT = Number(d.out_bap_target || 0), bapP = Number(d.out_bap_paid || 0);
+          var bapDone = bapT > 0 && bapP >= bapT;
+          t += '<tr><td class="left">' + e(d.out_church) + '</td>' +
+            '<td>' + wonf(d.out_monthly) + '만</td>' +
+            '<td>' + d.out_months + '/' + fyElapsed + '개월 · ' + wonf(d.out_dues_paid) + '만원</td>' +
+            '<td>' + (late > 0
+              ? '<span class="fail">' + late + '개월 미납</span>'
+              : '<span class="pass">완납</span>') + '</td>' +
+            '<td>' + wonf(bapP) + ' / ' + wonf(bapT) + '원</td>' +
+            '<td>' + (bapDone ? '<span class="pass">완납</span>'
+              : (bapP > 0 ? '<span style="color:#b0731f">일부 납부</span>'
+                          : '<span class="fail">미납</span>')) + '</td></tr>';
+        });
+        t += '</tbody></table></div>' +
+          '<p style="font-size:0.78rem;color:var(--gray-5);margin-top:6px">상회비는 회기(4월~다음 해 3월) 경과 ' +
+          fyElapsed + '개월 기준이며, 세례의무금은 올해 배정액 기준입니다. ' +
+          '납부 확인이 실제와 다르면 노회 회계에게 알려 주세요.</p>';
+        body.innerHTML = t;
+      }).catch(function () {
+        body.innerHTML = '<p style="color:var(--gray-5)">상세를 불러오지 못했습니다.</p>';
+      });
+    });
 
     area.querySelectorAll('button[data-go]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -740,10 +788,22 @@ document.addEventListener('DOMContentLoaded', function () {
       '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다. ' +
       '명단 자체는 관리자 → 회원 관리 → 노회 명단 관리에서 고칩니다.</p>';
 
+    /* 남은 임기: 회원 명단의 생년월일로 정년(만 70세)까지 계산한다 */
+    function remainLabel(m) {
+      var rd = SHS.retireDate(m.birth_date);
+      if (!rd) return '<span style="color:var(--gray-5)">-</span>';
+      var today = new Date();
+      if (rd <= today) return '<span class="fail">정년 경과</span>';
+      var months = (rd.getFullYear() - today.getFullYear()) * 12 + (rd.getMonth() - today.getMonth());
+      var y = Math.floor(months / 12), mo2 = months % 12;
+      return e((y ? y + '년 ' : '') + (mo2 ? mo2 + '개월' : (y ? '' : '한 달 미만')));
+    }
+
     Object.keys(groups).forEach(function (g) {
       h += '<h3>' + e(g) + ' (' + groups[g].length + '명)</h3>';
       h += '<table class="tbl"><thead><tr><th style="width:120px">성명</th>' +
-        '<th style="width:110px">직분</th><th>소속 교회</th><th style="width:160px">비고</th>' +
+        '<th style="width:110px">직분</th><th>소속 교회</th>' +
+        '<th style="width:120px">남은 임기</th><th style="width:160px">비고</th>' +
         '</tr></thead><tbody>';
       groups[g].forEach(function (m) {
         var ch = churches.filter(function (x) { return x.name === m.church; })[0];
@@ -754,10 +814,13 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<a href="' + e(link) + '" target="_blank" rel="noopener" ' +
               'style="color:var(--navy);text-decoration:underline">' + e(m.church || '-') + '</a>'
             : e(m.church || '-')) + '</td>' +
+          '<td>' + remainLabel(m) + '</td>' +
           '<td>' + e(m.note || '-') + '</td></tr>';
       });
       h += '</tbody></table>';
     });
+    h += '<p style="font-size:0.8rem;color:var(--gray-5)">남은 임기는 회원 명단의 생년월일로 ' +
+      '총회 정년(만 70세)까지 계산한 값입니다. 생년월일이 없는 분은 -로 표시됩니다.</p>';
     box.innerHTML = h;
   }
 
