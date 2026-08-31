@@ -774,8 +774,11 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     function pastorOf(ch) {
+      /* 담임 목사. 은퇴 후 유예 기간에 목회를 잇는 은퇴·원로목사도 담임으로 본다 */
       return roster.filter(function (m) {
         return m.category === '목사' && key(m.church) === key(ch);
+      })[0] || roster.filter(function (m) {
+        return (m.category === '은퇴목사' || m.category === '원로목사') && key(m.church) === key(ch);
       })[0] || null;
     }
     function organized(ch) {
