@@ -79,8 +79,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div class="notice-banner">개인정보(생년월일·연락처·주소)는 <strong>**</strong>로 가려서 표시됩니다. ' +
         '<strong>열람</strong>을 누르면 내용이 표시되며, <strong>열람 기록은 감사 기록에 남습니다.</strong></div>';
       html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th>' +
-        '<th style="width:150px">개인정보</th><th style="width:185px">정년 (만 70세)</th>' +
-        '<th style="width:150px">남은 임기</th><th>등급</th>' +
+        '<th style="width:150px">개인정보</th><th>등급</th>' +
         '<th style="width:110px">자격</th>' +
         (canAppoint ? '<th style="width:200px">등급 임명</th>' : '') + '</tr></thead><tbody>';
       visible.forEach(function (p) {
@@ -92,14 +91,6 @@ document.addEventListener('DOMContentLoaded', function () {
           /* 개인정보: 가려서 표시하고 열람 버튼 제공 */
           '<td><span id="pi-' + e(p.id) + '">**</span><br>' +
           '<button class="btn ghost sm" data-piview="' + e(p.id) + '" style="margin-top:4px">열람</button></td>' +
-          '<td style="font-size:0.82rem">' +
-          '<input type="date" data-birth="' + e(p.id) + '" value="' + e(p.birth_date || '') + '" ' +
-          'style="font-size:0.82rem;padding:4px 6px">' +
-          '<div style="margin-top:3px">' +
-          (SHS.retireDate(p.birth_date) && SHS.retireDate(p.birth_date) <= new Date()
-            ? '<span class="fail">' + e(SHS.retireLabel(p)) + '</span>'
-            : e(SHS.retireLabel(p))) + '</div></td>' +
-          '<td style="font-size:0.82rem">' + e(SHS.termLabel(p)) + '</td>' +
           '<td><span class="role-badge">' + SHS.displayRole(p.role, p.title) + '</span>' +
           (p.title ? '<div style="font-size:0.75rem;color:var(--gray-5);margin-top:2px">' + e(p.title) + '</div>' : '') + '</td>' +
           '<td>' +
@@ -122,10 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '</tbody></table>';
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">' +
         '· 총회 정년은 만 70세이며, <strong>정년이 지나면 등급과 상관없이 정회원 자격이 상실</strong>됩니다. ' +
-        '정회원 전용 자료도 열람할 수 없습니다.<br>' +
-        '· 생년월일이 없으면 정년을 계산할 수 없습니다. ' +
-        '<strong>정년 칸의 날짜를 고치시면 관리자가 대신 입력</strong>할 수 있고, 곧바로 저장됩니다. ' +
-        '입력 기록은 감사 기록에 남습니다.<br>' +
+        '정회원 전용 자료도 열람할 수 없습니다. 정년·임기는 <strong>회원 신상관리</strong>에서 열람합니다.<br>' +
         '· 장로 총대는 다음 봄 정기노회까지 자격이 유지되며, 총대로 다시 등록되지 않으면 자격이 상실됩니다. ' +
         '총대 자격 관리는 <strong>장로 총대 자격</strong> 탭에서 합니다.<br>' +
         '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
@@ -144,12 +132,10 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="tabs" id="eld-tabs" style="margin-bottom:14px">' +
         '<button class="active" data-et="selder">시무장로</button>' +
         '<button data-et="elder">총대장로</button>' +
-        '<button data-et="relder">원로장로</button>' +
-        '<button data-et="xelder">은퇴장로</button></div>' +
+        '<button data-et="relder">원로장로</button></div>' +
         '<div id="selder-area"><p style="color:var(--gray-5)">시무장로 명단을 불러오는 중...</p></div>' +
         '<div id="elder-area" class="hidden"><p style="color:var(--gray-5)">장로 총대를 불러오는 중...</p></div>' +
         '<div id="relder-area" class="hidden"><p style="color:var(--gray-5)">원로장로 명단을 불러오는 중...</p></div>' +
-        '<div id="xelder-area" class="hidden"><p style="color:var(--gray-5)">은퇴장로 명단을 불러오는 중...</p></div>' +
         '</div>';
       html += '<h2>교회 관리</h2>';
       html += '<div id="church-area"><p style="color:var(--gray-5)">교회 명부를 불러오는 중...</p></div>';
@@ -206,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function () {
             area.querySelectorAll('#eld-tabs button').forEach(function (x) {
               x.classList.toggle('active', x === b);
             });
-            ['selder', 'elder', 'relder', 'xelder'].forEach(function (k) {
+            ['selder', 'elder', 'relder'].forEach(function (k) {
               document.getElementById(k + '-area').classList.toggle('hidden', k !== b.dataset.et);
             });
           });
@@ -1628,12 +1614,12 @@ document.addEventListener('DOMContentLoaded', function () {
         })[0] || null;
       }
 
-      function drawList(box, roles, title, withRosterLink) {
+      function drawList(box, roles, title, honored) {
         if (!box) return;
         var list = staff.filter(function (x) { return roles.indexOf(x.role) !== -1; });
         var h = '<div class="notice-banner">원본은 <strong>교회 관리</strong>의 교역자·장로 명부입니다. ' +
           '교회 관리에서 ' + title + '를 입력하면 이 명단에 자동으로 모입니다. ' +
-          '생년월일·장립일은 여기서 바로 고칠 수 있습니다.</div>';
+          '날짜는 수정 버튼으로 여기서 바로 고칠 수 있습니다.</div>';
         h += '<p style="font-size:0.88rem;color:var(--gray-7)">모두 <strong>' + list.length + '명</strong></p>';
         /* 시찰별·교회별 검색 */
         var sicNames = [];
@@ -1647,15 +1633,23 @@ document.addEventListener('DOMContentLoaded', function () {
           sicNames.map(function (s2) { return '<option>' + e(s2) + '</option>'; }).join('') + '</select></div>' +
           '<div class="field"><label>검색</label>' +
           '<input type="text" data-sefq placeholder="교회·성명으로 찾기"></div></div>';
+        /* 장로 표는 성명·소속 교회·시찰·장립일까지 공통이고,
+         * 원로장로는 추대일을, 그 밖에는 정년(만 70세)을 보여 준다 */
+        var today2 = new Date();
+        function retireCell(birth) {
+          var rd = SHS.retireDate(birth);
+          if (!rd) return '<span style="color:var(--gray-5)">생년월일 미등록</span>';
+          var over = rd <= today2;
+          return '<span class="' + (over ? 'fail' : '') + '">' +
+            rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '.' + (over ? ' (경과)' : '') + '</span>';
+        }
         h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th style="width:50px">번호</th>' +
-          '<th style="width:100px">시찰</th><th style="width:160px">교회</th>' +
-          (roles.length > 1 ? '<th style="width:90px">구분</th>' : '') +
-          '<th style="width:110px">성명</th>' +
-          '<th style="width:160px">생년월일</th><th style="width:160px">장립일</th>' +
-          (withRosterLink ? '<th style="width:110px">노회 명단</th>' : '') +
+          '<th style="width:110px">성명</th><th style="width:160px">소속 교회</th>' +
+          '<th style="width:100px">시찰</th><th style="width:140px">장립일</th>' +
+          (honored ? '<th style="width:140px">원로 추대일</th>' : '<th style="width:140px">정년</th>') +
           '<th style="width:90px">관리</th></tr></thead><tbody>';
         if (!list.length) {
-          h += '<tr><td colspan="9" style="color:var(--gray-5);padding:16px;text-align:center">' +
+          h += '<tr><td colspan="7" style="color:var(--gray-5);padding:16px;text-align:center">' +
             '아직 등록된 분이 없습니다. 교회 관리에서 입력해 주세요.</td></tr>';
         }
         list.forEach(function (x, i) {
@@ -1665,17 +1659,13 @@ document.addEventListener('DOMContentLoaded', function () {
           var ord = x.ordained_on || (linked && linked.ordained_on) || '';
           h += '<tr data-sesic="' + e(sicOf[x.church] || '') + '" data-sefind="' + e(x.church + ' ' + x.name) + '">' +
             '<td>' + (i + 1) + '</td>' +
-            '<td>' + e(sicOf[x.church] || '-') + '</td>' +
-            '<td class="left">' + e(x.church) + '</td>' +
-            (roles.length > 1 ? '<td>' + e(x.role) + '</td>' : '') +
             '<td><strong>' + e(x.name) + '</strong></td>' +
-            '<td>' + (birth ? e(birth) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td class="left">' + e(x.church) + '</td>' +
+            '<td>' + e(sicOf[x.church] || '-') + '</td>' +
             '<td>' + (ord ? e(ord) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
-            (withRosterLink
-              ? '<td>' + (linked
-                  ? '<span class="pass">연동됨</span>'
-                  : '<button class="btn ghost sm" data-selink="' + x.id + '">명단에 추가</button>') + '</td>'
-              : '') +
+            (honored
+              ? '<td>' + (x.honored_on ? e(x.honored_on) : '<span style="color:var(--gray-5)">-</span>') + '</td>'
+              : '<td style="font-size:0.84rem">' + retireCell(birth) + '</td>') +
             '<td><button class="btn sm" data-seedit="' + x.id + '">수정</button></td></tr>';
         });
         h += '</tbody></table></div>';
@@ -1701,26 +1691,6 @@ document.addEventListener('DOMContentLoaded', function () {
         var fq = box.querySelector('[data-sefq]');
         if (fs) fs.addEventListener('change', applySeFilter);
         if (fq) fq.addEventListener('input', applySeFilter);
-        box.querySelectorAll('[data-selink]').forEach(function (b) {
-          b.addEventListener('click', function () {
-            var x = staff.filter(function (s2) { return s2.id === Number(b.dataset.selink); })[0];
-            if (!confirm(x.name + ' 장로를 노회 명단(장로)에 추가하고 연동할까요?')) return;
-            SHSCloud.init().then(function (c) {
-              return c.from('roster').insert({
-                name: x.name, church: x.church, sichal: sicOf[x.church] || null,
-                category: '장로', position: x.role,
-                birth_date: x.birth_date || null, ordained_on: x.ordained_on || null,
-                sort: 100000
-              }).select('id').single().then(function (r2) {
-                if (r2.error) throw r2.error;
-                return c.from('church_staff').update({ roster_id: r2.data.id }).eq('id', x.id);
-              });
-            }).then(function () {
-              SHSCloud.log('create', '시무장로 명단 연동 추가', x.name + ' (' + x.church + ')');
-              renderServingElders();
-            }).catch(function (err) { alert(err.message || err); });
-          });
-        });
       }
 
       /* 수정 팝업: 교회 DB(church_staff)가 원본이며, 연동된 노회 명단도 함께 갱신한다 */
@@ -1749,6 +1719,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '<input type="date" id="sem-birth" value="' + e(x.birth_date || '') + '"></div>' +
           '<div class="field" style="flex:0 0 160px"><label>장립일</label>' +
           '<input type="date" id="sem-ord" value="' + e(x.ordained_on || '') + '"></div>' +
+          '<div class="field" style="flex:0 0 160px"><label>원로 추대일</label>' +
+          '<input type="date" id="sem-hon" value="' + e(x.honored_on || '') + '"></div>' +
           '<div class="field"><label>연락처</label>' +
           '<input type="text" id="sem-phone" value="' + e(x.phone || '') + '" placeholder="010-0000-0000"></div>' +
           '</div>' +
@@ -1768,6 +1740,7 @@ document.addEventListener('DOMContentLoaded', function () {
             church: document.getElementById('sem-church').value.trim(),
             birth_date: document.getElementById('sem-birth').value || null,
             ordained_on: document.getElementById('sem-ord').value || null,
+            honored_on: document.getElementById('sem-hon').value || null,
             phone: document.getElementById('sem-phone').value.trim() || null,
             note: document.getElementById('sem-note').value.trim() || null,
             updated_at: new Date().toISOString(), updated_by: user.name
@@ -1812,9 +1785,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
 
-      drawList(sbox, ['시무장로'], '시무장로', true);
-      drawList(rbox, ['원로장로'], '원로장로', false);
-      drawList(document.getElementById('xelder-area'), ['은퇴장로'], '은퇴장로', false);
+      drawList(sbox, ['시무장로'], '시무장로', false);
+      drawList(rbox, ['원로장로'], '원로장로', true);
     });
   }
 
@@ -2057,7 +2029,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       h += '<table class="tbl"><thead><tr><th style="width:50px">번호</th>' +
         '<th style="width:110px">성명</th><th style="width:160px">소속 교회</th>' +
-        '<th style="width:110px">시찰</th><th style="width:120px">생년월일</th>' +
+        '<th style="width:110px">시찰</th><th style="width:120px">장립일</th>' +
         '<th style="width:120px">정년</th>' +
         '<th style="width:150px">관리</th></tr></thead><tbody>';
       if (!cohort.length) {
@@ -2070,7 +2042,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><strong>' + e(x.name) + '</strong></td>' +
           '<td class="left">' + e(x.church) + '</td>' +
           '<td>' + e(x.sichal || '-') + '</td>' +
-          '<td>' + (x.birth_date ? e(x.birth_date) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+          '<td>' + (x.ordained_on ? e(x.ordained_on) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td style="font-size:0.84rem">' + retireText(x) + '</td>' +
           '<td><button class="btn sm" data-eledit="' + x.id + '">수정</button> ' +
           '<button class="btn danger sm" data-eldrop="' + x.id + '" data-nm="' + e(x.name) + '">제외</button></td>' +
