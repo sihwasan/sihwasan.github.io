@@ -144,6 +144,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var sealPos = { dx: 0, dy: 0 };   /* 미리보기에서 끌어 옮긴 직인 위치 */
   var meRow = null;        /* 명단에서 찾은 나 */
   var pastorRow = null;    /* 이 교회의 담임목사 (명단) */
+  var prevRecord = null;   /* 지난해 보고서 — 새 해에는 이 내용을 미리 채워 준다 */
   var SICHAL = '';
 
   /* ---------- 불러오기 ---------- */
@@ -160,6 +161,10 @@ document.addEventListener('DOMContentLoaded', function () {
         jobs.push(c.from('church_reports').select('*').eq('year', YEAR).eq('church', CHURCH));
         jobs.push(c.from('roster').select('name,church,position,category,sichal,address,postcode,phone,email')
           .eq('category', '목사').eq('active', true));
+        /* 지난 해 보고서: 새 해에 그대로 이어받아 몇 가지만 고치면 되게 한다 */
+        jobs.push(c.from('church_reports').select('*').eq('church', CHURCH).lt('year', YEAR)
+          .order('year', { ascending: false }).limit(1)
+          .then(null, function () { return { data: null }; }));
       }
       return Promise.all(jobs);
     }).then(function (rs) {
@@ -177,6 +182,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       record = rs[2].data && rs[2].data[0] || null;
+      prevRecord = rs[4] && rs[4].data && rs[4].data[0] || null;
       var pastors = rs[3] && rs[3].data || [];
       pastorRow = pastors.filter(function (m) { return chKey(m.church) === chKey(CHURCH); })[0] || null;
       SICHAL = (record && record.sichal) || (pastorRow && pastorRow.sichal) ||
@@ -210,6 +216,14 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     var d = (record && record.data) || {};
+    /* 그 해 보고서가 아직 없으면 지난해 내용을 그대로 이어받는다.
+     * 대부분 그대로 두고 바뀐 몇 가지만 고치면 된다. */
+    var carried = false;
+    if (!record && prevRecord && prevRecord.data) {
+      d = JSON.parse(JSON.stringify(prevRecord.data));
+      d.date = '';   /* 보고일은 새로 적는다 */
+      carried = true;
+    }
     /* 저장본에 담긴 직인 사용 여부·위치를 되살린다 */
     if (d._seal) {
       sealOn = d._seal.on !== false;
@@ -235,7 +249,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var h = '';
     h += '<div class="notice-banner"><strong>' + YEAR + '년 ' + e(CHURCH) + '</strong> 교회상황 보고서' +
-      (record ? ' — 제출된 내용을 고치고 있습니다.' : '') + '</div>';
+      (record ? ' — 제출된 내용을 고치고 있습니다.'
+        : carried ? ' — <strong>' + prevRecord.year + '년 보고서 내용을 그대로 가져왔습니다.</strong> ' +
+          '바뀐 부분만 고친 뒤 저장·제출해 주세요.' : '') + '</div>';
 
     /* ① 기본 정보 */
     h += '<div class="admin-card rf-sec"><h3>① 기본 정보</h3>' +
