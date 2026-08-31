@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', function () {
       (isOfficer
         ? '<strong>' + e(SHS.honorific(user)) + '</strong>은 이 시찰의 <strong>' + e(myDuty) +
           '</strong>이시므로 관내 교회·자료·회의록을 등록하고 고치실 수 있습니다.'
-        : '이 시찰의 관내 교회와 자료입니다. 등록·수정은 <strong>시찰장·서기</strong>가 합니다.') +
+        : '이 시찰의 관내 교회와 자료입니다.') +
       '</div>';
 
     /* 다른 시찰로 건너가기 */
@@ -835,8 +835,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function drawDocs() {
     var box = document.getElementById('si-body');
-    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-      '시찰 서류를 올려 두는 곳입니다. 자료마다 누가 볼 수 있는지 정할 수 있습니다.</p>';
+    var h = '';
 
     if (!docs.length) {
       h += '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>';
