@@ -62,6 +62,10 @@ document.addEventListener('DOMContentLoaded', function () {
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
   var year = new Date().getFullYear();
+  /* 상회비 회기: 4월에 시작해 다음 해 3월에 끝난다 */
+  var FY_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  var fyYear = new Date().getMonth() + 1 >= 4 ? year : year - 1;
+  var fyElapsed = FY_MONTHS.indexOf(new Date().getMonth() + 1) + 1;
 
   function db() { return SHSCloud.init(); }
   function safeName(s) { return String(s || '').replace(/[^\w.\-가-힣]/g, '_'); }
@@ -120,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
           c.from('bapdues').select('*').in('year', [year, year - 1])
             .then(function (x) { return x; }, function () { return { data: [] }; }),
           /* 시찰별 상회비·세례의무금 요약 (49 를 아직 실행하지 않았어도 넘어간다) */
-          c.rpc('sichal_finance', { p_year: year })
+          c.rpc('sichal_finance', { p_year: fyYear })
             .then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
@@ -194,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function () {
     /* 상회비 · 세례의무금 진행률 — 노회 전체와 이 시찰 (49 sichal_finance) */
     (function () {
       if (!sicFin.length) return;
-      var mo = new Date().getMonth() + 1;
+      var mo = fyElapsed;   /* 회기(4월 시작)에서 몇 달째인지 */
       function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
       function bar(pct, color) {
         return '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:10px;overflow:hidden">' +
@@ -226,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       var mineFin = sicFin.filter(function (x) { return x.out_sichal === NAME; })[0];
       h += '<div class="side-box" style="max-width:860px;margin-bottom:16px"><div class="box-head">' +
-        year + '년 상회비 · 세례의무금 진행률</div>' +
+        fyYear + '년 회기(4월~다음 해 3월) 상회비 · 세례의무금 진행률</div>' +
         '<div class="box-body">' +
         rowHtml('노회 전체', tDP, tDA, tBT, tBP, tBJ, tBN) +
         (mineFin
@@ -968,7 +972,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var canFee = isOfficer || isTreasurer();
     db().then(function (c) {
       return Promise.all([
-        c.rpc('sichal_finance_detail', { p_year: year, p_sichal: NAME })
+        c.rpc('sichal_finance_detail', { p_year: fyYear, p_sichal: NAME })
           .then(function (x) { return x; }, function () { return { data: [] }; }),
         c.from('sichal_fees').select('*').eq('year', year).eq('sichal', NAME),
         /* 시찰회가 따로 정한 회비 (51 을 아직 실행하지 않았어도 넘어간다) */

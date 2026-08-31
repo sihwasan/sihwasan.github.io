@@ -18,6 +18,17 @@ var SHSBoard = (function () {
   'use strict';
 
   function esc(s) { return SHS.esc(s); }
+
+  /* 상회비 회기: 4월에 시작해 다음 해 3월에 끝난다 */
+  var FY_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  function fyYear() {
+    var d = new Date();
+    return d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;
+  }
+  /* 회기에서 이번 달까지 몇 달째인지 (4월=1 ... 3월=12) */
+  function fyElapsed() {
+    return FY_MONTHS.indexOf(new Date().getMonth() + 1) + 1;
+  }
   function ymd(d) { return d.toISOString().slice(0, 10); }
 
   /* 이 화면을 볼 수 있는 사람인가 — 서버 로그인한 정회원 */
@@ -207,8 +218,10 @@ var SHSBoard = (function () {
           if (duesSec) duesSec.classList.remove('hidden');
         }
       } else if (sicSec) sicSec.classList.add('span2');
-      var yr = new Date().getFullYear();
+      var calYr = new Date().getFullYear();
+      var yr = fyYear();          /* 상회비 회기 연도 (4월 시작) */
       var mo = new Date().getMonth() + 1;
+      var fyEl = fyElapsed();     /* 회기에서 몇 달째인지 */
 
       /* ----- 나의 상회비 (명단의 내 교회 기준) ----- */
       SHSCloud.init().then(function (c) {
@@ -234,16 +247,16 @@ var SHSBoard = (function () {
           return mt ? (Number(mt[1]) + '.' + Number(mt[2])) : '';
         }
         var dots = '';
-        for (var m = 1; m <= 12; m++) {
+        FY_MONTHS.forEach(function (m) {
           var pd = paid[m];
           dots += '<span class="md-cell"><span class="md-dot' + (pd ? ' on' : '') + (m === mo ? ' cur' : '') + '"' +
             (pd ? ' title="' + m + '월 ' + Number(pd.out_amount || 0) + '만원 납부 (' + (pd.out_paid_on || '') + ')"'
                 : ' title="' + m + '월 미납"') + '>' + m + '</span>' +
             '<span class="md-date">' + (pd ? payDay(pd) : '') + '</span></span>';
-        }
-        /* 이번 달까지 안 낸 달을 미납으로 본다 */
+        });
+        /* 회기(4월 시작)에서 이번 달까지 안 낸 달을 미납으로 본다 */
         var lateMonths = [];
-        for (var lm = 1; lm <= mo; lm++) if (!paid[lm]) lateMonths.push(lm);
+        for (var li = 0; li < fyEl; li++) if (!paid[FY_MONTHS[li]]) lateMonths.push(FY_MONTHS[li]);
         var lateAmt = lateMonths.length * Number(info.out_monthly || 0);
         var lateHtml = lateMonths.length
           ? '<p class="mydues-late">' + lateMonths.join('·') + '월 미납 — <strong>' +
@@ -253,10 +266,11 @@ var SHSBoard = (function () {
           '<div class="mydues-head"><strong>' + SHS.esc(info.out_church) + '</strong>' +
           (info.out_pastor ? ' <span class="mydues-p">' + SHS.esc(info.out_pastor) + ' 목사</span>' : '') +
           ' · 월 ' + Number(info.out_monthly || 0) + '만원' +
+          ' <span style="font-size:0.76rem;color:var(--gray-5)">회기 ' + yr + '년 4월 ~ ' + (yr + 1) + '년 3월</span>' +
           (info.out_closed ? ' <span class="dues-mini-closed">' + yr + '년 마감</span>' : '') + '</div>' +
           '<div class="mydues-dots">' + dots + '</div>' +
           lateHtml +
-          '<p class="mydues-sum">올해 ' + months + '개월 납부 · ' + sum.toLocaleString('ko-KR') + '만원' +
+          '<p class="mydues-sum">이번 회기 ' + months + '개월 납부 · ' + sum.toLocaleString('ko-KR') + '만원' +
           '<span class="mydues-note">납부 확인이 실제와 다르면 노회 회계에게 알려 주세요.</span></p>';
       }).catch(function () {
         var el = document.getElementById('dash-mydues');
@@ -266,7 +280,7 @@ var SHSBoard = (function () {
       /* ----- 나의 세례의무금 (해마다 한 번 총회에 내는 세례교인헌금) ----- */
       SHSCloud.init().then(function (c) {
         return Promise.all([
-          c.from('bapdues').select('*').in('year', [yr, yr - 1])
+          c.from('bapdues').select('*').in('year', [calYr, calYr - 1])
             .then(function (x) { return x; }, function () { return { data: [] }; }),
           c.from('site_settings').select('*').in('key', ['bapdues_pay', 'bapdues_deadline'])
             .then(function (x) { return x; }, function () { return { data: [] }; })
@@ -286,7 +300,7 @@ var SHSBoard = (function () {
           el.innerHTML = '<p class="dash-none">세례의무금 자료가 아직 없습니다.</p>';
           return;
         }
-        var bapYr = all.some(function (b) { return b.year === yr && key(b.church) === myKey; }) ? yr : yr - 1;
+        var bapYr = all.some(function (b) { return b.year === calYr && key(b.church) === myKey; }) ? calYr : calYr - 1;
         var mine = all.filter(function (b) { return b.year === bapYr && key(b.church) === myKey; })[0];
         if (!mine) {
           el.innerHTML = '<p class="dash-none">우리 교회는 올해 세례의무금 배정에 없습니다. ' +
@@ -305,7 +319,7 @@ var SHSBoard = (function () {
             : '<span class="mydues-late" style="display:inline;margin:0">미납</span>');
         el.innerHTML =
           '<div class="mydues-head"><strong>' + SHS.esc(mine.church) + '</strong>' +
-          ' · ' + bapYr + '년' + (bapYr !== yr ? ' <span style="color:var(--gray-5)">(지난해 배정 기준)</span>' : '') +
+          ' · ' + bapYr + '년' + (bapYr !== calYr ? ' <span style="color:var(--gray-5)">(지난해 배정 기준)</span>' : '') +
           ' · 세례교인 ' + Number(mine.members || 0) + '명</div>' +
           '<p style="margin:4px 0">배정액 <strong>' + target.toLocaleString('ko-KR') + '원</strong> — ' + state + '</p>' +
           (function () {
@@ -355,12 +369,14 @@ var SHSBoard = (function () {
         pays.forEach(function (p2) {
           var a = p2.amount != null ? Number(p2.amount) : (rateBy[p2.church] || 0);
           paid += a;
-          if (p2.month <= mo) paidToDate += a;
+          /* 회기(4월 시작)에서 이번 달까지 낸 것만 센다 */
+          var idx = FY_MONTHS.indexOf(Number(p2.month));
+          if (idx > -1 && idx < fyEl) paidToDate += a;
           if (p2.month === mo) curCnt++;
         });
         var pct = monthly ? Math.round(paid / (monthly * 12) * 100) : 0;
-        /* 이번 달까지 부과된 금액과 실제 낸 금액의 차이 */
-        var late = Math.max(0, monthly * mo - paidToDate);
+        /* 회기에서 이번 달까지 부과된 금액과 실제 낸 금액의 차이 */
+        var late = Math.max(0, monthly * fyEl - paidToDate);
         el.innerHTML =
           '<div class="dues-mini">' +
           '<span><strong>' + curCnt + '/' + rates.length + '</strong> ' + mo + '월 납부 교회</span>' +
@@ -485,8 +501,8 @@ var SHSBoard = (function () {
     function loadSicFin(mySic) {
       var box = document.getElementById('dash-sicfin');
       if (!box) return;
-      var yr = new Date().getFullYear();
-      var mo = new Date().getMonth() + 1;
+      var yr = fyYear();          /* 상회비 회기 연도 (4월 시작) */
+      var mo = fyElapsed();       /* 회기에서 몇 달째인지 */
       var ORDER = ['북부시찰', '상록시찰', '남부시찰', '기타'];
 
       function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
@@ -560,8 +576,8 @@ var SHSBoard = (function () {
             '<div class="hidden" data-sicdetail="' + esc(x.out_sichal) + '" style="margin-top:6px"></div>' +
             '</div>';
         });
-        h += '<p style="font-size:0.7rem;color:var(--gray-5);margin:2px 0 0">상회비는 이번 달까지 부과된 금액 대비, ' +
-          '세례의무금은 올해 목표금액 대비 납부율입니다.</p></div>';
+        h += '<p style="font-size:0.7rem;color:var(--gray-5);margin:2px 0 0">상회비는 회기(4월~다음 해 3월)에서 ' +
+          '이번 달까지 부과된 금액 대비, 세례의무금은 올해 목표금액 대비 납부율입니다.</p></div>';
         box.innerHTML = h;
 
         box.querySelectorAll('a[data-sicfin]').forEach(function (a) {
@@ -581,7 +597,7 @@ var SHSBoard = (function () {
               var list = (r2 && r2.data) || [];
               if (!list.length) { det.innerHTML = '<p class="dash-none">자료가 없습니다.</p>'; return; }
               var t = '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.78rem">' +
-                '<thead><tr><th class="left">교회</th><th>상회비<br>(납부/이번 달)</th>' +
+                '<thead><tr><th class="left">교회</th><th>상회비<br>(납부/회기 경과)</th>' +
                 '<th>세례의무금<br>(납입/목표)</th><th>상태</th></tr></thead><tbody>';
               list.forEach(function (d) {
                 var bapDone = Number(d.out_bap_target) > 0 && Number(d.out_bap_paid) >= Number(d.out_bap_target);
