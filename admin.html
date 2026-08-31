@@ -1421,7 +1421,8 @@ document.addEventListener('DOMContentLoaded', function () {
           e(m.position || m.category || '') + '</span></h4>' +
           '<table class="tbl" style="margin-top:12px"><tbody>' +
           viewRow('소속 교회', e(m.church || '')) +
-          viewRow('시찰', e(m.sichal || '')) +
+          '<tr id="rv-sichal"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">시찰</td>' +
+          '<td class="left">' + (m.sichal ? e(m.sichal) : '<span style="color:var(--gray-5)">-</span>') + '</td></tr>' +
           '<tr id="rv-coms"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">상비부</td>' +
           '<td class="left" style="color:var(--gray-5)">확인 중...</td></tr>' +
           viewRow('직분 / 직위', e(m.category || '') +
@@ -1442,6 +1443,25 @@ document.addEventListener('DOMContentLoaded', function () {
           mo.close();
           openRosterEdit(m);
         });
+        /* 시찰 명부에서 시찰장·서기·회계 직책을 찾아 시찰 줄에 함께 보여 준다 */
+        SHSCloud.init().then(function (c) {
+          return c.from('sichals').select('name,head,clerk,treasurer');
+        }).then(function (r) {
+          function fw(s) { return String(s || '').trim().split(/[\s(]/)[0]; }
+          var tags = [];
+          ((r.data) || []).forEach(function (s) {
+            if (m.sichal && s.name !== m.sichal) return;
+            if (fw(s.head) === m.name) tags.push(s.name + ' 시찰장');
+            if (fw(s.clerk) === m.name) tags.push(s.name + ' 서기');
+            if (fw(s.treasurer) === m.name) tags.push(s.name + ' 회계');
+          });
+          if (!tags.length) return;
+          var cell = mo.ov.querySelector('#rv-sichal td:last-child');
+          if (cell) cell.innerHTML = e(m.sichal || '') +
+            ' <span style="color:var(--navy);font-weight:700">(' +
+            tags.map(function (t) { return e(t.replace((m.sichal || '') + ' ', '')); }).join('·') + ')</span>';
+        }).catch(function () {});
+
         /* 상비부 명부에서 이 분이 속한 부서·직책을 찾아 보여 준다 */
         SHSCloud.init().then(function (c) {
           return c.from('committees').select('*').order('sort');
