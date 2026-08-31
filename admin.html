@@ -2206,9 +2206,45 @@ document.addEventListener('DOMContentLoaded', function () {
           if (isNew) d.sort = (rows.length + 1) * 10;
           msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
           SHSCloud.init().then(function (c) {
+            /* 규칙: 노회 임원은 시찰 임원을 겸할 수 없다.
+             * 다만 노회장은 직권으로 임명할 수 있다. */
+            function fw(s) { return String(s || '').trim().split(/[\s(]/)[0]; }
+            var picked = [
+              ['시찰장', fw(d.head)], ['서기', fw(d.clerk)], ['회계', fw(d.treasurer)]
+            ].filter(function (p2) { return p2[1]; });
+            if (!picked.length) return c;
+            return c.from('profiles').select('name,role,title')
+              .in('role', ['president', 'clerk', 'officer']).then(function (r2) {
+                var offs = (r2.data) || [];
+                var hit = [];
+                picked.forEach(function (p2) {
+                  var o = offs.filter(function (of) { return of.name === p2[1]; })[0];
+                  if (o) hit.push(p2[1] + ' 님(노회 ' +
+                    (o.title || (o.role === 'president' ? '노회장' : o.role === 'clerk' ? '서기' : '임원')) +
+                    ') → ' + p2[0]);
+                });
+                if (!hit.length) return c;
+                var isPresident = user.role === 'president' || user.role === 'superadmin';
+                if (!isPresident) {
+                  throw new Error('노회 임원은 시찰 임원을 겸할 수 없습니다.\n' + hit.join('\n') +
+                    '\n노회장 직권으로만 임명할 수 있습니다.');
+                }
+                if (!confirm('노회 임원은 시찰 임원을 겸할 수 없으나, 노회장 직권으로 임명할 수 있습니다.\n\n' +
+                  hit.join('\n') + '\n\n노회장 직권으로 임명하시겠습니까?')) {
+                  throw new Error('임명을 취소했습니다.');
+                }
+                SHSCloud.log('update', '시찰 임원 직권 임명(노회장)', d.name + ' — ' + hit.join(', '));
+                return c;
+              });
+          }).then(function (c) {
             return isNew ? c.from('sichals').insert(d).select()
                          : c.from('sichals').update(d).eq('id', x.id).select();
+          }).catch(function (err) {
+            msg.className = 'form-msg err';
+            msg.textContent = (err && err.message) || '저장하지 못했습니다.';
+            return null;
           }).then(function (res) {
+            if (!res) return;
             var w = SHS.wrote(res);
             if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
             SHSCloud.log(isNew ? 'create' : 'update', isNew ? '시찰 추가' : '시찰 정보 수정', d.name);
