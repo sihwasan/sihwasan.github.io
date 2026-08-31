@@ -83,19 +83,12 @@ document.addEventListener('DOMContentLoaded', function () {
     var churches = [];
     SHSData.sichals.forEach(function (s) { churches = churches.concat(s.churches); });
     churches.sort();
-    /* 서버 시찰 자료가 있으면 그 교회 목록으로 바꿔 준다 */
+    /* 교회 명부(sichal_churches)가 원본이다. 있으면 그 목록으로 바꿔 준다 */
     SHSCloud.init().then(function (c) {
-      return c.from('sichals').select('churches').order('sort');
+      return c.from('sichal_churches').select('name').order('name');
     }).then(function (r) {
-      var list = [];
-      ((r && r.data) || []).forEach(function (s) {
-        String(s.churches || '').split(String.fromCharCode(10)).forEach(function (x) {
-          x = x.trim();
-          if (x) list.push(x);
-        });
-      });
+      var list = ((r && r.data) || []).map(function (x) { return x.name; }).filter(Boolean);
       if (!list.length) return;
-      list.sort();
       var sel = document.getElementById('cb-church');
       if (!sel) return;
       var keep = sel.value;

@@ -127,17 +127,11 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSData.sichals.forEach(function (s) { fallback = fallback.concat(s.churches); });
     fallback.sort();
     if (!(window.SHSCloud && SHSCloud.enabled())) return Promise.resolve(fallback);
+    /* 교회 명부(sichal_churches)가 노회 교회 목록의 원본이다 */
     return SHSCloud.init().then(function (c) {
-      return c.from('sichals').select('churches').order('sort');
+      return c.from('sichal_churches').select('name').order('name');
     }).then(function (r) {
-      var list = [];
-      ((r && r.data) || []).forEach(function (s) {
-        String(s.churches || '').split('\n').forEach(function (x) {
-          x = x.trim();
-          if (x) list.push(x);
-        });
-      });
-      list.sort();
+      var list = ((r && r.data) || []).map(function (x) { return x.name; }).filter(Boolean);
       return list.length ? list : fallback;
     }).catch(function () { return fallback; });
   }

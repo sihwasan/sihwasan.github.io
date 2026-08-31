@@ -2125,21 +2125,29 @@ document.addEventListener('DOMContentLoaded', function () {
     var box = document.getElementById('sichal-area');
     if (!box) return;
     SHSCloud.init().then(function (c) {
-      return c.from('sichals').select('*').order('sort');
-    }).then(function (r) {
+      return Promise.all([
+        c.from('sichals').select('*').order('sort'),
+        c.from('sichal_churches').select('sichal')
+          .then(function (x) { return x; }, function () { return { data: [] }; })
+      ]);
+    }).then(function (rs) {
+      var r = rs[0];
       if (r.error) {
         box.innerHTML = '<div class="notice-banner">시찰 정보를 불러오지 못했습니다: ' +
           e(r.error.message) + '</div>';
         return;
       }
       var rows = r.data || [];
-      function churchCount(x) {
-        return String(x.churches || '').split('\n')
-          .filter(function (t) { return t.trim(); }).length;
-      }
+      /* 관내 교회 수는 교회 명부(sichal_churches)가 원본이다 */
+      var cnt = {};
+      ((rs[1] && rs[1].data) || []).forEach(function (x) {
+        cnt[x.sichal] = (cnt[x.sichal] || 0) + 1;
+      });
+      function churchCount(x) { return cnt[x.name] || 0; }
 
-      var html = '<div class="notice-banner">시찰 구성은 조직 페이지와 <strong>회원가입 화면의 교회 목록</strong>에 함께 쓰입니다. ' +
-        '관내 교회의 교역자·장로 명부는 <strong>교회 관리</strong>에서 다룹니다.</div>';
+      var html = '<div class="notice-banner">시찰 임원과 관할 지역을 관리합니다. ' +
+        '관내 교회 목록은 <strong>교회 관리(교회 명부)</strong>가 원본이며, ' +
+        '회원가입·조직 페이지의 교회 목록도 그 명부를 그대로 씁니다.</div>';
       html += '<table class="tbl"><thead><tr><th style="width:120px">시찰</th>' +
         '<th style="width:120px">시찰장</th><th style="width:110px">서기</th>' +
         '<th style="width:110px">회계</th><th style="width:90px">관내 교회</th>' +
@@ -2182,8 +2190,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field"><label>회계</label>' +
           '<input type="text" data-names id="sim-treasurer" value="' + e(x.treasurer || '') + '"></div>' +
           '</div>' +
-          '<div class="field"><label>소속 교회 (한 줄에 한 교회씩)</label>' +
-          '<textarea id="sim-churches" rows="10">' + e(x.churches || '') + '</textarea></div>' +
+          '<p style="font-size:0.84rem;color:var(--gray-5)">관내 교회 목록(' + churchCount(x) +
+          '곳)은 <strong>교회 관리</strong>에서 추가·이동·삭제합니다.</p>' +
           '<div style="margin-top:6px"><button class="btn" id="sim-save">저장</button> ' +
           (isNew ? '' : '<button class="btn danger" id="sim-del" style="float:right">시찰 삭제</button>') +
           '</div><div class="form-msg" id="sim-msg"></div></div>', 720);
@@ -2191,15 +2199,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('sim-save').addEventListener('click', function () {
           var msg = document.getElementById('sim-msg');
-          var lines = document.getElementById('sim-churches').value.split('\n')
-            .map(function (t) { return t.trim(); }).filter(function (t) { return t; });
           var d = {
             name: document.getElementById('sim-name').value.trim(),
             area: document.getElementById('sim-area').value.trim() || null,
             head: document.getElementById('sim-head').value.trim() || null,
             clerk: document.getElementById('sim-clerk').value.trim() || null,
             treasurer: document.getElementById('sim-treasurer').value.trim() || null,
-            churches: lines.join('\n') || null,
             updated_at: new Date().toISOString(), updated_by: user.name
           };
           if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '시찰 이름을 적어 주세요.'; return; }

@@ -701,7 +701,9 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('committees').select('*').order('sort'),
         c.from('roster').select('*').order('sort'),
-        c.from('sichals').select('*').order('sort')
+        c.from('sichals').select('*').order('sort'),
+        c.from('sichal_churches').select('sichal,name').order('sort').order('id')
+          .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
       if (rs[0] && rs[0].data && rs[0].data.length) renderCommittees(rs[0].data);
@@ -714,13 +716,16 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       var sichals = (rs[2] && rs[2].data) || [];
+      /* 관내 교회는 교회 명부(sichal_churches)가 원본이다 */
+      var chBySic = {};
+      ((rs[3] && rs[3].data) || []).forEach(function (ch) {
+        (chBySic[ch.sichal] = chBySic[ch.sichal] || []).push(ch.name);
+      });
       if (sichals.length) {
         renderSichals(sichals.map(function (s) {
           return {
             name: s.name, area: s.area, head: s.head, clerk: s.clerk, treasurer: s.treasurer,
-            churches: String(s.churches || '').split('\n')
-              .map(function (x) { return x.trim(); })
-              .filter(function (x) { return x; })
+            churches: chBySic[s.name] || []
           };
         }));
       }
