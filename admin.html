@@ -1601,14 +1601,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
       h += '<h3>본노회 목사 안수 명단 (' + ords.length + '명)</h3>' + tableHtml(ords, 'ordained_on', 'ord');
       h += '<div class="inline-form" style="margin:10px 0 26px">' +
-        '<div class="field"><label>안수 명단에 추가 — 성명 (노회 명단에서)</label>' +
+        '<div class="field"><label>안수 명단에 추가 — 성명 (명단에서 고르거나 직접 입력)</label>' +
         '<input type="text" data-names="plain" id="ord-new" autocomplete="off"></div>' +
         '<div class="field" style="flex:0 0 170px"><label>안수일</label><input type="date" id="ord-new-d"></div>' +
         '<button class="btn sm" id="ord-add" style="align-self:flex-end;margin-bottom:2px">추가</button></div>';
 
       h += '<h3>본노회 강도사 인허 명단 (' + lics.length + '명)</h3>' + tableHtml(lics, 'licensed_on', 'lic');
       h += '<div class="inline-form" style="margin:10px 0 4px">' +
-        '<div class="field"><label>인허 명단에 추가 — 성명 (노회 명단에서)</label>' +
+        '<div class="field"><label>인허 명단에 추가 — 성명 (명단에서 고르거나 직접 입력)</label>' +
         '<input type="text" data-names="plain" id="lic-new" autocomplete="off"></div>' +
         '<div class="field" style="flex:0 0 170px"><label>인허일</label><input type="date" id="lic-new-d"></div>' +
         '<button class="btn sm" id="lic-add" style="align-self:flex-end;margin-bottom:2px">추가</button></div>' +
@@ -1654,25 +1654,46 @@ document.addEventListener('DOMContentLoaded', function () {
           saveRec(b.dataset.licdel, { licensed_on: null, licensed_by: null }, '강도사 인허 기록 제외');
         });
       });
-      function addRec(inpId, dateId, patchOf, label) {
+      function addRec(inpId, dateId, patchOf, label, personKind) {
         var nm = document.getElementById(inpId).value.trim().split(/[\s(]/)[0];
         if (!nm) { say('성명을 입력해 주세요.', true); return; }
         var hit = rows.filter(function (m) { return m.name === nm; });
-        if (!hit.length) {
-          say(nm + ' 님이 노회 명단에 없습니다. 회원 신상관리에서 먼저 추가해 주세요.', true);
+        if (hit.length) {
+          saveRec(hit[0].id, patchOf(document.getElementById(dateId).value || null), label);
           return;
         }
-        saveRec(hit[0].id, patchOf(document.getElementById(dateId).value || null), label);
+        /* 본노회에서 안수·인허를 받고 타노회로 이적한 분은 명단에 없어도 직접 등재한다 */
+        if (!confirm(nm + ' 님이 노회 명단에 없습니다.\n\n' +
+          '본노회에서 받고 타노회로 이적하신 분이면 [확인]을 눌러 기록용으로 직접 등재하세요.\n' +
+          '현재 노회 회원이라면 [취소] 후 회원 신상관리에서 먼저 추가해 주세요.')) return;
+        var birth = prompt(nm + ' 님의 생년월일을 아시면 적어 주세요. (예: 1970-01-01, 안수증명서 대조에 쓰입니다. 모르면 비워 두세요)', '');
+        if (birth === null) return;
+        birth = /^\d{4}-\d{2}-\d{2}$/.test(birth.trim()) ? birth.trim() : null;
+        var note = prompt('현재 소속(타노회·교회)을 아시면 적어 주세요. (선택)', '') || '';
+        var patch = patchOf(document.getElementById(dateId).value || null);
+        SHSCloud.init().then(function (c) {
+          return c.from('roster').insert(Object.assign({
+            name: nm, church: '타노회 이적', category: '타노회이적',
+            position: personKind, birth_date: birth,
+            note: note.trim() || '본노회 ' + (personKind === '강도사' ? '인허' : '안수') + ' 후 타노회 이적',
+            active: false,
+            sort: 100000
+          }, patch));
+        }).then(function (res) {
+          if (res.error) { say(res.error.message, true); return; }
+          SHSCloud.log('create', label + ' (타노회 이적자 직접 등재)', nm);
+          renderOrdinations();
+        });
       }
       document.getElementById('ord-add').addEventListener('click', function () {
         addRec('ord-new', 'ord-new-d', function (d0) {
           return { ordained_on: d0, ordained_by: '시화산노회' };
-        }, '목사 안수 명단 추가');
+        }, '목사 안수 명단 추가', '목사');
       });
       document.getElementById('lic-add').addEventListener('click', function () {
         addRec('lic-new', 'lic-new-d', function (d0) {
           return { licensed_on: d0, licensed_by: '시화산노회' };
-        }, '강도사 인허 명단 추가');
+        }, '강도사 인허 명단 추가', '강도사');
       });
     });
   }
