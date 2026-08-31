@@ -127,20 +127,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '<strong>정년 칸의 날짜를 고치시면 관리자가 대신 입력</strong>할 수 있고, 곧바로 저장됩니다. ' +
         '입력 기록은 감사 기록에 남습니다.<br>' +
         '· 장로 총대는 다음 봄 정기노회까지 자격이 유지되며, 총대로 다시 등록되지 않으면 자격이 상실됩니다. ' +
-        '아래 <strong>총대 자격 기간 일괄 설정</strong>으로 만료일을 지정할 수 있습니다.<br>' +
+        '만료일 지정은 <strong>장로 총대 자격</strong> 탭의 일괄 설정에서 합니다.<br>' +
         '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
-
-      /* 총대 자격 기간 일괄 설정 */
-      var nextSpring = SHS.nthMonday(new Date().getFullYear() + (new Date().getMonth() >= 3 ? 1 : 0), 4, 2);
-      var nsStr = nextSpring.toISOString().slice(0, 10);
-      html += '<div class="admin-card" style="max-width:760px"><h3 style="margin-top:0">총대 자격 기간 일괄 설정</h3>' +
-        '<p style="font-size:0.86rem;color:var(--gray-7)">장로 총대의 자격 만료일을 한 번에 지정합니다. ' +
-        '기본값은 다음 봄 정기노회일입니다. 만료일이 지나면 정회원 자격이 자동으로 상실됩니다.</p>' +
-        '<div class="inline-form">' +
-        '<div class="field" style="flex:0 0 180px"><label>만료일</label><input type="date" id="mu-date" value="' + nsStr + '"></div>' +
-        '<div class="field" style="flex:0 0 160px"><label>대상 직분</label><select id="mu-pos"><option value="장로">장로</option><option value="">전체 정회원</option></select></div>' +
-        '<button class="btn" id="mu-apply">일괄 적용</button>' +
-        '</div><div class="form-msg" id="mu-msg"></div></div>';
 
       /* 노회 명단·상비부 관리 영역 */
       html += '<h2>회원 신상관리</h2>';
@@ -280,27 +268,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       });
 
-      /* 총대 자격 기간 일괄 설정 */
-      var muBtn = document.getElementById('mu-apply');
-      if (muBtn) muBtn.addEventListener('click', function () {
-        var msg = document.getElementById('mu-msg');
-        var until = document.getElementById('mu-date').value;
-        var pos = document.getElementById('mu-pos').value;
-        if (!until) { msg.className = 'form-msg err'; msg.textContent = '만료일을 선택해 주세요.'; return; }
-        if (!confirm((pos ? pos + ' 직분' : '전체 정회원') + '의 자격 만료일을 ' + until + '로 설정하시겠습니까?')) return;
-        SHSCloud.init().then(function (c) {
-          var q = c.from('profiles').update({ member_until: until, updated_at: new Date().toISOString() })
-            .eq('role', 'member');
-          if (pos) q = q.eq('position', pos);
-          return q;
-        }).then(function (res) {
-          if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
-          SHSCloud.log('update', '총대 자격 기간 설정', (pos || '전체 정회원') + ' → ' + until);
-          msg.className = 'form-msg ok';
-          msg.textContent = '설정되었습니다.';
-          renderCloud();
-        });
-      });
     });
   }
 
@@ -1775,6 +1742,18 @@ document.addEventListener('DOMContentLoaded', function () {
         '정기노회 뒤에 한 번 눌러 주시면 됩니다. 정년이 지난 분은 제외됩니다.</span></p>' +
         '<div class="form-msg" id="el-msg"></div>';
 
+      /* 총대 자격 기간 일괄 설정 (계정 등급의 정회원 자격 만료일) */
+      var nextSpring = SHS.nthMonday(new Date().getFullYear() + (new Date().getMonth() >= 3 ? 1 : 0), 4, 2);
+      var nsStr = nextSpring.toISOString().slice(0, 10);
+      h += '<div class="admin-card" style="max-width:760px;margin-bottom:18px"><h3 style="margin-top:0">총대 자격 기간 일괄 설정</h3>' +
+        '<p style="font-size:0.86rem;color:var(--gray-7)">장로 총대의 자격 만료일을 한 번에 지정합니다. ' +
+        '기본값은 다음 봄 정기노회일입니다. 만료일이 지나면 정회원 자격이 자동으로 상실됩니다.</p>' +
+        '<div class="inline-form">' +
+        '<div class="field" style="flex:0 0 180px"><label>만료일</label><input type="date" id="mu-date" value="' + nsStr + '"></div>' +
+        '<div class="field" style="flex:0 0 160px"><label>대상 직분</label><select id="mu-pos"><option value="장로">장로</option><option value="">전체 정회원</option></select></div>' +
+        '<button class="btn" id="mu-apply">일괄 적용</button>' +
+        '</div><div class="form-msg" id="mu-msg"></div></div>';
+
       h += '<table class="tbl"><thead><tr><th style="width:50px">번호</th>' +
         '<th style="width:110px">성명</th><th style="width:160px">소속 교회</th>' +
         '<th style="width:110px">시찰</th><th style="width:120px">생년월일</th>' +
@@ -1786,7 +1765,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><strong>' + e(x.name) + '</strong></td>' +
           '<td class="left">' + e(x.church) + '</td>' +
           '<td>' + e(x.sichal || '-') + '</td>' +
-          '<td>' + e(x.birth_date || '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+          '<td>' + (x.birth_date ? e(x.birth_date) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td style="font-size:0.84rem">' + retireText(x) + '</td>' +
           '<td>' + termText(x) + '</td>' +
           '<td><button class="btn sm" data-eledit="' + x.id + '">수정</button></td>' +
@@ -1892,6 +1871,26 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       /* 자격 일괄 연장 */
+      /* 총대 자격 기간 일괄 설정 */
+      document.getElementById('mu-apply').addEventListener('click', function () {
+        var msg2 = document.getElementById('mu-msg');
+        var until = document.getElementById('mu-date').value;
+        var pos = document.getElementById('mu-pos').value;
+        if (!until) { msg2.className = 'form-msg err'; msg2.textContent = '만료일을 선택해 주세요.'; return; }
+        if (!confirm((pos ? pos + ' 직분' : '전체 정회원') + '의 자격 만료일을 ' + until + '로 설정하시겠습니까?')) return;
+        SHSCloud.init().then(function (c) {
+          var q = c.from('profiles').update({ member_until: until, updated_at: new Date().toISOString() })
+            .eq('role', 'member');
+          if (pos) q = q.eq('position', pos);
+          return q;
+        }).then(function (res) {
+          if (res.error) { msg2.className = 'form-msg err'; msg2.textContent = res.error.message; return; }
+          SHSCloud.log('update', '총대 자격 기간 설정', (pos || '전체 정회원') + ' → ' + until);
+          msg2.className = 'form-msg ok';
+          msg2.textContent = '설정되었습니다.';
+        });
+      });
+
       document.getElementById('el-extend').addEventListener('click', function () {
         if (!confirm('자격이 만료된 장로 총대의 기간을 1년 연장하시겠습니까? ' +
                      '교체되지 않은 총대만 연장되며, 정년이 지난 분은 제외됩니다.')) return;
