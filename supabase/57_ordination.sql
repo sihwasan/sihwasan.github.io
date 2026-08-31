@@ -1,0 +1,6 @@
+-- 57. 안수증명서
+--   roster에 안수일(ordained_on)·안수 노회(ordained_by) 추가.
+--   update_my_ordination: 본인 안수 기록 입력.
+--   check_my_ordination: 시화산노회 안수 기록 대조(비정회원 포함, 이름·생년월일).
+--   doc_requests_insert 정책: 안수증명서는 기록이 확인되면 정회원 아니어도 신청 가능.
+--   실제 적용은 Supabase migration ordination_fields, ordination_cert_request 로 완료.

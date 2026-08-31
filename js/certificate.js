@@ -58,6 +58,9 @@ var SHSCert = (function () {
         return '상기 직인은 대한예수교장로회 ' + church + ' 사용 직인임을 증명합니다.';
       case '은퇴목사확인서':
         return '위 사람은 ' + NOHOE + ' 소속 은퇴목사임을 확인합니다.';
+      case '안수증명서':
+        return '위의 기록한 목사는 ' + NOHOE + '에서 안수 받았음을 증명합니다.' +
+          (rec.ordained_on ? ' (안수일자: ' + ymKo(rec.ordained_on) + ')' : '');
       default:
         return '위 사람은 ' + NOHOE + ' 소속 ' + church + ' ' + pos + '임을 증명합니다.';
     }

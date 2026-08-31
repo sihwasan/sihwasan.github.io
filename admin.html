@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('sichal_churches').select('*').order('sichal').order('sort').order('id'),
         c.from('church_staff').select('*').order('sort').order('id'),
-        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode,photo_path')
+        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode,photo_path,ordained_on,ordained_by')
       ]);
     }).then(function (rs) {
       if (rs[1].error) throw rs[1].error;
@@ -1198,6 +1198,13 @@ document.addEventListener('DOMContentLoaded', function () {
           gradeOptions(rosterGrade(m)) + '</select></div>' +
           '</div>' +
           '<div class="inline-form">' +
+          '<div class="field" style="flex:0 0 160px"><label>안수일</label>' +
+          '<input type="date" id="rm-ordon" value="' + e(m.ordained_on || '') + '"></div>' +
+          '<div class="field"><label>안수 노회</label>' +
+          '<input type="text" id="rm-ordby" value="' + e(m.ordained_by || '') + '" placeholder="예: 시화산노회"' +
+          ' title="안수증명서 발급 시 이 기록과 대조합니다"></div>' +
+          '</div>' +
+          '<div class="inline-form">' +
           '<div class="field" style="flex:0 0 120px"><label>우편번호</label>' +
           '<input type="text" id="rm-post" value="' + e(m.postcode || '') + '" maxlength="7"></div>' +
           '<div class="field"><label>주소</label>' +
@@ -1344,6 +1351,8 @@ document.addEventListener('DOMContentLoaded', function () {
             postcode: v('rm-post') || null,
             address: v('rm-addr') || null,
             served_from: v('rm-served') || null,
+            ordained_on: v('rm-ordon') || null,
+            ordained_by: v('rm-ordby') || null,
             role: g.role, officer_title: g.title
           };
           if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명은 비울 수 없습니다.'; return; }

@@ -140,6 +140,18 @@ document.addEventListener('DOMContentLoaded', function () {
           '<span style="font-size:0.8rem;color:var(--gray-5)">수정이 필요하시면 노회 서기에게 문의해 주세요. ' +
           '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>';
       })() +
+      (/목사|강도사/.test(p.position || '')
+        ? '<div class="inline-form" style="margin-bottom:4px">' +
+          '<div class="field" style="flex:0 0 170px"><label>안수일</label>' +
+          '<input type="date" id="q-ordon"></div>' +
+          '<div class="field"><label>안수 노회</label>' +
+          '<input type="text" id="q-ordby" placeholder="예: 시화산노회"></div>' +
+          '<button class="btn ghost sm" id="q-ordsave" style="align-self:flex-end;margin-bottom:2px">안수 기록 저장</button>' +
+          '</div>' +
+          '<span class="form-msg" id="q-ordmsg" style="display:block;margin:-4px 0 4px"></span>' +
+          '<span style="display:block;font-size:0.8rem;color:var(--gray-5);margin:0 0 12px">' +
+          '안수증명서 발급 시 이 기록을 노회 명단과 대조합니다.</span>'
+        : '') +
       '<div class="field"><label>교회 주소</label>' +
       '<input type="text" id="q-chaddr" value="불러오는 중..." disabled>' +
       '<span style="font-size:0.8rem;color:var(--gray-5)">교회 주소는 교회 명부와 연동되며, ' +
@@ -565,6 +577,39 @@ document.addEventListener('DOMContentLoaded', function () {
         msg.textContent = '저장되었습니다.';
       });
     });
+
+    /* ---------- 안수 기록 (안수일·안수 노회) ---------- */
+    (function () {
+      var onEl = document.getElementById('q-ordon');
+      var byEl = document.getElementById('q-ordby');
+      var btn = document.getElementById('q-ordsave');
+      if (!btn) return;
+      /* 현재 기록을 명단에서 불러온다 */
+      if (p.roster_id && window.SHSCloud && SHSCloud.enabled()) {
+        SHSCloud.init().then(function (c) {
+          return c.from('roster').select('ordained_on,ordained_by').eq('id', p.roster_id);
+        }).then(function (r) {
+          var row = (r.data || [])[0];
+          if (row) {
+            if (row.ordained_on) onEl.value = row.ordained_on;
+            if (row.ordained_by) byEl.value = row.ordained_by;
+          }
+        }).catch(function () {});
+      }
+      btn.addEventListener('click', function () {
+        var m2 = document.getElementById('q-ordmsg');
+        m2.className = 'form-msg'; m2.textContent = '저장 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.rpc('update_my_ordination', {
+            p_on: onEl.value || null, p_by: byEl.value.trim() || null
+          });
+        }).then(function (r) {
+          if (r.error) { m2.className = 'form-msg err'; m2.textContent = r.error.message; return; }
+          SHSCloud.log('update', '안수 기록 입력', p.email);
+          m2.className = 'form-msg ok'; m2.textContent = '안수 기록이 저장되었습니다.';
+        });
+      });
+    })();
 
     /* ---------- 교회 주소 표시 + 담임목사 전용 교회 정보 ---------- */
     function firstWord(s) { return String(s || '').trim().split(/[\s(]/)[0]; }

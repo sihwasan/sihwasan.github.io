@@ -32,6 +32,7 @@
     <div class="doc-item"><div class="d-name">대표자증명서</div><div class="d-desc">해당 교회의 대표자임을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
     <div class="doc-item"><div class="d-name">직인증명서</div><div class="d-desc">교회 직인을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
     <div class="doc-item"><div class="d-name">은퇴목사확인서</div><div class="d-desc">은퇴목사임을 확인합니다.</div></div>
+    <div class="doc-item"><div class="d-name">안수증명서</div><div class="d-desc">시화산노회에서 목사 안수를 받았음을 증명합니다. 타노회로 이적하셨어도 시화산노회에서 안수받으셨다면 신청할 수 있습니다.</div></div>
     <div class="doc-item"><div class="d-name">그 밖의 증명</div><div class="d-desc">필요한 내용을 신청 시 메모란에 적어 주시면 서기가 확인 후 처리합니다.</div></div>
   </div>
 
@@ -59,7 +60,7 @@
 <script src="js/main.js?v=20260831d"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
-<script src="js/certificate.js?v=20260829p"></script>
+<script src="js/certificate.js?v=20260831a"></script>
 <script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -67,19 +68,19 @@ document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('req-area');
   var e = SHS.esc;
 
-  var gate = SHS.memberGate(user, '서류 신청');
-  if (gate) {
-    area.innerHTML = gate +
-      '<p style="color:var(--gray-7)">서류가 필요하신 경우 노회 사무실(031-486-9993)로 문의해 주시기 바랍니다.</p>';
-    return;
-  }
-  if (!user.cloud) {
+  if (!user || !user.cloud) {
     area.innerHTML = '<div class="notice-banner">서류 신청은 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
       '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
     return;
   }
+  /* 정회원이 아니어도 안수증명서는 신청할 수 있다 (시화산노회에서 안수받은 기록이 있으면).
+   * 그 밖의 서류는 정회원 전용이다. */
+  var gate = SHS.memberGate(user, '서류 신청');
+  var ORD_ONLY = !!gate;
 
-  var DOCS = ['소속증명서', '재직증명서', '대표자증명서', '직인증명서', '은퇴목사확인서', '기타'];
+  var DOCS = ORD_ONLY
+    ? ['안수증명서']
+    : ['소속증명서', '재직증명서', '대표자증명서', '직인증명서', '은퇴목사확인서', '안수증명서', '기타'];
   var FEES = {};                                   /* 서류 종류 → 원 */
   var PAY = { bank: 'NH농협', account: '3511015867663', holder: '시화산노회',
     staff_phone: '010-2498-8696' };
@@ -261,6 +262,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (mode === 'form') {
     html += '<div class="notice-banner"><strong>' + e(user.name) + '</strong> 님, 아래에서 필요한 서류를 신청하실 수 있습니다. ' +
       '신청하시면 관리자에게 바로 알림이 전달됩니다.</div>';
+    if (ORD_ONLY) {
+      html += '<div class="notice-banner" style="border-color:#d9a33b">정회원이 아닌 계정은 ' +
+        '<strong>안수증명서</strong>만 신청하실 수 있습니다. 시화산노회에서 안수를 받으신 기록을 ' +
+        '노회 명단과 대조한 뒤 신청이 접수됩니다.</div>';
+    }
 
     html += '<h2>서류 신청</h2>';
     html += '<div class="admin-card" style="max-width:820px"><div class="inline-form" style="margin-bottom:8px">' +
@@ -454,8 +460,28 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.className = 'form-msg';
       msg.textContent = '신청 중입니다...';
       SHSCloud.init().then(function (c) {
+        /* 안수증명서: 시화산노회 안수 기록을 명단과 대조한 뒤에만 접수한다 */
+        if (d.doc_type !== '안수증명서') return c;
+        return c.rpc('check_my_ordination').then(function (r0) {
+          var hit = r0.data && r0.data[0];
+          if (r0.error || !hit) {
+            throw new Error('노회 명단에서 시화산노회 안수 기록을 찾지 못했습니다.' + NL +
+              '성함·생년월일이 명단과 다르거나 안수 기록이 아직 입력되지 않았을 수 있습니다.' + NL +
+              '노회 사무실(031-486-9993)로 연락해 주시기 바랍니다.');
+          }
+          d.memo = (d.memo ? d.memo + ' / ' : '') +
+            '안수 확인: ' + (hit.out_ordained_on || '날짜 미상') + ' ' + (hit.out_ordained_by || '');
+          return c;
+        });
+      }).then(function (c) {
         return c.from('doc_requests').insert(d);
+      }).catch(function (err) {
+        msg.className = 'form-msg err';
+        msg.textContent = (err && err.message) || '신청하지 못했습니다.';
+        alert((err && err.message) || '신청하지 못했습니다.');
+        return null;
       }).then(function (res) {
+        if (!res) return;
         if (res.error) {
           msg.className = 'form-msg err';
           msg.textContent = res.error.message;
