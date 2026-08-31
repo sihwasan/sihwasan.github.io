@@ -785,8 +785,7 @@ document.addEventListener('DOMContentLoaded', function () {
     pastors.forEach(function (m) { (groups[m.category || '기타'] = groups[m.category || '기타'] || []).push(m); });
 
     var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-      '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다. ' +
-      '명단 자체는 관리자 → 회원 관리 → 노회 명단 관리에서 고칩니다.</p>';
+      '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다.</p>';
 
     /* 남은 임기: 회원 명단의 생년월일로 정년(만 70세)까지 계산한다 */
     function remainLabel(m) {
