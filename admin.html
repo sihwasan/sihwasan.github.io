@@ -1163,6 +1163,16 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div style="background:#fff;border-radius:8px;max-width:560px;width:100%;padding:24px;' +
           'box-shadow:0 10px 40px rgba(0,0,0,.25)">' +
           '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(m.name) + ' — 회원 정보 수정</h3>' +
+          '<div class="field"><label>사진</label>' +
+          '<div id="rm-photo-drop" style="display:flex;gap:12px;align-items:center;' +
+          'border:2px dashed var(--gray-3,#c7c8c6);border-radius:10px;padding:10px 12px;cursor:pointer">' +
+          '<div id="rm-photo-prev" style="width:64px;height:80px;border:1px solid var(--gray-2,#e5e4df);' +
+          'border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;' +
+          'font-size:0.7rem;color:var(--gray-5);flex:none;background:#fff">없음</div>' +
+          '<div><strong style="font-size:0.85rem">여기에 사진을 끌어다 놓거나 눌러서 선택</strong>' +
+          '<div style="font-size:0.76rem;color:var(--gray-5);margin-top:4px">어떤 크기든 자동으로 웹 크기로 줄여 저장되며, 회원명단 카드에 보입니다.</div>' +
+          (m.photo_path ? '<button class="btn danger sm" id="rm-photo-del" type="button" style="margin-top:6px">사진 지우기</button>' : '') +
+          '</div></div><div class="form-msg" id="rm-photo-msg"></div></div>' +
           '<div class="inline-form">' +
           '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
           '<input type="text" id="rm-name" value="' + e(m.name) + '"></div>' +
@@ -1196,16 +1206,6 @@ document.addEventListener('DOMContentLoaded', function () {
           '<button class="btn ghost sm" data-addrsearch="rm-addr,rm-post" ' +
           'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' +
           '</div>' +
-          '<div class="field" style="margin-top:4px"><label>사진</label>' +
-          '<div id="rm-photo-drop" style="display:flex;gap:12px;align-items:center;' +
-          'border:2px dashed var(--gray-3,#c7c8c6);border-radius:10px;padding:10px 12px;cursor:pointer">' +
-          '<div id="rm-photo-prev" style="width:64px;height:80px;border:1px solid var(--gray-2,#e5e4df);' +
-          'border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;' +
-          'font-size:0.7rem;color:var(--gray-5);flex:none;background:#fff">없음</div>' +
-          '<div><strong style="font-size:0.85rem">여기에 사진을 끌어다 놓거나 눌러서 선택</strong>' +
-          '<div style="font-size:0.76rem;color:var(--gray-5);margin-top:4px">어떤 크기든 자동으로 웹 크기로 줄여 저장되며, 회원명단 카드에 보입니다.</div>' +
-          (m.photo_path ? '<button class="btn danger sm" id="rm-photo-del" type="button" style="margin-top:6px">사진 지우기</button>' : '') +
-          '</div></div><div class="form-msg" id="rm-photo-msg"></div></div>' +
           '<div style="margin-top:6px">' +
           '<button class="btn" id="rm-save">저장</button> ' +
           '<button class="btn ghost" id="rm-close">닫기</button> ' +
@@ -1415,6 +1415,7 @@ document.addEventListener('DOMContentLoaded', function () {
           term = e(m.term_from || '?') + ' ~ ' + e(m.term_until || '?');
         }
         var mo = adminModal(
+          '<div id="rv-photo" class="hidden" style="text-align:center;margin-bottom:14px"></div>' +
           '<h4 style="margin:0 0 4px">' + e(m.name) +
           ' <span style="font-weight:400;color:var(--gray-6);font-size:0.9rem">' +
           e(m.position || m.category || '') + '</span></h4>' +
@@ -1439,6 +1440,20 @@ document.addEventListener('DOMContentLoaded', function () {
           mo.close();
           openRosterEdit(m);
         });
+        /* 등록된 사진이 있으면 맨 위에 보여 준다 */
+        if (m.photo_path) {
+          SHSCloud.init().then(function (c) {
+            return c.storage.from('member-photos').createSignedUrl(m.photo_path, 300);
+          }).then(function (r) {
+            var slot = mo.ov.querySelector('#rv-photo');
+            if (slot && r.data && r.data.signedUrl) {
+              slot.innerHTML = '<img src="' + r.data.signedUrl + '" alt="' + e(m.name) + '" ' +
+                'style="width:140px;height:175px;object-fit:cover;border-radius:12px;' +
+                'box-shadow:0 6px 16px rgba(0,0,0,0.18)">';
+              slot.classList.remove('hidden');
+            }
+          }).catch(function () {});
+        }
       }
       box.querySelectorAll('a[data-roview]').forEach(function (a) {
         a.addEventListener('click', function (ev) {
