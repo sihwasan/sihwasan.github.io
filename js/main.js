@@ -135,7 +135,7 @@
     var a = document.createElement('a');
     a.href = 'schedule.html';
     a.textContent = '노회 일정관리';
-    sub.insertBefore(a, sub.firstChild.nextSibling);   /* 임원 자료실 다음 자리 */
+    sub.insertBefore(a, sub.firstChild);   /* 맨 위 자리 */
   }
 
   function addAdminMenu() {
