@@ -46,6 +46,12 @@
       { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
       { t: '고시 모의고사', h: 'exam.html' }
     ]},
+    { title: '보고서', href: 'report.html', sub: [
+      { t: '교회상황 보고서', h: 'report.html' },
+      { t: '시찰보고서', h: 'petition.html?form=sichalreport' },
+      { t: '부 사업보고서', h: 'petition.html?form=deptreport' },
+      { t: '부 조직 보고서', h: 'petition.html?form=deptorg' }
+    ]},
     { title: '총회자료실', href: 'assembly-constitution.html', sub: [
       { t: '총회 헌법', h: 'assembly-constitution.html' },
       { t: '총회 규정', h: 'assembly-rules.html' },
