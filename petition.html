@@ -176,7 +176,7 @@ body.pt-embed main { padding-top: 10px; }
     <h3 id="pt-title"></h3>
     <div class="pt-form" id="pt-form"></div>
     <div class="pt-actions">
-      <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;cursor:pointer">
+      <label id="pt-sealwrap" style="display:flex;align-items:center;gap:6px;font-size:0.88rem;cursor:pointer">
         <input type="checkbox" id="pt-sealon" checked style="width:auto"> 당회장 도장 찍기</label>
       <button class="btn" id="pt-print">인쇄</button>
       <button class="btn" id="pt-pdf">PDF 저장</button>
@@ -221,7 +221,8 @@ body.pt-embed main { padding-top: 10px; }
   }
   /* (인) 자리: 도장이 등록되어 있으면 함께 찍어 보여 준다 */
   function inMark() {
-    var s = sealOn ? (viewSeal || sealImg) : null;
+    /* 보고서 서식(시찰·부)에는 당회장 도장을 찍지 않는다 */
+    var s = (sealOn && !(cur && cur.cat === '보고서')) ? (viewSeal || sealImg) : null;
     return '<span class="inwrap">(인)' + (s
       ? '<img class="pt-seal" src="' + s + '" alt="도장" title="끌어서 위치를 옮길 수 있습니다" ' +
         'style="left:' + (-8 + sealPos.dx) + 'px;margin-top:' + (-23 + sealPos.dy) + 'px">'
@@ -901,6 +902,13 @@ body.pt-embed main { padding-top: 10px; }
     var extra = document.getElementById('pt-extra');
     if (extra) extra.remove();
     if (cur.id === 'sichalreport') enhanceSichalReport();
+    /* 보고서 서식(시찰·부)은 당회장 도장이 들어가지 않는다.
+     * 시찰보고서는 시찰 서기가 직접 노회에 내는 것이므로 '시찰 서기에게 전달' 도 뺀다. */
+    var isReport = cur.cat === '보고서';
+    var sw0 = document.getElementById('pt-sealwrap');
+    if (sw0) sw0.style.display = isReport ? 'none' : '';
+    var sd0 = document.getElementById('pt-send');
+    if (sd0) sd0.style.display = (cur.id === 'sichalreport') ? 'none' : '';
   }
 
   /* ================= 시찰보고서 연동 =================

@@ -126,6 +126,24 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function db() { return SHSCloud.init(); }
+
+  /* 시찰보고서는 시찰 서기가 작성한다 — 시찰 임원(시찰장·서기)과 관리자에게만 탭을 보인다 */
+  (function () {
+    var tb = document.querySelector('#rp-tabs button[data-rt="sichalreport"]');
+    if (!tb) return;
+    if (SHSAuth.canManageMembers(user)) return;
+    tb.style.display = 'none';   /* 확인될 때까지 감춰 둔다 */
+    db().then(function (c) {
+      return c.from('sichals').select('head,clerk');
+    }).then(function (r) {
+      var first = function (s) { return String(s || '').trim().split(/[\s(]/)[0]; };
+      var mine = ((r && r.data) || []).some(function (s) {
+        return first(s.head) === user.name || first(s.clerk) === user.name;
+      });
+      if (mine) tb.style.display = '';
+    }).catch(function () {});
+  })();
+
   function qs(k) {
     var m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)'));
     return m ? decodeURIComponent(m[1]).replace(/\+/g, ' ') : '';
