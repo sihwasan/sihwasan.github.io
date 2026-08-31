@@ -971,15 +971,19 @@ body.pt-embed main { padding-top: 10px; }
     /* 화면에 보이는 미리보기를 그대로 뜬다.
      * (화면 밖 복사본으로 만들면 스타일이 빠져 빈 PDF가 나온다) */
     var paper = document.getElementById('pt-paper');
+    /* 스크롤 위치에 따라 위가 잘려 나오는 일이 있어,
+     * 찍는 동안 맨 위로 올렸다가 끝나면 제자리로 돌려 놓는다 */
+    var keepY = window.scrollY;
+    window.scrollTo(0, 0);
     loadPdfTool().then(function (html2pdf) {
       return html2pdf().set({
         margin: 10,
         filename: cur.title + '.pdf',
-        html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: -window.scrollY },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       }).from(paper).save();
-    }).then(function () { done(); })
-      .catch(function (err) { done(); alert(err.message || err); });
+    }).then(function () { done(); window.scrollTo(0, keepY); })
+      .catch(function (err) { done(); window.scrollTo(0, keepY); alert(err.message || err); });
   }
 
   /* ----- 저장하기 / 내 청원서 ----- */
