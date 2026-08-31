@@ -1004,6 +1004,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 회비 납부 현황(시찰회비)과 회계 장부를 탭으로 나눠 보여 준다.
    * 시찰회비는 1년에 두 차례(상반기·하반기), 1회분은 노회 상회비 한 달치다. */
   var accTab = 'fee';
+  var feeFilter = 'all';   /* 회비 납부 현황 필터: all | full(완납) | late(미납) */
 
   /* 시찰 회계인가 — 시찰 명부의 회계 이름과 내 이름이 같으면 */
   function isTreasurer() {
@@ -1092,10 +1093,23 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="ds"><div class="n">' + n2 + '/' + names.length + '곳</div><div class="l">하반기 납부 (' + sum2.toLocaleString('ko-KR') + '만원)</div></div>' +
         '</div>';
 
+      /* 완납(상·하반기 모두 납부) / 미납 필터 */
+      var fullNames = names.filter(function (nm) { return feeOf(nm, 1) && feeOf(nm, 2); });
+      var lateNames = names.filter(function (nm) { return !(feeOf(nm, 1) && feeOf(nm, 2)); });
+      var shown = feeFilter === 'full' ? fullNames : (feeFilter === 'late' ? lateNames : names);
+      h += '<div class="tabs" style="margin-bottom:10px" id="fee-filter">' +
+        '<button class="' + (feeFilter === 'all' ? 'active' : '') + '" data-ff="all">전체 ' + names.length + '</button>' +
+        '<button class="' + (feeFilter === 'full' ? 'active' : '') + '" data-ff="full">완납 ' + fullNames.length + '</button>' +
+        '<button class="' + (feeFilter === 'late' ? 'active' : '') + '" data-ff="late">미납 ' + lateNames.length + '</button>' +
+        '</div>';
+
       h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:760px"><thead><tr>' +
         '<th class="left">교회</th><th style="width:120px">기준액(만원)</th>' +
         '<th style="width:180px">상반기</th><th style="width:180px">하반기</th></tr></thead><tbody>';
-      names.forEach(function (nm) {
+      if (!shown.length) {
+        h += '<tr><td colspan="4" style="text-align:center;color:var(--gray-5);padding:16px">해당하는 교회가 없습니다.</td></tr>';
+      }
+      shown.forEach(function (nm) {
         var base = baseOf(nm);
         function cell(half) {
           var f = feeOf(nm, half);
@@ -1115,6 +1129,11 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       h += '</tbody></table></div>';
       box.innerHTML = h;
+
+      box.querySelectorAll('#fee-filter button').forEach(function (b) {
+        b.addEventListener('click', function () { feeFilter = b.dataset.ff; drawFees(); });
+      });
+
       if (!canFee) return;
 
       /* 시찰회비 금액 수정 (시찰회가 정한다) */
