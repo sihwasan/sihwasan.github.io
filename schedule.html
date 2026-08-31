@@ -527,6 +527,11 @@ document.addEventListener('DOMContentLoaded', function () {
           (newMeta.fee ? ' · 회비 ' + newMeta.fee : '') +
           (newMeta.dept ? ' · 주관 ' + newMeta.dept : '') +
           (note ? ' · ' + note : '');
+      } else if (kind === '정기노회') {
+        /* 어떤 경우에도 회기·정기노회 문구가 제목에 들어가게 한다.
+         * 내용에 장소만 적으면 "제N회기 봄 정기노회 (장소)" 로 만든다. */
+        if (note && note.indexOf('정기노회') !== -1) title = note;
+        else title = sesText() + (note ? ' (' + note + ')' : '');
       } else {
         title = note || kind;
       }
