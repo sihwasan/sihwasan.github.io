@@ -201,7 +201,7 @@ var SHSBoard = (function () {
         }).then(function (r) {
           var url = r && r.data && r.data.signedUrl;
           if (!url) return;
-          slot.innerHTML = '<img src="' + url + '" alt="내 사진" style="width:200px;height:250px;' +
+          slot.innerHTML = '<img src="' + url + '" alt="내 사진" style="width:400px;height:500px;max-width:100%;' +
             'object-fit:cover;border-radius:18px;' +
             'box-shadow:0 10px 24px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.15);' +
             'border:3px solid rgba(255,255,255,0.55)">';
