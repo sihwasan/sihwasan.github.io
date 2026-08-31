@@ -69,6 +69,19 @@ var SHSMyDuties = (function () {
     function draw(me, coms, myCom, mySic, ambiguous) {
       var h = '<div class="duty-card">';
 
+      /* ---------- 노회 임원 ----------
+       * 노회장·부노회장·서기·부서기·회록서기·회계·부회계·간사 등
+       * 계정 등급과 직책을 그대로 맨 위에 보여 준다. */
+      var offTag = null;
+      if (user.role === 'president') offTag = user.title || '노회장';
+      else if (user.role === 'clerk') offTag = user.title || '서기';
+      else if (user.role === 'staff') offTag = user.title || '간사';
+      else if (user.role === 'officer') offTag = user.title || '임원';
+      if (offTag) {
+        h += '<div class="duty-row"><div class="duty-k">노회 임원</div><div class="duty-v">' +
+          '<span class="duty-tag">' + esc(offTag) + '</span></div></div>';
+      }
+
       /* ---------- 시찰 ---------- */
       var sicName = (me && me.sichal) || '';
       var sicDuty = mySic.filter(function (m) { return !sicName || m.sichal === sicName; })

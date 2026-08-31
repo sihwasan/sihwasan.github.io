@@ -104,48 +104,6 @@ document.addEventListener('DOMContentLoaded', function () {
       : '성명 또는 소속 교회를 수정하면 노회 명단과 다시 대조하여 등급이 갱신됩니다.';
     html += '</div>';
 
-    html += '<h2>회원 정보</h2>';
-    html += '<div class="form-card" style="max-width:520px;margin:0">' +
-      '<div class="field"><label id="q-emailtag">이메일</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
-      '<div class="field"><label>성명</label><input type="text" id="q-name" value="' + e(p.name || '') + '"></div>' +
-      '<div class="field"><label>직분</label><select id="q-pos">' +
-      ['목사', '위임목사', '부목사', '강도사', '전도사', '장로', '간사'].map(function (x) {
-        return '<option' + (p.position === x ? ' selected' : '') + '>' + x + '</option>';
-      }).join('') + '</select></div>' +
-      '<div class="field"><label>소속 교회</label><select id="q-church">' +
-      '<option value="">— 선택하세요 —</option>' +
-      churches.map(function (c) {
-        return '<option' + (p.church === c ? ' selected' : '') + '>' + e(c) + '</option>';
-      }).join('') + '</select></div>' +
-      '<div class="field"><label>연락처</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
-      '<div class="field"><label>생년월일</label>' +
-      '<input type="text" id="q-birth" value="' + e(p.birth_date || '아직 등록되지 않았습니다') + '" disabled>' +
-      '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 남은 임기 표시에 사용되며, ' +
-      '<strong>관리자가 입력</strong>합니다. 변경이 필요하시면 서기 또는 간사에게 문의해 주세요. ' +
-      '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>' +
-      (function () {
-        var sv = sinceText(p.served_from);
-        return '<div class="field"><label>부임(위임)일</label>' +
-          '<input type="text" value="' +
-          (sv ? sv.date + ' — 위임 ' + sv.span : '아직 등록되지 않았습니다') + '" disabled>' +
-          '<span style="font-size:0.8rem;color:var(--gray-5)">수정이 필요하시면 노회 서기에게 문의해 주세요.</span></div>';
-      })() +
-      '<div class="inline-form" style="margin-bottom:16px">' +
-      '<div class="field" style="flex:0 0 130px"><label>우편번호</label>' +
-      '<input type="text" id="q-post" value="' + e(p.postcode || '') + '" placeholder="00000" maxlength="7"></div>' +
-      '<div class="field"><label>주소</label>' +
-      '<input type="text" id="q-addr" value="' + e(p.address || '') + '" placeholder="예: 경기도 화성시 ○○로 12"></div>' +
-      '<button class="btn ghost sm" data-addrsearch="q-addr,q-post" ' +
-      'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' +
-      '</div>' +
-      '<button class="btn" id="q-save" style="width:100%">저장</button>' +
-      '<div class="form-msg" id="q-msg"></div>' +
-      '</div>';
-
-    /* 내가 노회에서 맡은 일 — 시찰과 상비부, 그 안에서의 직책 */
-    html += '<h2>노회에서 맡은 일</h2>';
-    html += '<div id="duty-area" style="max-width:620px"></div>';
-
     /* 내 사진: 회원명단 카드에 보여진다 */
     html += '<h2>내 사진</h2>';
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
@@ -160,6 +118,43 @@ document.addEventListener('DOMContentLoaded', function () {
       '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:8px">사진은 비공개 보관소에 저장되며, ' +
       '정회원에게만 회원명단 카드에서 보여집니다.</p>' +
       '</div>';
+
+    html += '<h2>회원 정보</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<div class="field"><label id="q-emailtag">이메일</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
+      '<div class="field"><label>성명</label><input type="text" value="' + e(p.name || '') + '" disabled></div>' +
+      '<div class="field"><label>직분</label><input type="text" value="' + e(p.position || '-') + '" disabled></div>' +
+      '<div class="field"><label>소속 교회</label><input type="text" value="' + e(p.church || '-') + '" disabled>' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">성명·직분·소속 교회의 변경은 서기 또는 간사에게 문의해 주세요. ' +
+      '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>' +
+      '<div class="field"><label>연락처</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
+      '<div class="field"><label>생년월일</label>' +
+      '<input type="text" id="q-birth" value="' + e(p.birth_date || '아직 등록되지 않았습니다') + '" disabled>' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">변경이 필요하시면 서기 또는 간사에게 문의해 주세요. ' +
+      '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>' +
+      (function () {
+        var sv = sinceText(p.served_from);
+        return '<div class="field"><label>부임(위임)일</label>' +
+          '<input type="text" value="' +
+          (sv ? sv.date + ' — 위임 ' + sv.span : '아직 등록되지 않았습니다') + '" disabled>' +
+          '<span style="font-size:0.8rem;color:var(--gray-5)">수정이 필요하시면 노회 서기에게 문의해 주세요. ' +
+          '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>';
+      })() +
+      '<div class="field"><label>교회 주소</label>' +
+      '<input type="text" id="q-chaddr" value="불러오는 중..." disabled>' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">교회 주소는 교회 명부와 연동되며, ' +
+      '담임목사께서 아래 <strong>교회 정보</strong>에서 고치실 수 있습니다.</span></div>' +
+      '<button class="btn" id="q-save" style="width:100%">저장</button>' +
+      '<div class="form-msg" id="q-msg"></div>' +
+      '</div>';
+
+    /* 담임목사 전용: 교회 정보와 장로 명단을 여기서 고친다 */
+    html += '<div id="church-area"></div>';
+
+    /* 내가 노회에서 맡은 일 — 시찰과 상비부, 그 안에서의 직책 */
+    html += '<h2>노회에서 맡은 일</h2>';
+    html += '<div id="duty-area" style="max-width:620px"></div>';
+
 
     /* 교회 직인·도장: 교회상황 보고서 등 문서 하단에 찍힌다 */
     html += '<h2>교회 직인·도장</h2>';
@@ -539,51 +534,162 @@ document.addEventListener('DOMContentLoaded', function () {
       refresh();
     }
 
+    /* 개인이 고칠 수 있는 것은 연락처뿐이다.
+     * 성명·직분·교회·생년월일·부임일은 관리자(서기·간사)가 관리한다. */
     document.getElementById('q-save').addEventListener('click', function () {
       var msg = document.getElementById('q-msg');
-      var name = document.getElementById('q-name').value.trim();
-      var church = document.getElementById('q-church').value;
-      if (!name || !church) {
-        msg.className = 'form-msg err';
-        msg.textContent = '성명과 소속 교회를 입력해 주세요.';
-        return;
-      }
-      /* 위임목사 직분 확인: 조직교회 담임만 가능 */
-      var adj = SHS.adjustPosition(name, church, document.getElementById('q-pos').value);
-      if (adj.blocked) {
-        msg.className = 'form-msg err';
-        msg.textContent = adj.msg;
-        return;
-      }
-      if (adj.note) alert(adj.note);
       msg.className = 'form-msg';
       msg.textContent = '저장 중입니다...';
-      SHSCloud.claimMembership(name, church, adj.position,
-        document.getElementById('q-phone').value.trim()).then(function (r) {
-        if (!r.ok) {
+      SHSCloud.init().then(function (c) {
+        return c.rpc('update_my_member', {
+          p_phone:       document.getElementById('q-phone').value.trim(),
+          p_address:     null,
+          p_postcode:    null,
+          p_church_addr: null,
+          p_birth_date:  null,
+          p_photo_path:  null
+        });
+      }).then(function (r2) {
+        if (r2 && r2.error) {
           msg.className = 'form-msg err';
-          msg.textContent = r.msg;
+          msg.textContent = r2.error.message;
           return;
         }
-        /* 연락처·주소·생년월일은 노회 명단에 저장한다 (명단이 원본이다) */
-        return SHSCloud.init().then(function (c) {
-          return c.rpc('update_my_member', {
-            p_phone:       document.getElementById('q-phone').value.trim(),
-            p_address:     document.getElementById('q-addr').value.trim(),
-            p_postcode:    document.getElementById('q-post').value.trim(),
-            p_church_addr: null,
-            p_birth_date:  null,   /* 생년월일은 관리자만 입력한다 */
-            p_photo_path:  null
-          });
-        }).then(function (r2) {
-          if (r2 && r2.data && r2.data[0] && !r2.data[0].out_ok) {
-            alert(r2.data[0].out_msg);
-          }
-          alert('저장되었습니다. 현재 등급: ' + r.roleName + (r.title ? ' (' + r.title + ')' : ''));
-          location.reload();
-        });
+        if (r2 && r2.data && r2.data[0] && !r2.data[0].out_ok) {
+          msg.className = 'form-msg err';
+          msg.textContent = r2.data[0].out_msg;
+          return;
+        }
+        SHSCloud.log('update', '연락처 변경', p.email);
+        msg.className = 'form-msg ok';
+        msg.textContent = '저장되었습니다.';
       });
     });
+
+    /* ---------- 교회 주소 표시 + 담임목사 전용 교회 정보 ---------- */
+    function firstWord(s) { return String(s || '').trim().split(/[\s(]/)[0]; }
+    if (p.church && window.SHSCloud && SHSCloud.enabled()) {
+      SHSCloud.init().then(function (c) {
+        return c.from('sichal_churches').select('*').eq('name', p.church).limit(1);
+      }).then(function (r) {
+        var row = (r.data || [])[0];
+        var addrEl = document.getElementById('q-chaddr');
+        if (addrEl) addrEl.value = (row && row.address) || '등록된 교회 주소가 없습니다';
+        if (!row) return;
+        if (firstWord(row.pastor) !== p.name && !SHSAuth.canManageMembers(p)) return;
+        drawChurchInfo(row);
+      }).catch(function () {});
+    }
+
+    function drawChurchInfo(row) {
+      var box = document.getElementById('church-area');
+      if (!box) return;
+      var h = '<h2>교회 정보 (담임목사)</h2>' +
+        '<div class="form-card" style="max-width:520px;margin:0">' +
+        '<p style="font-size:0.85rem;color:var(--gray-5)">담임목사께서 우리 교회의 정보를 직접 고치실 수 있습니다. ' +
+        '고친 내용은 교회 명부와 시찰회·회원 화면에 바로 반영됩니다.</p>' +
+        '<div class="field"><label>시찰</label><input type="text" value="' + e(row.sichal || '-') + '" disabled></div>' +
+        '<div class="inline-form" style="margin-bottom:12px">' +
+        '<div class="field"><label>교회 주소</label>' +
+        '<input type="text" id="ci-addr" value="' + e(row.address || '') + '"></div>' +
+        '<button class="btn ghost sm" data-addrsearch="ci-addr" ' +
+        'style="align-self:flex-end;margin-bottom:2px">주소 검색</button></div>' +
+        '<div class="field"><label>교회 전화</label><input type="tel" id="ci-phone" value="' + e(row.phone || '') + '"></div>' +
+        '<div class="field"><label>홈페이지</label><input type="text" id="ci-url" value="' + e(row.url || '') + '" placeholder="예: church.or.kr"></div>' +
+        '<button class="btn" id="ci-save" style="width:100%">교회 정보 저장</button>' +
+        '<div class="form-msg" id="ci-msg"></div>' +
+        '<h3 style="margin:22px 0 8px">장로 명단</h3>' +
+        '<p style="font-size:0.82rem;color:var(--gray-5)">우리 교회 장로를 노회 명단에 추가하고 ' +
+        '생년월일을 입력하실 수 있습니다. 생년월일은 정년·총대 자격 확인에 쓰입니다.</p>' +
+        '<div id="ci-elders"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
+        '</div>';
+      box.innerHTML = h;
+      SHSDate.attachAll(box);
+
+      document.getElementById('ci-save').addEventListener('click', function () {
+        var m2 = document.getElementById('ci-msg');
+        m2.className = 'form-msg'; m2.textContent = '저장 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.from('sichal_churches').update({
+            address: document.getElementById('ci-addr').value.trim() || null,
+            phone: document.getElementById('ci-phone').value.trim() || null,
+            url: document.getElementById('ci-url').value.trim() || null,
+            updated_at: new Date().toISOString(), updated_by: p.name
+          }).eq('id', row.id);
+        }).then(function (r2) {
+          if (r2.error) { m2.className = 'form-msg err'; m2.textContent = r2.error.message; return; }
+          SHSCloud.log('update', '교회 정보 수정', p.church);
+          m2.className = 'form-msg ok'; m2.textContent = '교회 정보가 저장되었습니다.';
+          var addrEl = document.getElementById('q-chaddr');
+          if (addrEl) addrEl.value = document.getElementById('ci-addr').value.trim() || '등록된 교회 주소가 없습니다';
+        });
+      });
+
+      loadElders();
+    }
+
+    function loadElders() {
+      var box = document.getElementById('ci-elders');
+      if (!box) return;
+      SHSCloud.init().then(function (c) {
+        return c.from('roster').select('id,name,birth_date')
+          .eq('church', p.church).eq('category', '장로').order('sort');
+      }).then(function (r) {
+        var rows = r.data || [];
+        var h = '<table class="tbl"><thead><tr><th class="left">성명</th>' +
+          '<th style="width:170px">생년월일</th><th style="width:80px">저장</th></tr></thead><tbody>';
+        rows.forEach(function (m2) {
+          h += '<tr><td class="left">' + e(m2.name) + '</td>' +
+            '<td><input type="date" id="el-b-' + m2.id + '" value="' + e(m2.birth_date || '') + '"></td>' +
+            '<td><button class="btn sm" data-elsave="' + m2.id + '">저장</button></td></tr>';
+        });
+        if (!rows.length) h += '<tr><td colspan="3" style="color:var(--gray-5)">등록된 장로가 없습니다.</td></tr>';
+        h += '</tbody></table>' +
+          '<div class="inline-form" style="margin-top:10px">' +
+          '<div class="field"><label>장로 추가 — 성명</label><input type="text" id="el-new-name"></div>' +
+          '<div class="field" style="flex:0 0 170px"><label>생년월일</label><input type="date" id="el-new-birth"></div>' +
+          '<button class="btn sm" id="el-add" style="align-self:flex-end;margin-bottom:2px">추가</button></div>' +
+          '<div class="form-msg" id="el-msg"></div>';
+        box.innerHTML = h;
+
+        function done(m3, t, err) {
+          m3.className = 'form-msg' + (err ? ' err' : ' ok');
+          m3.textContent = t;
+        }
+        box.querySelectorAll('[data-elsave]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var m3 = document.getElementById('el-msg');
+            SHSCloud.init().then(function (c) {
+              return c.rpc('upsert_my_church_elder', {
+                p_id: Number(b.dataset.elsave), p_name: null,
+                p_birth: document.getElementById('el-b-' + b.dataset.elsave).value || null
+              });
+            }).then(function (r2) {
+              if (r2.error) { done(m3, r2.error.message, true); return; }
+              SHSCloud.log('update', '장로 생년월일 입력', p.church);
+              done(m3, '저장되었습니다.');
+            });
+          });
+        });
+        document.getElementById('el-add').addEventListener('click', function () {
+          var m3 = document.getElementById('el-msg');
+          var nm = document.getElementById('el-new-name').value.trim();
+          if (!nm) { done(m3, '장로 성명을 입력해 주세요.', true); return; }
+          SHSCloud.init().then(function (c) {
+            return c.rpc('upsert_my_church_elder', {
+              p_id: null, p_name: nm,
+              p_birth: document.getElementById('el-new-birth').value || null
+            });
+          }).then(function (r2) {
+            if (r2.error) { done(m3, r2.error.message, true); return; }
+            SHSCloud.log('create', '장로 추가', p.church + ' ' + nm);
+            loadElders();
+          });
+        });
+      }).catch(function () {
+        box.innerHTML = '<p style="color:var(--gray-5)">장로 명단을 불러오지 못했습니다.</p>';
+      });
+    }
 
     document.getElementById('q-pwsave').addEventListener('click', function () {
       var msg = document.getElementById('q-pwmsg');
