@@ -652,14 +652,6 @@ var SHSOps = (function () {
             '<div class="form-msg" data-mmsg="' + m.id + '"></div></div>';
         });
 
-        html += '<div class="admin-card"><h3 style="margin-top:0">일정 추가</h3>' +
-          '<div class="inline-form">' +
-          '<div class="field" style="flex:0 0 150px"><label>구분</label><select id="mn-kind">' + kindOpts('봄 정기노회') + '</select></div>' +
-          '<div class="field" style="flex:0 0 110px"><label>회기 연도</label><input type="number" id="mn-year" value="' + new Date().getFullYear() + '"></div>' +
-          '<div class="field" style="flex:0 0 170px"><label>날짜</label><input type="date" id="mn-date"></div>' +
-          '<div class="field"><label>장소</label><input type="text" id="mn-place"></div>' +
-          '<button class="btn" id="mn-add">추가</button>' +
-          '</div><div class="form-msg" id="mn-msg"></div></div>';
 
         box.innerHTML = html;
 
@@ -720,22 +712,6 @@ var SHSOps = (function () {
           });
         });
 
-        document.getElementById('mn-add').addEventListener('click', function () {
-          var msg = document.getElementById('mn-msg');
-          var d = {
-            kind: document.getElementById('mn-kind').value,
-            year: Number(document.getElementById('mn-year').value) || null,
-            meet_date: document.getElementById('mn-date').value || null,
-            place: document.getElementById('mn-place').value.trim() || null,
-            confirmed: false,
-            updated_at: new Date().toISOString(), updated_by: user.name
-          };
-          db.from('meetings').insert(d).then(function (res) {
-            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
-            SHSCloud.log('create', '정기노회 일정 등록', d.kind + ' ' + (d.meet_date || ''));
-            loadMeetings();
-          });
-        });
       });
   }
 
