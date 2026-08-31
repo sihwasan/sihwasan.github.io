@@ -811,55 +811,74 @@ var SHSBoard = (function () {
         return m ? (new Date().getFullYear() + '-' + pad2(m[1]) + '-' + pad2(m[2])) : '';
       }
 
+      var KIND_BG = { '정기노회': '#b03a2e', '임직식': '#8e44ad', '총회': '#1f618d',
+        '임원회의': '#7d6608', '상비부 일정': '#1e8449', '수양회': '#148f77' };
+
       function calHtml() {
         var first = new Date(calY, calM, 1);
         var start = first.getDay();
         var days = new Date(calY, calM + 1, 0).getDate();
         var nowD = new Date();
         var todayS = nowD.getFullYear() + '-' + pad2(nowD.getMonth() + 1) + '-' + pad2(nowD.getDate());
+        /* 여러 날 일정은 시작~끝 모든 날에 넣되, 이어지는 칸은 띠로 연결한다 */
         var byDate = {};
         rows.forEach(function (x) {
           var d = rowDate(x);
           if (!d) return;
-          (byDate[d] = byDate[d] || []).push(x);
-          if (x.end_date && x.end_date > d) {
-            var t = new Date(d + 'T00:00:00');
-            for (var k = 0; k < 60; k++) {
-              t.setDate(t.getDate() + 1);
-              var ts = t.getFullYear() + '-' + pad2(t.getMonth() + 1) + '-' + pad2(t.getDate());
-              if (ts > x.end_date) break;
-              (byDate[ts] = byDate[ts] || []).push(x);
-            }
+          if (!(x.end_date && x.end_date > d)) {
+            (byDate[d] = byDate[d] || []).push({ ev: x, pos: '' });
+            return;
+          }
+          (byDate[d] = byDate[d] || []).push({ ev: x, pos: 's' });
+          var t = new Date(d + 'T00:00:00');
+          for (var k = 0; k < 60; k++) {
+            t.setDate(t.getDate() + 1);
+            var ts = t.getFullYear() + '-' + pad2(t.getMonth() + 1) + '-' + pad2(t.getDate());
+            if (ts > x.end_date) break;
+            (byDate[ts] = byDate[ts] || []).push({ ev: x, pos: ts === x.end_date ? 'e' : 'm' });
           }
         });
         var h = '<div style="background:#fff;border:1px solid var(--gray-2,#e8e5df);border-radius:12px;' +
-          'padding:14px 16px;margin-bottom:16px">' +
+          'padding:14px 16px;margin-bottom:16px;overflow-x:auto">' +
           '<div style="display:flex;align-items:center;margin-bottom:8px">' +
           '<button type="button" class="btn ghost sm" data-dc="p" style="padding:2px 10px">&#8249;</button>' +
           '<strong style="flex:1;text-align:center">' + calY + '년 ' + (calM + 1) + '월</strong>' +
           '<button type="button" class="btn ghost sm" data-dc="n" style="padding:2px 10px">&#8250;</button></div>' +
-          '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:0.82rem;text-align:center">' +
+          '<table style="width:100%;min-width:560px;border-collapse:collapse;table-layout:fixed;font-size:0.82rem">' +
           '<thead><tr>' + ['일', '월', '화', '수', '목', '금', '토'].map(function (w, i) {
-            return '<th style="padding:4px 0;font-weight:600;' + (i === 0 ? 'color:#c0392b' : '') + '">' + w + '</th>';
+            return '<th style="padding:4px 0;font-weight:600;text-align:center;' +
+              (i === 0 ? 'color:#c0392b' : '') + '">' + w + '</th>';
           }).join('') + '</tr></thead><tbody><tr>';
         var cell = 0;
-        for (var i = 0; i < start; i++) { h += '<td></td>'; cell++; }
+        for (var i = 0; i < start; i++) { h += '<td style="border:1px solid var(--gray-1,#f2efe9)"></td>'; cell++; }
         for (var d = 1; d <= days; d++) {
           var ds = calY + '-' + pad2(calM + 1) + '-' + pad2(d);
           var evs = byDate[ds] || [];
-          h += '<td data-dd="' + ds + '" title="' + esc(evs.map(function (x) { return x.title; }).join('\n')) + '" ' +
-            'style="padding:5px 0;vertical-align:top;' + (canEdit ? 'cursor:pointer;' : '') +
-            (ds === todayS ? 'outline:2px solid var(--accent,#b08d3e);outline-offset:-2px;border-radius:8px;' : '') +
-            (cell % 7 === 0 ? 'color:#c0392b;' : '') + '">' + d +
-            '<div style="line-height:0.6;font-size:1rem;' +
-            (evs.length ? 'color:#b03a2e' : 'visibility:hidden') + '">&#8226;</div></td>';
+          h += '<td data-dd="' + ds + '" ' +
+            'style="height:64px;vertical-align:top;padding:3px 4px;border:1px solid var(--gray-1,#f2efe9);' +
+            (evs.length || canEdit ? 'cursor:pointer;' : '') +
+            (ds === todayS ? 'outline:2px solid var(--accent,#b08d3e);outline-offset:-2px;' : '') + '">' +
+            '<div style="font-weight:600;font-size:0.78rem;' + (cell % 7 === 0 ? 'color:#c0392b' : '') + '">' + d + '</div>' +
+            evs.map(function (it) {
+              var x = it.ev;
+              /* 이어지는 날은 제목을 되풀이하지 않되, 주 첫 칸에는 다시 보여 준다 */
+              var showTitle = !it.pos || it.pos === 's' || cell % 7 === 0;
+              var edge =
+                (it.pos === 's' || it.pos === 'm' ? 'margin-right:-6px;border-top-right-radius:0;border-bottom-right-radius:0;' : '') +
+                (it.pos === 'm' || it.pos === 'e' ? 'margin-left:-6px;border-top-left-radius:0;border-bottom-left-radius:0;' : '');
+              return '<span title="' + esc(x.title) + '" style="display:block;margin-top:3px;padding:2px 5px;' +
+                'border-radius:4px;font-size:0.7rem;line-height:1.35;color:#fff;white-space:nowrap;' +
+                'overflow:hidden;text-overflow:ellipsis;background:' +
+                (KIND_BG[x.kind] || 'var(--navy,#4b3f33)') + ';' + edge + '">' +
+                (showTitle ? esc(x.title) : '&nbsp;') + '</span>';
+            }).join('') + '</td>';
           cell++;
           if (cell % 7 === 0 && d < days) h += '</tr><tr>';
         }
-        while (cell % 7 !== 0) { h += '<td></td>'; cell++; }
+        while (cell % 7 !== 0) { h += '<td style="border:1px solid var(--gray-1,#f2efe9)"></td>'; cell++; }
         h += '</tr></tbody></table>' +
           '<p style="margin:6px 0 0;font-size:0.78rem;color:var(--gray-5)">' +
-          '&#8226; 표시가 있는 날에 일정이 있습니다. 아래 목록에서 자세한 내용을 보세요.' +
+          '일정을 누르면 자세한 내용을 볼 수 있습니다.' +
           (canEdit ? ' <a href="schedule.html" style="text-decoration:underline">일정관리 &#8594;</a>' : '') +
           '</p></div>';
         return h;
