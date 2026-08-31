@@ -4,3 +4,5 @@
 --   check_my_ordination: 시화산노회 안수 기록 대조(비정회원 포함, 이름·생년월일).
 --   doc_requests_insert 정책: 안수증명서는 기록이 확인되면 정회원 아니어도 신청 가능.
 --   실제 적용은 Supabase migration ordination_fields, ordination_cert_request 로 완료.
+-- 강도사 인허 기록 (migration license_fields)
+-- alter table roster add column licensed_on date, licensed_by text;
