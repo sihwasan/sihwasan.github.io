@@ -967,15 +967,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var g = parseGrade(t);
         return g.title || ROSTER_ROLES[g.role] || g.role || '정회원';
       }
-      /* 남은 임기: 장로 총대는 자격 기간, 그 외는 정년(만 70세)까지 */
+      /* 남은 임기: 목사·장로 모두 생년월일에 따라 정년(만 70세)까지 */
       function remainLabel(m) {
         var today = new Date();
-        if (m.category === '장로' && m.term_until) {
-          var left = Math.ceil((new Date(m.term_until + 'T00:00:00') - today) / 86400000);
-          if (left <= 0) return '<span class="fail">총대 만료</span>';
-          if (left < 365) return '총대 ' + left + '일';
-          return '총대 ' + (Math.round(left / 36.5) / 10) + '년';
-        }
         var rd = SHS.retireDate(m.birth_date);
         if (!rd) return '<span style="color:var(--gray-5)">-</span>';
         if (rd <= today) return '<span class="fail">정년 경과</span>';
@@ -991,14 +985,10 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:130px">남은 임기</th><th style="width:130px">부여 등급</th>' +
         '<th style="width:80px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
-        /* 보기 방식 정렬에 쓸 값: 남은 날수(장로 총대는 자격 기간, 그 외는 정년) */
+        /* 보기 방식 정렬에 쓸 값: 정년까지 남은 날수 */
         var days = 999999;
-        if (m.category === '장로' && m.term_until) {
-          days = Math.ceil((new Date(m.term_until + 'T00:00:00') - new Date()) / 86400000);
-        } else {
-          var rd0 = SHS.retireDate(m.birth_date);
-          if (rd0) days = Math.ceil((rd0 - new Date()) / 86400000);
-        }
+        var rd0 = SHS.retireDate(m.birth_date);
+        if (rd0) days = Math.ceil((rd0 - new Date()) / 86400000);
         html += '<tr data-ro="' + m.id + '" data-find="' +
           e([m.name, m.church, m.category, m.sichal, m.note].filter(Boolean).join(' ')) + '"' +
           ' data-cat="' + e(m.category || '') + '" data-grade="' + e(rosterGrade(m)) + '"' +
