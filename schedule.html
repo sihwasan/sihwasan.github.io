@@ -84,6 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var db = null;
   var events = [];      /* site_schedule 전체 */
   var roster = [];      /* 임직식 대상자 선택용 노회 명단 */
+  var SESSIONS = null;  /* 회기 설정 {current, list} — 정기노회 회기 자동 입력용 */
   var now = new Date();
   var calY = now.getFullYear(), calM = now.getMonth();   /* 보고 있는 달 */
 
@@ -278,12 +279,33 @@ document.addEventListener('DOMContentLoaded', function () {
     /* 고른 대상: 명단 id 숫자, '__etc'(직접 입력), ''(아직 안 고름) */
     var tgtVal = meta.roster_id ? String(meta.roster_id) : (meta.person ? '__etc' : '');
 
+    /* 정기노회를 고르면 내용에 회기가 자동으로 들어간다.
+     * 정기노회가 열리면 다음 회기가 시작되므로 현재 회기 + 1 로 적고,
+     * 날짜의 달로 봄·가을을 가른다. 자동으로 넣은 글만 바꾸므로
+     * 직접 고친 내용은 그대로 둔다. */
+    var noteEl = mo.el.querySelector('#ev-note');
+    var lastAuto = '';
+    function autoNote() {
+      if (kindSel.value !== '정기노회') return;
+      var cur = Number((SESSIONS && SESSIONS.current) || 0);
+      if (!cur) return;
+      var d = mo.el.querySelector('#ev-date').value;
+      var mon = d ? Number(d.split('-')[1]) : 0;
+      var season = mon ? (mon >= 8 || mon <= 1 ? '가을' : '봄') : '';
+      var text = '제' + (cur + 1) + '회기 ' + (season ? season + ' ' : '') + '정기노회';
+      if (!noteEl.value.trim() || noteEl.value === lastAuto) {
+        noteEl.value = text;
+        lastAuto = text;
+      }
+    }
     function refreshKind() {
       var k = kindSel.value;
       mo.el.querySelector('#ev-etcwrap').classList.toggle('hidden', k !== '기타');
       mo.el.querySelector('#ev-ordwrap').classList.toggle('hidden', k !== '임직식');
       refreshEtcPerson();
+      autoNote();
     }
+    mo.el.querySelector('#ev-date').addEventListener('change', autoNote);
     function refreshEtcPerson() {
       mo.el.querySelector('#ev-etcperson').classList.toggle('hidden', tgtVal !== '__etc');
     }
@@ -476,6 +498,10 @@ document.addEventListener('DOMContentLoaded', function () {
     reload();
     c.from('roster').select('id,name,church,category,position,active').order('name')
       .then(function (r) { roster = (r && r.data) || []; });
+    c.from('site_settings').select('value').eq('key', 'sessions')
+      .then(function (r) {
+        SESSIONS = (r && r.data && r.data[0] && r.data[0].value) || null;
+      }, function () {});
     /* 정기노회 일정(40일 전 알림)·기준일 — 사이트 관리에서 옮겨 왔다 */
     SHSOps.mountSchedule(document.getElementById('sc-ops'), user);
   });
