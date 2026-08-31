@@ -26,6 +26,7 @@
 .sc-ev.k총회 { background:#1f618d; }
 .sc-ev.k임원회의 { background:#7d6608; }
 .sc-ev.k상비부일정 { background:#1e8449; }
+.sc-ev.k수양회 { background:#148f77; }
 .sc-head { display:flex; align-items:center; gap:12px; margin:0 0 10px; }
 .sc-head h2 { margin:0; }
 /* 대상자 검색 목록 */
@@ -92,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var hm = location.hash.match(/d=(\d{4})-(\d{2})-(\d{2})/);
   if (hm) { calY = Number(hm[1]); calM = Number(hm[2]) - 1; }
 
-  var KINDS = ['정기노회', '임원회의', '상비부 일정', '임직식', '총회', '기타'];
+  var KINDS = ['정기노회', '임원회의', '상비부 일정', '임직식', '총회', '수양회', '기타'];
 
   function pad2(n) { return String(n).padStart(2, '0'); }
   function ymd(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
@@ -146,11 +147,21 @@ document.addEventListener('DOMContentLoaded', function () {
     var days = new Date(calY, calM + 1, 0).getDate();
     var todayS = ymd(now.getFullYear(), now.getMonth(), now.getDate());
 
+    /* 여러 날 일정(수양회 등)은 시작~끝의 모든 날에 표시한다 */
     var byDate = {};
     events.forEach(function (x) {
       var d = dateOfRow(x);
       if (!d) return;
       (byDate[d] = byDate[d] || []).push(x);
+      if (x.end_date && x.end_date > d) {
+        var t = new Date(d + 'T00:00:00');
+        for (var k = 0; k < 60; k++) {
+          t.setDate(t.getDate() + 1);
+          var ts = ymd(t.getFullYear(), t.getMonth(), t.getDate());
+          if (ts > x.end_date) break;
+          (byDate[ts] = byDate[ts] || []).push(x);
+        }
+      }
     });
 
     var h = '<table class="sc-cal"><thead><tr>' +
@@ -183,7 +194,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- 하루 보기: 그날 일정 + 추가 ---------- */
   function openDay(ds) {
-    var evs = events.filter(function (x) { return dateOfRow(x) === ds; });
+    var evs = events.filter(function (x) {
+      var d = dateOfRow(x);
+      return d === ds || (d && x.end_date && d <= ds && ds <= x.end_date);
+    });
     var mo = modal(
       '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(ds) + ' 일정</h3>' +
       (evs.length
@@ -192,7 +206,13 @@ document.addEventListener('DOMContentLoaded', function () {
               'border-bottom:1px solid var(--gray-2,#eee)">' +
               '<span style="flex:0 0 auto;font-size:0.78rem;padding:2px 8px;border-radius:10px;' +
               'background:var(--gray-1,#f2efe9)">' + e(x.kind || '일정') + '</span>' +
-              '<span style="flex:1">' + e(x.title) + '</span>' +
+              '<span style="flex:1">' + e(x.title) +
+              (x.end_date ? '<div style="font-size:0.76rem;color:var(--gray-5)">' +
+                e(dateOfRow(x)) + ' ~ ' + e(x.end_date) + '</div>' : '') +
+              (x.meta && x.meta.contact ? '<div style="font-size:0.76rem;color:var(--gray-5)">담당 ' +
+                e(x.meta.contact) + '</div>' : '') +
+              (x.meta && x.meta.info ? '<div style="font-size:0.78rem;color:var(--gray-6);white-space:pre-line">' +
+                e(x.meta.info) + '</div>' : '') + '</span>' +
               '<button class="btn sm" data-dedit="' + x.id + '">수정</button>' +
               '<button class="btn danger sm" data-ddel="' + x.id + '">삭제</button></div>';
           }).join('')
@@ -242,12 +262,34 @@ document.addEventListener('DOMContentLoaded', function () {
     var mo = modal(
       '<h3 style="margin:0 0 14px;color:var(--navy)">' + (isNew ? '일정 추가' : '일정 수정') + '</h3>' +
       '<div class="inline-form">' +
-      '<div class="field" style="flex:0 0 170px"><label>날짜</label>' +
+      '<div class="field" style="flex:0 0 160px"><label>시작 날짜</label>' +
       '<input type="date" id="ev-date" value="' + e(ds || '') + '"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>끝 날짜 (선택)</label>' +
+      '<input type="date" id="ev-date2" value="' + e(x.end_date || '') + '" title="하루 일정이면 비워 두세요"></div>' +
       '<div class="field"><label>행사</label><select id="ev-kind">' +
       KINDS.map(function (k) {
         return '<option' + (k === kindNow ? ' selected' : '') + '>' + k + '</option>';
       }).join('') + '</select></div></div>' +
+      /* 수양회: 행사명·장소·대상·회비 */
+      '<div id="ev-retwrap" class="hidden">' +
+      '<div class="inline-form">' +
+      '<div class="field"><label>행사명</label>' +
+      '<input type="text" id="ev-rname" value="' + e(meta.rname || '') + '" placeholder="예: 목회자 수양회"></div>' +
+      '<div class="field"><label>장소</label>' +
+      '<input type="text" id="ev-rplace" value="' + e(meta.place || '') + '" placeholder="예: 반월수양관"></div></div>' +
+      '<div class="inline-form">' +
+      '<div class="field"><label>대상</label>' +
+      '<input type="text" id="ev-rtarget" value="' + e(meta.target || '') + '" placeholder="예: 전 노회원"></div>' +
+      '<div class="field"><label>회비</label>' +
+      '<input type="text" id="ev-rfee" value="' + e(meta.fee || '') + '" placeholder="예: 10만원"></div></div>' +
+      '<div class="inline-form">' +
+      '<div class="field"><label>주관부서</label>' +
+      '<input type="text" id="ev-rdept" value="' + e(meta.dept || '') + '" placeholder="예: 임원회 · 교육부"></div>' +
+      '<div class="field"><label>담당자 연락처</label>' +
+      '<input type="text" id="ev-rcontact" value="' + e(meta.contact || '') + '" placeholder="예: 김동석 목사 010-0000-0000"></div></div>' +
+      '<div class="field"><label>안내문구 (선택)</label>' +
+      '<textarea id="ev-rinfo" rows="3" placeholder="회원들에게 알릴 안내문을 적어 주세요.">' +
+      e(meta.info || '') + '</textarea></div></div>' +
       /* 기타: 행사명 직접 입력 */
       '<div class="field hidden" id="ev-etcwrap"><label>행사명</label>' +
       '<input type="text" id="ev-etc" value="' + (kindNow === '기타' ? e(x.title || '') : '') + '" placeholder="행사명"></div>' +
@@ -302,6 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var k = kindSel.value;
       mo.el.querySelector('#ev-etcwrap').classList.toggle('hidden', k !== '기타');
       mo.el.querySelector('#ev-ordwrap').classList.toggle('hidden', k !== '임직식');
+      mo.el.querySelector('#ev-retwrap').classList.toggle('hidden', k !== '수양회');
       refreshEtcPerson();
       autoNote();
     }
@@ -358,9 +401,12 @@ document.addEventListener('DOMContentLoaded', function () {
       var msg = mo.el.querySelector('#ev-msg');
       function err(t) { msg.className = 'form-msg err'; msg.textContent = t; }
       var date = mo.el.querySelector('#ev-date').value;
+      var date2 = mo.el.querySelector('#ev-date2').value || null;
       var kind = kindSel.value;
       var note = mo.el.querySelector('#ev-note').value.trim();
-      if (!date) { err('날짜를 골라 주세요.'); return; }
+      if (!date) { err('시작 날짜를 골라 주세요.'); return; }
+      if (date2 && date2 < date) { err('끝 날짜가 시작 날짜보다 앞설 수 없습니다.'); return; }
+      if (date2 === date) date2 = null;
 
       var title = '';
       var newMeta = null;
@@ -409,13 +455,30 @@ document.addEventListener('DOMContentLoaded', function () {
             return c.from('roster').update({ position: '위임목사', served_from: date }).eq('id', rid);
           };
         }
+      } else if (kind === '수양회') {
+        function rv(id) { return mo.el.querySelector(id).value.trim(); }
+        var rname = rv('#ev-rname');
+        var place = rv('#ev-rplace');
+        if (!rname) { err('수양회 행사명을 입력해 주세요.'); return; }
+        if (!place) { err('수양회 장소를 입력해 주세요.'); return; }
+        newMeta = {
+          rname: rname, place: place, target: rv('#ev-rtarget'), fee: rv('#ev-rfee'),
+          dept: rv('#ev-rdept'), contact: rv('#ev-rcontact'), info: rv('#ev-rinfo')
+        };
+        title = rname + ' (' + place + ')' +
+          (newMeta.target ? ' · 대상 ' + newMeta.target : '') +
+          (newMeta.fee ? ' · 회비 ' + newMeta.fee : '') +
+          (newMeta.dept ? ' · 주관 ' + newMeta.dept : '') +
+          (note ? ' · ' + note : '');
       } else {
         title = note || kind;
       }
 
       var row = {
         title: title, kind: kind, meta: newMeta,
-        event_date: date, date_label: labelOf(date), sort: sortOf(date)
+        event_date: date, end_date: date2,
+        date_label: labelOf(date) + (date2 ? '~' + labelOf(date2) : ''),
+        sort: sortOf(date)
       };
       msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
       SHSCloud.init().then(function (c) {
@@ -444,7 +507,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<th>내용</th><th style="width:130px">관리</th></tr></thead><tbody>';
     if (!rows.length) h += '<tr><td colspan="4" style="color:var(--gray-5)">등록된 일정이 없습니다.</td></tr>';
     rows.forEach(function (x) {
-      h += '<tr><td>' + e(dateOfRow(x) || x.date_label || '-') + '</td>' +
+      h += '<tr><td>' + e(dateOfRow(x) || x.date_label || '-') +
+        (x.end_date ? '<br>~ ' + e(x.end_date) : '') + '</td>' +
         '<td>' + e(x.kind || '-') + '</td>' +
         '<td class="left">' + e(x.title) + '</td>' +
         '<td><button class="btn sm" data-ledit="' + x.id + '">수정</button> ' +

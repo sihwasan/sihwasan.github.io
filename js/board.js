@@ -236,7 +236,18 @@ var SHSBoard = (function () {
           var byDate = {};
           evrows.forEach(function (x) {
             var d = rowDate(x);
-            if (d) (byDate[d] = byDate[d] || []).push(x);
+            if (!d) return;
+            (byDate[d] = byDate[d] || []).push(x);
+            /* 수양회처럼 여러 날 일정은 끝 날짜까지 점을 찍는다 */
+            if (x.end_date && x.end_date > d) {
+              var t = new Date(d + 'T00:00:00');
+              for (var k = 0; k < 60; k++) {
+                t.setDate(t.getDate() + 1);
+                var ts = t.getFullYear() + '-' + pad2(t.getMonth() + 1) + '-' + pad2(t.getDate());
+                if (ts > x.end_date) break;
+                (byDate[ts] = byDate[ts] || []).push(x);
+              }
+            }
           });
           var h = '<div style="background:rgba(255,255,255,0.55);border-radius:14px;padding:14px 16px;' +
             'max-width:420px;box-shadow:0 4px 14px rgba(0,0,0,0.08)">' +
@@ -282,7 +293,7 @@ var SHSBoard = (function () {
           });
         }
         SHSCloud.init().then(function (c) {
-          return c.from('site_schedule').select('id,title,event_date,date_label,kind');
+          return c.from('site_schedule').select('id,title,event_date,end_date,date_label,kind');
         }).then(function (r) {
           evrows = (r && r.data) || [];
           draw();
