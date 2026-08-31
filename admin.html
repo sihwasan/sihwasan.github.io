@@ -1516,6 +1516,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 회기로 정하는 것이 노회 실무에 맞으므로, 화면에서는 회기로 고르고
    * 저장은 그 회기의 시작·끝 날짜로 한다. (자동 연장 기능과 호환) */
   var SESSIONS = { current: 19, list: [] };
+  var elderSes = null;   /* 장로 총대 탭에서 보고 있는 회기 (기본: 현재 회기) */
 
   function sesList() { return SESSIONS.list || []; }
   function sesFind(no) {
@@ -1739,7 +1740,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       h += '<p><button class="btn" id="el-extend">자격 만료된 총대 1년 연장</button> ' +
         '<span style="font-size:0.84rem;color:var(--gray-5);margin-left:8px">' +
-        '정기노회 뒤에 한 번 눌러 주시면 됩니다. 정년이 지난 분은 제외됩니다.</span></p>' +
+        '봄 정기노회 뒤에 한 번 눌러 주시면 명단이 다음 회기로 이월됩니다. 정년이 지난 분은 제외됩니다.</span></p>' +
         '<div class="form-msg" id="el-msg"></div>';
 
       /* 총대 자격 기간 일괄 설정 (계정 등급의 정회원 자격 만료일) */
@@ -1754,12 +1755,38 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button class="btn" id="mu-apply">일괄 적용</button>' +
         '</div><div class="form-msg" id="mu-msg"></div></div>';
 
+      /* ----- 회기별 총대장로 명단 -----
+       * 회기를 고르면 그 회기에 자격이 있는 장로만 보인다.
+       * 봄 정기노회 뒤 1년 연장을 누르면 명단이 다음 회기로 이월된다. */
+      var sel = Number(elderSes || SESSIONS.current);
+      function coverStart(x) { return sesOfDate(x.term_from); }
+      function coverEnd(x) { return sesOfEnd(x.term_until); }
+      var cohort = live.filter(function (x) {
+        var a = coverStart(x), b = coverEnd(x);
+        if (!a && !b) return false;
+        return (a || b) <= sel && sel <= (b || a);
+      });
+      var noTerm = live.filter(function (x) {
+        var a = coverStart(x), b = coverEnd(x);
+        return !((a || b) <= sel && sel <= (b || a));
+      });
+
+      h += '<div class="inline-form" style="margin:4px 0 6px;max-width:760px">' +
+        '<div class="field" style="flex:0 0 260px"><label>회기 선택</label>' +
+        '<select id="el-ses">' + sesOptions(sel) + '</select></div></div>';
+      h += '<h3 style="margin:8px 0 8px">제' + sel + '~' + (sel + 1) + '회기 총대장로 명단 ' +
+        '<span style="font-weight:400;font-size:0.85rem;color:var(--gray-5)">' + cohort.length + '명</span></h3>';
+
       h += '<table class="tbl"><thead><tr><th style="width:50px">번호</th>' +
         '<th style="width:110px">성명</th><th style="width:160px">소속 교회</th>' +
         '<th style="width:110px">시찰</th><th style="width:120px">생년월일</th>' +
-        '<th style="width:120px">정년</th><th style="width:170px">총대 자격</th>' +
-        '<th style="width:80px">관리</th></tr></thead><tbody>';
-      live.forEach(function (x, i) {
+        '<th style="width:120px">정년</th>' +
+        '<th style="width:150px">관리</th></tr></thead><tbody>';
+      if (!cohort.length) {
+        h += '<tr><td colspan="7" style="color:var(--gray-5);padding:16px;text-align:center">' +
+          '이 회기의 총대장로가 없습니다. 아래에서 추가해 주세요.</td></tr>';
+      }
+      cohort.forEach(function (x, i) {
         h += '<tr>' +
           '<td>' + (i + 1) + '</td>' +
           '<td><strong>' + e(x.name) + '</strong></td>' +
@@ -1767,11 +1794,22 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td>' + e(x.sichal || '-') + '</td>' +
           '<td>' + (x.birth_date ? e(x.birth_date) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td style="font-size:0.84rem">' + retireText(x) + '</td>' +
-          '<td>' + termText(x) + '</td>' +
-          '<td><button class="btn sm" data-eledit="' + x.id + '">수정</button></td>' +
+          '<td><button class="btn sm" data-eledit="' + x.id + '">수정</button> ' +
+          '<button class="btn danger sm" data-eldrop="' + x.id + '" data-nm="' + e(x.name) + '">제외</button></td>' +
           '</tr>';
       });
       h += '</tbody></table>';
+
+      /* 명단에 추가: 노회 명단의 장로 중 이 회기 자격이 없는 분 */
+      h += '<div class="inline-form" style="margin:12px 0 4px;max-width:760px">' +
+        '<div class="field"><label>총대장로 추가 (노회 명단의 장로 중에서)</label>' +
+        '<select id="el-addsel"><option value="">— 선택하세요 —</option>' +
+        noTerm.map(function (x) {
+          return '<option value="' + x.id + '">' + e(x.name) + ' (' + e(x.church || '-') + ')</option>';
+        }).join('') + '</select></div>' +
+        '<button class="btn sm" id="el-addbtn" style="align-self:flex-end;margin-bottom:2px">이 회기에 추가</button></div>' +
+        '<p style="font-size:0.8rem;color:var(--gray-5)">목록에 없는 장로는 회원 신상관리에서 먼저 명단에 추가해 주세요. ' +
+        '추가하면 제' + sel + '~' + (sel + 1) + '회기 자격으로 등재되고, 제외하면 이 회기 자격만 사라집니다(명단 자체는 유지).</p>';
 
       if (past.length) {
         h += '<h3 style="margin-top:24px">교체된 장로 총대 (' + past.length + '명)</h3>' +
@@ -1871,6 +1909,40 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       /* 자격 일괄 연장 */
+      /* 회기 선택 / 이 회기에 추가 / 제외 */
+      document.getElementById('el-ses').addEventListener('change', function () {
+        elderSes = Number(this.value);
+        renderElders();
+      });
+      document.getElementById('el-addbtn').addEventListener('click', function () {
+        var id = document.getElementById('el-addsel').value;
+        if (!id) { alert('추가할 장로를 선택해 주세요.'); return; }
+        var a = sesFind(sel), b = sesFind(sel + 1);
+        if (!a) { alert('회기 기간이 등록되지 않았습니다. 사이트 관리 → 회기 설정을 확인해 주세요.'); return; }
+        SHSCloud.init().then(function (c) {
+          return c.from('roster').update({
+            term_from: a.from, term_until: (b ? b.to : a.to), active: true
+          }).eq('id', id);
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('update', '총대장로 추가', '제' + sel + '~' + (sel + 1) + '회기 roster #' + id);
+          renderElders();
+        });
+      });
+      box.querySelectorAll('[data-eldrop]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm(b.dataset.nm + ' 장로를 제' + sel + '~' + (sel + 1) +
+            '회기 총대 명단에서 제외할까요?\n(노회 명단 자체에서 삭제되지는 않습니다)')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('roster').update({ term_from: null, term_until: null }).eq('id', b.dataset.eldrop);
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('update', '총대장로 제외', b.dataset.nm + ' (제' + sel + '회기)');
+            renderElders();
+          });
+        });
+      });
+
       /* 총대 자격 기간 일괄 설정 */
       document.getElementById('mu-apply').addEventListener('click', function () {
         var msg2 = document.getElementById('mu-msg');
