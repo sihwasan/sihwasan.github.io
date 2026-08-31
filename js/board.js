@@ -920,7 +920,7 @@ var SHSBoard = (function () {
             '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
             (x.kind ? '<span style="flex:none;font-size:0.76rem;color:#fff;padding:3px 11px;border-radius:12px;' +
               'background:' + (KIND_C[x.kind] || 'var(--navy,#4b3f33)') + '">' + esc(x.kind) + '</span>' : '') +
-            '<strong style="font-size:1.05rem;line-height:1.5">' + esc(x.title) + '</strong></div>' +
+            '<strong style="font-size:1.05rem;line-height:1.5">' + esc(m.rname || x.title) + '</strong></div>' +
             row('일시', when) +
             row('장소', m.loc || m.place) +
             (m.person ? row('대상자', m.person + (m.church ? ' (' + m.church + ')' : '') +

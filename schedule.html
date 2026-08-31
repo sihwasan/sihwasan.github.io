@@ -562,11 +562,8 @@ document.addEventListener('DOMContentLoaded', function () {
           rname: rname, place: place, target: rv('#ev-rtarget'), fee: rv('#ev-rfee'),
           dept: rv('#ev-rdept'), contact: rv('#ev-rcontact'), info: rv('#ev-rinfo'), note: note
         };
-        title = rname + ' (' + place + ')' +
-          (newMeta.target ? ' · 대상 ' + newMeta.target : '') +
-          (newMeta.fee ? ' · 회비 ' + newMeta.fee : '') +
-          (newMeta.dept ? ' · 주관 ' + newMeta.dept : '') +
-          (note ? ' · ' + note : '');
+        /* 제목은 행사명만 깔끔하게 — 장소·대상·회비 등은 세부 정보(팝업)에서 보여 준다 */
+        title = rname;
       } else if (kind === '정기노회') {
         /* 제목은 회기·봄가을 선택으로 조합하고, 내용은 뒤에 덧붙인다.
          * 예전 저장분처럼 내용에 정기노회 문구가 통째로 있으면 버린다. */
@@ -577,11 +574,11 @@ document.addEventListener('DOMContentLoaded', function () {
         title = note || kind;
       }
 
-      /* 시간·장소는 모든 행사 공통으로 제목 뒤에 붙이고 meta에도 남긴다 */
+      /* 시간·장소는 meta에 남기고 제목 뒤에도 붙인다 (수양회는 제목을 깨끗하게 둔다) */
       var evTime = mo.el.querySelector('#ev-time').value;
       var evLoc = kind === '수양회' ? '' : mo.el.querySelector('#ev-loc').value.trim();
       if (evLoc && title.indexOf(evLoc) === -1) title += ' (' + evLoc + ')';
-      if (evTime) {
+      if (evTime && kind !== '수양회') {
         var hh = Number(evTime.split(':')[0]);
         var mm2 = evTime.split(':')[1];
         var timeK = (hh < 12 ? '오전 ' : '오후 ') + ((hh % 12) || 12) + '시' +
