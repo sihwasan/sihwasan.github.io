@@ -28,6 +28,19 @@
 .sc-ev.k상비부일정 { background:#1e8449; }
 .sc-head { display:flex; align-items:center; gap:12px; margin:0 0 10px; }
 .sc-head h2 { margin:0; }
+/* 대상자 검색 목록 */
+.tg-list { position:absolute; left:0; right:0; top:100%; z-index:40; margin-top:4px;
+  background:#fff; border:1px solid var(--gray-3,#ddd); border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,0.16); max-height:280px; overflow:auto; }
+.tg-item { display:flex; align-items:center; gap:10px; padding:9px 14px; cursor:pointer; }
+.tg-item + .tg-item { border-top:1px solid var(--gray-1,#f2efe9); }
+.tg-item:hover, .tg-item.on { background:var(--gray-1,#f7f5f0); }
+.tg-item .tg-nm { font-weight:700; }
+.tg-item .tg-sub { font-size:0.78rem; color:var(--gray-5); }
+.tg-item .tg-badge { margin-left:auto; font-size:0.72rem; color:var(--gray-5);
+  border:1px solid var(--gray-3,#ddd); border-radius:10px; padding:1px 8px; white-space:nowrap; }
+.tg-etc { color:var(--navy); font-weight:600; }
+.tg-none { padding:12px 14px; color:var(--gray-5); font-size:0.85rem; }
 </style>
 </head>
 <body>
@@ -224,14 +237,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return true;
       });
     }
-    function targetOptions(sub, selId) {
-      return '<option value="">— 회원 명단에서 선택 —</option>' +
-        targets(sub).map(function (m) {
-          return '<option value="' + m.id + '"' + (String(selId) === String(m.id) ? ' selected' : '') + '>' +
-            e(m.name) + ' (' + e(m.church || '-') + ' · ' + e(m.category || m.position || '') + ')</option>';
-        }).join('') +
-        '<option value="__etc"' + (selId === '__etc' ? ' selected' : '') + '>명단에 없음 (직접 입력)</option>';
-    }
 
     var mo = modal(
       '<h3 style="margin:0 0 14px;color:var(--navy)">' + (isNew ? '일정 추가' : '일정 수정') + '</h3>' +
@@ -252,7 +257,10 @@ document.addEventListener('DOMContentLoaded', function () {
       ['목사 위임', '장로 장립'].map(function (s) {
         return '<option' + (meta.sub === s ? ' selected' : '') + '>' + s + '</option>';
       }).join('') + '</select></div>' +
-      '<div class="field"><label>대상자</label><select id="ev-target"></select></div></div>' +
+      '<div class="field" style="position:relative"><label>대상자</label>' +
+      '<input type="text" id="ev-tq" autocomplete="off" placeholder="이름이나 교회로 검색" ' +
+      'value="' + e(meta.person ? meta.person + (meta.church ? ' · ' + meta.church : '') : '') + '">' +
+      '<div class="tg-list hidden" id="ev-tlist"></div></div></div>' +
       '<div class="inline-form hidden" id="ev-etcperson">' +
       '<div class="field"><label>성명</label><input type="text" id="ev-pname" value="' + e(meta.person || '') + '"></div>' +
       '<div class="field"><label>교회</label><input type="text" id="ev-pchurch" value="' + e(meta.church || '') + '"></div></div>' +
@@ -265,24 +273,63 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="form-msg" id="ev-msg"></div>');
 
     var kindSel = mo.el.querySelector('#ev-kind');
-    var tgtSel = mo.el.querySelector('#ev-target');
+    var tq = mo.el.querySelector('#ev-tq');
+    var tlist = mo.el.querySelector('#ev-tlist');
+    /* 고른 대상: 명단 id 숫자, '__etc'(직접 입력), ''(아직 안 고름) */
+    var tgtVal = meta.roster_id ? String(meta.roster_id) : (meta.person ? '__etc' : '');
+
     function refreshKind() {
       var k = kindSel.value;
       mo.el.querySelector('#ev-etcwrap').classList.toggle('hidden', k !== '기타');
       mo.el.querySelector('#ev-ordwrap').classList.toggle('hidden', k !== '임직식');
-      if (k === '임직식') refreshTargets();
-    }
-    function refreshTargets() {
-      var sub = mo.el.querySelector('#ev-ordsub').value;
-      tgtSel.innerHTML = targetOptions(sub, meta.roster_id || (meta.person && !meta.roster_id ? '__etc' : ''));
       refreshEtcPerson();
     }
     function refreshEtcPerson() {
-      mo.el.querySelector('#ev-etcperson').classList.toggle('hidden', tgtSel.value !== '__etc');
+      mo.el.querySelector('#ev-etcperson').classList.toggle('hidden', tgtVal !== '__etc');
     }
+    /* 이름·교회로 검색해 고르는 목록 */
+    function drawTargetList() {
+      var sub = mo.el.querySelector('#ev-ordsub').value;
+      var q = tq.value.trim().replace(/\s*·.*$/, '');   /* '이름 · 교회' 표시는 이름만으로 찾는다 */
+      var list = targets(sub).filter(function (m) {
+        return !q || (m.name && m.name.indexOf(q) !== -1) ||
+               (m.church && m.church.indexOf(q) !== -1);
+      }).slice(0, 40);
+      var h = list.map(function (m) {
+        return '<div class="tg-item" data-tid="' + m.id + '">' +
+          '<span class="tg-nm">' + e(m.name) + '</span>' +
+          '<span class="tg-sub">' + e(m.church || '무임') + '</span>' +
+          '<span class="tg-badge">' + e(m.position || m.category || '') + '</span></div>';
+      }).join('');
+      if (!list.length) h = '<div class="tg-none">"' + e(q) + '" 로 찾은 분이 없습니다.</div>';
+      h += '<div class="tg-item tg-etc" data-tid="__etc">&#43; 명단에 없음 — 직접 입력</div>';
+      tlist.innerHTML = h;
+      tlist.classList.remove('hidden');
+      tlist.querySelectorAll('.tg-item').forEach(function (it) {
+        it.addEventListener('mousedown', function (ev) {
+          ev.preventDefault();   /* 입력창 blur 전에 선택을 잡는다 */
+          tgtVal = it.dataset.tid;
+          if (tgtVal === '__etc') {
+            tq.value = '직접 입력';
+          } else {
+            var m = roster.filter(function (v) { return String(v.id) === tgtVal; })[0];
+            tq.value = m ? m.name + (m.church ? ' · ' + m.church : '') : '';
+          }
+          tlist.classList.add('hidden');
+          refreshEtcPerson();
+        });
+      });
+    }
+    tq.addEventListener('focus', drawTargetList);
+    tq.addEventListener('input', function () { tgtVal = ''; drawTargetList(); });
+    tq.addEventListener('blur', function () {
+      setTimeout(function () { tlist.classList.add('hidden'); }, 150);
+    });
     kindSel.addEventListener('change', refreshKind);
-    mo.el.querySelector('#ev-ordsub').addEventListener('change', refreshTargets);
-    tgtSel.addEventListener('change', refreshEtcPerson);
+    mo.el.querySelector('#ev-ordsub').addEventListener('change', function () {
+      tgtVal = ''; tq.value = '';
+      refreshEtcPerson();
+    });
     refreshKind();
 
     mo.el.querySelector('#ev-save').addEventListener('click', function () {
@@ -304,12 +351,12 @@ document.addEventListener('DOMContentLoaded', function () {
       } else if (kind === '임직식') {
         var sub = mo.el.querySelector('#ev-ordsub').value;
         var person = '', church = '', rid = null;
-        if (tgtSel.value === '__etc') {
+        if (tgtVal === '__etc') {
           person = mo.el.querySelector('#ev-pname').value.trim();
           church = mo.el.querySelector('#ev-pchurch').value.trim();
           if (!person) { err('대상자 성명을 입력해 주세요.'); return; }
-        } else if (tgtSel.value) {
-          rid = Number(tgtSel.value);
+        } else if (tgtVal) {
+          rid = Number(tgtVal);
           var m = roster.filter(function (v) { return v.id === rid; })[0];
           person = m ? m.name : ''; church = m ? (m.church || '') : '';
         } else { err('대상자를 골라 주세요.'); return; }
