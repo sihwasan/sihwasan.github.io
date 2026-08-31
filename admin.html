@@ -1220,6 +1220,10 @@ document.addEventListener('DOMContentLoaded', function () {
           '<input type="text" id="rm-ordby" value="' + e(m.ordained_by || '') + '" placeholder="예: 시화산노회"' +
           ' title="안수증명서 발급 시 이 기록과 대조합니다"></div>' +
           '</div>' +
+          '<div class="field"><label>상비부</label>' +
+          '<div id="rm-com-box" style="border:1px solid var(--gray-2,#e5e4df);border-radius:8px;padding:10px 12px">' +
+          '<span style="color:var(--gray-5);font-size:0.85rem">상비부 정보를 불러오는 중...</span></div>' +
+          '<div class="form-msg" id="rm-com-msg"></div></div>' +
           '<div class="inline-form">' +
           '<div class="field" style="flex:0 0 120px"><label>우편번호</label>' +
           '<input type="text" id="rm-post" value="' + e(m.postcode || '') + '" maxlength="7"></div>' +
@@ -1347,6 +1351,158 @@ document.addEventListener('DOMContentLoaded', function () {
             }).catch(function () {
               pmsg.className = 'form-msg err'; pmsg.textContent = '사진을 지우지 못했습니다.';
             });
+          });
+        })();
+
+        /* ----- 상비부 배정 (상비부 DB committees 와 직접 연동) -----
+         * 회원 한 사람 기준으로 배정을 보여 주고, 저장하면
+         * 모든 상비부의 1·2·3년조와 부장·서기·회계 칸에서 이 이름을
+         * 정리한 뒤 고른 대로 다시 넣는다. */
+        (function () {
+          var box = document.getElementById('rm-com-box');
+          var cmsg = document.getElementById('rm-com-msg');
+          var coms = [];
+
+          function splitNames(s) {
+            return String(s || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+          }
+          /* '김동석 위임목사' 처럼 직분이 붙은 칸도 같은 사람으로 본다 */
+          function isMe(s) {
+            var t = String(s || '').trim();
+            return t === m.name || t.indexOf(m.name + ' ') === 0;
+          }
+          function bandsOf(cm) {
+            return SHS.isBoard(cm.name)
+              ? [{ k: 'members', t: '위원' }]
+              : [{ k: 'y1', t: '1년조' }, { k: 'y2', t: '2년조' }, { k: 'y3', t: '3년조' }];
+          }
+
+          function rowHtml(sel) {
+            sel = sel || {};
+            var h = '<div class="inline-form rm-com-row" style="margin-bottom:6px">' +
+              '<div class="field" style="flex:1"><select data-rc="com">' +
+              '<option value="">— 상비부 선택 —</option>' +
+              coms.map(function (cm) {
+                return '<option' + (sel.com === cm.name ? ' selected' : '') + '>' + e(cm.name) + '</option>';
+              }).join('') + '</select></div>' +
+              '<div class="field" style="flex:0 0 110px"><select data-rc="band"></select></div>' +
+              '<div class="field" style="flex:0 0 110px"><select data-rc="duty">' +
+              ['부원', '부장', '서기', '회계'].map(function (d0) {
+                return '<option' + (sel.duty === d0 ? ' selected' : '') + '>' + d0 + '</option>';
+              }).join('') + '</select></div>' +
+              '<button type="button" class="btn ghost sm" data-rc="del" style="align-self:flex-end;margin-bottom:2px">제외</button>' +
+              '</div>';
+            var div = document.createElement('div');
+            div.innerHTML = h;
+            var row = div.firstChild;
+            var comSel = row.querySelector('[data-rc="com"]');
+            var bandSel = row.querySelector('[data-rc="band"]');
+            function fillBand() {
+              var cm = coms.filter(function (x) { return x.name === comSel.value; })[0];
+              bandSel.innerHTML = (cm ? bandsOf(cm) : []).map(function (b) {
+                return '<option value="' + b.k + '"' + (sel.band === b.k ? ' selected' : '') + '>' + b.t + '</option>';
+              }).join('');
+            }
+            comSel.addEventListener('change', fillBand);
+            fillBand();
+            row.querySelector('[data-rc="del"]').addEventListener('click', function () { row.remove(); });
+            return row;
+          }
+
+          function draw() {
+            /* 지금 배정된 곳을 찾는다 */
+            var cur = [];
+            coms.forEach(function (cm) {
+              bandsOf(cm).forEach(function (b) {
+                if (splitNames(cm[b.k]).some(isMe)) {
+                  var duty = isMe(cm.head) ? '부장' : isMe(cm.clerk) ? '서기' : isMe(cm.treasurer) ? '회계' : '부원';
+                  cur.push({ com: cm.name, band: b.k, duty: duty });
+                }
+              });
+              /* 조에는 없는데 임원으로만 적혀 있는 경우도 보여 준다 */
+              if (!cur.some(function (x) { return x.com === cm.name; })) {
+                var duty2 = isMe(cm.head) ? '부장' : isMe(cm.clerk) ? '서기' : isMe(cm.treasurer) ? '회계' : '';
+                if (duty2) cur.push({ com: cm.name, band: bandsOf(cm)[0].k, duty: duty2 });
+              }
+            });
+            box.innerHTML = '<div id="rm-com-rows"></div>' +
+              '<button type="button" class="btn ghost sm" id="rm-com-add">배정 추가</button> ' +
+              '<button type="button" class="btn sm" id="rm-com-save">상비부 저장</button>' +
+              '<div style="font-size:0.76rem;color:var(--gray-5);margin-top:6px">' +
+              '부장·위원장은 <strong>부장</strong>으로 고르시면 됩니다. 저장하면 상비부 배정 관리와 대시보드에 바로 반영됩니다.</div>';
+            var rowsBox = box.querySelector('#rm-com-rows');
+            cur.forEach(function (s) { rowsBox.appendChild(rowHtml(s)); });
+            box.querySelector('#rm-com-add').addEventListener('click', function () {
+              rowsBox.appendChild(rowHtml(null));
+            });
+            box.querySelector('#rm-com-save').addEventListener('click', saveComs);
+          }
+
+          function saveComs() {
+            var want = [];
+            box.querySelectorAll('.rm-com-row').forEach(function (row) {
+              var com = row.querySelector('[data-rc="com"]').value;
+              var band = row.querySelector('[data-rc="band"]').value;
+              var duty = row.querySelector('[data-rc="duty"]').value;
+              if (com && band) want.push({ com: com, band: band, duty: duty });
+            });
+            cmsg.className = 'form-msg'; cmsg.textContent = '상비부 배정을 저장하는 중입니다...';
+            var withPos = SHSNames.fix(m.name, { style: 'withPos' }).value || m.name;
+            var updates = [];
+            coms.forEach(function (cm) {
+              var upd = {}, dirty = false;
+              /* 이 사람 이름을 모든 조에서 먼저 걷어낸다 */
+              bandsOf(cm).forEach(function (b) {
+                var list = splitNames(cm[b.k]);
+                var kept = list.filter(function (x) { return !isMe(x); });
+                var w = want.filter(function (x) { return x.com === cm.name && x.band === b.k; })[0];
+                if (w) kept.push(m.name);
+                var nv = kept.join(', ');
+                if (nv !== String(cm[b.k] || '')) { upd[b.k] = nv; cm[b.k] = nv; dirty = true; }
+              });
+              /* 부장·서기·회계 칸 정리 */
+              var wHere = want.filter(function (x) { return x.com === cm.name; })[0];
+              [['head', '부장'], ['clerk', '서기'], ['treasurer', '회계']].forEach(function (p) {
+                var f = p[0], label = p[1];
+                var val = String(cm[f] || '');
+                var mine = isMe(val);
+                var should = !!(wHere && wHere.duty === label);
+                if (should && !mine) { upd[f] = withPos; cm[f] = withPos; dirty = true; }
+                if (!should && mine) { upd[f] = ''; cm[f] = ''; dirty = true; }
+              });
+              if (dirty) {
+                upd.updated_at = new Date().toISOString();
+                updates.push({ name: cm.name, upd: upd });
+              }
+            });
+            if (!updates.length) {
+              cmsg.className = 'form-msg ok'; cmsg.textContent = '바꿀 내용이 없습니다.'; return;
+            }
+            SHSCloud.init().then(function (c) {
+              return Promise.all(updates.map(function (u) {
+                return c.from('committees').update(u.upd).eq('name', u.name);
+              }));
+            }).then(function (rs) {
+              var bad = rs.filter(function (r2) { return r2.error; })[0];
+              if (bad) { cmsg.className = 'form-msg err'; cmsg.textContent = bad.error.message; return; }
+              SHSCloud.log('update', '상비부 배정 수정(회원 팝업)',
+                m.name + ' → ' + (want.map(function (x) {
+                  return x.com + (x.duty !== '부원' ? ' ' + x.duty : '');
+                }).join(', ') || '배정 없음'));
+              cmsg.className = 'form-msg ok'; cmsg.textContent = '상비부 배정이 저장되었습니다.';
+              draw();
+            });
+          }
+
+          SHSCloud.init().then(function (c) {
+            return c.from('committees').select('*').order('sort');
+          }).then(function (r) {
+            if (r.error || !(r.data && r.data.length)) {
+              box.innerHTML = '<span style="color:var(--gray-5);font-size:0.85rem">상비부 정보를 불러오지 못했습니다.</span>';
+              return;
+            }
+            coms = r.data;
+            draw();
           });
         })();
 
