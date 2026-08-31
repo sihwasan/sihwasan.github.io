@@ -304,9 +304,15 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div id="ev-ordwrap" class="hidden">' +
       '<div class="inline-form">' +
       '<div class="field" style="flex:0 0 170px"><label>임직 종류</label><select id="ev-ordsub">' +
-      ['목사 위임', '장로 장립'].map(function (s) {
-        return '<option' + (meta.sub === s ? ' selected' : '') + '>' + s + '</option>';
+      ['목사 위임', '장로 장립', '기타'].map(function (s) {
+        var subNow = ['목사 위임', '장로 장립'].indexOf(meta.sub) !== -1 ? meta.sub
+          : (meta.sub ? '기타' : '목사 위임');
+        return '<option' + (subNow === s ? ' selected' : '') + '>' + s + '</option>';
       }).join('') + '</select></div>' +
+      '<div class="field hidden" style="flex:0 0 170px" id="ev-ordetcwrap"><label>임직 이름</label>' +
+      '<input type="text" id="ev-ordetc" value="' +
+      e(meta.sub && ['목사 위임', '장로 장립'].indexOf(meta.sub) === -1 ? meta.sub : '') +
+      '" placeholder="예: 안수집사 임직"></div>' +
       '<div class="field" style="position:relative"><label>대상자</label>' +
       '<input type="text" id="ev-tq" autocomplete="off" placeholder="이름이나 교회로 검색" ' +
       'value="' + e(meta.person ? meta.person + (meta.church ? ' · ' + meta.church : '') : '') + '">' +
@@ -474,10 +480,16 @@ document.addEventListener('DOMContentLoaded', function () {
       setTimeout(function () { tlist.classList.add('hidden'); }, 150);
     });
     kindSel.addEventListener('change', refreshKind);
+    function refreshOrdEtc() {
+      mo.el.querySelector('#ev-ordetcwrap').classList.toggle('hidden',
+        mo.el.querySelector('#ev-ordsub').value !== '기타');
+    }
     mo.el.querySelector('#ev-ordsub').addEventListener('change', function () {
       tgtVal = ''; tq.value = '';
       refreshEtcPerson();
+      refreshOrdEtc();
     });
+    refreshOrdEtc();
     refreshKind();
 
     mo.el.querySelector('#ev-save').addEventListener('click', function () {
@@ -501,6 +513,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (note) title += ' — ' + note;
       } else if (kind === '임직식') {
         var sub = mo.el.querySelector('#ev-ordsub').value;
+        if (sub === '기타') {
+          sub = mo.el.querySelector('#ev-ordetc').value.trim();
+          if (!sub) { err('임직 이름을 입력해 주세요. (예: 안수집사 임직)'); return; }
+        }
         var person = '', church = '', rid = null;
         if (tgtVal === '__etc') {
           person = mo.el.querySelector('#ev-pname').value.trim();
@@ -514,7 +530,7 @@ document.addEventListener('DOMContentLoaded', function () {
         /* 예전 저장분은 내용 칸에 제목 전체가 들어 있었다 — 자동 조합 문구는 버린다 */
         if (note.indexOf('임직식') !== -1) note = '';
         newMeta = { sub: sub, person: person, church: church, roster_id: rid, note: note };
-        title = '임직식 — ' + person + ' ' + (sub === '목사 위임' ? '목사 위임' : '장로 장립') +
+        title = '임직식 — ' + person + ' ' + sub +
           (church ? ' (' + church + ')' : '') + (note ? ' · ' + note : '');
 
         /* 회원 명단(roster) 연동: 위임일·장립일 기록 */
