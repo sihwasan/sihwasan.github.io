@@ -42,15 +42,13 @@
     { title: '자료실', href: 'archive.html', sub: [
       { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
       { t: '청원서', h: 'petition.html' },
-      { t: '나의 서류', h: 'mydocs.html' },
-      { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
-      { t: '고시 모의고사', h: 'exam.html' }
-    ]},
-    { title: '보고서', href: 'report.html', sub: [
       { t: '교회상황 보고서', h: 'report.html' },
       { t: '시찰보고서', h: 'petition.html?form=sichalreport' },
       { t: '부 사업보고서', h: 'petition.html?form=deptreport' },
-      { t: '부 조직 보고서', h: 'petition.html?form=deptorg' }
+      { t: '부 조직 보고서', h: 'petition.html?form=deptorg' },
+      { t: '나의 서류', h: 'mydocs.html' },
+      { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
+      { t: '고시 모의고사', h: 'exam.html' }
     ]},
     { title: '총회자료실', href: 'assembly-constitution.html', sub: [
       { t: '총회 헌법', h: 'assembly-constitution.html' },
@@ -61,7 +59,6 @@
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
       { t: '신청서류 확인', h: 'request.html#list' },
-      { t: '교회상황 보고서', h: 'report.html' },
       { t: '발급 서류 안내', h: 'request.html#docs' },
       { t: '증명서 진위 확인', h: 'verify.html' },
       { t: '구비서류 규정', h: 'archive.html#forms' }
