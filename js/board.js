@@ -794,17 +794,182 @@ var SHSBoard = (function () {
     }
 
     /* ---------- 노회 일정 ---------- */
+    /* 모든 회원에게 달력 + 목록을 함께 보여 준다. 달력은 읽기 전용이며,
+     * 관리자(노회장·서기·간사)가 날짜를 누르면 일정관리로 간다. */
     function drawSchedule(rows) {
       var el = document.getElementById('dash-sched');
       var list = rows.length
         ? rows.map(function (s) { return { date: s.date_label, title: s.title }; })
         : (SHSData.schedule || []);
-      if (!list.length) { el.innerHTML = '<p class="dash-none">잡힌 일정이 없습니다.</p>'; return; }
-      el.innerHTML = '<div class="side-box"><div class="box-body">' +
-        list.map(function (s) {
-          return '<div class="schedule-item"><span class="d">' + esc(s.date) + '</span>' +
-            '<span class="t">' + esc(s.title) + '</span></div>';
-        }).join('') + '</div></div>';
+      var calY = new Date().getFullYear(), calM = new Date().getMonth();
+      var canEdit = SHSAuth.canManageMembers(user);
+
+      function pad2(n) { return String(n).padStart(2, '0'); }
+      function rowDate(x) {
+        if (x.event_date) return x.event_date;
+        var m = String(x.date_label || '').match(/^(\d{1,2})\.(\d{1,2})$/);
+        return m ? (new Date().getFullYear() + '-' + pad2(m[1]) + '-' + pad2(m[2])) : '';
+      }
+
+      function calHtml() {
+        var first = new Date(calY, calM, 1);
+        var start = first.getDay();
+        var days = new Date(calY, calM + 1, 0).getDate();
+        var nowD = new Date();
+        var todayS = nowD.getFullYear() + '-' + pad2(nowD.getMonth() + 1) + '-' + pad2(nowD.getDate());
+        var byDate = {};
+        rows.forEach(function (x) {
+          var d = rowDate(x);
+          if (!d) return;
+          (byDate[d] = byDate[d] || []).push(x);
+          if (x.end_date && x.end_date > d) {
+            var t = new Date(d + 'T00:00:00');
+            for (var k = 0; k < 60; k++) {
+              t.setDate(t.getDate() + 1);
+              var ts = t.getFullYear() + '-' + pad2(t.getMonth() + 1) + '-' + pad2(t.getDate());
+              if (ts > x.end_date) break;
+              (byDate[ts] = byDate[ts] || []).push(x);
+            }
+          }
+        });
+        var h = '<div style="background:#fff;border:1px solid var(--gray-2,#e8e5df);border-radius:12px;' +
+          'padding:14px 16px;margin-bottom:16px">' +
+          '<div style="display:flex;align-items:center;margin-bottom:8px">' +
+          '<button type="button" class="btn ghost sm" data-dc="p" style="padding:2px 10px">&#8249;</button>' +
+          '<strong style="flex:1;text-align:center">' + calY + '년 ' + (calM + 1) + '월</strong>' +
+          '<button type="button" class="btn ghost sm" data-dc="n" style="padding:2px 10px">&#8250;</button></div>' +
+          '<table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:0.82rem;text-align:center">' +
+          '<thead><tr>' + ['일', '월', '화', '수', '목', '금', '토'].map(function (w, i) {
+            return '<th style="padding:4px 0;font-weight:600;' + (i === 0 ? 'color:#c0392b' : '') + '">' + w + '</th>';
+          }).join('') + '</tr></thead><tbody><tr>';
+        var cell = 0;
+        for (var i = 0; i < start; i++) { h += '<td></td>'; cell++; }
+        for (var d = 1; d <= days; d++) {
+          var ds = calY + '-' + pad2(calM + 1) + '-' + pad2(d);
+          var evs = byDate[ds] || [];
+          h += '<td data-dd="' + ds + '" title="' + esc(evs.map(function (x) { return x.title; }).join('\n')) + '" ' +
+            'style="padding:5px 0;vertical-align:top;' + (canEdit ? 'cursor:pointer;' : '') +
+            (ds === todayS ? 'outline:2px solid var(--accent,#b08d3e);outline-offset:-2px;border-radius:8px;' : '') +
+            (cell % 7 === 0 ? 'color:#c0392b;' : '') + '">' + d +
+            '<div style="line-height:0.6;font-size:1rem;' +
+            (evs.length ? 'color:#b03a2e' : 'visibility:hidden') + '">&#8226;</div></td>';
+          cell++;
+          if (cell % 7 === 0 && d < days) h += '</tr><tr>';
+        }
+        while (cell % 7 !== 0) { h += '<td></td>'; cell++; }
+        h += '</tr></tbody></table>' +
+          '<p style="margin:6px 0 0;font-size:0.78rem;color:var(--gray-5)">' +
+          '&#8226; 표시가 있는 날에 일정이 있습니다. 아래 목록에서 자세한 내용을 보세요.' +
+          (canEdit ? ' <a href="schedule.html" style="text-decoration:underline">일정관리 &#8594;</a>' : '') +
+          '</p></div>';
+        return h;
+      }
+
+      /* ----- 일정 상세 팝업: 누르면 깔끔하게 정리된 세부 내용을 보여 준다 ----- */
+      function timeK(t) {
+        if (!t) return '';
+        var hh = Number(t.split(':')[0]), mm = t.split(':')[1];
+        return (hh < 12 ? '오전 ' : '오후 ') + ((hh % 12) || 12) + '시' +
+          (mm !== '00' ? ' ' + Number(mm) + '분' : '');
+      }
+      function fmtD(s) {
+        if (!s) return '';
+        var p = s.split('-');
+        return Number(p[0]) + '년 ' + Number(p[1]) + '월 ' + Number(p[2]) + '일';
+      }
+      function openDetail(evs) {
+        var old = document.getElementById('sch-modal');
+        if (old) old.remove();
+        var ov = document.createElement('div');
+        ov.id = 'sch-modal';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;' +
+          'display:flex;align-items:flex-start;justify-content:center;padding:50px 16px;overflow:auto';
+        var KIND_C = { '정기노회': '#b03a2e', '임직식': '#8e44ad', '총회': '#1f618d',
+          '임원회의': '#7d6608', '상비부 일정': '#1e8449', '수양회': '#148f77' };
+        var inner = evs.map(function (x) {
+          var m = x.meta || {};
+          function row(t, v, pre) {
+            if (!v) return '';
+            return '<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--gray-1,#f2efe9)">' +
+              '<span style="flex:0 0 84px;color:var(--gray-5);font-size:0.84rem">' + t + '</span>' +
+              '<span style="flex:1;font-size:0.92rem;' + (pre ? 'white-space:pre-line;line-height:1.7' : '') + '">' +
+              esc(v) + '</span></div>';
+          }
+          var when = fmtD(rowDate(x)) + (x.end_date ? ' ~ ' + fmtD(x.end_date) : '') +
+            (m.time ? ' · ' + timeK(m.time) : '');
+          return '<div style="padding:4px 0 14px">' +
+            '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+            (x.kind ? '<span style="flex:none;font-size:0.76rem;color:#fff;padding:3px 11px;border-radius:12px;' +
+              'background:' + (KIND_C[x.kind] || 'var(--navy,#4b3f33)') + '">' + esc(x.kind) + '</span>' : '') +
+            '<strong style="font-size:1.05rem;line-height:1.5">' + esc(x.title) + '</strong></div>' +
+            row('일시', when) +
+            row('장소', m.loc || m.place) +
+            (m.person ? row('대상자', m.person + (m.church ? ' (' + m.church + ')' : '') +
+              (m.sub ? ' · ' + m.sub : '')) : '') +
+            row('대상', m.target) +
+            row('회비', m.fee) +
+            row('주관부서', m.dept) +
+            row('담당자', m.contact) +
+            row('안내', m.info, true) +
+            (m.note ? row('비고', m.note) : '') +
+            '</div>';
+        }).join('<hr style="border:none;border-top:1px solid var(--gray-2,#e8e5df);margin:4px 0 14px">');
+        ov.innerHTML =
+          '<div style="background:#fff;border-radius:14px;max-width:520px;width:100%;padding:24px 26px;' +
+          'box-shadow:0 14px 40px rgba(0,0,0,0.25);position:relative">' +
+          '<button aria-label="닫기" id="sch-modal-x" style="position:absolute;top:10px;right:14px;border:none;' +
+          'background:none;font-size:1.5rem;color:var(--gray-5);cursor:pointer">&times;</button>' +
+          inner +
+          (canEdit ? '<p style="margin:6px 0 0;text-align:right"><a class="btn ghost sm" href="schedule.html#d=' +
+            rowDate(evs[0]) + '">일정관리에서 수정</a></p>' : '') +
+          '</div>';
+        document.body.appendChild(ov);
+        ov.addEventListener('click', function (ev) { if (ev.target === ov) ov.remove(); });
+        ov.querySelector('#sch-modal-x').addEventListener('click', function () { ov.remove(); });
+      }
+      function dayEvents(ds) {
+        return rows.filter(function (x) {
+          var d = rowDate(x);
+          return d === ds || (d && x.end_date && d <= ds && ds <= x.end_date);
+        });
+      }
+
+      function render() {
+        el.innerHTML = calHtml() +
+          (rows.length
+            ? '<div class="side-box"><div class="box-body">' +
+              rows.map(function (x, i) {
+                return '<div class="schedule-item" data-si="' + i + '" style="cursor:pointer">' +
+                  '<span class="d">' + esc(x.date_label) + '</span>' +
+                  '<span class="t">' + esc(x.title) + '</span></div>';
+              }).join('') + '</div></div>' +
+              '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:8px">일정을 누르면 자세한 내용을 볼 수 있습니다.</p>'
+            : (list.length
+              ? '<div class="side-box"><div class="box-body">' +
+                list.map(function (s) {
+                  return '<div class="schedule-item"><span class="d">' + esc(s.date) + '</span>' +
+                    '<span class="t">' + esc(s.title) + '</span></div>';
+                }).join('') + '</div></div>'
+              : '<p class="dash-none">잡힌 일정이 없습니다.</p>'));
+        el.querySelector('[data-dc="p"]').addEventListener('click', function () {
+          calM--; if (calM < 0) { calM = 11; calY--; } render();
+        });
+        el.querySelector('[data-dc="n"]').addEventListener('click', function () {
+          calM++; if (calM > 11) { calM = 0; calY++; } render();
+        });
+        el.querySelectorAll('.schedule-item[data-si]').forEach(function (it) {
+          it.addEventListener('click', function () {
+            openDetail([rows[Number(it.dataset.si)]]);
+          });
+        });
+        el.querySelectorAll('td[data-dd]').forEach(function (td) {
+          td.addEventListener('click', function () {
+            var evs = dayEvents(td.dataset.dd);
+            if (evs.length) openDetail(evs);
+          });
+        });
+      }
+      render();
     }
 
     /* ---------- 신청서류 발급 현황 ---------- */
