@@ -1741,6 +1741,32 @@ input.dp-bad { border-color: var(--red); }
 /* 교회 × 월 납부표 */
 .dues-tbl { font-size: 0.85rem; }
 .dues-tbl .dues-date { display: block; font-size: 0.62rem; color: var(--gray-5); line-height: 1.2; }
+
+/* 입금일 달력 팝업 */
+#dues-cal {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(24, 22, 18, 0.4);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.dcal-box {
+  background: var(--white); border-radius: 14px; padding: 18px 20px;
+  width: 320px; max-width: 100%; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.dcal-head { display: flex; align-items: center; margin-bottom: 12px; font-size: 0.95rem; }
+.dcal-x {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  font-size: 1.4rem; line-height: 1; color: var(--gray-5); padding: 0 2px;
+}
+.dcal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.dcal-w { font-size: 0.72rem; color: var(--gray-5); padding: 3px 0; }
+.dcal-d {
+  border: 1px solid var(--gray-2); background: var(--white); border-radius: 7px;
+  padding: 7px 0; font-size: 0.85rem; cursor: pointer; color: var(--ink);
+}
+.dcal-d:hover { background: var(--gray-1); border-color: var(--gray-3); }
+.dcal-d.sel { background: #c0392b; border-color: #c0392b; color: #fff; font-weight: 700; }
+.dcal-tip { font-size: 0.78rem; color: var(--gray-5); margin: 10px 0 0; }
+.dcal-del { margin-top: 12px; }
 .dues-tbl th.cur, .dues-tbl td.cur { background: rgba(176, 141, 62, 0.08); }
 .dues-tbl .dues-sc td {
   background: var(--gray-1); color: var(--navy); font-weight: 700;

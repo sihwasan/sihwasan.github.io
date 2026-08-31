@@ -746,7 +746,6 @@ document.addEventListener('DOMContentLoaded', function () {
   var duesRates = [], duesPays = [];
   var duesView = 'status';
   var duesFilter = 'all';    /* all | full | unpaid — 완납/미납 필터 */
-  var duesEdit = false;      /* 수정하기 모드: 켜면 납부 칸을 눌러 입금일을 고친다 */
   var duesQuery = '';        /* 교회·교역자 검색어 */
   var duesClosed = null;      /* 마감 기록. 있으면 그 해는 잠겨 있다 */
   var canDues = SHSAuth.canManageMembers(user) ||
@@ -868,9 +867,6 @@ document.addEventListener('DOMContentLoaded', function () {
       (canDues && duesRates.length
         ? '<button class="btn ghost sm" id="du-print">인쇄</button>' +
           '<button class="btn ghost sm" id="du-pdf">PDF 저장</button>' : '') +
-      (canDues && duesRates.length && !duesClosed
-        ? '<button class="btn ' + (duesEdit ? '' : 'ghost ') + 'sm" id="du-edit">' +
-          (duesEdit ? '수정 끝내기' : '수정하기') + '</button>' : '') +
       (duesClosed
         ? '<span class="dues-closed-chip">마감됨</span>'
         : (canDues && duesRates.length
@@ -1009,12 +1005,10 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '</tbody></table></div>';
     h += duesClosed
       ? ''
-      : (canDues && duesEdit
-        ? '<p style="font-size:0.82rem;color:var(--red);font-weight:600">수정하기 모드입니다. ' +
-          '납부 표시(●)가 있는 칸을 누르면 입금일을 고칠 수 있습니다. 끝나면 위의 수정 끝내기를 눌러 주세요.</p>'
-        : canDues
-        ? '<p style="font-size:0.82rem;color:var(--gray-5)">칸을 누르면 그 달을 납부로 표시하고, 다시 누르면 되돌립니다. ' +
-          '금액은 설정된 월액으로 적히며, 월액이 0원인 교회는 누를 때 금액을 물어봅니다.</p>'
+      : (canDues
+        ? '<p style="font-size:0.82rem;color:var(--gray-5)">칸을 누르면 그 달 달력이 열립니다. ' +
+          '입금일 날짜를 누르면 납부(●)로 표시되고, 이미 납부한 칸은 날짜를 바꾸거나 납부를 취소할 수 있습니다. ' +
+          '금액은 설정된 월액으로 적히며, 월액이 0원인 교회는 금액을 물어봅니다.</p>'
         : '<p style="font-size:0.82rem;color:var(--gray-5)">납부 입력은 회계·부회계와 관리자가 할 수 있습니다.</p>');
 
     box.innerHTML = h;
@@ -1044,8 +1038,6 @@ document.addEventListener('DOMContentLoaded', function () {
     box.querySelectorAll('.dues-tabs button').forEach(function (b) {
       b.addEventListener('click', function () { duesView = b.dataset.duv; renderDues(); });
     });
-    var ed = box.querySelector('#du-edit');
-    if (ed) ed.addEventListener('click', function () { duesEdit = !duesEdit; renderDues(); });
     var cl = box.querySelector('#du-close');
     if (cl) cl.addEventListener('click', closeDuesYear);
     var pr = box.querySelector('#du-print');
@@ -1092,40 +1084,62 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!canDues) return;
     duesBox().querySelectorAll('td[data-duch]').forEach(function (td) {
       td.addEventListener('click', function () {
-        var church = td.dataset.duch, m = +td.dataset.dum;
-        var r = duesRates.filter(function (x) { return x.church === church; })[0];
-        var p2 = payOf(church, m);
-        /* 수정하기 모드: 납부 칸을 누르면 입금일을 고친다 */
-        if (duesEdit) {
-          if (!p2) {
-            alert('납부 표시가 있는 칸만 입금일을 고칠 수 있습니다.\n납부 입력은 수정 끝내기를 누른 뒤에 해 주세요.');
-            return;
-          }
-          var cur = String(p2.paid_on || '').slice(0, 10);
-          var v = prompt(church + ' ' + m + '월 입금일을 적어 주세요. (예: 2026-08-31)', cur);
-          if (v === null) return;
-          v = v.trim();
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(new Date(v).getTime())) {
-            alert('날짜는 2026-08-31 처럼 연-월-일 형식으로 적어 주세요.');
-            return;
-          }
-          if (v === cur) return;
-          SHSCloud.init().then(function (c) {
-            return c.from('dues_payments').update({ paid_on: v }).eq('id', p2.id);
-          }).then(function (res) {
-            if (res.error) throw res.error;
-            SHSCloud.log('update', '상회비 입금일 수정',
-              duesYear + '년 ' + m + '월 ' + church + ' ' + cur + ' → ' + v);
-            loadDues();
-          }).catch(function (err) { alert(err.message || err); });
-          return;
-        }
+        var r = duesRates.filter(function (x) { return x.church === td.dataset.duch; })[0];
+        if (r) openDuesCal(r, +td.dataset.dum);
+      });
+    });
+  }
+
+  /* 칸을 누르면 그 달 달력을 띄운다. 날짜를 누르면 그 날짜로 납부(●)가 기록되고,
+   * 이미 납부한 칸은 날짜를 바꾸거나 납부를 취소한다. 1~3월은 다음 해 달력이다. */
+  function openDuesCal(r, m) {
+    var church = r.church;
+    var p2 = payOf(church, m);
+    var calY = m >= 4 ? duesYear : duesYear + 1;
+    var old = document.getElementById('dues-cal');
+    if (old) old.remove();
+
+    var days = new Date(calY, m, 0).getDate();
+    var first = new Date(calY, m - 1, 1).getDay();
+    var sel = p2 ? String(p2.paid_on || '').slice(0, 10) : '';
+
+    var h = '<div class="dcal-box">' +
+      '<div class="dcal-head"><strong>' + e(church) + '</strong>&nbsp;' + calY + '년 ' + m + '월' +
+      '<button class="dcal-x" type="button" aria-label="닫기">&times;</button></div>';
+    h += '<div class="dcal-grid">';
+    ['일', '월', '화', '수', '목', '금', '토'].forEach(function (w) {
+      h += '<span class="dcal-w">' + w + '</span>';
+    });
+    for (var i = 0; i < first; i++) h += '<span></span>';
+    for (var d = 1; d <= days; d++) {
+      var ds = calY + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2);
+      h += '<button type="button" class="dcal-d' + (ds === sel ? ' sel' : '') + '" data-d="' + ds + '">' + d + '</button>';
+    }
+    h += '</div>';
+    h += '<p class="dcal-tip">' + (p2
+      ? '현재 입금일은 <strong>' + e(sel) + '</strong>입니다. 다른 날짜를 누르면 입금일이 바뀝니다.'
+      : '입금일 날짜를 누르면 납부(●)로 표시됩니다.') + '</p>';
+    if (p2) h += '<button type="button" class="btn danger sm dcal-del">납부 취소</button>';
+    h += '</div>';
+
+    var wrap = document.createElement('div');
+    wrap.id = 'dues-cal';
+    wrap.innerHTML = h;
+    document.body.appendChild(wrap);
+    function close() { wrap.remove(); }
+    wrap.addEventListener('click', function (ev) { if (ev.target === wrap) close(); });
+    wrap.querySelector('.dcal-x').addEventListener('click', close);
+
+    wrap.querySelectorAll('.dcal-d').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var ds = b.dataset.d;
         SHSCloud.init().then(function (c) {
           if (p2) {
-            if (!confirm(church + ' ' + m + '월 납부 표시를 지울까요?')) return null;
-            return c.from('dues_payments').delete().eq('id', p2.id).then(function (res) {
+            if (ds === sel) return null;
+            return c.from('dues_payments').update({ paid_on: ds }).eq('id', p2.id).then(function (res) {
               if (res.error) throw res.error;
-              SHSCloud.log('delete', '상회비 납부 취소', duesYear + '년 ' + m + '월 ' + church);
+              SHSCloud.log('update', '상회비 입금일 수정',
+                duesYear + '년 ' + m + '월 ' + church + ' ' + sel + ' → ' + ds);
             });
           }
           var amt = Number(r.monthly_amount || 0);
@@ -1135,17 +1149,32 @@ document.addEventListener('DOMContentLoaded', function () {
             amt = Math.max(0, Math.round(Number(v) || 0));
           }
           return c.from('dues_payments').insert({
-            year: duesYear, church: church, month: m,
+            year: duesYear, church: church, month: m, paid_on: ds,
             amount: amt === Number(r.monthly_amount || 0) ? null : amt,
             entered_by: user.name
           }).then(function (res) {
             if (res.error) throw res.error;
-            SHSCloud.log('create', '상회비 납부 입력', duesYear + '년 ' + m + '월 ' + church + ' ' + amt + '만원');
+            SHSCloud.log('create', '상회비 납부 입력',
+              duesYear + '년 ' + m + '월 ' + church + ' ' + ds + ' 납부');
           });
         }).then(function (done) {
+          close();
           if (done !== null) loadDues();
         }).catch(function (err) { alert(err.message || err); });
       });
+    });
+
+    var del = wrap.querySelector('.dcal-del');
+    if (del) del.addEventListener('click', function () {
+      if (!confirm(church + ' ' + m + '월 납부 표시를 지울까요?')) return;
+      SHSCloud.init().then(function (c) {
+        return c.from('dues_payments').delete().eq('id', p2.id);
+      }).then(function (res) {
+        if (res.error) throw res.error;
+        SHSCloud.log('delete', '상회비 납부 취소', duesYear + '년 ' + m + '월 ' + church);
+        close();
+        loadDues();
+      }).catch(function (err) { alert(err.message || err); });
     });
   }
 
