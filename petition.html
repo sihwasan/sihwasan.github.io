@@ -251,7 +251,7 @@ body.pt-embed main { padding-top: 10px; }
       { k: 'kind', label: '청빙 구분', type: 'select',
         opt: ['목사위임', '시무목사', '부목사', '부목사계속', '교육목사', '전도목사', '강도사', '전도사'] },
       { k: 'name', label: '청빙 대상자 성명' },
-      { k: 'church', label: '교회명 (—교회의 "교회"는 빼고)' },
+      { k: 'church', label: '교회명 (교회까지 적으셔도 됩니다)' },
       { k: 'dang', label: '당회장 성명' },
       { k: 'date', label: '작성일', type: 'date' }
     ],
@@ -871,8 +871,18 @@ body.pt-embed main { padding-top: 10px; }
     });
     box.innerHTML = h;
     box.querySelectorAll('[data-ptf]').forEach(function (el) {
-      el.addEventListener('input', function () { data[el.dataset.ptf] = el.value; renderPaper(); });
-      el.addEventListener('change', function () { data[el.dataset.ptf] = el.value; renderPaper(); });
+      /* 교회명 칸은 "…교회"라고 적어도 서식에서 교회가 겹치지 않게
+       * 끝의 "교회"를 떼어 담는다 (서식이 뒤에 교회를 붙여 준다) */
+      function put() {
+        var v2 = el.value;
+        if (['church', 'fromch', 'toch'].indexOf(el.dataset.ptf) !== -1) {
+          v2 = v2.replace(/\s*교회\s*$/, '');
+        }
+        data[el.dataset.ptf] = v2;
+        renderPaper();
+      }
+      el.addEventListener('input', put);
+      el.addEventListener('change', put);
     });
     /* 작성일은 오늘로 미리 채운다 */
     var dEl = box.querySelector('#ptf-date');
@@ -1516,7 +1526,11 @@ body.pt-embed main { padding-top: 10px; }
         var wm = mo.querySelector('#wz-msg');
         var d = {};
         mo.querySelectorAll('[data-wf]').forEach(function (el2) {
-          d[el2.dataset.wf] = el2.value.trim();
+          var v2 = el2.value.trim();
+          if (['church', 'fromch', 'toch'].indexOf(el2.dataset.wf) !== -1) {
+            v2 = v2.replace(/\s*교회\s*$/, '');
+          }
+          d[el2.dataset.wf] = v2;
         });
         if (c.custom) {
           if (!d.__kind) { wm.className = 'form-msg err'; wm.textContent = '청빙 직위를 적어 주세요.'; return; }
