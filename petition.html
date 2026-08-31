@@ -1043,9 +1043,12 @@ body.pt-embed main { padding-top: 10px; }
   function loadSeal() {
     if (!cloudOn()) return Promise.resolve(null);
     return SHSCloud.init().then(function (c) {
-      return c.from('member_seals').select('image').eq('user_id', user.id);
+      return c.from('member_seals').select('image,kind').eq('user_id', user.id);
     }).then(function (r) {
-      sealImg = (r.data && r.data[0] && r.data[0].image) || null;
+      /* 청원서에는 목사(당회장) 도장을 먼저 쓰고, 없으면 교회 직인을 쓴다 */
+      var rows = r.data || [];
+      var pk = rows.filter(function (x) { return x.kind === 'pastor'; })[0];
+      sealImg = (pk && pk.image) || (rows[0] && rows[0].image) || null;
       renderPaper();
       return sealImg;
     }).catch(function () { return null; });
@@ -1132,8 +1135,8 @@ body.pt-embed main { padding-top: 10px; }
         wrap.querySelector('#ptm-msg').textContent = '저장하는 중...';
         SHSCloud.init().then(function (c) {
           return c.from('member_seals').upsert({
-            user_id: user.id, image: pending, updated_at: new Date().toISOString()
-          });
+            user_id: user.id, kind: 'pastor', image: pending, updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id,kind' });
         }).then(function (r) {
           if (r.error) throw r.error;
           sealImg = pending;

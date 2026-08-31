@@ -175,6 +175,23 @@ document.addEventListener('DOMContentLoaded', function () {
       '<strong>교회상황 보고서</strong>를 제출하거나 인쇄할 때 문서 하단 (직인) 자리에 찍힙니다.</p>' +
       '</div>';
 
+    /* 목사(당회장) 도장: 청원서의 (인) 자리에 찍힌다.
+     * 당회(장로)가 있는 교회의 목사는 당회장이므로 "당회장 도장"으로 표기한다. */
+    html += '<h2 id="ps-title">목사 도장</h2>';
+    html += '<div class="form-card" style="max-width:520px;margin:0">' +
+      '<div class="ph-wrap">' +
+      '<div class="ph-preview seal-preview" id="ps-preview">도장 없음</div>' +
+      '<div class="ph-drop" id="ps-drop">도장을 찍은 사진·그림 파일을<br>' +
+      '끌어다 놓거나 <span>눌러서 선택</span>하세요' +
+      '<small>흰 바탕은 자동으로 투명하게 지워져, 문서 위에 자연스럽게 찍힙니다</small></div>' +
+      '</div>' +
+      '<input type="file" id="ps-file" accept="image/*" class="hidden">' +
+      '<button class="btn ghost hidden" id="ps-del" style="width:100%;margin-top:12px">도장 지우기</button>' +
+      '<div class="form-msg" id="ps-msg"></div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:8px">본인만 보고 쓸 수 있으며, ' +
+      '<strong>청원서</strong>를 작성해 인쇄·PDF 저장하거나 시찰로 전달할 때 (인) 자리에 찍힙니다.</p>' +
+      '</div>';
+
     /* 노회장 전용: 차기 노회장에게 권한 이양 */
     if (p.role === 'president') {
       html += '<h2>차기 노회장에게 관리자 권한 넘기기</h2>';
@@ -196,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
       '<p style="font-size:0.88rem;color:var(--gray-7);margin-bottom:16px">' +
       '이메일로 가입하신 경우 여기서 비밀번호를 바꾸실 수 있습니다.<br>' +
-      '구글 계정으로 로그인하신 경우에는 구글에서 관리하므로 바꾸실 필요가 없습니다.</p>' +
+      '구글 또는 네이버 계정으로 로그인하신 경우에는 해당 계정에서 관리하므로 바꾸실 필요가 없습니다.</p>' +
       '<div class="field"><label>새 비밀번호 (6자 이상)</label><input type="password" id="q-pw1" autocomplete="new-password"></div>' +
       '<div class="field"><label>새 비밀번호 확인</label><input type="password" id="q-pw2" autocomplete="new-password"></div>' +
       '<button class="btn" id="q-pwsave" style="width:100%">비밀번호 변경</button>' +
@@ -219,18 +236,33 @@ document.addEventListener('DOMContentLoaded', function () {
     area.innerHTML = html;
     SHSDate.attachAll(area);   /* 생년월일 — 손으로 적거나 굴려서 고른다 */
     setupPhoto();
-    setupSeal();
+    setupSeal('church', 'sl', '직인', '교회 직인');
+    setupSeal('pastor', 'ps', '도장', '목사(당회장) 도장');
+
+    /* 노회 명단(회원 DB)과 연동: 내 교회에 장로가 있으면(당회 조직)
+     * 목사가 곧 당회장이므로 "당회장 도장"으로 표기한다. */
+    if (p.church && window.SHSCloud && SHSCloud.enabled()) {
+      SHSCloud.init().then(function (c) {
+        return c.from('roster').select('id', { count: 'exact', head: true })
+          .eq('church', p.church).eq('category', '장로');
+      }).then(function (r) {
+        if ((r.count || 0) > 0) {
+          var t = document.getElementById('ps-title');
+          if (t) t.textContent = '당회장 도장';
+        }
+      }).catch(function () {});
+    }
     SHSMyDuties.mount(document.getElementById('duty-area'), p);
 
     /* ---------- 교회 직인·도장 올리기 ----------
      * 흰 바탕을 투명하게 지우고 420px 이하 PNG로 줄여
      * member_seals 표(본인 전용)에 저장한다. */
-    function setupSeal() {
-      var drop = document.getElementById('sl-drop');
-      var fileIn = document.getElementById('sl-file');
-      var preview = document.getElementById('sl-preview');
-      var delBtn = document.getElementById('sl-del');
-      var msg = document.getElementById('sl-msg');
+    function setupSeal(kind, pre, label, logLabel) {
+      var drop = document.getElementById(pre + '-drop');
+      var fileIn = document.getElementById(pre + '-file');
+      var preview = document.getElementById(pre + '-preview');
+      var delBtn = document.getElementById(pre + '-del');
+      var msg = document.getElementById(pre + '-msg');
       if (!drop) return;
 
       function setMsg(t, err) {
@@ -239,16 +271,16 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       function show(dataUrl) {
         if (dataUrl) {
-          preview.innerHTML = '<img src="' + dataUrl + '" alt="교회 직인">';
+          preview.innerHTML = '<img src="' + dataUrl + '" alt="' + logLabel + '">';
           delBtn.classList.remove('hidden');
         } else {
-          preview.textContent = '직인 없음';
+          preview.textContent = label + ' 없음';
           delBtn.classList.add('hidden');
         }
       }
 
       SHSCloud.init().then(function (c) {
-        return c.from('member_seals').select('image').eq('user_id', p.id);
+        return c.from('member_seals').select('image').eq('user_id', p.id).eq('kind', kind);
       }).then(function (r) {
         var row = r.data && r.data[0];
         if (row) show(row.image);
@@ -292,21 +324,21 @@ document.addEventListener('DOMContentLoaded', function () {
       function upload(f) {
         if (!f) return;
         if (!/^image\//.test(f.type)) { setMsg('그림 파일만 올릴 수 있습니다.', true); return; }
-        setMsg('직인을 다듬어 저장하는 중입니다…');
+        setMsg(label + '을(를) 다듬어 저장하는 중입니다…');
         toSeal(f).then(function (dataUrl) {
           if (dataUrl.length > 900000) throw new Error('그림이 너무 큽니다. 더 작은 파일로 올려 주세요.');
           return SHSCloud.init().then(function (c) {
             return c.from('member_seals').upsert({
-              user_id: p.id, image: dataUrl, updated_at: new Date().toISOString()
-            });
+              user_id: p.id, kind: kind, image: dataUrl, updated_at: new Date().toISOString()
+            }, { onConflict: 'user_id,kind' });
           }).then(function (r) {
             if (r.error) throw r.error;
-            SHSCloud.log('update', '교회 직인 등록', p.email);
-            setMsg('직인이 저장되었습니다. 이제 보고서에 찍을 수 있습니다.');
+            SHSCloud.log('update', logLabel + ' 등록', p.email);
+            setMsg(label + '이(가) 저장되었습니다. 이제 문서에 찍을 수 있습니다.');
             show(dataUrl);
           });
         }).catch(function (err) {
-          setMsg((err && err.message) || '직인을 올리지 못했습니다.', true);
+          setMsg((err && err.message) || label + '을(를) 올리지 못했습니다.', true);
         });
       }
 
@@ -331,15 +363,15 @@ document.addEventListener('DOMContentLoaded', function () {
         upload(x.dataTransfer && x.dataTransfer.files && x.dataTransfer.files[0]);
       });
       delBtn.addEventListener('click', function () {
-        if (!confirm('등록된 직인을 지우시겠습니까?')) return;
+        if (!confirm('등록된 ' + label + '을(를) 지우시겠습니까?')) return;
         SHSCloud.init().then(function (c) {
-          return c.from('member_seals').delete().eq('user_id', p.id);
+          return c.from('member_seals').delete().eq('user_id', p.id).eq('kind', kind);
         }).then(function (r) {
           if (r.error) throw r.error;
-          SHSCloud.log('update', '교회 직인 삭제', p.email);
-          setMsg('직인을 지웠습니다.');
+          SHSCloud.log('update', logLabel + ' 삭제', p.email);
+          setMsg(label + '을(를) 지웠습니다.');
           show(null);
-        }).catch(function () { setMsg('직인을 지우지 못했습니다.', true); });
+        }).catch(function () { setMsg(label + '을(를) 지우지 못했습니다.', true); });
       });
     }
 

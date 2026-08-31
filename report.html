@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', function () {
     db().then(function (c) {
       var jobs = [
         c.rpc('my_member').then(null, function () { return { data: null }; }),
-        c.from('member_seals').select('image').eq('user_id', user.id)
+        c.from('member_seals').select('image').eq('user_id', user.id).eq('kind', 'church')
           .then(null, function () { return { data: null }; })
       ];
       if (VIEW_ID) {

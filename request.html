@@ -143,8 +143,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (dataUrl.length > 900000) throw new Error('그림이 너무 큽니다. 더 작은 파일로 올려 주세요.');
         return SHSCloud.init().then(function (c) {
           return c.from('member_seals').upsert({
-            user_id: user.id, image: dataUrl, updated_at: new Date().toISOString()
-          });
+            user_id: user.id, kind: 'church', image: dataUrl, updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id,kind' });
         }).then(function (r) {
           if (r.error) throw r.error;
           mySeal = dataUrl;
@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function () {
           .order('id', { ascending: false })
           .then(function (x) { return x; }, function () { return { data: [] }; }),
         /* 등록된 교회 직인 (직인증명서 안내에 쓴다) */
-        c.from('member_seals').select('image').eq('user_id', user.id)
+        c.from('member_seals').select('image').eq('user_id', user.id).eq('kind', 'church')
           .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {

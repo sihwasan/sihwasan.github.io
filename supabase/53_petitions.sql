@@ -15,3 +15,7 @@ alter table public.petitions enable row level security;
 drop policy if exists petitions_self on public.petitions;
 create policy petitions_self on public.petitions for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- (추가) 도장 종류: church(교회 직인) / pastor(목사·당회장 도장)
+-- alter table member_seals add column kind text not null default 'church';
+-- 기본키를 (user_id, kind)로 변경. 실제 적용은 migration member_seals_kind.
