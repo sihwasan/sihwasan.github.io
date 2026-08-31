@@ -337,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function () {
               for (var i = 0; i < a.length; i += 4) {
                 var mn = Math.min(a[i], a[i + 1], a[i + 2]);
                 if (mn > 235) a[i + 3] = 0;                       /* 흰 바탕 */
-                else if (mn > 200) a[i + 3] = Math.round(a[i + 3] * (235 - mn) / 35);
+                else if (mn > 170) a[i + 3] = Math.round(a[i + 3] * (235 - mn) / 65);
               }
               cx.putImageData(d, 0, 0);
             } catch (x) { /* 못 지워도 그대로 저장한다 */ }

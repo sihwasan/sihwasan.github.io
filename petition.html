@@ -63,6 +63,7 @@
 #pt-paper .pt-seal {
   height: 46px; width: auto; max-width: none; opacity: 0.92;
   position: absolute; left: -8px; top: 50%; margin-top: -23px;
+  mix-blend-mode: multiply;   /* 흰 자국·잡티가 종이에 자연스럽게 스며든다 */
 }
 
 /* 도장 등록·시찰 선택 작은 창 */
@@ -1082,7 +1083,7 @@ body.pt-embed main { padding-top: 10px; }
           for (var i = 0; i < a.length; i += 4) {
             var mn = Math.min(a[i], a[i + 1], a[i + 2]);
             if (mn > 235) a[i + 3] = 0;
-            else if (mn > 200) a[i + 3] = Math.round(a[i + 3] * (235 - mn) / 35);
+            else if (mn > 170) a[i + 3] = Math.round(a[i + 3] * (235 - mn) / 65);
           }
           cx.putImageData(d, 0, 0);
         } catch (x) { /* 못 지워도 그대로 저장한다 */ }
