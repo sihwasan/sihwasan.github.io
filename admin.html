@@ -984,6 +984,18 @@ document.addEventListener('DOMContentLoaded', function () {
         return (y ? y + '년 ' : '') + (mo ? mo + '개월' : (y ? '' : '한 달 미만'));
       }
 
+      /* 재직 경과: 부임일로부터 몇 년 몇 개월인지 */
+      function servedDur(m) {
+        var from = m.served_from ? new Date(m.served_from + 'T00:00:00') : null;
+        if (!from || isNaN(from)) return '';
+        var today = new Date();
+        var months = (today.getFullYear() - from.getFullYear()) * 12 + (today.getMonth() - from.getMonth());
+        if (today.getDate() < from.getDate()) months--;
+        if (months < 0) return '';
+        var y = Math.floor(months / 12), mo = months % 12;
+        return (y ? y + '년 ' : '') + (mo ? mo + '개월' : (y ? '' : '한 달 미만')) + ' 경과';
+      }
+
       /* 명단 표 — 읽기 전용. [수정]을 누르면 팝업에서 고친다. */
       html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th>' +
         '<th style="width:110px">성명</th><th style="width:110px">직분</th>' +
@@ -1013,7 +1025,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? e(m.ordained_on)
             : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td>' + (m.served_from
-            ? e(m.served_from)
+            ? e(m.served_from) + '<div style="font-size:0.76rem;color:var(--gray-5)">' + servedDur(m) + '</div>'
             : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td>' + remainLabel(m) + '</td>' +
           '<td>' + e(gradeName(rosterGrade(m))) + '</td>' +
