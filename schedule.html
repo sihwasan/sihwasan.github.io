@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var hm = location.hash.match(/d=(\d{4})-(\d{2})-(\d{2})/);
   if (hm) { calY = Number(hm[1]); calM = Number(hm[2]) - 1; }
 
-  var KINDS = ['정기노회', '임원회의', '상비부 일정', '임직식', '총회', '수양회', '기타'];
+  var KINDS = ['정기노회', '임원회의', '상비부 일정', '임직식', '총회', '수양회', '사모위로회', '기타'];
 
   function pad2(n) { return String(n).padStart(2, '0'); }
   function ymd(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
@@ -316,7 +316,12 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>교회</label><input type="text" id="ev-pchurch" value="' + e(meta.church || '') + '"></div></div>' +
       '<p style="font-size:0.8rem;color:var(--gray-5);margin:2px 0 10px">저장하면 회원 명단에 ' +
       '<strong>목사 위임 → 위임일(직분 위임목사)</strong>, <strong>장로 장립 → 장립일</strong>이 함께 기록됩니다.</p></div>' +
-      '<div class="field"><label>내용·장소 (선택)</label>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 150px"><label>시간 (선택)</label>' +
+      '<input type="time" id="ev-time" value="' + e(meta.time || '') + '"></div>' +
+      '<div class="field" id="ev-locwrap"><label>장소 (선택)</label>' +
+      '<input type="text" id="ev-loc" value="' + e(meta.loc || '') + '"></div></div>' +
+      '<div class="field"><label>내용 (선택)</label>' +
       '<input type="text" id="ev-note" value="' +
       /* 임직식·수양회는 제목이 자동 조합되므로 덧붙인 메모만 보여 준다 */
       (kindNow === '기타' ? ''
@@ -421,6 +426,8 @@ document.addEventListener('DOMContentLoaded', function () {
       mo.el.querySelector('#ev-ordwrap').classList.toggle('hidden', k !== '임직식');
       mo.el.querySelector('#ev-retwrap').classList.toggle('hidden', k !== '수양회');
       mo.el.querySelector('#ev-seswrap').classList.toggle('hidden', k !== '정기노회');
+      /* 수양회는 위쪽에 전용 장소 칸이 있으므로 공용 장소 칸은 감춘다 */
+      mo.el.querySelector('#ev-locwrap').classList.toggle('hidden', k === '수양회');
       refreshEtcPerson();
       autoNote();
     }
@@ -556,6 +563,21 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         title = note || kind;
       }
+
+      /* 시간·장소는 모든 행사 공통으로 제목 뒤에 붙이고 meta에도 남긴다 */
+      var evTime = mo.el.querySelector('#ev-time').value;
+      var evLoc = kind === '수양회' ? '' : mo.el.querySelector('#ev-loc').value.trim();
+      if (evLoc && title.indexOf(evLoc) === -1) title += ' (' + evLoc + ')';
+      if (evTime) {
+        var hh = Number(evTime.split(':')[0]);
+        var mm2 = evTime.split(':')[1];
+        var timeK = (hh < 12 ? '오전 ' : '오후 ') + ((hh % 12) || 12) + '시' +
+          (mm2 !== '00' ? ' ' + Number(mm2) + '분' : '');
+        if (title.indexOf(timeK) === -1) title += ' · ' + timeK;
+      }
+      newMeta = newMeta || {};
+      newMeta.time = evTime || '';
+      newMeta.loc = evLoc || '';
 
       var row = {
         title: title, kind: kind, meta: newMeta,
