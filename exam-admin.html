@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260830d"></script>
+<script src="js/main.js?v=20260831a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -133,12 +133,13 @@ document.addEventListener('DOMContentLoaded', function () {
       '<h3 style="margin-top:26px">구분별 출제 과목</h3>' +
       '<table class="tbl" style="max-width:720px"><thead><tr><th style="width:130px">구분</th><th>필기 과목</th></tr></thead><tbody>' +
       '<tr><td>목사</td><td class="left">목회학 · 권징조례 · 신조 · 예배모범</td></tr>' +
-      '<tr><td>장로</td><td class="left">정치 · 권징조례 · 신조 · 상식 · 소요리</td></tr>' +
-      '<tr><td>전도사</td><td class="left">상식 · 영어</td></tr>' +
-      '<tr><td>목사후보생</td><td class="left">상식 · 영어</td></tr>' +
+      '<tr><td>장로</td><td class="left">성경 · 정치 · 권징조례 · 신조 · 상식 · 소요리</td></tr>' +
+      '<tr><td>전도사</td><td class="left">성경 · 상식 · 영어</td></tr>' +
+      '<tr><td>목사후보생</td><td class="left">성경 · 상식 · 영어</td></tr>' +
       '</tbody></table>' +
       '<p style="font-size:0.84rem;color:var(--gray-5)">노회규칙 제7장 22~23조에 따른 배정입니다. ' +
-      '면접은 필기가 아니므로, 성경은 성경통신 수료증으로 대체되므로 모의고사에서 제외했습니다.</p>';
+      '면접은 필기가 아니므로 모의고사에서 제외했으며, 성경은 성경통신 신구약 수료증으로 대체할 수 있어 ' +
+      '응시자가 성경을 빼고 볼 수도 있습니다.</p>';
     box.innerHTML = h;
   }
 
