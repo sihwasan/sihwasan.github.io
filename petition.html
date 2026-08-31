@@ -56,6 +56,30 @@
 .pt-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .pt-mine-tbl td .btn { margin-right: 4px; }
 
+/* 서명란에 찍히는 도장 */
+#pt-paper .pt-seal {
+  height: 46px; width: auto; vertical-align: middle;
+  margin-left: -38px; position: relative; top: -2px; opacity: 0.92;
+}
+
+/* 도장 등록·시찰 선택 작은 창 */
+.pt-modal {
+  position: fixed; inset: 0; z-index: 1300; background: rgba(24, 22, 18, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.pt-modal .box {
+  background: var(--white); border-radius: 14px; padding: 22px 24px;
+  width: 420px; max-width: 100%; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.pt-modal h3 { margin: 0 0 10px; }
+.pt-modal p { font-size: 0.88rem; color: var(--gray-7); }
+.pt-modal .row { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+.pt-modal select, .pt-modal input[type="file"] {
+  width: 100%; border: 1px solid var(--gray-2); border-radius: 8px; padding: 9px 10px; font-size: 0.92rem;
+}
+.pt-modal .seal-prev { min-height: 60px; margin-top: 10px; text-align: center; }
+.pt-modal .seal-prev img { height: 60px; }
+
 /* ----- 미리보기 (A4 느낌) ----- */
 #pt-paper {
   background: #fff; color: #111; max-width: 760px; margin: 0 auto;
@@ -132,12 +156,15 @@
       <button class="btn" id="pt-print">인쇄</button>
       <button class="btn" id="pt-pdf">PDF 저장</button>
       <button class="btn" id="pt-save">저장하기</button>
+      <button class="btn" id="pt-send">시찰 서기에게 전달하기</button>
       <button class="btn ghost" id="pt-clear">입력 지우기</button>
       <span class="form-msg" id="pt-msg" style="margin:0"></span>
     </div>
   </div>
 
   <div id="pt-mine"></div>
+  <div id="pt-sent"></div>
+  <div id="pt-inbox"></div>
 
   <h2 style="margin-top:8px">미리보기</h2>
   <div id="pt-print-wrap"><div id="pt-paper"></div></div>
@@ -167,13 +194,18 @@
   function sbox(label) {
     return '<table class="sbox"><tr><td>' + (label || '시 찰 장') + '</td><td>(인)</td></tr></table>';
   }
+  /* (인) 자리: 도장이 등록되어 있으면 함께 찍어 보여 준다 */
+  function inMark() {
+    var s = viewSeal || sealImg;
+    return '(인)' + (s ? '<img class="pt-seal" src="' + s + '" alt="도장">' : '');
+  }
   /* ___교회   당회장___(인) 서명줄 */
   function signChurch(church, role, name) {
     return '<div class="signrow"><span>' + u(church, 'l') + '교회</span>' +
-      '<span>' + (role || '당회장') + u(name, 'l') + '(인)</span></div>';
+      '<span>' + (role || '당회장') + u(name, 'l') + inMark() + '</span></div>';
   }
   function signOnly(role, name) {
-    return '<div class="signrow r"><span>' + role + u(name, 'l') + '(인)</span></div>';
+    return '<div class="signrow r"><span>' + role + u(name, 'l') + inMark() + '</span></div>';
   }
   function addr(t) { return '<div class="addr">' + (t || '시화산노회장 귀하') + '</div>'; }
   function arae() { return '<div class="arae">- 아     래 -</div>'; }
@@ -679,6 +711,8 @@
   var data = {};
   var editingId = null;   /* 저장한 청원서를 다시 열어 고치는 중이면 그 id */
   var user = null;
+  var sealImg = null;     /* 내 도장 PNG (내 정보의 교회 직인·도장) */
+  var viewSeal = null;    /* 받은 청원서를 열람할 때 제출자의 도장 */
 
   function cloudOn() {
     return user && user.cloud && window.SHSCloud && SHSCloud.enabled();
@@ -704,16 +738,24 @@
     }).join('');
     /* 휴대폰처럼 마우스가 없는 화면에서는 눌러서 연다 */
     box.querySelectorAll('.ptm > button').forEach(function (b) {
-      b.addEventListener('click', function () {
+      b.addEventListener('click', function (ev) {
+        ev.stopPropagation();
         var wrap = b.parentElement;
         box.querySelectorAll('.ptm').forEach(function (x) { if (x !== wrap) x.classList.remove('open'); });
         wrap.classList.toggle('open');
       });
     });
+    /* 다른 메뉴에 마우스를 올리거나 메뉴 밖을 누르면, 눌러서 연 메뉴를 닫는다 */
+    box.querySelectorAll('.ptm').forEach(function (m) {
+      m.addEventListener('mouseenter', function () {
+        box.querySelectorAll('.ptm.open').forEach(function (x) { if (x !== m) x.classList.remove('open'); });
+      });
+      m.addEventListener('mouseleave', function () { m.classList.remove('open'); });
+    });
     box.querySelectorAll('ul button').forEach(function (b) {
       b.addEventListener('click', function () {
         cur = FORMS.filter(function (f) { return f.id === b.dataset.pt; })[0];
-        data = {}; editingId = null; msg('');
+        data = {}; editingId = null; viewSeal = null; msg('');
         renderMenu(); renderForm(); renderPaper();
       });
     });
@@ -850,7 +892,7 @@
           if (!p) return;
           var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
           if (!f) { alert('이 서식은 더 이상 지원되지 않습니다.'); return; }
-          cur = f; data = p.data || {}; editingId = p.id; msg('');
+          cur = f; data = p.data || {}; editingId = p.id; viewSeal = null; msg('');
           renderMenu(); renderForm(); renderPaper();
           window.scrollTo({ top: 0, behavior: 'smooth' });
         });
@@ -873,17 +915,295 @@
     });
   }
 
+  /* 메뉴 밖을 누르면 열린 드롭다운을 닫는다 */
+  document.addEventListener('click', function () {
+    document.querySelectorAll('#pt-menu .ptm.open').forEach(function (x) { x.classList.remove('open'); });
+  });
+
+  /* ================= 도장과 시찰 전달 =================
+   * 청원서는 시찰을 경유하는 것이 일반이다. 전달하려면 내 정보의
+   * 교회 직인·도장(member_seals, PNG)이 있어야 하고, 없으면 이 자리에서
+   * 올리게 한다. jpg 등 어떤 그림이든 흰 바탕을 지운 PNG로 바꿔 저장한다. */
+  function loadSeal() {
+    if (!cloudOn()) return Promise.resolve(null);
+    return SHSCloud.init().then(function (c) {
+      return c.from('member_seals').select('image').eq('user_id', user.id);
+    }).then(function (r) {
+      sealImg = (r.data && r.data[0] && r.data[0].image) || null;
+      renderPaper();
+      return sealImg;
+    }).catch(function () { return null; });
+  }
+
+  /* 어떤 그림이든 420px 이하 + 흰 바탕 투명 PNG로 (내 정보와 같은 방식) */
+  function toSealPng(f) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(f);
+      img.onload = function () {
+        var MAX = 420;
+        var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        var w = Math.max(1, Math.round(img.naturalWidth * sc));
+        var hh = Math.max(1, Math.round(img.naturalHeight * sc));
+        var cv = document.createElement('canvas');
+        cv.width = w; cv.height = hh;
+        var cx = cv.getContext('2d');
+        cx.drawImage(img, 0, 0, w, hh);
+        URL.revokeObjectURL(url);
+        try {
+          var d = cx.getImageData(0, 0, w, hh);
+          var a = d.data;
+          for (var i = 0; i < a.length; i += 4) {
+            var mn = Math.min(a[i], a[i + 1], a[i + 2]);
+            if (mn > 235) a[i + 3] = 0;
+            else if (mn > 200) a[i + 3] = Math.round(a[i + 3] * (235 - mn) / 35);
+          }
+          cx.putImageData(d, 0, 0);
+        } catch (x) { /* 못 지워도 그대로 저장한다 */ }
+        resolve(cv.toDataURL('image/png'));
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('그림 파일을 읽지 못했습니다.'));
+      };
+      img.src = url;
+    });
+  }
+
+  function modal(inner) {
+    var old = document.getElementById('pt-modal');
+    if (old) old.remove();
+    var wrap = document.createElement('div');
+    wrap.id = 'pt-modal'; wrap.className = 'pt-modal';
+    wrap.innerHTML = '<div class="box">' + inner + '</div>';
+    document.body.appendChild(wrap);
+    wrap.addEventListener('click', function (ev) { if (ev.target === wrap) wrap.remove(); });
+    return wrap;
+  }
+
+  /* 도장이 없으면 여기서 바로 올리게 한다 → member_seals(PNG)에 저장 */
+  function askSeal() {
+    return new Promise(function (resolve) {
+      var wrap = modal(
+        '<h3>도장 이미지를 올려 주세요</h3>' +
+        '<p>시찰로 전달하는 청원서에는 목사님(작성자)의 도장이 찍혀야 합니다. ' +
+        '도장을 찍어 사진으로 찍거나 스캔한 파일(jpg도 됩니다)을 올리시면 ' +
+        '흰 바탕을 지운 <strong>PNG</strong>로 바꿔 <strong>내 정보의 교회 직인·도장</strong>란에 저장합니다.</p>' +
+        '<input type="file" id="ptm-file" accept="image/*">' +
+        '<div class="seal-prev" id="ptm-prev"></div>' +
+        '<div class="form-msg" id="ptm-msg"></div>' +
+        '<div class="row"><button class="btn ghost sm" id="ptm-cancel">취소</button>' +
+        '<button class="btn sm" id="ptm-ok" disabled>도장 저장하고 계속</button></div>');
+      var pending = null;
+      wrap.querySelector('#ptm-file').addEventListener('change', function () {
+        var f = this.files && this.files[0];
+        if (!f) return;
+        if (!/^image\//.test(f.type)) {
+          wrap.querySelector('#ptm-msg').textContent = '그림 파일만 올릴 수 있습니다.';
+          return;
+        }
+        toSealPng(f).then(function (dataUrl) {
+          pending = dataUrl;
+          wrap.querySelector('#ptm-prev').innerHTML = '<img src="' + dataUrl + '" alt="도장 미리보기">';
+          wrap.querySelector('#ptm-ok').disabled = false;
+        }).catch(function (err) {
+          wrap.querySelector('#ptm-msg').textContent = err.message || String(err);
+        });
+      });
+      wrap.querySelector('#ptm-cancel').addEventListener('click', function () { wrap.remove(); resolve(null); });
+      wrap.querySelector('#ptm-ok').addEventListener('click', function () {
+        if (!pending) return;
+        wrap.querySelector('#ptm-msg').textContent = '저장하는 중...';
+        SHSCloud.init().then(function (c) {
+          return c.from('member_seals').upsert({
+            user_id: user.id, image: pending, updated_at: new Date().toISOString()
+          });
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          sealImg = pending;
+          renderPaper();
+          wrap.remove();
+          resolve(pending);
+        }).catch(function (err) {
+          wrap.querySelector('#ptm-msg').textContent = '저장하지 못했습니다: ' + (err.message || err);
+        });
+      });
+    });
+  }
+
+  /* 시찰을 고르고 전달한다 */
+  function askSichalAndSend() {
+    SHSCloud.init().then(function (c) {
+      return Promise.all([
+        c.from('sichals').select('name').order('sort'),
+        c.rpc('my_sichal_name').then(function (r) { return r; }, function () { return {}; })
+      ]);
+    }).then(function (rs) {
+      var names = ((rs[0].data) || []).map(function (x) { return x.name; });
+      if (!names.length) names = ['북부시찰', '상록시찰', '남부시찰'];
+      var mine = rs[1] && rs[1].data ? String(rs[1].data) : '';
+      var wrap = modal(
+        '<h3>시찰 서기에게 전달</h3>' +
+        '<p>「' + e(mineTitle()) + '」을(를) 전달합니다. 전달받을 시찰을 골라 주세요. ' +
+        '그 시찰의 시찰장·서기에게 알림이 가고, 받은 청원서에서 열람합니다.</p>' +
+        '<select id="ptm-sichal">' + names.map(function (n) {
+          return '<option' + (n === mine ? ' selected' : '') + '>' + e(n) + '</option>';
+        }).join('') + '</select>' +
+        '<div class="form-msg" id="ptm-msg"></div>' +
+        '<div class="row"><button class="btn ghost sm" id="ptm-cancel">취소</button>' +
+        '<button class="btn sm" id="ptm-ok">전달하기</button></div>');
+      wrap.querySelector('#ptm-cancel').addEventListener('click', function () { wrap.remove(); });
+      wrap.querySelector('#ptm-ok').addEventListener('click', function () {
+        var sc = wrap.querySelector('#ptm-sichal').value;
+        wrap.querySelector('#ptm-msg').textContent = '전달하는 중...';
+        SHSCloud.init().then(function (c) {
+          return c.rpc('submit_petition', {
+            p_sichal: sc, p_form_id: cur.id, p_form_title: cur.title,
+            p_title: mineTitle(), p_data: data, p_seal: sealImg
+          });
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          wrap.remove();
+          msg(sc + ' 서기에게 전달했습니다. 처리 상황은 아래 보낸 청원서에서 보실 수 있습니다.');
+          loadSent();
+        }).catch(function (err) {
+          wrap.querySelector('#ptm-msg').textContent = '전달하지 못했습니다: ' + (err.message || err);
+        });
+      });
+    });
+  }
+
+  function sendToSichal() {
+    if (!cloudOn()) { msg('전달하시려면 구글 또는 이메일 계정으로 로그인해 주세요.', true); return; }
+    viewSeal = null;
+    (sealImg ? Promise.resolve(sealImg) : loadSeal()).then(function (s) {
+      if (s) { askSichalAndSend(); return; }
+      askSeal().then(function (saved) { if (saved) askSichalAndSend(); });
+    });
+  }
+
+  /* ----- 보낸 청원서 ----- */
+  function loadSent() {
+    var box = document.getElementById('pt-sent');
+    if (!cloudOn()) { box.innerHTML = ''; return; }
+    SHSCloud.init().then(function (c) {
+      return c.from('petition_submissions').select('*')
+        .eq('user_id', user.id).order('created_at', { ascending: false });
+    }).then(function (r) {
+      var rows = r.data || [];
+      if (!rows.length) { box.innerHTML = ''; return; }
+      var h = '<h2>보낸 청원서 (' + rows.length + ')</h2>' +
+        '<div style="overflow-x:auto"><table class="tbl" style="max-width:940px"><thead><tr>' +
+        '<th>제목</th><th style="width:110px">시찰</th><th style="width:150px">보낸 날</th>' +
+        '<th style="width:100px">상태</th><th style="width:90px">관리</th></tr></thead><tbody>';
+      rows.forEach(function (p) {
+        var st = p.status === '접수' ? '<span class="pass">접수</span>'
+          : p.status === '반려' ? '<span class="fail">반려</span>' : e(p.status);
+        h += '<tr><td class="left">' + e(p.title) +
+          (p.note ? '<br><small style="color:var(--gray-5)">' + e(p.note) + '</small>' : '') + '</td>' +
+          '<td>' + e(p.sichal) + '</td>' +
+          '<td>' + e(String(p.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
+          '<td>' + st + '</td>' +
+          '<td>' + (p.status === '제출됨'
+            ? '<button class="btn danger sm" data-ptsdel="' + p.id + '">회수</button>' : '') + '</td></tr>';
+      });
+      box.innerHTML = h + '</tbody></table></div>';
+      box.querySelectorAll('[data-ptsdel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('전달을 회수(삭제)할까요?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('petition_submissions').delete().eq('id', b.dataset.ptsdel);
+          }).then(function () { loadSent(); });
+        });
+      });
+    }).catch(function () {});
+  }
+
+  /* ----- 받은 청원서 (시찰장·서기·관리자) ----- */
+  function loadInbox() {
+    var box = document.getElementById('pt-inbox');
+    if (!cloudOn()) { box.innerHTML = ''; return; }
+    SHSCloud.init().then(function (c) {
+      return c.from('petition_submissions').select('*')
+        .neq('user_id', user.id).order('created_at', { ascending: false });
+    }).then(function (r) {
+      var rows = r.data || [];
+      if (!rows.length) { box.innerHTML = ''; return; }
+      var h = '<h2>받은 청원서 (' + rows.length + ')</h2>' +
+        '<p style="color:var(--gray-5);font-size:0.86rem">우리 시찰로 제출된 청원서입니다. ' +
+        '열람을 누르면 위 미리보기에 도장까지 찍힌 내용이 보이며, 인쇄·PDF 저장할 수 있습니다.</p>' +
+        '<div style="overflow-x:auto"><table class="tbl" style="max-width:940px"><thead><tr>' +
+        '<th>제목</th><th style="width:100px">제출자</th><th style="width:110px">시찰</th>' +
+        '<th style="width:150px">받은 날</th><th style="width:100px">상태</th>' +
+        '<th style="width:200px">관리</th></tr></thead><tbody>';
+      rows.forEach(function (p) {
+        var st = p.status === '접수' ? '<span class="pass">접수</span>'
+          : p.status === '반려' ? '<span class="fail">반려</span>' : e(p.status);
+        h += '<tr><td class="left">' + e(p.title) + '</td>' +
+          '<td>' + e(p.user_name || '') + '</td>' +
+          '<td>' + e(p.sichal) + '</td>' +
+          '<td>' + e(String(p.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
+          '<td>' + st + '</td>' +
+          '<td><button class="btn sm" data-ptview="' + p.id + '">열람</button>' +
+          (p.status === '제출됨'
+            ? '<button class="btn sm" data-ptok="' + p.id + '">접수</button>' +
+              '<button class="btn danger sm" data-ptno="' + p.id + '">반려</button>' : '') +
+          '</td></tr>';
+      });
+      box.innerHTML = h + '</tbody></table></div>';
+
+      function decide(id, status) {
+        var p = rows.filter(function (x) { return String(x.id) === String(id); })[0];
+        var note = status === '반려' ? (prompt('반려 사유를 적어 주세요. (제출자에게 알림으로 전달됩니다)', '') || '') : '';
+        SHSCloud.init().then(function (c) {
+          return c.from('petition_submissions').update({
+            status: status, note: note || null, updated_at: new Date().toISOString()
+          }).eq('id', id).then(function (r2) {
+            if (r2.error) throw r2.error;
+            return c.from('notifications').insert({
+              user_id: p.user_id, kind: '시찰',
+              title: '[' + p.sichal + '] 청원서가 ' + status + '되었습니다',
+              body: '「' + p.title + '」' + (note ? '\n' + note : '')
+            });
+          });
+        }).then(function () { loadInbox(); })
+          .catch(function (err) { alert(err.message || err); });
+      }
+      box.querySelectorAll('[data-ptview]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var p = rows.filter(function (x) { return String(x.id) === b.dataset.ptview; })[0];
+          var f = p && FORMS.filter(function (x) { return x.id === p.form_id; })[0];
+          if (!f) return;
+          cur = f; data = p.data || {}; editingId = null; viewSeal = p.seal || null;
+          renderMenu(); renderForm(); renderPaper();
+          msg(e(p.user_name || '') + ' 님이 제출한 청원서를 열람하는 중입니다. 인쇄·PDF 저장을 하실 수 있습니다.');
+          document.getElementById('pt-paper').scrollIntoView({ behavior: 'smooth' });
+        });
+      });
+      box.querySelectorAll('[data-ptok]').forEach(function (b) {
+        b.addEventListener('click', function () { decide(b.dataset.ptok, '접수'); });
+      });
+      box.querySelectorAll('[data-ptno]').forEach(function (b) {
+        b.addEventListener('click', function () { decide(b.dataset.ptno, '반려'); });
+      });
+    }).catch(function () {});
+  }
+
   document.getElementById('pt-print').addEventListener('click', function () { window.print(); });
   document.getElementById('pt-pdf').addEventListener('click', savePdf);
   document.getElementById('pt-save').addEventListener('click', saveMine);
+  document.getElementById('pt-send').addEventListener('click', sendToSichal);
   document.getElementById('pt-clear').addEventListener('click', function () {
-    data = {}; editingId = null; msg('');
+    data = {}; editingId = null; viewSeal = null; msg('');
     renderForm(); renderPaper();
   });
 
   renderMenu(); renderForm(); renderPaper();
   if (window.SHS && SHS.getUser) {
-    SHS.getUser().then(function (u) { user = u; loadMine(); });
+    SHS.getUser().then(function (u) {
+      user = u;
+      loadMine(); loadSeal(); loadSent(); loadInbox();
+    });
   } else {
     loadMine();
   }
