@@ -72,8 +72,9 @@
   display: flex; align-items: center; justify-content: center; padding: 16px;
 }
 .pt-modal .box {
-  background: var(--white); border-radius: 14px; padding: 22px 24px;
-  width: 420px; max-width: 100%; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  background: var(--white); border-radius: 14px; padding: 26px 28px;
+  width: 560px; max-width: 100%; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  max-height: 86vh; overflow: auto;
 }
 .pt-modal h3 { margin: 0 0 10px; }
 .pt-modal p { font-size: 0.88rem; color: var(--gray-7); }
@@ -156,14 +157,10 @@ body.pt-embed main { padding-top: 10px; }
 </div>
 
 <main class="page-body container" id="main">
-  <p>위 메뉴에서 청원서 종류에 마우스를 올려 서식을 고르고, 내용을 입력하면 아래에 완성된 청원서가 보입니다.
-    <strong>인쇄</strong>·<strong>PDF 저장</strong>으로 출력하고, <strong>저장하기</strong>를 누르면
-    작성한 청원서가 내 계정에 보관되어 언제든 다시 열어 고칠 수 있습니다.
-    도장(인) 자리는 비워져 있으니 출력 후 날인해 주세요.</p>
-
-  <p><button class="btn" id="pt-wizard">청빙서류 작성 도우미</button>
-    <span style="font-size:0.85rem;color:var(--gray-5);margin-left:8px">
-    몇 가지 질문에 답하시면 알맞은 청빙 서류가 만들어집니다.</span></p>
+  <p style="margin:4px 0 18px">
+    <button class="btn" id="pt-wizard" style="font-size:1.05rem;padding:14px 26px">청원서류 작성 도우미</button>
+    <span style="font-size:0.88rem;color:var(--gray-5);margin-left:10px">
+    몇 가지 질문에 답하시면 알맞은 청원 서류가 만들어집니다. (청빙·고시·장로·교회·이명 등 모든 청원)</span></p>
 
   <nav class="pt-menu" id="pt-menu" aria-label="청원서 종류"></nav>
 
@@ -348,6 +345,21 @@ body.pt-embed main { padding-top: 10px; }
         signChurch(d.church, '당회장', d.dang) + addr() +
         '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + ' 전도사를 강도사 인허 후 ' +
         '부목사로 청빙하고자 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>';
+    } },
+
+  /* 전도사(목사후보생)를 강도사 인허 뒤 부목사로 청빙하는 경우 */
+  { id: 'callassoclic', cat: '청빙', title: '부목사 청빙청원서 (강도사 인허 후)',
+    fields: [
+      { k: 'name', label: '청빙 대상자(전도사·목사후보생) 성명' },
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">부목사 청빙청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + ' 전도사(목사후보생)를 ' +
+        '강도사 인허 후 부목사로 청빙하고자 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>';
     } },
 
   /* ---------- 고시·신학 ---------- */
@@ -1358,8 +1370,12 @@ body.pt-embed main { padding-top: 10px; }
 
   /* ================= 청빙서류 작성 도우미 =================
    * 질문에 답하면 알맞은 청빙 서식을 골라 내용을 채워 준다. */
-  function callWizard() {
-    var WIZ = {
+  /* ================= 청원서류 작성 도우미 =================
+   * 질문에 답하면 알맞은 청원 서식을 골라 내용을 채워 준다.
+   * 청빙은 대상자·형태를 따로 묻고, 그 밖의 청원은 종류를 고른 뒤
+   * 그 서식의 입력칸을 그대로 문답으로 채운다. */
+  function petWizard() {
+    var CALL_WIZ = {
       '목사': [
         { t: '위임목사로 청빙', f: 'call', kind: '목사위임',
           tip: '위임목사 청빙은 공동의회 결의가 필요하며, 교인 연서 <청빙서>도 함께 제출합니다.' },
@@ -1381,7 +1397,7 @@ body.pt-embed main { padding-top: 10px; }
         { t: '다른 형태로 청빙 (직접 입력)', f: 'call', custom: true }
       ]
     };
-    var pick = { who: null, choice: null };
+    var pick = { cat: null, who: null, choice: null };
 
     function stepBtns(list) {
       return list.map(function (t, i) {
@@ -1389,70 +1405,125 @@ body.pt-embed main { padding-top: 10px; }
           'style="display:block;width:100%;text-align:left;margin-top:8px">' + e(t) + '</button>';
       }).join('');
     }
+    function backRow() {
+      return '<div class="row"><button class="btn ghost" data-wzback>&#8592; 이전</button></div>';
+    }
 
+    /* 1단계: 청원 종류(분류) */
     function step1() {
-      var mo = modal('<h3>청빙서류 작성 도우미</h3>' +
-        '<p>1단계 — <strong>청빙 대상자</strong>는 어떤 분이십니까?</p>' +
-        stepBtns(['목사', '강도사', '전도사']));
+      var cats = [];
+      FORMS.forEach(function (f) { if (cats.indexOf(f.cat) === -1) cats.push(f.cat); });
+      var mo = modal('<h3>청원서류 작성 도우미</h3>' +
+        '<p>1단계 — 어떤 종류의 청원입니까?</p>' + stepBtns(cats));
       mo.querySelectorAll('[data-wz]').forEach(function (b, i) {
         b.addEventListener('click', function () {
-          pick.who = ['목사', '강도사', '전도사'][i];
-          mo.remove(); step2();
+          pick.cat = cats[i];
+          mo.remove();
+          if (pick.cat === '청빙') stepWho(); else stepForm();
         });
       });
     }
-    function step2() {
-      var opts = WIZ[pick.who];
-      var mo = modal('<h3>청빙서류 작성 도우미</h3>' +
-        '<p>2단계 — <strong>' + e(pick.who) + '</strong>를 어떤 형태로 청빙하십니까?</p>' +
-        stepBtns(opts.map(function (o) { return o.t; })) +
-        '<div class="row"><button class="btn ghost" data-wzback>&#8592; 이전</button></div>');
+
+    /* 청빙: 대상자 → 형태 */
+    function stepWho() {
+      var mo = modal('<h3>청원서류 작성 도우미</h3>' +
+        '<p>2단계 — <strong>청빙 대상자</strong>는 어떤 분이십니까?</p>' +
+        stepBtns(['목사', '강도사', '전도사']) + backRow());
       mo.querySelectorAll('[data-wz]').forEach(function (b, i) {
         b.addEventListener('click', function () {
-          pick.choice = opts[i];
-          mo.remove(); step3();
+          pick.who = ['목사', '강도사', '전도사'][i];
+          mo.remove(); stepCallKind();
         });
       });
       mo.querySelector('[data-wzback]').addEventListener('click', function () { mo.remove(); step1(); });
     }
-    function step3() {
-      var c = pick.choice;
+    function stepCallKind() {
+      var opts = CALL_WIZ[pick.who];
+      var mo = modal('<h3>청원서류 작성 도우미</h3>' +
+        '<p>3단계 — <strong>' + e(pick.who) + '</strong>를 어떤 형태로 청빙하십니까?</p>' +
+        stepBtns(opts.map(function (o) { return o.t; })) + backRow());
+      mo.querySelectorAll('[data-wz]').forEach(function (b, i) {
+        b.addEventListener('click', function () {
+          pick.choice = opts[i];
+          mo.remove(); stepFields(pick.choice);
+        });
+      });
+      mo.querySelector('[data-wzback]').addEventListener('click', function () { mo.remove(); stepWho(); });
+    }
+
+    /* 그 밖의 청원: 서식 고르기 */
+    function stepForm() {
+      var list = FORMS.filter(function (f) { return f.cat === pick.cat; });
+      var mo = modal('<h3>청원서류 작성 도우미</h3>' +
+        '<p>2단계 — <strong>' + e(pick.cat) + '</strong> 가운데 어떤 청원을 하시겠습니까?</p>' +
+        stepBtns(list.map(function (f) { return f.title; })) + backRow());
+      mo.querySelectorAll('[data-wz]').forEach(function (b, i) {
+        b.addEventListener('click', function () {
+          pick.choice = { f: list[i].id };
+          mo.remove(); stepFields(pick.choice);
+        });
+      });
+      mo.querySelector('[data-wzback]').addEventListener('click', function () { mo.remove(); step1(); });
+    }
+
+    /* 마지막: 고른 서식의 입력칸을 문답으로 채운다 */
+    function stepFields(c) {
+      var frm = FORMS.filter(function (x) { return x.id === c.f; })[0];
       var today = new Date();
       var todayS = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') +
         '-' + String(today.getDate()).padStart(2, '0');
-      var mo = modal('<h3>청빙서류 작성 도우미</h3>' +
-        '<p>3단계 — 청원서에 들어갈 내용을 적어 주세요.</p>' +
-        (c.custom
-          ? '<div class="field" style="margin-top:8px"><label>청빙 직위 (예: 협동목사)</label>' +
-            '<input type="text" id="wz-kind" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></div>'
-          : '') +
-        ['<label style="display:block;margin-top:10px;font-size:0.84rem">대상자 성명' +
-         '<input type="text" id="wz-name" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>',
-         '<label style="display:block;margin-top:10px;font-size:0.84rem">교회명 (—교회의 "교회"는 빼고)' +
-         '<input type="text" id="wz-church" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>',
-         '<label style="display:block;margin-top:10px;font-size:0.84rem">당회장 성명' +
-         '<input type="text" id="wz-dang" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>',
-         '<label style="display:block;margin-top:10px;font-size:0.84rem">작성일' +
-         '<input type="date" id="wz-date" value="' + todayS + '" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>'
-        ].join('') +
+      var inputStyle = 'width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px;font-family:inherit';
+      var fh = '';
+      if (c.custom) {
+        fh += '<label style="display:block;margin-top:10px;font-size:0.84rem">청빙 직위 (예: 협동목사)' +
+          '<input type="text" data-wf="__kind" style="' + inputStyle + '"></label>';
+      }
+      frm.fields.forEach(function (f) {
+        if (c.kind !== undefined && f.k === 'kind') return;   /* 이미 골랐다 */
+        if (f.type === 'select') {
+          fh += '<label style="display:block;margin-top:10px;font-size:0.84rem">' + e(f.label) +
+            '<select data-wf="' + f.k + '" style="' + inputStyle + '">' +
+            (f.opt || []).map(function (o) { return '<option>' + e(o) + '</option>'; }).join('') +
+            '</select></label>';
+        } else if (f.type === 'textarea') {
+          fh += '<label style="display:block;margin-top:10px;font-size:0.84rem">' + e(f.label) +
+            '<textarea data-wf="' + f.k + '" rows="3" style="' + inputStyle + '"></textarea></label>';
+        } else if (f.type === 'date') {
+          fh += '<label style="display:block;margin-top:10px;font-size:0.84rem">' + e(f.label) +
+            '<input type="date" data-wf="' + f.k + '" value="' + (f.k === 'date' ? todayS : '') +
+            '" style="' + inputStyle + '"></label>';
+        } else {
+          fh += '<label style="display:block;margin-top:10px;font-size:0.84rem">' + e(f.label) +
+            '<input type="text" data-wf="' + f.k + '" style="' + inputStyle + '"></label>';
+        }
+      });
+      var mo = modal('<h3>청원서류 작성 도우미</h3>' +
+        '<p>마지막 — <strong>' + e(frm.title) + '</strong>에 들어갈 내용을 적어 주세요. ' +
+        '빈 칸은 나중에 채우셔도 됩니다.</p>' + fh +
         '<div class="row"><button class="btn ghost" data-wzback>&#8592; 이전</button>' +
         '<button class="btn" id="wz-make">청원서 만들기</button></div>' +
         '<div class="form-msg" id="wz-msg"></div>');
-      mo.querySelector('[data-wzback]').addEventListener('click', function () { mo.remove(); step2(); });
+      mo.querySelector('[data-wzback]').addEventListener('click', function () {
+        mo.remove();
+        if (pick.cat === '청빙') stepCallKind(); else stepForm();
+      });
       mo.querySelector('#wz-make').addEventListener('click', function () {
-        function v(id) { var el2 = mo.querySelector(id); return el2 ? el2.value.trim() : ''; }
         var wm = mo.querySelector('#wz-msg');
-        var name = v('#wz-name');
-        if (!name) { wm.className = 'form-msg err'; wm.textContent = '대상자 성명을 적어 주세요.'; return; }
-        var kind = c.custom ? v('#wz-kind') : (c.kind || '');
-        if (c.custom && !kind) { wm.className = 'form-msg err'; wm.textContent = '청빙 직위를 적어 주세요.'; return; }
-        cur = FORMS.filter(function (x) { return x.id === c.f; })[0];
-        data = { name: name, church: v('#wz-church'), dang: v('#wz-dang'), date: v('#wz-date') };
-        if (c.f === 'call') data.kind = kind;
-        editingId = null;
+        var d = {};
+        mo.querySelectorAll('[data-wf]').forEach(function (el2) {
+          d[el2.dataset.wf] = el2.value.trim();
+        });
+        if (c.custom) {
+          if (!d.__kind) { wm.className = 'form-msg err'; wm.textContent = '청빙 직위를 적어 주세요.'; return; }
+          d.kind = d.__kind; delete d.__kind;
+        } else if (c.kind !== undefined) {
+          d.kind = c.kind;
+        }
+        cur = frm; data = d; editingId = null;
+        sealOn = true; sealPos = { dx: 0, dy: 0 };
         mo.remove();
         renderMenu(); renderForm(); renderPaper();
-        msg('청빙서류 도우미로 <' + cur.title + '>를 만들었습니다. 아래 미리보기를 확인하시고 ' +
+        msg('도우미로 <' + cur.title + '>를 만들었습니다. 아래 미리보기를 확인하시고 ' +
           '인쇄·PDF 저장 또는 시찰 서기에게 전달하세요.' + (c.tip ? ' ' + c.tip : ''));
         var paper = document.getElementById('pt-paper');
         if (paper) paper.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1460,7 +1531,7 @@ body.pt-embed main { padding-top: 10px; }
     }
     step1();
   }
-  document.getElementById('pt-wizard').addEventListener('click', callWizard);
+  document.getElementById('pt-wizard').addEventListener('click', petWizard);
 
   document.getElementById('pt-print').addEventListener('click', function () { window.print(); });
   document.getElementById('pt-pdf').addEventListener('click', savePdf);
