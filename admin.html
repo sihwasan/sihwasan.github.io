@@ -1422,6 +1422,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '<table class="tbl" style="margin-top:12px"><tbody>' +
           viewRow('소속 교회', e(m.church || '')) +
           viewRow('시찰', e(m.sichal || '')) +
+          '<tr id="rv-coms"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">상비부</td>' +
+          '<td class="left" style="color:var(--gray-5)">확인 중...</td></tr>' +
           viewRow('직분 / 직위', e(m.category || '') +
             (m.position && m.position !== m.category ? ' / ' + e(m.position) : '')) +
           viewRow('부여 등급', e(gradeName(rosterGrade(m)))) +
@@ -1440,6 +1442,32 @@ document.addEventListener('DOMContentLoaded', function () {
           mo.close();
           openRosterEdit(m);
         });
+        /* 상비부 명부에서 이 분이 속한 부서·직책을 찾아 보여 준다 */
+        SHSCloud.init().then(function (c) {
+          return c.from('committees').select('*').order('sort');
+        }).then(function (r) {
+          var cell = mo.ov.querySelector('#rv-coms td');
+          if (!cell) return;
+          function firstWord(s) { return String(s || '').trim().split(/[\s(]/)[0]; }
+          function names(s) {
+            return String(s || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+          }
+          var mine = [];
+          ((r.data) || []).forEach(function (cm) {
+            var tags = [];
+            [['head', SHS.headTitle(cm.name)], ['clerk', '서기'], ['treasurer', '회계']]
+              .forEach(function (pp) { if (firstWord(cm[pp[0]]) === m.name) tags.push(pp[1]); });
+            (SHS.isBoard(cm.name)
+              ? [['members', '위원']]
+              : [['y1', '1년조'], ['y2', '2년조'], ['y3', '3년조']]
+            ).forEach(function (pp) {
+              if (names(cm[pp[0]]).indexOf(m.name) !== -1) tags.push(pp[1]);
+            });
+            if (tags.length) mine.push(e(cm.name) + ' <span style="color:var(--gray-5)">(' + tags.join('·') + ')</span>');
+          });
+          cell.innerHTML = mine.length ? mine.join('<br>') : '<span style="color:var(--gray-5)">-</span>';
+        }).catch(function () {});
+
         /* 등록된 사진이 있으면 맨 위에 보여 준다 */
         if (m.photo_path) {
           SHSCloud.init().then(function (c) {
