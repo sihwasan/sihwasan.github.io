@@ -158,14 +158,18 @@ body.pt-embed main { padding-top: 10px; }
 
 <main class="page-body container" id="main">
   <div class="tabs" style="margin:4px 0 6px">
-    <button type="button" id="pt-wizard" style="background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border-color:#c0392b;border-radius:8px;font-weight:700">청원서류 작성 도우미</button>
     <button type="button" class="active" id="pt-tab-forms">청원서류</button>
     <button type="button" id="pt-tab-mine">나의 서류</button>
   </div>
   <p style="font-size:0.85rem;color:var(--gray-5);margin:0 0 14px">
-    <strong>작성 도우미</strong>는 몇 가지 질문으로 알맞은 청원 서류를 만들어 주고,
-    <strong>청원서류</strong>에서는 아래 메뉴에서 서식을 직접 골라 작성합니다.
+    <strong>청원서류</strong>에서는 아래 메뉴에서 서식을 직접 골라 작성하고,
     저장·전달한 서류는 <strong>나의 서류</strong>에서 봅니다.</p>
+  <p style="margin:0 0 18px">
+    <button type="button" class="btn" id="pt-wizard"
+      style="background:linear-gradient(135deg,#c0392b,#e74c3c);border-color:#c0392b;font-size:1.05rem;padding:14px 28px;font-weight:700">
+      청원서류 작성 도우미</button>
+    <span style="font-size:0.88rem;color:var(--gray-5);margin-left:10px">
+    몇 가지 질문에 답하시면 알맞은 청원 서류가 만들어집니다.</span></p>
 
   <nav class="pt-menu" id="pt-menu" aria-label="청원서 종류"></nav>
 
