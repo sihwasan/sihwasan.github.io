@@ -1197,14 +1197,15 @@ document.addEventListener('DOMContentLoaded', function () {
           'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' +
           '</div>' +
           '<div class="field" style="margin-top:4px"><label>사진</label>' +
-          '<div style="display:flex;gap:12px;align-items:center">' +
+          '<div id="rm-photo-drop" style="display:flex;gap:12px;align-items:center;' +
+          'border:2px dashed var(--gray-3,#c7c8c6);border-radius:10px;padding:10px 12px;cursor:pointer">' +
           '<div id="rm-photo-prev" style="width:64px;height:80px;border:1px solid var(--gray-2,#e5e4df);' +
           'border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;' +
-          'font-size:0.7rem;color:var(--gray-5)">없음</div>' +
-          '<div><button class="btn ghost sm" id="rm-photo-up" type="button">사진 올리기</button> ' +
-          (m.photo_path ? '<button class="btn danger sm" id="rm-photo-del" type="button">사진 지우기</button>' : '') +
-          '<div style="font-size:0.76rem;color:var(--gray-5);margin-top:4px">어떤 크기든 자동으로 웹 크기로 줄여 저장되며, 회원명단 카드에 보입니다.</div></div>' +
-          '</div><div class="form-msg" id="rm-photo-msg"></div></div>' +
+          'font-size:0.7rem;color:var(--gray-5);flex:none;background:#fff">없음</div>' +
+          '<div><strong style="font-size:0.85rem">여기에 사진을 끌어다 놓거나 눌러서 선택</strong>' +
+          '<div style="font-size:0.76rem;color:var(--gray-5);margin-top:4px">어떤 크기든 자동으로 웹 크기로 줄여 저장되며, 회원명단 카드에 보입니다.</div>' +
+          (m.photo_path ? '<button class="btn danger sm" id="rm-photo-del" type="button" style="margin-top:6px">사진 지우기</button>' : '') +
+          '</div></div><div class="form-msg" id="rm-photo-msg"></div></div>' +
           '<div style="margin-top:6px">' +
           '<button class="btn" id="rm-save">저장</button> ' +
           '<button class="btn ghost" id="rm-close">닫기</button> ' +
@@ -1257,35 +1258,54 @@ document.addEventListener('DOMContentLoaded', function () {
             });
           }
 
-          document.getElementById('rm-photo-up').addEventListener('click', function () {
+          /* 파일 하나를 받아 웹 크기(긴 변 900px, jpg)로 줄여 올린다 */
+          function uploadPhoto(f) {
+            if (!f) return;
+            if (!/^image\//.test(f.type)) { pmsg.className = 'form-msg err'; pmsg.textContent = '이미지 파일만 올릴 수 있습니다.'; return; }
+            pmsg.className = 'form-msg'; pmsg.textContent = '사진을 웹 크기로 줄여서 올리는 중입니다…';
+            var path = 'roster/' + m.id + '/photo.jpg';
+            shrink(f).then(function (blob) {
+              return SHSCloud.init().then(function (c) {
+                return c.storage.from('member-photos')
+                  .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+                  .then(function (r) {
+                    if (r.error) throw r.error;
+                    return c.from('roster').update({ photo_path: path }).eq('id', m.id);
+                  });
+              });
+            }).then(function (r2) {
+              if (r2.error) throw r2.error;
+              m.photo_path = path;
+              SHSCloud.log('update', '회원 사진 등록(관리자)', m.name);
+              pmsg.className = 'form-msg ok'; pmsg.textContent = '사진이 저장되었습니다.';
+              showPhoto(path);
+            }).catch(function (err) {
+              pmsg.className = 'form-msg err'; pmsg.textContent = (err && err.message) || '사진을 올리지 못했습니다.';
+            });
+          }
+
+          var drop = document.getElementById('rm-photo-drop');
+          drop.addEventListener('click', function (ev) {
+            if (ev.target && ev.target.id === 'rm-photo-del') return;
             var fin = document.createElement('input');
             fin.type = 'file'; fin.accept = 'image/*';
-            fin.addEventListener('change', function () {
-              var f = fin.files && fin.files[0];
-              if (!f) return;
-              if (!/^image\//.test(f.type)) { pmsg.className = 'form-msg err'; pmsg.textContent = '이미지 파일만 올릴 수 있습니다.'; return; }
-              pmsg.className = 'form-msg'; pmsg.textContent = '사진을 줄여서 올리는 중입니다…';
-              var path = 'roster/' + m.id + '/photo.jpg';
-              shrink(f).then(function (blob) {
-                return SHSCloud.init().then(function (c) {
-                  return c.storage.from('member-photos')
-                    .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
-                    .then(function (r) {
-                      if (r.error) throw r.error;
-                      return c.from('roster').update({ photo_path: path }).eq('id', m.id);
-                    });
-                });
-              }).then(function (r2) {
-                if (r2.error) throw r2.error;
-                m.photo_path = path;
-                SHSCloud.log('update', '회원 사진 등록(관리자)', m.name);
-                pmsg.className = 'form-msg ok'; pmsg.textContent = '사진이 저장되었습니다.';
-                showPhoto(path);
-              }).catch(function (err) {
-                pmsg.className = 'form-msg err'; pmsg.textContent = (err && err.message) || '사진을 올리지 못했습니다.';
-              });
-            });
+            fin.addEventListener('change', function () { uploadPhoto(fin.files && fin.files[0]); });
             fin.click();
+          });
+          ['dragenter', 'dragover'].forEach(function (ev) {
+            drop.addEventListener(ev, function (x) {
+              x.preventDefault(); x.stopPropagation();
+              drop.style.borderColor = 'var(--navy)'; drop.style.background = 'var(--gray-1,#f7f6f3)';
+            });
+          });
+          ['dragleave', 'drop'].forEach(function (ev) {
+            drop.addEventListener(ev, function (x) {
+              x.preventDefault(); x.stopPropagation();
+              drop.style.borderColor = ''; drop.style.background = '';
+            });
+          });
+          drop.addEventListener('drop', function (x) {
+            uploadPhoto(x.dataTransfer && x.dataTransfer.files && x.dataTransfer.files[0]);
           });
 
           var pdel = document.getElementById('rm-photo-del');
