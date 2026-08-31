@@ -39,6 +39,13 @@
       { t: '총회 회칙 안내', h: 'rules-assembly.html' },
       { t: '각종 내규', h: 'rules-presbytery.html#bylaws' }
     ]},
+    { title: '서류발급', href: 'request.html', sub: [
+      { t: '서류 신청', h: 'request.html' },
+      { t: '신청서류 확인', h: 'request.html#list' },
+      { t: '발급 서류 안내', h: 'request.html#docs' },
+      { t: '증명서 진위 확인', h: 'verify.html' },
+      { t: '구비서류 규정', h: 'archive.html#forms' }
+    ]},
     { title: '자료실', href: 'archive.html', sub: [
       { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
       { t: '청원서', h: 'petition.html' },
@@ -55,13 +62,6 @@
       { t: '총회 규정', h: 'assembly-rules.html' },
       { t: '총회 회의결의', h: 'assembly-resolution.html' },
       { t: '총회 보고서', h: 'assembly-report.html' }
-    ]},
-    { title: '서류발급', href: 'request.html', sub: [
-      { t: '서류 신청', h: 'request.html' },
-      { t: '신청서류 확인', h: 'request.html#list' },
-      { t: '발급 서류 안내', h: 'request.html#docs' },
-      { t: '증명서 진위 확인', h: 'verify.html' },
-      { t: '구비서류 규정', h: 'archive.html#forms' }
     ]},
     { title: '게시판', href: 'board.html', sub: [
       { t: '공지사항', h: 'board.html#notice' },
