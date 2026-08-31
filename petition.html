@@ -122,6 +122,14 @@
 #pt-paper table.roster th, #pt-paper table.roster td { border: 1px solid #333; padding: 7px 4px; text-align: center; font-size: 13px; height: 26px; }
 #pt-paper .pre { white-space: pre-wrap; }
 
+/* ----- 끼워 넣기(embed) 모드: 구비서류 안내 박스 안에서 서식만 보여 준다 ----- */
+body.pt-embed > *:not(main) { display: none !important; }
+body.pt-embed .page-head { display: none !important; }
+body.pt-embed #pt-menu, body.pt-embed #pt-mine,
+body.pt-embed main > p:first-of-type { display: none !important; }
+body.pt-embed { background: var(--paper, #fcfbf9); }
+body.pt-embed main { padding-top: 10px; }
+
 /* ----- 인쇄: 종이만 나온다 ----- */
 @media print {
   body * { visibility: hidden; }
@@ -1267,6 +1275,9 @@
     data = {}; editingId = null; viewSeal = null; msg('');
     renderForm(); renderPaper();
   });
+
+  /* 구비서류 안내 박스 안에 끼워 넣어 보여 줄 때 */
+  if (/[?&]embed=1/.test(location.search)) document.body.classList.add('pt-embed');
 
   /* 구비서류 안내에서 ?form=아이디 로 들어오면 그 서식을 바로 연다 */
   var fm = location.search.match(/[?&]form=([a-z]+)/);

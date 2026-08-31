@@ -164,12 +164,15 @@ document.addEventListener('DOMContentLoaded', function () {
           return '<li style="margin:3px 0">&#10003; ' + e(x) + '</li>';
         }).join('') + '</ul>' +
         (f.forms && f.forms.length
-          ? '<p style="margin:0 0 8px"><strong>서식 작성·출력</strong> — 아래 버튼을 누르면 ' +
-            '청원서 작성 페이지에서 해당 서식이 열립니다. 내용을 채워 인쇄하거나 PDF로 저장하세요.</p>' +
+          ? '<p style="margin:0 0 8px"><strong>서식 작성·출력</strong> — 버튼을 누르면 이 자리에서 ' +
+            '바로 서식이 열립니다. 내용을 채워 인쇄하거나 PDF로 저장하세요.</p>' +
             f.forms.map(function (x) {
-              return '<a class="btn sm" style="margin:0 6px 6px 0" href="petition.html?form=' +
-                encodeURIComponent(x.f) + '">' + e(x.t) + '</a>';
-            }).join('')
+              return '<button type="button" class="btn sm" style="margin:0 6px 6px 0" data-fxopen="' +
+                e(x.f) + '">' + e(x.t) + '</button>';
+            }).join('') +
+            ' <a href="petition.html?form=' + encodeURIComponent(f.forms[0].f) + '" ' +
+            'style="font-size:0.82rem;color:var(--gray-5);text-decoration:underline">새 창으로 크게 보기</a>' +
+            '<div class="fx-embed" style="margin-top:12px"></div>'
           : '') +
         '</td></tr>';
     });
@@ -213,6 +216,25 @@ document.addEventListener('DOMContentLoaded', function () {
         var open = d.hidden;
         area.querySelectorAll('.fx-detail').forEach(function (x) { x.hidden = true; });
         d.hidden = !open;
+      });
+    });
+
+    /* 서식 버튼을 누르면 그 자리 박스 안에 청원서 작성 화면이 열린다 */
+    area.querySelectorAll('button[data-fxopen]').forEach(function (b) {
+      b.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        var slot = b.closest('td').querySelector('.fx-embed');
+        if (!slot) return;
+        var url = 'petition.html?embed=1&form=' + encodeURIComponent(b.dataset.fxopen);
+        var cur = slot.querySelector('iframe');
+        if (cur && cur.dataset.form === b.dataset.fxopen) {
+          slot.innerHTML = '';                       /* 같은 버튼을 다시 누르면 닫는다 */
+          return;
+        }
+        slot.innerHTML = '<iframe src="' + url + '" data-form="' + e(b.dataset.fxopen) + '" ' +
+          'style="width:100%;height:1600px;border:1px solid var(--gray-2);border-radius:10px;background:#fff" ' +
+          'title="청원서 작성"></iframe>';
+        slot.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
     });
   }
