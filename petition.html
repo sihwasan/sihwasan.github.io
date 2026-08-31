@@ -665,7 +665,7 @@
       { k: 'date', label: '작성일', type: 'date' }
     ],
     render: function (d) {
-      return '<h1 class="pt-title">' + u(d.sichal) + ' 시찰보고서</h1>' +
+      return '<h1 class="pt-title">' + u(String(d.sichal || '').replace(/시찰$/, '')) + ' 시찰보고서</h1>' +
         '<div class="pt-date">' + juhu(d.date) + '</div>' +
         signOnly('시 찰 장', d.sichaljang) + signOnly('서    기', d.clerk) + addr() +
         '<p class="body">제 ' + u(d.session, 's') + '회기간 본 시찰회 상황을 아래 별지와 같이 보고합니다.</p>' +
@@ -810,6 +810,129 @@
       dEl.value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
       data.date = dEl.value;
     }
+    /* 시찰보고서는 노회 시스템과 연동한다 */
+    var extra = document.getElementById('pt-extra');
+    if (extra) extra.remove();
+    if (cur.id === 'sichalreport') enhanceSichalReport();
+  }
+
+  /* ================= 시찰보고서 연동 =================
+   * · 회기: 노회 시스템의 현재 회기(site_settings.sessions)를 자동으로 채운다
+   * · 시찰: 고르면 시찰 명부의 시찰장·서기가 자동으로 채워진다
+   * · 교세: 그 시찰 교회들의 올해 교회상황 보고서를 합산해 채우고,
+   *         교회마다 보고서 제출 여부를 목록으로 보여 준다 */
+  function firstWord(s) { return String(s || '').trim().split(/[\s(]/)[0]; }
+  function enhanceSichalReport() {
+    if (!cloudOn()) return;
+    var box = document.getElementById('pt-form');
+    SHSCloud.init().then(function (c) {
+      return Promise.all([
+        c.from('sichals').select('name,head,clerk').order('sort'),
+        c.from('site_settings').select('value').eq('key', 'sessions')
+      ]);
+    }).then(function (rs) {
+      var sichals = (rs[0].data) || [];
+      var ses = (rs[1].data && rs[1].data[0] && rs[1].data[0].value) || null;
+
+      /* 현재 회기 자동 입력 */
+      var sEl = box.querySelector('#ptf-session');
+      if (sEl && !sEl.value && ses && ses.current) {
+        sEl.value = ses.current;
+        data.session = String(ses.current);
+        renderPaper();
+      }
+
+      /* 시찰명 입력칸을 명부 기반 선택으로 바꾼다 */
+      var inp = box.querySelector('#ptf-sichal');
+      if (!inp || !sichals.length) return;
+      var sel = document.createElement('select');
+      sel.id = 'ptf-sichal'; sel.dataset.ptf = 'sichal';
+      sel.innerHTML = '<option value=""></option>' + sichals.map(function (s) {
+        return '<option' + (s.name === data.sichal ? ' selected' : '') + '>' + e(s.name) + '</option>';
+      }).join('');
+      inp.parentElement.querySelector('label').textContent = '시찰 (고르면 시찰장·서기·교세가 자동 입력)';
+      inp.replaceWith(sel);
+      sel.addEventListener('change', function () {
+        data.sichal = sel.value;
+        var s = sichals.filter(function (x) { return x.name === sel.value; })[0];
+        if (s) {
+          data.sichaljang = firstWord(s.head);
+          data.clerk = firstWord(s.clerk);
+          var a = box.querySelector('#ptf-sichaljang'), b = box.querySelector('#ptf-clerk');
+          if (a) a.value = data.sichaljang;
+          if (b) b.value = data.clerk;
+        }
+        renderPaper();
+        if (sel.value) loadSichalStats(sel.value);
+      });
+      if (data.sichal) loadSichalStats(data.sichal);
+    }).catch(function () {});
+  }
+
+  function loadSichalStats(sichal) {
+    var year = new Date().getFullYear();
+    SHSCloud.init().then(function (c) {
+      return Promise.all([
+        c.from('church_reports').select('church,pastor,members_total,data,updated_at')
+          .eq('sichal', sichal).eq('year', year),
+        c.from('dues_rates').select('church,pastor').eq('year', year).eq('sichal', sichal).order('sort')
+      ]);
+    }).then(function (rs) {
+      var reports = (rs[0].data) || [];
+      var churches = (rs[1].data) || [];
+      /* 교회 명부가 없으면 보고서에 있는 교회라도 쓴다 */
+      if (!churches.length) {
+        churches = reports.map(function (r) { return { church: r.church, pastor: r.pastor }; });
+      }
+      function n(v) { return Number(v || 0) || 0; }
+      function pick(obj, keys) {
+        var s = 0; keys.forEach(function (k) { s += n(obj && obj[k]); }); return s;
+      }
+      var sum = { p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0, p7: 0, p8: 0 };
+      reports.forEach(function (r) {
+        var d = r.data || {};
+        var cg = d.clergy || {}, jj = d.jejik || {};
+        sum.p1 += pick(cg, ['damim', 'wonro', 'bumok', 'hyup', 'gita']);   /* 목사 */
+        sum.p2 += n(jj.jr_simu);                                            /* 시무장로 */
+        sum.p3 += n(cg.gangdosa);                                           /* 강도사 */
+        sum.p4 += pick(cg, ['jd_m', 'jd_f']);                               /* 전도사 */
+        sum.p5 += pick(jj, ['jr_wonro', 'jr_euntoe', 'jr_hyup', 'jr_gita']); /* 무임장로 */
+        sum.p6 += pick(jj, ['ks_simu', 'ks_gita']);                         /* 권사 */
+        sum.p7 += pick(jj, ['as_simu', 'as_gita', 'ss_m', 'ss_f']);         /* 집사 */
+        sum.p8 += n(r.members_total);                                       /* 교인 */
+      });
+      /* 보고서가 있을 때만 교세를 자동으로 채운다 (직접 고칠 수 있다) */
+      if (reports.length) {
+        Object.keys(sum).forEach(function (k) {
+          data[k] = String(sum[k]);
+          var el = document.getElementById('ptf-' + k);
+          if (el) el.value = sum[k];
+        });
+        renderPaper();
+      }
+
+      /* 교회별 보고서 제출 여부 목록 */
+      var done = {};
+      reports.forEach(function (r) { done[String(r.church || '').replace(/\s|교회$/g, '')] = r; });
+      var h = '<h4 style="margin:18px 0 8px">' + e(sichal) + ' 교회상황 보고서 제출 현황 (' + year + '년)</h4>' +
+        '<p style="font-size:0.82rem;color:var(--gray-5);margin:0 0 8px">교세는 제출된 보고서 ' +
+        reports.length + '건을 자동 합산한 값입니다. 미제출 교회 몫은 직접 더해 주세요.</p>' +
+        '<div style="overflow-x:auto"><table class="tbl" style="max-width:640px"><thead><tr>' +
+        '<th>교회</th><th style="width:110px">교역자</th><th style="width:130px">보고서</th></tr></thead><tbody>';
+      churches.forEach(function (ch) {
+        var r = done[String(ch.church || '').replace(/\s|교회$/g, '')];
+        h += '<tr><td class="left">' + e(ch.church) + '</td>' +
+          '<td>' + e(ch.pastor || '') + '</td>' +
+          '<td>' + (r ? '<span class="pass">제출</span>' : '<span class="fail">미제출</span>') + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+      var old = document.getElementById('pt-extra');
+      if (old) old.remove();
+      var div = document.createElement('div');
+      div.id = 'pt-extra';
+      div.innerHTML = h;
+      document.getElementById('pt-form').after(div);
+    }).catch(function () {});
   }
 
   function renderPaper() {
