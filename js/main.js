@@ -18,7 +18,8 @@
       { t: '인사말', h: 'about.html#greeting' },
       { t: '노회 연혁', h: 'about.html#history' },
       { t: '관할지역 안내', h: 'about.html#area' },
-      { t: '오시는 길', h: 'about.html#location' }
+      { t: '오시는 길', h: 'about.html#location' },
+      { t: '홈페이지 이용 안내', h: 'guide.html' }
     ]},
     { title: '조직', href: 'organization.html', sub: [
       { t: '노회 임원', h: 'organization.html#officers' },
