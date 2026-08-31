@@ -816,10 +816,17 @@
         '<div class="notice-banner" style="border-left:4px solid var(--accent)">' +
         '<strong>[시스템 알림]</strong> 확인이 필요한 운영 알림이 ' + active.length + '건 있습니다: ' +
         active.map(function (n) { return n.title; }).join(', ') + ' ' +
-        '<a class="btn sm" style="margin-left:8px" href="manage.html#mg-ops">알림 확인하기</a>' +
+        '<a class="btn sm" style="margin-left:8px" href="manage.html#mg-ops">알림 확인하기</a> ' +
+        '<button class="btn ghost sm" id="ops-done-btn">읽음으로 표시</button>' +
         '</div>';
       var gnb = document.querySelector('.gnb');
       if (gnb) gnb.insertAdjacentElement('afterend', bar);
+      var doneBtn = bar.querySelector('#ops-done-btn');
+      if (doneBtn) doneBtn.addEventListener('click', function () {
+        /* 이 알림들을 올해는 다시 띄우지 않는다 */
+        active.forEach(function (n) { localStorage.setItem(n.doneKey, '1'); });
+        bar.remove();
+      });
     }
 
     if (u.cloud && window.SHSCloud && SHSCloud.enabled()) {
