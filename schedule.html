@@ -400,6 +400,21 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     sesSel.addEventListener('change', applySes);
     seasonSel.addEventListener('change', applySes);
+
+    /* 끝 날짜 달력이 시작 날짜부터 열리도록: 최소값을 시작일로 묶고,
+     * 비어 있는 채로 누르면 시작일을 미리 채워 그 달이 펼쳐지게 한다.
+     * (시작일과 같으면 저장할 때 하루 일정으로 처리된다) */
+    var dateEl = mo.el.querySelector('#ev-date');
+    var date2El = mo.el.querySelector('#ev-date2');
+    function syncDate2() {
+      date2El.min = dateEl.value || '';
+      if (date2El.value && dateEl.value && date2El.value < dateEl.value) date2El.value = dateEl.value;
+    }
+    dateEl.addEventListener('change', syncDate2);
+    date2El.addEventListener('focus', function () {
+      if (!date2El.value && dateEl.value) date2El.value = dateEl.value;
+    });
+    syncDate2();
     function refreshKind() {
       var k = kindSel.value;
       mo.el.querySelector('#ev-etcwrap').classList.toggle('hidden', k !== '기타');
