@@ -1724,7 +1724,10 @@ input.dp-bad { border-color: var(--red); }
 .dues-sc-chart .dsc-track {
   flex: 1; height: 14px; background: var(--gray-1); border-radius: 7px; overflow: hidden;
 }
-.dues-sc-chart .dsc-bar { height: 100%; background: var(--navy-light); border-radius: 7px; transition: width .3s; }
+.dues-sc-chart .dsc-bar {
+  height: 100%; border-radius: 7px; transition: width .3s;
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
+}
 .dues-sc-chart .dsc-val { width: 150px; flex: none; font-size: 0.8rem; color: var(--gray-7); text-align: right; }
 
 /* 완납/미납 필터와 검색 */
