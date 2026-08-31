@@ -215,9 +215,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var h = '';
     h += '<div class="notice-banner"><strong>' + YEAR + '년 ' + e(CHURCH) + '</strong> 교회상황 보고서' +
-      (record ? ' — 제출된 내용을 고치고 있습니다.' : ' — 총회 서식 그대로 온라인으로 작성합니다.') +
-      ' 적은 내용은 <strong>시찰 서기</strong>에게 전달되고, 하단 (직인) 자리에는 ' +
-      '<a href="mypage.html" style="text-decoration:underline">내 정보</a>에 올려 둔 교회 직인이 찍힙니다.</div>';
+      (record ? ' — 제출된 내용을 고치고 있습니다.' : '') + '</div>';
 
     /* ① 기본 정보 */
     h += '<div class="admin-card rf-sec"><h3>① 기본 정보</h3>' +
