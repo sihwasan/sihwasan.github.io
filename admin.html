@@ -996,6 +996,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th>' +
         '<th style="width:110px">성명</th><th style="width:110px">직분</th>' +
         '<th>소속 교회</th><th style="width:110px">시찰</th>' +
+        '<th style="width:120px">임직일자</th>' +
         '<th style="width:130px">남은 임기</th><th style="width:130px">부여 등급</th>' +
         '<th style="width:80px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
@@ -1015,6 +1016,9 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td>' + e(m.position || m.category || '-') + '</td>' +
           '<td class="left">' + e(m.church || '-') + '</td>' +
           '<td>' + e(m.sichal || '-') + '</td>' +
+          '<td>' + (m.ordained_on
+            ? e(m.ordained_on)
+            : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td>' + remainLabel(m) + '</td>' +
           '<td>' + e(gradeName(rosterGrade(m))) + '</td>' +
           '<td><button class="btn sm" data-roedit="' + m.id + '">수정</button></td>' +
@@ -1452,6 +1456,8 @@ document.addEventListener('DOMContentLoaded', function () {
             (m.position && m.position !== m.category ? ' / ' + e(m.position) : '')) +
           viewRow('부여 등급', e(gradeName(rosterGrade(m)))) +
           viewRow('생년월일', e(m.birth_date || '')) +
+          viewRow('임직일자', e(m.ordained_on || '') +
+            (m.ordained_by ? ' <span style="color:var(--gray-5)">(' + e(m.ordained_by) + ')</span>' : '')) +
           viewRow('남은 임기', remainLabel(m)) +
           viewRow('부임(위임)일', served) +
           (term ? viewRow('장로 총대 자격', term) : '') +
