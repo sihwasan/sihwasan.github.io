@@ -45,7 +45,10 @@
 .sheet .s-seal-spot img.stamp { position: absolute; left: 50%; top: 50%;
   height: 64px; width: auto; max-width: none; opacity: 0.92; cursor: move; touch-action: none; }
 .sheet .s-note { font-size: 10.5px; color: #333; }
+/* 인쇄할 때 표 머리칸 음영이 사라지지 않게 배경색을 그대로 찍는다 */
+.sheet, .sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 @media print {
+  .sheet, .sheet * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body > *:not(#sheet-wrap) { display: none !important; }
   #sheet-wrap { display: block !important; }
   .sheet { border: none; box-shadow: none; max-width: none; padding: 0; }
