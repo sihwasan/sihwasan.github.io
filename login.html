@@ -30,6 +30,13 @@
         </svg>
         <span>구글 계정으로 로그인</span>
       </button>
+      <button class="btn-google" id="btn-naver" type="button"
+        style="background:#03C75A;border-color:#03C75A;color:#fff;margin-top:8px">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path fill="#fff" d="M16.3 4v8.4L7.7 4H2v16h5.7v-8.4L16.3 20H22V4z"/>
+        </svg>
+        <span>네이버 계정으로 로그인</span>
+      </button>
       <div class="login-divider"><span>또는 이메일로 로그인</span></div>
     </div>
 
@@ -118,6 +125,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('social-login').classList.remove('hidden');
     document.getElementById('btn-google').addEventListener('click', function () {
       SHSCloud.signInWithGoogle();
+    });
+    /* 네이버 로그인: 서버(Edge Function)가 네이버 인증을 대신 처리한다 */
+    document.getElementById('btn-naver').addEventListener('click', function () {
+      location.href = 'https://ltbhgwozkffenahqdzfj.supabase.co/functions/v1/naver-login';
     });
   }
 

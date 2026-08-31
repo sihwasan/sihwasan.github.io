@@ -74,6 +74,13 @@
         </svg>
         <span>구글 계정으로 가입하기</span>
       </button>
+      <button class="btn-google" id="btn-naver-up" type="button"
+        style="background:#03C75A;border-color:#03C75A;color:#fff;margin-top:8px">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <path fill="#fff" d="M16.3 4v8.4L7.7 4H2v16h5.7v-8.4L16.3 20H22V4z"/>
+        </svg>
+        <span>네이버 계정으로 가입하기</span>
+      </button>
       <div class="login-divider"><span>또는 이메일로 가입</span></div>
     </div>
 
@@ -198,6 +205,15 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.className = 'form-msg';
       msg.textContent = '구글 로그인 화면으로 이동합니다...';
       SHSCloud.signInWithGoogle();
+    });
+    document.getElementById('btn-naver-up').addEventListener('click', function () {
+      var info = readInfo();
+      if (!info) return;
+      /* 네이버 화면을 다녀오는 동안 입력한 가입 정보를 보관한다. */
+      try { sessionStorage.setItem('shs_signup_v1', JSON.stringify(info)); } catch (err) {}
+      msg.className = 'form-msg';
+      msg.textContent = '네이버 로그인 화면으로 이동합니다...';
+      location.href = 'https://ltbhgwozkffenahqdzfj.supabase.co/functions/v1/naver-login';
     });
   }
 
