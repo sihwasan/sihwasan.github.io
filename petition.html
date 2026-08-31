@@ -161,6 +161,10 @@ body.pt-embed main { padding-top: 10px; }
     작성한 청원서가 내 계정에 보관되어 언제든 다시 열어 고칠 수 있습니다.
     도장(인) 자리는 비워져 있으니 출력 후 날인해 주세요.</p>
 
+  <p><button class="btn" id="pt-wizard">청빙서류 작성 도우미</button>
+    <span style="font-size:0.85rem;color:var(--gray-5);margin-left:8px">
+    몇 가지 질문에 답하시면 알맞은 청빙 서류가 만들어집니다.</span></p>
+
   <nav class="pt-menu" id="pt-menu" aria-label="청원서 종류"></nav>
 
   <div class="pt-card">
@@ -255,8 +259,10 @@ body.pt-embed main { padding-top: 10px; }
         case '전도목사':   phrase = u(d.name) + ' 목사를 전도목사로 청빙하고저'; break;
         case '강도사':     phrase = u(d.name) + ' 강도사를 청빙하고저'; break;
         case '전도사':     phrase = u(d.name) + ' 전도사를 청빙하고저'; break;
-        default:           phrase = u(d.name) + ' 목사(위임, 시무, 부목사, 부목사계속, 교육목사, ' +
-                                    '전도목사, 강도사, 전도사)로 청빙하고저';
+        default:           phrase = d.kind
+                             ? u(d.name) + ' 목사(강도사·전도사)를 ' + e(d.kind) + '로 청빙하고저'
+                             : u(d.name) + ' 목사(위임, 시무, 부목사, 부목사계속, 교육목사, ' +
+                               '전도목사, 강도사, 전도사)로 청빙하고저';
       }
       return '<h1 class="pt-title">' + u(d.kind) + ' 청빙청원서</h1>' +
         '<p class="pt-sub">(목사위임. 시무. 부목사. 부목사계속. 교육목사. 전도목사. 강도사. 전도사)</p>' +
@@ -1292,6 +1298,111 @@ body.pt-embed main { padding-top: 10px; }
       });
     }).catch(function () {});
   }
+
+  /* ================= 청빙서류 작성 도우미 =================
+   * 질문에 답하면 알맞은 청빙 서식을 골라 내용을 채워 준다. */
+  function callWizard() {
+    var WIZ = {
+      '목사': [
+        { t: '위임목사로 청빙', f: 'call', kind: '목사위임',
+          tip: '위임목사 청빙은 공동의회 결의가 필요하며, 교인 연서 <청빙서>도 함께 제출합니다.' },
+        { t: '시무목사로 청빙', f: 'call', kind: '시무목사' },
+        { t: '부목사로 청빙 (새로 모심)', f: 'callassoc' },
+        { t: '부목사 계속 청빙 (연임)', f: 'call', kind: '부목사계속' },
+        { t: '교육목사로 청빙', f: 'call', kind: '교육목사' },
+        { t: '전도목사로 청빙', f: 'call', kind: '전도목사' },
+        { t: '다른 형태로 청빙 (직접 입력)', f: 'call', custom: true }
+      ],
+      '강도사': [
+        { t: '강도사로 청빙', f: 'call', kind: '강도사' },
+        { t: '목사안수 후 부목사로 청빙', f: 'callassocord' },
+        { t: '다른 형태로 청빙 (직접 입력)', f: 'call', custom: true }
+      ],
+      '전도사': [
+        { t: '전도사로 청빙', f: 'call', kind: '전도사' },
+        { t: '다른 형태로 청빙 (직접 입력)', f: 'call', custom: true }
+      ]
+    };
+    var pick = { who: null, choice: null };
+
+    function stepBtns(list) {
+      return list.map(function (t, i) {
+        return '<button class="btn ghost" data-wz="' + i + '" ' +
+          'style="display:block;width:100%;text-align:left;margin-top:8px">' + e(t) + '</button>';
+      }).join('');
+    }
+
+    function step1() {
+      var mo = modal('<h3>청빙서류 작성 도우미</h3>' +
+        '<p>1단계 — <strong>청빙 대상자</strong>는 어떤 분이십니까?</p>' +
+        stepBtns(['목사', '강도사', '전도사']));
+      mo.querySelectorAll('[data-wz]').forEach(function (b, i) {
+        b.addEventListener('click', function () {
+          pick.who = ['목사', '강도사', '전도사'][i];
+          mo.remove(); step2();
+        });
+      });
+    }
+    function step2() {
+      var opts = WIZ[pick.who];
+      var mo = modal('<h3>청빙서류 작성 도우미</h3>' +
+        '<p>2단계 — <strong>' + e(pick.who) + '</strong>를 어떤 형태로 청빙하십니까?</p>' +
+        stepBtns(opts.map(function (o) { return o.t; })) +
+        '<div class="row"><button class="btn ghost" data-wzback>&#8592; 이전</button></div>');
+      mo.querySelectorAll('[data-wz]').forEach(function (b, i) {
+        b.addEventListener('click', function () {
+          pick.choice = opts[i];
+          mo.remove(); step3();
+        });
+      });
+      mo.querySelector('[data-wzback]').addEventListener('click', function () { mo.remove(); step1(); });
+    }
+    function step3() {
+      var c = pick.choice;
+      var today = new Date();
+      var todayS = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') +
+        '-' + String(today.getDate()).padStart(2, '0');
+      var mo = modal('<h3>청빙서류 작성 도우미</h3>' +
+        '<p>3단계 — 청원서에 들어갈 내용을 적어 주세요.</p>' +
+        (c.custom
+          ? '<div class="field" style="margin-top:8px"><label>청빙 직위 (예: 협동목사)</label>' +
+            '<input type="text" id="wz-kind" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></div>'
+          : '') +
+        ['<label style="display:block;margin-top:10px;font-size:0.84rem">대상자 성명' +
+         '<input type="text" id="wz-name" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>',
+         '<label style="display:block;margin-top:10px;font-size:0.84rem">교회명 (—교회의 "교회"는 빼고)' +
+         '<input type="text" id="wz-church" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>',
+         '<label style="display:block;margin-top:10px;font-size:0.84rem">당회장 성명' +
+         '<input type="text" id="wz-dang" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>',
+         '<label style="display:block;margin-top:10px;font-size:0.84rem">작성일' +
+         '<input type="date" id="wz-date" value="' + todayS + '" style="width:100%;border:1px solid var(--gray-2);border-radius:8px;padding:9px 10px"></label>'
+        ].join('') +
+        '<div class="row"><button class="btn ghost" data-wzback>&#8592; 이전</button>' +
+        '<button class="btn" id="wz-make">청원서 만들기</button></div>' +
+        '<div class="form-msg" id="wz-msg"></div>');
+      mo.querySelector('[data-wzback]').addEventListener('click', function () { mo.remove(); step2(); });
+      mo.querySelector('#wz-make').addEventListener('click', function () {
+        function v(id) { var el2 = mo.querySelector(id); return el2 ? el2.value.trim() : ''; }
+        var wm = mo.querySelector('#wz-msg');
+        var name = v('#wz-name');
+        if (!name) { wm.className = 'form-msg err'; wm.textContent = '대상자 성명을 적어 주세요.'; return; }
+        var kind = c.custom ? v('#wz-kind') : (c.kind || '');
+        if (c.custom && !kind) { wm.className = 'form-msg err'; wm.textContent = '청빙 직위를 적어 주세요.'; return; }
+        cur = FORMS.filter(function (x) { return x.id === c.f; })[0];
+        data = { name: name, church: v('#wz-church'), dang: v('#wz-dang'), date: v('#wz-date') };
+        if (c.f === 'call') data.kind = kind;
+        editingId = null;
+        mo.remove();
+        renderMenu(); renderForm(); renderPaper();
+        msg('청빙서류 도우미로 <' + cur.title + '>를 만들었습니다. 아래 미리보기를 확인하시고 ' +
+          '인쇄·PDF 저장 또는 시찰 서기에게 전달하세요.' + (c.tip ? ' ' + c.tip : ''));
+        var paper = document.getElementById('pt-paper');
+        if (paper) paper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+    step1();
+  }
+  document.getElementById('pt-wizard').addEventListener('click', callWizard);
 
   document.getElementById('pt-print').addEventListener('click', function () { window.print(); });
   document.getElementById('pt-pdf').addEventListener('click', savePdf);
