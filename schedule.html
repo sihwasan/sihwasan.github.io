@@ -27,6 +27,9 @@
 .sc-ev.k임원회의 { background:#7d6608; }
 .sc-ev.k상비부일정 { background:#1e8449; }
 .sc-ev.k수양회 { background:#148f77; }
+/* 여러 날 일정: 칸 사이 틈을 메워 한 줄 띠처럼 잇는다 */
+.sc-ev.evs, .sc-ev.evm { margin-right:-6px; border-top-right-radius:0; border-bottom-right-radius:0; }
+.sc-ev.evm, .sc-ev.eve { margin-left:-6px; border-top-left-radius:0; border-bottom-left-radius:0; }
 .sc-head { display:flex; align-items:center; gap:12px; margin:0 0 10px; }
 .sc-head h2 { margin:0; }
 /* 대상자 검색 목록 */
@@ -147,20 +150,23 @@ document.addEventListener('DOMContentLoaded', function () {
     var days = new Date(calY, calM + 1, 0).getDate();
     var todayS = ymd(now.getFullYear(), now.getMonth(), now.getDate());
 
-    /* 여러 날 일정(수양회 등)은 시작~끝의 모든 날에 표시한다 */
+    /* 여러 날 일정(수양회 등)은 시작~끝의 모든 날에 넣되,
+     * 시작/중간/끝을 표시해 달력에서 한 줄 띠로 잇는다 */
     var byDate = {};
     events.forEach(function (x) {
       var d = dateOfRow(x);
       if (!d) return;
-      (byDate[d] = byDate[d] || []).push(x);
-      if (x.end_date && x.end_date > d) {
-        var t = new Date(d + 'T00:00:00');
-        for (var k = 0; k < 60; k++) {
-          t.setDate(t.getDate() + 1);
-          var ts = ymd(t.getFullYear(), t.getMonth(), t.getDate());
-          if (ts > x.end_date) break;
-          (byDate[ts] = byDate[ts] || []).push(x);
-        }
+      if (!(x.end_date && x.end_date > d)) {
+        (byDate[d] = byDate[d] || []).push({ ev: x, pos: '' });
+        return;
+      }
+      (byDate[d] = byDate[d] || []).push({ ev: x, pos: 'evs' });
+      var t = new Date(d + 'T00:00:00');
+      for (var k = 0; k < 60; k++) {
+        t.setDate(t.getDate() + 1);
+        var ts = ymd(t.getFullYear(), t.getMonth(), t.getDate());
+        if (ts > x.end_date) break;
+        (byDate[ts] = byDate[ts] || []).push({ ev: x, pos: ts === x.end_date ? 'eve' : 'evm' });
       }
     });
 
@@ -176,9 +182,12 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<td data-day="' + ds + '" class="' +
         (cell % 7 === 0 ? 'sun ' : '') + (ds === todayS ? 'today' : '') + '">' +
         '<span class="sc-day">' + d + '</span>' +
-        evs.map(function (x) {
-          return '<span class="sc-ev k' + e(String(x.kind || '').replace(/\s/g, '')) + '">' +
-            e(x.title) + '</span>';
+        evs.map(function (it) {
+          var x = it.ev;
+          /* 이어지는 날은 제목을 되풀이하지 않는다. 주가 바뀌는 일요일 칸에는 다시 보여 준다 */
+          var showTitle = !it.pos || it.pos === 'evs' || cell % 7 === 0;
+          return '<span class="sc-ev ' + it.pos + ' k' + e(String(x.kind || '').replace(/\s/g, '')) + '">' +
+            (showTitle ? e(x.title) : '&nbsp;') + '</span>';
         }).join('') + '</td>';
       cell++;
       if (cell % 7 === 0 && d < days) h += '</tr><tr>';
