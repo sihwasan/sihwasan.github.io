@@ -232,14 +232,26 @@
       { k: 'date', label: '작성일', type: 'date' }
     ],
     render: function (d) {
+      /* 청빙 구분마다 문법에 맞는 문구를 만든다 */
+      var phrase;
+      switch (d.kind) {
+        case '목사위임':   phrase = u(d.name) + ' 목사를 위임목사로 청빙하고저'; break;
+        case '시무목사':   phrase = u(d.name) + ' 목사를 시무목사로 청빙하고저'; break;
+        case '부목사':     phrase = u(d.name) + ' 목사를 부목사로 청빙하고저'; break;
+        case '부목사계속': phrase = u(d.name) + ' 목사를 부목사로 계속 청빙하고저'; break;
+        case '교육목사':   phrase = u(d.name) + ' 목사를 교육목사로 청빙하고저'; break;
+        case '전도목사':   phrase = u(d.name) + ' 목사를 전도목사로 청빙하고저'; break;
+        case '강도사':     phrase = u(d.name) + ' 강도사를 청빙하고저'; break;
+        case '전도사':     phrase = u(d.name) + ' 전도사를 청빙하고저'; break;
+        default:           phrase = u(d.name) + ' 목사(위임, 시무, 부목사, 부목사계속, 교육목사, ' +
+                                    '전도목사, 강도사, 전도사)로 청빙하고저';
+      }
       return '<h1 class="pt-title">' + u(d.kind) + ' 청빙청원서</h1>' +
         '<p class="pt-sub">(목사위임. 시무. 부목사. 부목사계속. 교육목사. 전도목사. 강도사. 전도사)</p>' +
         '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
         signChurch(d.church, '당회장', d.dang) + addr() +
-        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + ' 목사(위임, 시무, 부목사, ' +
-        '부목사계속, 교육목사, 전도목사, 강도사, 전도사)로 청빙하고저 별지 첨부하여 ' +
-        '청원하오니 허락하여 주시기를 바랍니다.</p>' +
-        '<p class="body">청빙 구분: <strong>' + e(d.kind || '') + '</strong></p>';
+        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + phrase +
+        ' 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>';
     } },
 
   { id: 'callletter', cat: '청빙', title: '청빙서 (교인 연서)',
