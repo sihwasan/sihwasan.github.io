@@ -20,7 +20,8 @@
 .rf-tbl .rowh { background: var(--gray-1, #f4f5f8); font-weight: 600; }
 .rf-scroll { overflow-x: auto; }
 .rf-bar { position: sticky; bottom: 0; background: var(--white, #fff); border-top: 1px solid var(--gray-3, #d8dbe2);
-  padding: 12px 0; margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; z-index: 5; }
+  padding: 12px 20px; margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; z-index: 5;
+  border-radius: 0 0 12px 12px; }
 .rf-seal-tip { font-size: 0.82rem; color: var(--gray-6); }
 .rf-seal-tip img { height: 34px; vertical-align: middle; margin-left: 6px; }
 
@@ -39,8 +40,10 @@
 .sheet .s-close { text-align: center; margin-top: 26px; }
 .sheet .s-stamp-line { text-align: center; font-size: 15px; font-weight: 700; margin-top: 18px; }
 .sheet .s-seal-spot { position: relative; display: inline-block; }
-.sheet .s-seal-spot img.stamp { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  height: 64px; width: auto; max-width: none; opacity: 0.92; pointer-events: none; }
+/* 직인: (직인) 글자 위에 겹쳐 찍는다. transform은 PDF 변환과 충돌해 여백 방식으로 잡고,
+ * 미리보기에서는 끌어서 위치를 옮길 수 있다. */
+.sheet .s-seal-spot img.stamp { position: absolute; left: 50%; top: 50%;
+  height: 64px; width: auto; max-width: none; opacity: 0.92; cursor: move; touch-action: none; }
 .sheet .s-note { font-size: 10.5px; color: #333; }
 @media print {
   body > *:not(#sheet-wrap) { display: none !important; }
@@ -56,12 +59,19 @@
 
 <div class="page-head">
   <div class="container">
-    <h1>교회상황 보고서</h1>
-    <div class="crumb">홈 &gt; 서류발급 &gt; 교회상황 보고서</div>
+    <h1>보고서</h1>
+    <div class="crumb">홈 &gt; 자료실 &gt; 보고서</div>
   </div>
 </div>
 
 <main class="page-body container" id="main">
+  <!-- 보고서 종류 탭: 교회상황은 이 화면, 나머지는 청원서의 해당 서식으로 간다 -->
+  <div class="tabs" style="margin-bottom:16px">
+    <button type="button" class="active">교회상황 보고서</button>
+    <button type="button" onclick="location.href='petition.html?form=sichalreport'">시찰보고서</button>
+    <button type="button" onclick="location.href='petition.html?form=deptreport'">부 사업보고서</button>
+    <button type="button" onclick="location.href='petition.html?form=deptorg'">부 조직 보고서</button>
+  </div>
   <div id="rp-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
 </main>
 
@@ -127,6 +137,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var record = null;       /* 서버에 저장된 줄 */
   var mySeal = null;       /* 내 직인 (data URL) */
+  var sealOn = true;       /* 직인을 찍을지 (선택) */
+  var sealPos = { dx: 0, dy: 0 };   /* 미리보기에서 끌어 옮긴 직인 위치 */
   var meRow = null;        /* 명단에서 찾은 나 */
   var pastorRow = null;    /* 이 교회의 담임목사 (명단) */
   var SICHAL = '';
@@ -195,6 +207,11 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     var d = (record && record.data) || {};
+    /* 저장본에 담긴 직인 사용 여부·위치를 되살린다 */
+    if (d._seal) {
+      sealOn = d._seal.on !== false;
+      sealPos = { dx: Number(d._seal.dx) || 0, dy: Number(d._seal.dy) || 0 };
+    }
     var head = d.head || {};
     var addr = d.addr || {};
     var clergy = d.clergy || {};
@@ -221,7 +238,14 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<div class="admin-card rf-sec"><h3>① 기본 정보</h3>' +
       '<p class="rf-hint">교회명·시찰·주소는 회원 명단에서 자동으로 가져왔습니다.</p>' +
       '<div class="inline-form">' +
-      '<div class="field" style="flex:0 0 130px"><label>보고 연도</label><input type="text" value="' + YEAR + '년" disabled></div>' +
+      '<div class="field" style="flex:0 0 130px"><label>보고 연도</label><select id="rp-year">' +
+      (function () {
+        var out = '', now2 = new Date().getFullYear();
+        for (var y2 = now2 + 1; y2 >= now2 - 4; y2--) {
+          out += '<option value="' + y2 + '"' + (y2 === YEAR ? ' selected' : '') + '>' + y2 + '년</option>';
+        }
+        return out;
+      })() + '</select></div>' +
       '<div class="field" style="flex:0 0 160px"><label>보고일</label><input type="date" id="f-date" value="' + e(d.date || today()) + '"></div>' +
       '<div class="field" style="flex:0 0 180px"><label>교회명</label><input type="text" value="' + e(CHURCH) + '" disabled></div>' +
       '<div class="field" style="flex:0 0 130px"><label>시찰</label><input type="text" id="f-sichal" value="' + e(SICHAL) + '"' + (SICHAL ? ' disabled' : ' placeholder="예: 남부시찰"') + '></div>' +
@@ -372,11 +396,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* 제출 줄 */
     h += '<div class="rf-bar">' +
+      '<button class="btn" id="rp-save">저장하기</button>' +
       '<button class="btn" id="rp-send">시찰 서기에게 제출</button>' +
       '<button class="btn ghost" id="rp-preview">미리보기 · 인쇄</button>' +
+      '<button class="btn ghost" id="rp-pdf">PDF 저장</button>' +
       '<span class="rf-seal-tip">' +
       (mySeal
-        ? '문서 하단에 이 직인이 찍힙니다:<img src="' + mySeal + '" alt="직인">'
+        ? '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">' +
+          '<input type="checkbox" id="rp-sealon" style="width:auto"' + (sealOn ? ' checked' : '') + '> 직인 사용' +
+          '</label> <img src="' + mySeal + '" alt="직인"> ' +
+          '<span style="color:var(--gray-5)">미리보기에서 직인을 끌어 위치를 옮길 수 있습니다.</span>'
         : '아직 직인이 없습니다. <a href="mypage.html" style="text-decoration:underline">내 정보</a>에서 올려 두시면 문서에 찍힙니다.') +
       '</span>' +
       '<span class="form-msg" id="rp-msg" style="margin:0"></span></div>';
@@ -409,12 +438,63 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('rp-preview').addEventListener('click', function () {
       openSheet(collect(), mySeal);
     });
-    document.getElementById('rp-send').addEventListener('click', send);
+    document.getElementById('rp-send').addEventListener('click', function () { send(false); });
+    document.getElementById('rp-save').addEventListener('click', function () { send(true); });
+    document.getElementById('rp-pdf').addEventListener('click', savePdf);
+    var so = document.getElementById('rp-sealon');
+    if (so) so.addEventListener('change', function () { sealOn = this.checked; });
+    /* 보고 연도를 바꾸면 그 해의 보고서를 연다 */
+    document.getElementById('rp-year').addEventListener('change', function () {
+      location.href = 'report.html?year=' + this.value;
+    });
+  }
+
+  /* ----- PDF 저장: 종이 서식을 만들어 그대로 PDF로 뜬다 ----- */
+  var pdfLoading = null;
+  function loadPdfTool() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (pdfLoading) return pdfLoading;
+    pdfLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+      sc.onload = function () { resolve(window.html2pdf); };
+      sc.onerror = function () { pdfLoading = null; reject(new Error('PDF 도구를 불러오지 못했습니다.')); };
+      document.head.appendChild(sc);
+    });
+    return pdfLoading;
+  }
+  function savePdf() {
+    var btn = document.getElementById('rp-pdf');
+    var msg = document.getElementById('rp-msg');
+    btn.disabled = true; btn.textContent = '만드는 중...';
+    function done() { btn.disabled = false; btn.textContent = 'PDF 저장'; }
+    var wrap = document.getElementById('sheet-wrap');
+    wrap.innerHTML = buildSheet(collect(), mySeal);
+    wrap.classList.add('show');
+    var target = wrap.querySelector('.sheet') || wrap;
+    var keepY = window.scrollY;
+    window.scrollTo(0, 0);
+    loadPdfTool().then(function (html2pdf) {
+      return html2pdf().set({
+        margin: 8,
+        filename: YEAR + '년 ' + CHURCH + ' 교회상황보고서.pdf',
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(target).save();
+    }).then(function () {
+      done(); wrap.classList.remove('show'); wrap.innerHTML = '';
+      window.scrollTo(0, keepY);
+    }).catch(function (err) {
+      done(); wrap.classList.remove('show'); wrap.innerHTML = '';
+      window.scrollTo(0, keepY);
+      msg.className = 'form-msg err'; msg.textContent = (err && err.message) || String(err);
+    });
   }
 
   /* 화면의 값을 하나의 자료로 모은다 */
   function collect() {
     var d = { v: 1, date: g('f-date') || today(), worship_avg: gn('f-wavg') || null, note: g('f-note') || null };
+    d._seal = { on: sealOn, dx: sealPos.dx, dy: sealPos.dy };
     d.head = { pastor: g('f-pastor'), ptype: g('f-ptype'), prrn: g('f-prrn'),
       danghoi: g('f-danghoi'), finance: g('f-finance'), region: g('f-region') };
     d.addr = { ch: g('f-achurch'), tel: g('f-atel'), fax: g('f-afax'), home: g('f-ahome'),
@@ -463,7 +543,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 제출 ---------- */
-  function send() {
+  /* draft=true 면 제출이 아니라 중간 저장이다 (내용은 같은 곳에 저장된다) */
+  function send(draft) {
     var msg = document.getElementById('rp-msg');
     var d = collect();
     if (!d.head.pastor) {
@@ -494,16 +575,18 @@ document.addEventListener('DOMContentLoaded', function () {
       offering_year: sumOf(d.fin['in'], ['carry', 'offer', 'special', 'mission', 'etc']) || null,
       note: d.note,
       data: d,
-      /* 내 교회 보고서일 때만 내 직인을 찍는다 */
-      seal_image: (chKey(user.church) === chKey(CHURCH) && mySeal) ? mySeal : (record && record.seal_image) || null,
+      /* 내 교회 보고서일 때만, 직인 사용을 켠 경우에 내 직인을 찍는다 */
+      seal_image: !sealOn ? null
+        : (chKey(user.church) === chKey(CHURCH) && mySeal) ? mySeal
+        : (record && record.seal_image) || null,
       submitted_by: user.name,
       updated_at: new Date().toISOString()
     };
     if (!record) row.user_id = user.id;
 
-    var btn = document.getElementById('rp-send');
+    var btn = document.getElementById(draft ? 'rp-save' : 'rp-send');
     btn.disabled = true;
-    msg.className = 'form-msg'; msg.textContent = '제출하는 중입니다...';
+    msg.className = 'form-msg'; msg.textContent = draft ? '저장하는 중입니다...' : '제출하는 중입니다...';
     db().then(function (c) {
       return record
         ? c.from('church_reports').update(row).eq('id', record.id).select()
@@ -519,13 +602,15 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       record = r.data[0];
       SHSCloud.log(record && record.created_at !== record.updated_at ? 'update' : 'create',
-        '교회상황 보고서 제출', YEAR + '년 ' + CHURCH);
+        draft ? '교회상황 보고서 저장' : '교회상황 보고서 제출', YEAR + '년 ' + CHURCH);
       msg.className = 'form-msg ok';
-      msg.textContent = '제출되었습니다. 시찰 서기에게 알림이 전달되었습니다.';
+      msg.textContent = draft
+        ? '저장되었습니다. 이어서 작성하시다가 완성되면 시찰 서기에게 제출을 눌러 주세요.'
+        : '제출되었습니다. 시찰 서기에게 알림이 전달되었습니다.';
     }).catch(function (x) {
       btn.disabled = false;
       msg.className = 'form-msg err';
-      msg.textContent = '제출 실패: ' + ((x && x.message) || String(x));
+      msg.textContent = (draft ? '저장' : '제출') + ' 실패: ' + ((x && x.message) || String(x));
     });
   }
 
@@ -558,6 +643,25 @@ document.addEventListener('DOMContentLoaded', function () {
     var wrap = document.getElementById('sheet-wrap');
     wrap.innerHTML = buildSheet(d, seal, rec);
     wrap.classList.add('show');
+    /* 직인을 끌어서 원하는 자리에 찍는다 — 위치는 인쇄·PDF·제출본에 그대로 적용된다 */
+    var stamp = wrap.querySelector('img.stamp');
+    if (stamp && !rec) stamp.addEventListener('pointerdown', function (ev) {
+      ev.preventDefault();
+      var sx = ev.clientX, sy = ev.clientY;
+      var base = { dx: sealPos.dx, dy: sealPos.dy };
+      function onMove(e2) {
+        sealPos.dx = base.dx + (e2.clientX - sx);
+        sealPos.dy = base.dy + (e2.clientY - sy);
+        stamp.style.marginLeft = (-32 + sealPos.dx) + 'px';
+        stamp.style.marginTop = (-32 + sealPos.dy) + 'px';
+      }
+      function onUp() {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+      }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+    });
     var pr = document.getElementById('sheet-print');
     if (pr) pr.addEventListener('click', function () { window.print(); });
     var cl = document.getElementById('sheet-close');
@@ -714,7 +818,10 @@ document.addEventListener('DOMContentLoaded', function () {
       dt[0] + '년 ' + num(dt[1]) + '월 ' + num(dt[2]) + '일</div>';
     h += '<div class="s-stamp-line">대한예수교장로회 ' + e(church) + ' ' +
       '<span class="s-seal-spot">(직인)' +
-      (seal ? '<img class="stamp" src="' + seal + '" alt="교회 직인">' : '') +
+      (seal && sealOn
+        ? '<img class="stamp" src="' + seal + '" alt="교회 직인" title="끌어서 위치를 옮길 수 있습니다" ' +
+          'style="margin-left:' + (-32 + sealPos.dx) + 'px;margin-top:' + (-32 + sealPos.dy) + 'px">'
+        : '') +
       '</span></div>';
     h += '</div>';
     return h;
