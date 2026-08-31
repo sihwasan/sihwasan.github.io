@@ -119,8 +119,10 @@ document.addEventListener('DOMContentLoaded', function () {
       }).join('') + '</select></div>' +
       '<div class="field"><label>연락처</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +
       '<div class="field"><label>생년월일</label>' +
-      '<input type="date" id="q-birth" data-birth value="' + e(p.birth_date || '') + '">' +
-      '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 회원명단 카드의 남은 임기 표시에 사용됩니다.</span></div>' +
+      '<input type="text" id="q-birth" value="' + e(p.birth_date || '아직 등록되지 않았습니다') + '" disabled>' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년(만 70세) 확인과 남은 임기 표시에 사용되며, ' +
+      '<strong>관리자가 입력</strong>합니다. 변경이 필요하시면 서기 또는 간사에게 문의해 주세요. ' +
+      '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>' +
       (function () {
         var sv = sinceText(p.served_from);
         return '<div class="field"><label>부임(위임)일</label>' +
@@ -570,7 +572,7 @@ document.addEventListener('DOMContentLoaded', function () {
             p_address:     document.getElementById('q-addr').value.trim(),
             p_postcode:    document.getElementById('q-post').value.trim(),
             p_church_addr: null,
-            p_birth_date:  SHSDate.get(document.getElementById('q-birth')) || null,
+            p_birth_date:  null,   /* 생년월일은 관리자만 입력한다 */
             p_photo_path:  null
           });
         }).then(function (r2) {
