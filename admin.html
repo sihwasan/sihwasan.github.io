@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('sichal_churches').select('*').order('sichal').order('sort').order('id'),
         c.from('church_staff').select('*').order('sort').order('id'),
-        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode')
+        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode,photo_path')
       ]);
     }).then(function (rs) {
       if (rs[1].error) throw rs[1].error;
@@ -1196,6 +1196,15 @@ document.addEventListener('DOMContentLoaded', function () {
           '<button class="btn ghost sm" data-addrsearch="rm-addr,rm-post" ' +
           'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' +
           '</div>' +
+          '<div class="field" style="margin-top:4px"><label>사진</label>' +
+          '<div style="display:flex;gap:12px;align-items:center">' +
+          '<div id="rm-photo-prev" style="width:64px;height:80px;border:1px solid var(--gray-2,#e5e4df);' +
+          'border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;' +
+          'font-size:0.7rem;color:var(--gray-5)">없음</div>' +
+          '<div><button class="btn ghost sm" id="rm-photo-up" type="button">사진 올리기</button> ' +
+          (m.photo_path ? '<button class="btn danger sm" id="rm-photo-del" type="button">사진 지우기</button>' : '') +
+          '<div style="font-size:0.76rem;color:var(--gray-5);margin-top:4px">어떤 크기든 자동으로 웹 크기로 줄여 저장되며, 회원명단 카드에 보입니다.</div></div>' +
+          '</div><div class="form-msg" id="rm-photo-msg"></div></div>' +
           '<div style="margin-top:6px">' +
           '<button class="btn" id="rm-save">저장</button> ' +
           '<button class="btn ghost" id="rm-close">닫기</button> ' +
@@ -1208,6 +1217,95 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('rm-close').addEventListener('click', function () { ov.remove(); });
         autoGrade(null, document.getElementById('rm-cat'),
                   document.getElementById('rm-birth'), document.getElementById('rm-grade'));
+
+        /* ----- 회원 사진 (관리자가 대신 올린다) ----- */
+        (function () {
+          var prev = document.getElementById('rm-photo-prev');
+          var pmsg = document.getElementById('rm-photo-msg');
+          function showPhoto(path) {
+            if (!path) { prev.textContent = '없음'; return; }
+            SHSCloud.init().then(function (c) {
+              return c.storage.from('member-photos').createSignedUrl(path, 300);
+            }).then(function (r) {
+              if (r.data && r.data.signedUrl) {
+                prev.innerHTML = '<img src="' + r.data.signedUrl +
+                  '" style="width:100%;height:100%;object-fit:cover" alt="사진">';
+              }
+            }).catch(function () {});
+          }
+          showPhoto(m.photo_path);
+
+          /* 어떤 크기든 긴 변 900px 이하 jpg로 줄인다 (내 정보와 같은 방식) */
+          function shrink(f) {
+            return new Promise(function (resolve, reject) {
+              var img = new Image();
+              var url = URL.createObjectURL(f);
+              img.onload = function () {
+                var MAX = 900;
+                var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+                var cv = document.createElement('canvas');
+                cv.width = Math.max(1, Math.round(img.naturalWidth * sc));
+                cv.height = Math.max(1, Math.round(img.naturalHeight * sc));
+                cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+                URL.revokeObjectURL(url);
+                cv.toBlob(function (b) {
+                  if (b) resolve(b); else reject(new Error('사진을 변환하지 못했습니다.'));
+                }, 'image/jpeg', 0.85);
+              };
+              img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진 파일을 읽지 못했습니다.')); };
+              img.src = url;
+            });
+          }
+
+          document.getElementById('rm-photo-up').addEventListener('click', function () {
+            var fin = document.createElement('input');
+            fin.type = 'file'; fin.accept = 'image/*';
+            fin.addEventListener('change', function () {
+              var f = fin.files && fin.files[0];
+              if (!f) return;
+              if (!/^image\//.test(f.type)) { pmsg.className = 'form-msg err'; pmsg.textContent = '이미지 파일만 올릴 수 있습니다.'; return; }
+              pmsg.className = 'form-msg'; pmsg.textContent = '사진을 줄여서 올리는 중입니다…';
+              var path = 'roster/' + m.id + '/photo.jpg';
+              shrink(f).then(function (blob) {
+                return SHSCloud.init().then(function (c) {
+                  return c.storage.from('member-photos')
+                    .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+                    .then(function (r) {
+                      if (r.error) throw r.error;
+                      return c.from('roster').update({ photo_path: path }).eq('id', m.id);
+                    });
+                });
+              }).then(function (r2) {
+                if (r2.error) throw r2.error;
+                m.photo_path = path;
+                SHSCloud.log('update', '회원 사진 등록(관리자)', m.name);
+                pmsg.className = 'form-msg ok'; pmsg.textContent = '사진이 저장되었습니다.';
+                showPhoto(path);
+              }).catch(function (err) {
+                pmsg.className = 'form-msg err'; pmsg.textContent = (err && err.message) || '사진을 올리지 못했습니다.';
+              });
+            });
+            fin.click();
+          });
+
+          var pdel = document.getElementById('rm-photo-del');
+          if (pdel) pdel.addEventListener('click', function () {
+            if (!confirm(m.name + ' 님의 사진을 지우시겠습니까?')) return;
+            SHSCloud.init().then(function (c) {
+              return c.storage.from('member-photos').remove([m.photo_path]).then(function () {
+                return c.from('roster').update({ photo_path: null }).eq('id', m.id);
+              });
+            }).then(function () {
+              m.photo_path = null;
+              SHSCloud.log('update', '회원 사진 삭제(관리자)', m.name);
+              pmsg.className = 'form-msg ok'; pmsg.textContent = '사진을 지웠습니다.';
+              prev.textContent = '없음';
+              pdel.remove();
+            }).catch(function () {
+              pmsg.className = 'form-msg err'; pmsg.textContent = '사진을 지우지 못했습니다.';
+            });
+          });
+        })();
 
         document.getElementById('rm-save').addEventListener('click', function () {
           var msg = document.getElementById('rm-msg');

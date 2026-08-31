@@ -40,3 +40,6 @@ end;
 $fn$;
 revoke all on function public.upsert_my_church_elder(bigint, text, date) from public;
 grant execute on function public.upsert_my_church_elder(bigint, text, date) to authenticated;
+
+-- (추가) 관리자가 회원 사진을 대신 올릴 수 있게 member-photos 버킷에 관리자 정책 부여
+-- 실제 적용은 Supabase migration member_photos_admin 으로 완료.
