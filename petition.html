@@ -157,10 +157,15 @@ body.pt-embed main { padding-top: 10px; }
 </div>
 
 <main class="page-body container" id="main">
-  <p style="margin:4px 0 18px">
-    <button class="btn" id="pt-wizard" style="font-size:1.05rem;padding:14px 26px">청원서류 작성 도우미</button>
-    <span style="font-size:0.88rem;color:var(--gray-5);margin-left:10px">
-    몇 가지 질문에 답하시면 알맞은 청원 서류가 만들어집니다. (청빙·고시·장로·교회·이명 등 모든 청원)</span></p>
+  <div class="tabs" style="margin:4px 0 6px">
+    <button type="button" id="pt-wizard">청원서류 작성 도우미</button>
+    <button type="button" class="active" id="pt-tab-forms">청원서류</button>
+    <button type="button" id="pt-tab-mine">나의 서류</button>
+  </div>
+  <p style="font-size:0.85rem;color:var(--gray-5);margin:0 0 14px">
+    <strong>작성 도우미</strong>는 몇 가지 질문으로 알맞은 청원 서류를 만들어 주고,
+    <strong>청원서류</strong>에서는 아래 메뉴에서 서식을 직접 골라 작성합니다.
+    저장·전달한 서류는 <strong>나의 서류</strong>에서 봅니다.</p>
 
   <nav class="pt-menu" id="pt-menu" aria-label="청원서 종류"></nav>
 
@@ -816,9 +821,7 @@ body.pt-embed main { padding-top: 10px; }
           return '<li><button type="button" data-pt="' + f.id + '"' +
             (cur.id === f.id ? ' class="active"' : '') + '>' + e(f.title) + '</button></li>';
         }).join('') + '</ul></div>';
-    }).join('') +
-      '<div class="ptm" style="margin-left:auto"><a href="mydocs.html" ' +
-      'style="display:block;color:#fff;padding:13px 18px;font-size:0.94rem;font-weight:600;text-decoration:none">나의 서류</a></div>';
+    }).join('');   /* 나의 서류는 위쪽 탭으로 옮겼다 */
     /* 휴대폰처럼 마우스가 없는 화면에서는 눌러서 연다 */
     box.querySelectorAll('.ptm > button').forEach(function (b) {
       b.addEventListener('click', function (ev) {
@@ -1533,6 +1536,13 @@ body.pt-embed main { padding-top: 10px; }
     step1();
   }
   document.getElementById('pt-wizard').addEventListener('click', petWizard);
+  document.getElementById('pt-tab-mine').addEventListener('click', function () {
+    location.href = 'mydocs.html';
+  });
+  document.getElementById('pt-tab-forms').addEventListener('click', function () {
+    var m0 = document.getElementById('pt-menu');
+    if (m0) m0.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   document.getElementById('pt-print').addEventListener('click', function () { window.print(); });
   document.getElementById('pt-pdf').addEventListener('click', savePdf);
