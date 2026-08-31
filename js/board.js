@@ -104,6 +104,7 @@ var SHSBoard = (function () {
       box.innerHTML =
         '<div id="hub-home" class="dash-hub">' +
         '<div class="hub-left">' +
+        '<div id="hub-photo" class="hidden" style="margin-bottom:16px"></div>' +
         '<div class="hub-label">&#10013; Dashboard</div>' +
         '<h2 class="hub-title">' + esc(SHS.honorific(user)) + ',<br>시화산노회의 <strong>소식과 현황</strong>을<br>확인해보세요.</h2>' +
         '<p class="hub-sub">알림 · 일정 · 납부 현황 · 서류를 한자리에 모았습니다.</p>' +
@@ -183,6 +184,30 @@ var SHSBoard = (function () {
           if (allSec) allSec.classList.toggle('hidden', b.dataset.mdt !== 'all');
         });
       });
+
+      /* 내 사진: 명단 카드에 올린 사진을 대시보드에도 보여 준다 */
+      (function () {
+        var slot = document.getElementById('hub-photo');
+        if (!slot || !user.id || !(window.SHSCloud && SHSCloud.enabled())) return;
+        SHSCloud.init().then(function (c) {
+          var path = user.photo_path
+            ? Promise.resolve(user.photo_path)
+            : c.from('profiles').select('photo_path').eq('id', user.id).single()
+                .then(function (r) { return r.data && r.data.photo_path; });
+          return Promise.resolve(path).then(function (pp) {
+            if (!pp) return null;
+            return c.storage.from('member-photos').createSignedUrl(pp, 600);
+          });
+        }).then(function (r) {
+          var url = r && r.data && r.data.signedUrl;
+          if (!url) return;
+          slot.innerHTML = '<img src="' + url + '" alt="내 사진" style="width:132px;height:164px;' +
+            'object-fit:cover;border-radius:18px;' +
+            'box-shadow:0 10px 24px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.15);' +
+            'border:3px solid rgba(255,255,255,0.55)">';
+          slot.classList.remove('hidden');
+        }).catch(function () {});
+      })();
 
       box.querySelectorAll('.hub-card').forEach(function (b) {
         b.addEventListener('click', function () {
