@@ -51,9 +51,13 @@
   .sheet, .sheet * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body > *:not(#sheet-wrap) { display: none !important; }
   #sheet-wrap { display: block !important; }
-  .sheet { border: none; box-shadow: none; max-width: none; padding: 0; }
+  /* 인쇄를 PDF 저장 결과와 같게 맞춘다:
+   * PDF는 폭 800px(+여백 50px×2)의 서식을 A4에 8mm 여백으로 줄여 담는다.
+   * 인쇄도 같은 폭·같은 축소 비율(194mm ÷ 902px ≈ 0.813)로 찍는다. */
+  .sheet { border: none; box-shadow: none; margin: 0; width: 800px; max-width: none;
+    padding: 46px 50px; zoom: 0.813; }
   .sheet-tools { display: none !important; }
-  @page { size: A4 portrait; margin: 14mm 12mm; }
+  @page { size: A4 portrait; margin: 8mm; }
 }
 .sheet-tools { max-width: 800px; margin: 0 auto 12px; display: flex; gap: 8px; }
 </style>
