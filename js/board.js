@@ -69,7 +69,8 @@ var SHSBoard = (function () {
       com: hicon('<circle cx="17" cy="17" r="6"/><circle cx="33" cy="19" r="5"/><path d="M6 38a11 11 0 0 1 22 0"/><path d="M28 38a9 9 0 0 1 14-7"/>'),
       doc: hicon('<path d="M14 6h14l8 8v28H14z"/><path d="M28 6v8h8"/><path d="M19 22h10M19 28h10M19 34h6"/>'),
       report: hicon('<rect x="12" y="8" width="24" height="34" rx="3"/><path d="M19 6h10v6H19z"/><path d="M18 22h12M18 28h12M18 34h8"/>'),
-      dues: hicon('<path d="M8 40h32"/><rect x="11" y="26" width="6" height="14"/><rect x="21" y="18" width="6" height="22"/><rect x="31" y="10" width="6" height="30"/>')
+      dues: hicon('<path d="M8 40h32"/><rect x="11" y="26" width="6" height="14"/><rect x="21" y="18" width="6" height="22"/><rect x="31" y="10" width="6" height="30"/>'),
+      me: hicon('<circle cx="24" cy="17" r="8"/><path d="M9 41a15 15 0 0 1 30 0"/>')
     };
 
     function hubCard(id, title, sub, extra) {
@@ -96,6 +97,7 @@ var SHSBoard = (function () {
       }
       cards += hubCard('doc', '서류 발급', '');
       cards += hubCard('report', '교회상황 보고서', '');
+      cards += hubCard('me', '내 정보', '사진 · 도장 · 연락처');
       /* 노회 사무실 계정은 개인 칸이 없으므로 상회비 전체를 카드로 둔다 */
       if (isSuper) cards += hubCard('dues', '상회비 전체', '관리 현황');
 
@@ -186,6 +188,8 @@ var SHSBoard = (function () {
         b.addEventListener('click', function () {
           /* 서류 발급은 서류 신청 화면으로 바로 간다 */
           if (b.dataset.hub === 'doc') { location.href = 'request.html'; return; }
+          /* 내 정보는 내 정보 화면으로 바로 간다 */
+          if (b.dataset.hub === 'me') { location.href = 'mypage.html'; return; }
           /* 나의 시찰은 그 시찰 화면으로 바로 간다 */
           if (b.dataset.hub === 'sichal' && hubSicLink) { location.href = hubSicLink; return; }
           location.hash = 'hub-' + b.dataset.hub;
