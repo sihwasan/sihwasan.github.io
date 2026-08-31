@@ -89,7 +89,8 @@ var SHSBoard = (function () {
       var cards = '';
       cards += hubCard('noti', '나의 알림', '', { badge: 'hub-badge-noti' });
       cards += hubCard('notice', '노회 공지', '');
-      cards += hubCard('sched', '노회 일정', '');
+      /* 노회장·서기·간사는 아래 노회 일정관리 카드로 일정을 보므로 따로 두지 않는다 */
+      if (!SHSAuth.canManageMembers(user)) cards += hubCard('sched', '노회 일정', '');
       if (!isSuper) {
         cards += hubCard('church', '나의 교회', '');
         cards += hubCard('sichal', '나의 시찰');
@@ -99,7 +100,7 @@ var SHSBoard = (function () {
       cards += hubCard('doc', '서류 발급', '');
       cards += hubCard('report', '교회상황 보고서', '');
       cards += hubCard('me', '내 정보', '사진 · 도장 · 연락처');
-      /* 노회장·서기·간사에게는 노회 일정관리 카드를 함께 둔다 */
+      /* 노회장·서기·간사에게는 노회 일정 카드 대신 노회 일정관리 카드를 둔다 */
       if (SHSAuth.canManageMembers(user)) cards += hubCard('schedmgr', '노회 일정관리', '달력 · 임직식');
       /* 노회 사무실 계정은 개인 칸이 없으므로 상회비 전체를 카드로 둔다 */
       if (isSuper) cards += hubCard('dues', '상회비 전체', '관리 현황');
