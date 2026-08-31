@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>청원서 작성 - 시화산노회</title>
+<meta name="description" content="시화산노회 청원서 작성 — 청빙·고시·이명·연기 등 각종 청원 서식을 채워 바로 인쇄합니다.">
+<link rel="canonical" href="https://sihwasan.org/petition.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="청원서 작성 - 시화산노회">
+<meta property="og:description" content="각종 청원 서식을 홈페이지에서 채워 바로 인쇄합니다.">
+<meta property="og:url" content="https://sihwasan.org/petition.html">
+<link rel="stylesheet" href="css/style.css?v=20260831zj">
+<style>
+/* ----- 작성 화면 ----- */
+.pt-pick { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 20px; }
+.pt-pick button {
+  border: 1px solid var(--gray-2); background: var(--white); border-radius: 8px;
+  padding: 8px 14px; font-size: 0.88rem; cursor: pointer; color: var(--ink);
+}
+.pt-pick button:hover { background: var(--gray-1); }
+.pt-pick button.active { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 700; }
+.pt-cat { flex-basis: 100%; font-size: 0.8rem; color: var(--gray-5); margin: 6px 0 -2px; font-weight: 700; }
+.pt-form { display: flex; flex-wrap: wrap; gap: 12px; max-width: 900px; margin-bottom: 18px; }
+.pt-form .field { flex: 1 1 200px; }
+.pt-form .field.wide { flex: 1 1 100%; }
+.pt-form label { display: block; font-size: 0.82rem; color: var(--gray-7); margin-bottom: 4px; }
+.pt-form input, .pt-form select, .pt-form textarea {
+  width: 100%; border: 1px solid var(--gray-2); border-radius: 8px;
+  padding: 8px 10px; font-size: 0.92rem; font-family: inherit; background: var(--white);
+}
+.pt-form textarea { min-height: 70px; resize: vertical; }
+.pt-actions { display: flex; gap: 10px; margin: 6px 0 22px; }
+
+/* ----- 미리보기 (A4 느낌) ----- */
+#pt-paper {
+  background: #fff; color: #111; max-width: 760px; margin: 0 auto;
+  padding: 60px 56px; border: 1px solid var(--gray-2); box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+  font-family: 'Noto Sans KR', sans-serif; font-size: 15px; line-height: 1.9;
+}
+#pt-paper h1.pt-title {
+  text-align: center; font-size: 26px; letter-spacing: 6px; margin: 0 0 8px;
+  text-decoration: underline; text-underline-offset: 8px; font-weight: 700; color: #111;
+}
+#pt-paper .pt-sub { text-align: center; font-size: 14px; margin: 0 0 26px; }
+#pt-paper .pt-date { margin: 20px 0 6px; }
+#pt-paper table.sbox {
+  border-collapse: collapse; margin: 14px 0 14px auto; font-size: 15px;
+}
+#pt-paper table.sbox td { border: 1px solid #333; padding: 10px 18px; }
+#pt-paper table.sbox td:first-child { letter-spacing: 8px; width: 150px; text-align: center; }
+#pt-paper table.sbox td:last-child { width: 120px; text-align: right; color: #555; font-size: 13px; }
+#pt-paper .signrow {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: 26px 0; font-size: 18px; font-weight: 700; flex-wrap: wrap; gap: 10px;
+}
+#pt-paper .signrow.r { justify-content: flex-end; }
+#pt-paper .addr { font-size: 21px; font-weight: 700; margin: 34px 0 24px; letter-spacing: 2px; }
+#pt-paper .body { text-indent: 2em; margin: 10px 0; }
+#pt-paper .arae { text-align: center; letter-spacing: 12px; margin: 22px 0 14px; }
+#pt-paper ol.items { list-style: none; padding-left: 40px; margin: 0; }
+#pt-paper ol.items li { margin: 10px 0; }
+#pt-paper .pv {
+  display: inline-block; border-bottom: 1px solid #333; min-width: 90px;
+  text-align: center; padding: 0 8px; font-weight: 700;
+}
+#pt-paper .pv.s { min-width: 50px; }
+#pt-paper .pv.l { min-width: 160px; }
+#pt-paper .dash { border: none; border-top: 2px dashed #666; margin: 34px 0; }
+#pt-paper .sec2 h1.pt-title { margin-top: 6px; }
+#pt-paper table.roster { border-collapse: collapse; width: 100%; margin: 10px 0; }
+#pt-paper table.roster th, #pt-paper table.roster td { border: 1px solid #333; padding: 7px 4px; text-align: center; font-size: 13px; height: 26px; }
+#pt-paper .pre { white-space: pre-wrap; }
+
+/* ----- 인쇄: 종이만 나온다 ----- */
+@media print {
+  body > *:not(#pt-print-wrap) { display: none !important; }
+  #pt-print-wrap { display: block !important; }
+  #pt-paper { border: none; box-shadow: none; padding: 0; max-width: none; margin: 0; }
+  @page { size: A4 portrait; margin: 18mm 16mm; }
+}
+#pt-print-wrap { display: block; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>청원서 작성</h1>
+    <div class="crumb">홈 &gt; 자료실 &gt; 청원서 작성</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <p>작성할 서식을 고르고 내용을 입력하면 아래에 완성된 청원서가 보입니다.
+    <strong>인쇄</strong>를 누르면 종이 서식 그대로 출력되며, 도장(인) 자리는 비워져 있으니 출력 후 날인해 주세요.</p>
+
+  <div class="pt-pick" id="pt-pick"></div>
+  <div class="pt-form" id="pt-form"></div>
+  <div class="pt-actions">
+    <button class="btn" id="pt-print">인쇄</button>
+    <button class="btn ghost" id="pt-clear">입력 지우기</button>
+  </div>
+
+  <div id="pt-print-wrap"><div id="pt-paper"></div></div>
+</main>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20260830d"></script>
+<script>
+(function () {
+  'use strict';
+  function e(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  /* 밑줄 빈칸: 값이 있으면 채우고 없으면 빈 밑줄 */
+  function u(v, cls) { return '<span class="pv' + (cls ? ' ' + cls : '') + '">' + e(v) + '</span>'; }
+  function juhu(d) {
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      var p = d.split('-');
+      return '주후 ' + Number(p[0]) + '년 ' + Number(p[1]) + '월 ' + Number(p[2]) + '일';
+    }
+    return '주후     년   월   일';
+  }
+  function sbox(label) {
+    return '<table class="sbox"><tr><td>' + (label || '시 찰 장') + '</td><td>(인)</td></tr></table>';
+  }
+  /* ___교회   당회장___(인) 서명줄 */
+  function signChurch(church, role, name) {
+    return '<div class="signrow"><span>' + u(church, 'l') + '교회</span>' +
+      '<span>' + (role || '당회장') + u(name, 'l') + '(인)</span></div>';
+  }
+  function signOnly(role, name) {
+    return '<div class="signrow r"><span>' + role + u(name, 'l') + '(인)</span></div>';
+  }
+  function addr(t) { return '<div class="addr">' + (t || '시화산노회장 귀하') + '</div>'; }
+  function arae() { return '<div class="arae">- 아     래 -</div>'; }
+  function items(arr) {
+    return '<ol class="items">' + arr.map(function (x, i) {
+      return '<li>' + (i + 1) + '. ' + x + '</li>';
+    }).join('') + '</ol>';
+  }
+
+  /* ================= 서식 정의 =================
+   * 노회 종이 서식(스캔본)을 그대로 옮겼다. render(d)는 인쇄용 HTML을 돌려준다. */
+  var FORMS = [
+
+  /* ---------- 청빙 ---------- */
+  { id: 'call', cat: '청빙', title: '청빙청원서',
+    fields: [
+      { k: 'kind', label: '청빙 구분', type: 'select',
+        opt: ['목사위임', '시무목사', '부목사', '부목사계속', '교육목사', '전도목사', '강도사', '전도사'] },
+      { k: 'name', label: '청빙 대상자 성명' },
+      { k: 'church', label: '교회명 (—교회의 "교회"는 빼고)' },
+      { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">' + u(d.kind) + ' 청빙청원서</h1>' +
+        '<p class="pt-sub">(목사위임. 시무. 부목사. 부목사계속. 교육목사. 전도목사. 강도사. 전도사)</p>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + ' 목사(위임, 시무, 부목사, ' +
+        '부목사계속, 교육목사, 전도목사, 강도사, 전도사)로 청빙하고저 별지 첨부하여 ' +
+        '청원하오니 허락하여 주시기를 바랍니다.</p>' +
+        '<p class="body">청빙 구분: <strong>' + e(d.kind || '') + '</strong></p>';
+    } },
+
+  { id: 'callletter', cat: '청빙', title: '청빙서 (교인 연서)',
+    fields: [
+      { k: 'si', label: '주소 (시)' }, { k: 'dong', label: '주소 (동)' },
+      { k: 'church', label: '교회명' },
+      { k: 'kind', label: '청빙 직위 (예: 위임목사)' },
+      { k: 'pay', label: '매월 생활비 (원)' }, { k: 'months', label: '지급 개월 수' },
+      { k: 'rice', label: '식량 (두)' },
+      { k: 'chair', label: '공동의회장 성명' },
+      { k: 'rows', label: '연서 서명칸 줄 수', type: 'select', opt: ['8', '12', '16', '20'] },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      var n = Number(d.rows || 8), rows = '';
+      for (var i = 0; i < n; i++) rows += '<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+      return '<h1 class="pt-title">청 빙 서</h1>' +
+        '<p style="margin-top:24px">주소 : ' + u(d.si) + ' 시 ' + u(d.dong) + ' 동</p>' +
+        '<p class="body">' + u(d.church) + '교회 교인들은 귀하께서 목사의 재덕과 능력을 구비하여 ' +
+        '우리 영혼의 신령적 유익을 선히 나누어 주실 줄로 확신하여 귀하를 본 교회 ' + u(d.kind) +
+        ' 목사로 청빙하오며, 겸하여 귀하께서 담임 시무기간 중에는 본 교인들이 모든 일에 편의와 위로를 도모하며, ' +
+        '주안에서 순복하고 주택과 매월 생활비 ' + u(d.pay) + '원정( ' + u(d.months, 's') + ' 개월)과 식량 ' +
+        u(d.rice, 's') + '두를 드리기로 서약하는 동시에 이를 확실히 증명하기 위하여 서명 날인하여 ' +
+        '청원하오니 허락하심을 바랍니다</p>' +
+        '<p style="text-align:right">' + juhu(d.date) + '</p>' +
+        '<p style="margin-top:16px"><strong>* 각 교인 연서 날인</strong></p>' +
+        '<table class="roster"><tr><th style="width:44px">순서</th><th>성명</th><th style="width:70px">직위</th><th style="width:44px">인</th>' +
+        '<th style="width:44px">순서</th><th>성명</th><th style="width:70px">직위</th><th style="width:44px">인</th></tr>' + rows + '</table>' +
+        '<div class="signrow r"><span>증인: 공동의회장 ' + u(d.chair, 'l') + '(인)</span></div>' + addr();
+    } },
+
+  { id: 'callassoc', cat: '청빙', title: '부목사 청빙청원서',
+    fields: [
+      { k: 'name', label: '청빙 대상자(강도사) 성명' },
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">부목사 청빙청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + ' 강도사를 목사안수 후 ' +
+        '부목사로 청빙하고자 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>';
+    } },
+
+  /* ---------- 고시·신학 ---------- */
+  { id: 'gosi', cat: '고시·신학', title: '고시 청원서 · 추천서',
+    fields: [
+      { k: 'kind', label: '응시 구분', type: 'select', opt: ['목사', '장로', '전도사', '목사후보생'] },
+      { k: 'name', label: '청원자 성명' },
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '추천일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">' + u(d.kind) + ' 고시 청원서</h1>' +
+        signChurch(d.church, '청원자', d.name) + addr('당회장 귀하') +
+        '<p class="body">본인은 (' + e(d.kind || '목사, 장로, 전도사, 목사후보생') +
+        ')고시에 응시하고자 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>' +
+        '<hr class="dash"><div class="sec2">' +
+        '<h1 class="pt-title">' + u(d.kind) + ' 고시 추천서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">위의 ' + u(d.name) + '씨가 (' + e(d.kind || '') +
+        ')고시에 응시하고자 하기에 추천하오니 허락하여 주시기를 바랍니다.</p></div>';
+    } },
+
+  { id: 'seminary', cat: '고시·신학', title: '신학입학 추천청원서 · 추천서',
+    fields: [
+      { k: 'school', label: '입학 학교', type: 'select', opt: ['총신대학신학대학원', '총회신학원'] },
+      { k: 'name', label: '청원자 성명' },
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '추천일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">신학입학 추천청원서</h1>' +
+        signChurch(d.church, '청원자', d.name) + addr('당회장 귀하') +
+        '<p class="body">본인은 ' + u(d.school, 'l') + '에 입학하고자 별지 첨부하여 청원하오니 ' +
+        '허락하여 주시기를 바랍니다.</p>' +
+        '<hr class="dash"><div class="sec2">' +
+        '<h1 class="pt-title">신학입학 추천서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">위의 ' + u(d.name) + '씨가 ' + u(d.school, 'l') +
+        '에 입학하고자 하기에 추천하오니 허락하여 주시기를 바랍니다.</p></div>';
+    } },
+
+  { id: 'semcont', cat: '고시·신학', title: '신학계속 청원서 · 추천서',
+    fields: [
+      { k: 'school', label: '학교', type: 'select', opt: ['총신대학신학대학원', '총회신학원'] },
+      { k: 'name', label: '청원자 성명' }, { k: 'birth', label: '생년월일', type: 'date' },
+      { k: 'course', label: '과정' }, { k: 'stno', label: '학번' },
+      { k: 'grade', label: '학년' }, { k: 'ban', label: '반' },
+      { k: 'year', label: '재학 연차 (년)' },
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '추천일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">신학계속 청원서</h1>' +
+        signChurch(d.church, '청원자', d.name) +
+        '<p style="font-size:14px">생년월일: ' + u(d.birth) + '   과정: ' + u(d.course, 's') +
+        '   학번: ' + u(d.stno, 's') + '   학년: ' + u(d.grade, 's') + '   반: ' + u(d.ban, 's') + '</p>' +
+        addr('당회장 귀하') +
+        '<p class="body">본인은 ' + u(d.school, 'l') + ' ' + u(d.year, 's') +
+        '년에 재학중 계속 수학하고자 청원하오니 허락하여 주시기를 바랍니다.</p>' +
+        '<hr class="dash"><div class="sec2">' +
+        '<h1 class="pt-title">신학계속 추천서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">본 교회 ' + u(d.name) + '씨가 ' + u(d.school, 'l') + ' ' + u(d.year, 's') +
+        '년에 계속 수학하고자 하기에 추천하오니 허락하여 주시기를 바랍니다.</p></div>';
+    } },
+
+  { id: 'gangdogosi', cat: '고시·신학', title: '강도사고시 추천청원서 · 추천서',
+    fields: [
+      { k: 'name', label: '청원자 성명' },
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '추천일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">강도사고시 추천청원서</h1>' +
+        signChurch(d.church, '청원자', d.name) + addr('당회장 귀하') +
+        '<p class="body">본인은 총신대학신학대학원, 총회신학원을 졸업하고 별지 첨부하여 ' +
+        '본 교단 강도사 고시에 응시하고자 추천청원 하오니 허락하여 주시기를 바랍니다.</p>' +
+        '<hr class="dash"><div class="sec2">' +
+        '<h1 class="pt-title">강도사고시 추천서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">위의 ' + u(d.name) + '씨가 강도사 고시에 응시하고자 하기에 추천하오니 ' +
+        '허락하여 주시기를 바랍니다.</p></div>';
+    } },
+
+  { id: 'gangdoinheo', cat: '고시·신학', title: '강도사인허 청원서 · 추천서',
+    fields: [
+      { k: 'name', label: '청원자 성명' },
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'date', label: '추천일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">강도사인허 청원서</h1>' +
+        signChurch(d.church, '청원자', d.name) + addr('당회장 귀하') +
+        '<p class="body">본인은 총회에서 실시한 강도사 고시에 합격하였기에 강도사인허를 ' +
+        '청원하오니 허락하여 주시기를 바랍니다.</p>' +
+        '<hr class="dash"><div class="sec2">' +
+        '<h1 class="pt-title">강도사인허 추천서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">위의 ' + u(d.name) + '씨가 강도사 인허하고자 하기에 추천하오니 ' +
+        '허락하여 주시기를 바랍니다.</p></div>';
+    } },
+
+  /* ---------- 장로 ---------- */
+  { id: 'elderorg', cat: '장로', title: '당회조직을 위한 장로허락 청원서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'cnt', label: '장로선거 인수' },
+      { k: 'baptized', label: '세례교인 수 (명)' }, { k: 'req', label: '장로허락청원수 (인)' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">당회조직을 위한 장로허락 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">' + u(d.church) + '교회에서 당회조직을 위하여 장로선거 ' + u(d.cnt, 's') +
+        '인을 청원하오니 허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['세 례 교 인 수 : ' + u(d.baptized, 's') + ' 명',
+               '장로허락청원수 : ' + u(d.req, 's') + ' 인']);
+    } },
+
+  { id: 'elderadd', cat: '장로', title: '장로 증원 청원서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'cnt', label: '증원 인수' },
+      { k: 'now', label: '현 시무 장로수' }, { k: 'baptized', label: '세례교인 수' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">장로 증원 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">본 ' + u(d.church) + '교회에서 장로 ' + u(d.cnt, 's') +
+        '인을 증원 청하오니 허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['현 시무 장로수 : ' + u(d.now, 's') + ' 인',
+               '세 례 교 인 수 : ' + u(d.baptized, 's') + ' 명']);
+    } },
+
+  { id: 'eldergosidelay', cat: '장로', title: '장로고시 연기 청원서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'name', label: '피택 장로명' }, { k: 'pick', label: '피택 연월일', type: 'date' },
+      { k: 'reason', label: '고시연기사유', type: 'textarea' }, { k: 'period', label: '연기 기간' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">장로고시 연기 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">본 교회 ' + u(d.name) + '씨가 장로고시를 연기 청원하오니 허락하여 ' +
+        '주시기를 바랍니다.</p>' + arae() +
+        items(['피택 장로명 : ' + u(d.name),
+               '피택 연월일 : ' + u(d.pick),
+               '고시연기사유 : <span class="pre">' + e(d.reason) + '</span>',
+               '연 기 기 간 : ' + u(d.period)]);
+    } },
+
+  { id: 'elderdelay', cat: '장로', title: '장로장립 연기 청원서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'name', label: '피택 장로명' }, { k: 'pass', label: '고시 합격일', type: 'date' },
+      { k: 'reason', label: '연기 사유', type: 'textarea' }, { k: 'period', label: '연기 기간' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">장로장립 연기 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">본 교회 ' + u(d.name) + '씨가 장로 장립을 아래와 같이 연기 청원하오니 ' +
+        '허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['피택 장로명 : ' + u(d.name),
+               '고시 합격일 : ' + u(d.pass),
+               '연 기 사 유 : <span class="pre">' + e(d.reason) + '</span>',
+               '연 기 기 간 : ' + u(d.period)]);
+    } },
+
+  /* ---------- 교회 ---------- */
+  { id: 'join', cat: '교회', title: '교회가입 청원서',
+    fields: [
+      { k: 'church', label: '교회명' },
+      { k: 'temp', label: '임시당회장 성명' }, { k: 'founder', label: '설립자대표 성명' },
+      { k: 'addr2', label: '교회 소재지', cls: 'wide' }, { k: 'founded', label: '신설 년월일', type: 'date' },
+      { k: 'cname', label: '교회 명칭' }, { k: 'land', label: '대지 및 건물' },
+      { k: 'sustain', label: '교회 유지 방법' },
+      { k: 'baptized', label: '세례교인 수' }, { k: 'learner', label: '학습교인 수' },
+      { k: 'wonip', label: '원입교인 수' }, { k: 'sunday', label: '주일학교 학생수' },
+      { k: 'dist', label: '인근 교회와의 거리' }, { k: 'homes', label: '구역 가구 수' },
+      { k: 'contact', label: '연락처' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">교회가입 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' +
+        '<div class="signrow"><span>' + u(d.church, 'l') + '교회</span>' +
+        '<span style="text-align:right">임시당회장' + u(d.temp, 'l') + '(인)<br>설립자대표' + u(d.founder, 'l') + '(인)</span></div>' +
+        addr() +
+        '<p class="body">본 교회는 귀 노회에 가입하고자 별지 교인서명 공증서 첨부하여 ' +
+        '청원하오니 허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['교 회 소 재 지 : ' + u(d.addr2, 'l'),
+               '신 설 년 월 일 : ' + u(d.founded),
+               '교 회 명 칭 : ' + u(d.cname),
+               '대 지 및 건 물 : ' + u(d.land, 'l'),
+               '교회 유지 방법 : ' + u(d.sustain, 'l'),
+               '교 인 수 : ① 세례교인 ' + u(d.baptized, 's') + ' ② 학습교인 ' + u(d.learner, 's') +
+               ' ③ 원입교인 ' + u(d.wonip, 's') + ' ④ 주일학교 학생수 ' + u(d.sunday, 's'),
+               '인근 교회와의 거리 : ' + u(d.dist),
+               '구 역 가 구 수 : ' + u(d.homes, 's'),
+               '연 락 처 : ' + u(d.contact, 'l')]);
+    } },
+
+  { id: 'rename', cat: '교회', title: '교회명칭(주소) 변경청원서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'before', label: '전(前) 명칭(주소)', cls: 'wide' },
+      { k: 'after', label: '현(現) 명칭(주소)', cls: 'wide' },
+      { k: 'reason', label: '사유', type: 'textarea', cls: 'wide' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">교회명칭(주소) 변경청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">' + u(d.church) + '교회는 사정에 따라 교회의 명칭(주소)을 아래와 같이 ' +
+        '청원하오니 허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['전(前)명칭(주소) : ' + u(d.before, 'l'),
+               '현(現)명칭(주소) : ' + u(d.after, 'l'),
+               '사    유 : <span class="pre">' + e(d.reason) + '</span>']);
+    } },
+
+  { id: 'selfsupport', cat: '교회', title: '교회자립지원신청서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'own', label: '자가/임대', type: 'select', opt: ['자가', '임대'] },
+      { k: 'deposit', label: '보증금 (만원)' }, { k: 'rent', label: '월세 (만원)' },
+      { k: 'adult', label: '교인수 장년 (명)' }, { k: 'student', label: '교인수 학생 (명)' }, { k: 'child', label: '교인수 아동 (명)' },
+      { k: 'famtotal', label: '가족 총원 (명)' }, { k: 'univ', label: '대학생 (명)' },
+      { k: 'high', label: '고등학생 (명)' }, { k: 'mid', label: '중학생 (명)' }, { k: 'ele', label: '초등학생 (명)' },
+      { k: 'budget', label: '전년도 교회결산금액 (만원)' }, { k: 'subsidy', label: '타교회·기관보조금 (만원)' },
+      { k: 'etc', label: '기타운영현황', type: 'textarea', cls: 'wide' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">교회자립지원신청서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' +
+        signChurch(d.church, '당회장', d.dang) +
+        addr('시화산노회 교회자립지원위원회 위원장 귀하') +
+        '<p class="body">본 (' + u(d.church) + ')교회는 아직 미자립교회로서 교회자립신청을 위해 ' +
+        '아래와 같이 별지 첨부하여 청원하오니 허락하여 주시기를 바라나이다.</p>' + arae() +
+        items(['교회 현황 : (' + e(d.own || '자가, 임대') + '). 보증금 (' + u(d.deposit, 's') + '만원), 월 (' + u(d.rent, 's') +
+               '만원),<br>    교인수 (장년 ' + u(d.adult, 's') + '명, 학생 ' + u(d.student, 's') + '명, 아동 ' + u(d.child, 's') + '명)',
+               '가족현황 : 총 ' + u(d.famtotal, 's') + '명 (대학생 ' + u(d.univ, 's') + '명, 고등학생 ' + u(d.high, 's') +
+               '명, 중학생 ' + u(d.mid, 's') + '명, 초등학생 ' + u(d.ele, 's') + '명)',
+               '전년도 교회결산금액 (' + u(d.budget, 's') + '만원), 타교회 및 기관보조금 (' + u(d.subsidy, 's') + '만원)',
+               '기타운영현황 : <span class="pre">' + e(d.etc) + '</span>']) +
+        '<p style="text-align:center;margin-top:26px"><strong>위 내용은 사실대로 기록하였음을 서약합니다.</strong></p>' +
+        signOnly('당회장', d.dang);
+    } },
+
+  /* ---------- 이명 ---------- */
+  { id: 'movein', cat: '이명', title: '이명 이래 청원서 (전입)',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'kind', label: '대상 구분', type: 'select', opt: ['목사', '강도사', '목사후보생'] },
+      { k: 'name', label: '이명자 성명' },
+      { k: 'fromno', label: '이명 노회 (오는 곳)' }, { k: 'fromch', label: '이명 교회 (오는 곳)' },
+      { k: 'reason', label: '이명 사유', type: 'textarea' },
+      { k: 'birth', label: '생년월일', type: 'date' },
+      { k: 'ansu', label: '안수 연월일 (강도사인허일·고시합격일)', type: 'date' },
+      { k: 'addr2', label: '주소', cls: 'wide' }, { k: 'contact', label: '연락처' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">이명 이래 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">아래와 같이 ' + u(d.name) + ' ' + e(d.kind || '목사') + '(강도사,후보생)를 ' +
+        u(d.fromno) + ' 노회로 이명 이래 하고자 청원 하오니 허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['이 명 자 성 명 : ' + u(d.name),
+               '이명노회 및 교회 : ' + u(d.fromno) + ' 노회 ' + u(d.fromch) + ' 교회에서',
+               '이 명 사 유 : <span class="pre">' + e(d.reason) + '</span>',
+               '생 년 월 일 : ' + u(d.birth),
+               '안 수 연 월 일 : ' + u(d.ansu) + ' <span style="font-size:12px">(강도사인허일, 고시합격일)</span>',
+               '주    소 : ' + u(d.addr2, 'l'),
+               '연 락 처 : ' + u(d.contact, 'l')]);
+    } },
+
+  { id: 'moveout', cat: '이명', title: '이명 이거 청원서 (전출)',
+    fields: [
+      { k: 'name', label: '본인 성명' }, { k: 'birth', label: '생년월일', type: 'date' },
+      { k: 'tono', label: '이명 갈 노회' },
+      { k: 'toch', label: '이명 갈 교회' },
+      { k: 'dang', label: '당회장 성명' },
+      { k: 'reason', label: '이명 사유', type: 'textarea' },
+      { k: 'addr2', label: '이명지 주소', cls: 'wide' }, { k: 'contact', label: '연락처' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">이명 이거 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signOnly('당회장', d.dang) + addr() +
+        '<p class="body">아래와 같은 본인 ' + u(d.name) + ' 목사는 ' + u(d.tono) +
+        ' 노회로 이명이거 하고자 청원하오니 허락하여 주시기 바랍니다.</p>' + arae() +
+        items(['성명 및 생년월일 : ' + u(d.name) + '   ' + u(d.birth),
+               '이명노회 및 교회 : ' + u(d.tono) + ' 노회 ' + u(d.toch) + ' 교회',
+               '이 명 사 유 : <span class="pre">' + e(d.reason) + '</span>',
+               '이 명 지 주 소 : ' + u(d.addr2, 'l'),
+               '연 락 처 : ' + u(d.contact, 'l')]);
+    } },
+
+  /* ---------- 목사 ---------- */
+  { id: 'wiimdelay', cat: '목사', title: '목사위임 연기 청원서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'name', label: '목사명' }, { k: 'callDate', label: '청빙 년월일', type: 'date' },
+      { k: 'period', label: '연기 기간' }, { k: 'reason', label: '연기 사유', type: 'textarea' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">목사위임 연기 청원서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">본 교회 ' + u(d.name) + ' 목사 위임을 아래와 같이 연기 청원하오니 ' +
+        '허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['목 사 명 : ' + u(d.name),
+               '청빙년월일 : ' + u(d.callDate),
+               '연기 기간 : ' + u(d.period),
+               '연기 사유 : <span class="pre">' + e(d.reason) + '</span>']);
+    } },
+
+  { id: 'resign', cat: '목사', title: '목사 시무 사면서',
+    fields: [
+      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
+      { k: 'workChurch', label: '시무 교회' }, { k: 'startDate', label: '부임 년월일', type: 'date' },
+      { k: 'reason', label: '사면 사유', type: 'textarea', cls: 'wide' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">목사 시무 사면서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
+        signChurch(d.church, '당회장', d.dang) + addr() +
+        '<p class="body">위 본인이 아래와 같이 사면하고자 하오니 허락하여 주시기를 바랍니다.</p>' + arae() +
+        items(['시 무 교 회 : ' + u(d.workChurch),
+               '부임 년월일 : ' + u(d.startDate),
+               '사 면 사 유 : <span class="pre">' + e(d.reason) + '</span>']);
+    } },
+
+  /* ---------- 보고서 ---------- */
+  { id: 'sichalreport', cat: '보고서', title: '시찰보고서',
+    fields: [
+      { k: 'sichal', label: '시찰명 (예: 북부)' },
+      { k: 'sichaljang', label: '시찰장 성명' }, { k: 'clerk', label: '서기 성명' },
+      { k: 'session', label: '회기 (제 몇 회기)' },
+      { k: 'i1', label: '1. 교역자 이동건', type: 'textarea', cls: 'wide' },
+      { k: 'i2', label: '2. 감사한일', type: 'textarea', cls: 'wide' },
+      { k: 'i3', label: '3. 장로장립 및 사면건', type: 'textarea', cls: 'wide' },
+      { k: 'i4', label: '4. 교회신축 및 증축건', type: 'textarea', cls: 'wide' },
+      { k: 'i5', label: '5. 각종 집회건', type: 'textarea', cls: 'wide' },
+      { k: 'i6', label: '6. 당회장 임명건', type: 'textarea', cls: 'wide' },
+      { k: 'p1', label: '교세: 목사 수' }, { k: 'p2', label: '장로 수' },
+      { k: 'p3', label: '강도사 수' }, { k: 'p4', label: '전도사 수' },
+      { k: 'p5', label: '무임장로 수' }, { k: 'p6', label: '권사 수' },
+      { k: 'p7', label: '집사 수' }, { k: 'p8', label: '교인 수' },
+      { k: 'i8', label: '8. 안건추이', type: 'textarea', cls: 'wide' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">' + u(d.sichal) + ' 시찰보고서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' +
+        signOnly('시 찰 장', d.sichaljang) + signOnly('서    기', d.clerk) + addr() +
+        '<p class="body">제 ' + u(d.session, 's') + '회기간 본 시찰회 상황을 아래 별지와 같이 보고합니다.</p>' +
+        '<div class="arae">- 아  래  별  지 -</div>' +
+        items(['교역자 이동건 : <span class="pre">' + e(d.i1) + '</span>',
+               '감사한일 : <span class="pre">' + e(d.i2) + '</span>',
+               '장로장립 및 사면건 : <span class="pre">' + e(d.i3) + '</span>',
+               '교회신축 및 증축건 : <span class="pre">' + e(d.i4) + '</span>',
+               '각종 집회건 : <span class="pre">' + e(d.i5) + '</span>',
+               '당회장 임명건 : <span class="pre">' + e(d.i6) + '</span>',
+               '교세보고: ① 목사수 ' + u(d.p1, 's') + ' ② 장로수 ' + u(d.p2, 's') +
+               ' ③ 강도사수 ' + u(d.p3, 's') + ' ④ 전도사수 ' + u(d.p4, 's') +
+               '<br>    ⑤ 무임장로수 ' + u(d.p5, 's') + ' ⑥ 권사수 ' + u(d.p6, 's') +
+               ' ⑦ 집사수 ' + u(d.p7, 's') + ' ⑧ 교인수 ' + u(d.p8, 's'),
+               '안건추이 : <span class="pre">' + e(d.i8) + '</span>']);
+    } },
+
+  { id: 'deptreport', cat: '보고서', title: '부 사업보고서',
+    fields: [
+      { k: 'dept', label: '부서명 (예: 전도)' },
+      { k: 'head', label: '부장 성명' }, { k: 'clerk', label: '서기 성명' },
+      { k: 'work', label: '1. 사업실적', type: 'textarea', cls: 'wide' },
+      { k: 'money', label: '2. 회계상황', type: 'textarea', cls: 'wide' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">' + u(d.dept) + ' 사업보고서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' +
+        signOnly('부    장', d.head) + signOnly('서    기', d.clerk) + addr() +
+        '<p class="body">본 ' + u(d.dept) + '부는 아래와 같이 사업보고 하오니 받아 주시기를 바랍니다.</p>' + arae() +
+        items(['사업실적 : <span class="pre">' + e(d.work) + '</span>',
+               '회계상황 : <span class="pre">' + e(d.money) + '</span>']);
+    } },
+
+  { id: 'deptorg', cat: '보고서', title: '부 조직 보고서',
+    fields: [
+      { k: 'dept', label: '부서명 (예: 전도)' },
+      { k: 'head', label: '부장 성명' }, { k: 'clerk', label: '서기 성명' },
+      { k: 'acct', label: '회계 성명' },
+      { k: 'members', label: '부원 명단', type: 'textarea', cls: 'wide' },
+      { k: 'date', label: '작성일', type: 'date' }
+    ],
+    render: function (d) {
+      return '<h1 class="pt-title">' + u(d.dept) + ' 부 조직 보고서</h1>' +
+        '<div class="pt-date">' + juhu(d.date) + '</div>' +
+        signOnly('부    장', d.head) + signOnly('서    기', d.clerk) + addr() +
+        '<p class="body">본 ' + u(d.dept) + '부는 아래와 같이 조직보고 하오니 받아 주시기를 바랍니다.</p>' + arae() +
+        items(['부    장 : ' + u(d.head),
+               '서    기 : ' + u(d.clerk),
+               '회    계 : ' + u(d.acct),
+               '부    원 : <span class="pre">' + e(d.members) + '</span>']);
+    } }
+  ];
+
+  /* ================= 화면 구성 ================= */
+  var cur = FORMS[0];
+  var data = {};
+
+  function renderPick() {
+    var box = document.getElementById('pt-pick');
+    var cats = [];
+    FORMS.forEach(function (f) { if (cats.indexOf(f.cat) === -1) cats.push(f.cat); });
+    var h = '';
+    cats.forEach(function (c) {
+      h += '<div class="pt-cat">' + e(c) + '</div>';
+      FORMS.filter(function (f) { return f.cat === c; }).forEach(function (f) {
+        h += '<button data-pt="' + f.id + '"' + (cur.id === f.id ? ' class="active"' : '') + '>' +
+          e(f.title) + '</button>';
+      });
+    });
+    box.innerHTML = h;
+    box.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        cur = FORMS.filter(function (f) { return f.id === b.dataset.pt; })[0];
+        data = {};
+        renderPick(); renderForm(); renderPaper();
+      });
+    });
+  }
+
+  function renderForm() {
+    var box = document.getElementById('pt-form');
+    var h = '';
+    cur.fields.forEach(function (f) {
+      h += '<div class="field' + (f.cls === 'wide' || f.type === 'textarea' ? ' wide' : '') + '">' +
+        '<label for="ptf-' + f.k + '">' + e(f.label) + '</label>';
+      if (f.type === 'select') {
+        h += '<select id="ptf-' + f.k + '" data-ptf="' + f.k + '"><option value=""></option>' +
+          f.opt.map(function (o) { return '<option>' + e(o) + '</option>'; }).join('') + '</select>';
+      } else if (f.type === 'textarea') {
+        h += '<textarea id="ptf-' + f.k + '" data-ptf="' + f.k + '"></textarea>';
+      } else {
+        h += '<input type="' + (f.type || 'text') + '" id="ptf-' + f.k + '" data-ptf="' + f.k + '">';
+      }
+      h += '</div>';
+    });
+    box.innerHTML = h;
+    box.querySelectorAll('[data-ptf]').forEach(function (el) {
+      el.addEventListener('input', function () { data[el.dataset.ptf] = el.value; renderPaper(); });
+      el.addEventListener('change', function () { data[el.dataset.ptf] = el.value; renderPaper(); });
+    });
+    /* 작성일은 오늘로 미리 채운다 */
+    var dEl = box.querySelector('#ptf-date');
+    if (dEl && !dEl.value) {
+      var t = new Date();
+      dEl.value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
+      data.date = dEl.value;
+    }
+  }
+
+  function renderPaper() {
+    document.getElementById('pt-paper').innerHTML = cur.render(data);
+  }
+
+  document.getElementById('pt-print').addEventListener('click', function () { window.print(); });
+  document.getElementById('pt-clear').addEventListener('click', function () {
+    data = {}; renderForm(); renderPaper();
+  });
+
+  renderPick(); renderForm(); renderPaper();
+})();
+</script>
+</body>
+</html>
