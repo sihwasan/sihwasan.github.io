@@ -1916,7 +1916,14 @@ td[data-duch]:hover { background: #eef2f8; }
 /* ---------- 대시보드 허브 (카드형) ----------
  * 참조 디자인: 따뜻한 베이지 바탕 + 선으로 그린 흰 아이콘 카드 */
 .dash-hub { background:#b9ac9d; border-radius:16px; padding:40px 34px; display:flex; gap:36px; flex-wrap:wrap; }
-.hub-left { flex:1 1 300px; align-self:center; min-width:260px; }
+.hub-left {
+  flex:1 1 300px; align-self:stretch; min-width:260px;
+  display:flex; flex-direction:column; justify-content:center;
+  padding:12px 28px;
+}
+/* 대시보드 내 사진: 좌우 가운데, 위아래 여백을 고르게 */
+#hub-photo { align-self:center; margin:6px 0 26px; }
+#hub-photo img { display:block; }
 .hub-label { font-size:0.85rem; letter-spacing:2px; color:#f7f3ec; opacity:.9; }
 .hub-title { font-size:1.85rem; line-height:1.5; color:#fdfbf7; font-weight:600; margin:14px 0 14px; font-family:'Noto Serif KR', serif; }
 .hub-title strong { color:#4a3f32; font-weight:700; }
