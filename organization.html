@@ -45,7 +45,7 @@
       <h2>증경노회장단</h2>
       <p>역대 노회를 섬기고 퇴임하신 목사 노회장과 장로 부노회장입니다.</p>
       <table class="tbl" style="max-width:720px">
-        <thead><tr><th>구분</th><th>성명</th><th>직분</th><th>시무교회</th><th>회기</th></tr></thead>
+        <thead><tr><th>구분</th><th>성명</th><th>직분</th><th>회기</th></tr></thead>
         <tbody id="veterans-body"></tbody>
       </table>
     </div>
@@ -89,7 +89,7 @@
     <div id="mem-vet-wrap" class="hidden">
       <h3>증경노회장단</h3>
       <table class="tbl" style="max-width:640px">
-        <thead><tr><th>번호</th><th>구분</th><th>성명</th><th>직분</th><th>시무교회</th></tr></thead>
+        <thead><tr><th>번호</th><th>구분</th><th>성명</th><th>직분</th></tr></thead>
         <tbody id="mem-vet-body"></tbody>
       </table>
     </div>
@@ -241,6 +241,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function renderVeterans(list) {
     if (!list.length) return;
+    /* 목사(증경노회장)를 위에, 장로(증경부노회장)를 아래에 둔다 */
+    list = list.slice().sort(function (a, b) {
+      function rank(o) {
+        if ((o.position || '').indexOf('목사') !== -1 || o.role === '증경노회장') return 0;
+        return 1;
+      }
+      return rank(a) - rank(b);
+    });
     var wrap = document.getElementById('veterans-wrap');
     var tb = document.getElementById('veterans-body');
     if (wrap && tb) {
@@ -248,7 +256,6 @@ document.addEventListener('DOMContentLoaded', function () {
       tb.innerHTML = list.map(function (o) {
         return '<tr><td><span class="role-badge">' + e(o.role || '') + '</span></td>' +
           '<td>' + e(o.name || '') + '</td><td>' + e(o.position || '-') + '</td>' +
-          '<td>' + e(o.church || '-') + '</td>' +
           '<td>' + (o.session_no ? '제' + e(o.session_no) + '회기' : '-') + '</td></tr>';
       }).join('');
     }
@@ -261,8 +268,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<tr><td>' + (i + 1) + '</td>' +
           '<td>' + e(o.role || '') + '</td>' +
           '<td>' + mlink(o.name || '', o.church || '') + '</td>' +
-          '<td>' + e(o.position || '-') + '</td>' +
-          '<td>' + e(o.church || '-') + '</td></tr>';
+          '<td>' + e(o.position || '-') + '</td></tr>';
       }).join('');
     }
   }
