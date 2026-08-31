@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260831d"></script>
+<script src="js/main.js?v=20260831e"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
@@ -157,27 +157,38 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div id="delegate-area"><p style="color:var(--gray-5)">총대 명단을 불러오는 중...</p></div>';
       html += '<h2>이사 관리</h2>';
       html += '<div id="board-area"><p style="color:var(--gray-5)">이사 명단을 불러오는 중...</p></div>';
-      html += '<h2>시찰회 관리</h2>';
+      html += '<h2>시찰회 임원 관리</h2>';
       html += '<div id="sichal-area"><p style="color:var(--gray-5)">시찰 정보를 불러오는 중...</p></div>';
-      html += '<h2>상비부 배정 관리</h2>';
-      html += '<div id="committee-area"><p style="color:var(--gray-5)">상비부 정보를 불러오는 중...</p></div>';
-      /* 상비부 대시보드는 예전에 따로 있던 화면이었으나 여기 탭으로 들어왔다.
-       * 그리는 일은 js/dashboard.js 한 곳에 있으므로 상비부 대시보드 화면과
-       * 늘 같은 모습이다. */
-      html += '<h2>상비부 대시보드</h2>';
-      html += '<div id="db-panel"><p style="color:var(--gray-5)">상비부 대시보드를 불러오는 중...</p></div>';
+
+      /* 상비부 배정·대시보드는 관리자 메뉴의 <상비부 관리>(?view=com)로 분리했다 */
+      var VIEW_COM = /[?&]view=com/.test(location.search);
+      if (VIEW_COM) {
+        html = '<div class="notice-banner">상비부 배정과 상비부 대시보드를 관리합니다. ' +
+          '회원·명단·시찰은 <a href="admin.html" style="text-decoration:underline"><strong>회원 관리</strong></a>에서 다룹니다.</div>';
+        html += '<h2>상비부 배정 관리</h2>';
+        html += '<div id="committee-area"><p style="color:var(--gray-5)">상비부 정보를 불러오는 중...</p></div>';
+        /* 그리는 일은 js/dashboard.js 한 곳에 있으므로 상비부 대시보드 화면과 늘 같은 모습이다. */
+        html += '<h2>상비부 대시보드</h2>';
+        html += '<div id="db-panel"><p style="color:var(--gray-5)">상비부 대시보드를 불러오는 중...</p></div>';
+        var ph = document.querySelector('.page-head h1');
+        if (ph) ph.textContent = '상비부 관리';
+        document.title = '상비부 관리 - 시화산노회';
+      }
 
       area.innerHTML = html;
       SHS.sectionize(area);
-      SHSDash.mount(document.getElementById('db-panel'), user);
-      renderRoster();
-      renderChurches();
-      renderElders();
-      renderOrdinations();
-      renderDelegates();
-      renderBoards();
-      renderSichals();
-      renderCommittees();
+      if (VIEW_COM) {
+        SHSDash.mount(document.getElementById('db-panel'), user);
+        renderCommittees();
+      } else {
+        renderRoster();
+        renderChurches();
+        renderElders();
+        renderOrdinations();
+        renderDelegates();
+        renderBoards();
+        renderSichals();
+      }
 
       function updateRole(id, grade, label) {
         var g = parseGrade(grade);

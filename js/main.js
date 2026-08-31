@@ -90,6 +90,7 @@
   var ADMIN_NAV = { title: '관리자', href: 'manage.html', sub: [
     { t: '사이트 관리', h: 'manage.html' },
     { t: '회원 관리', h: 'admin.html' },
+    { t: '상비부 관리', h: 'admin.html?view=com' },
     { t: '서류 발급', h: 'documents.html' },
     { t: '자료·회칙 관리', h: 'archive-edit.html' },
     { t: '직인·도장', h: 'settings.html' }
