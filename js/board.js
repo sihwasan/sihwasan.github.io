@@ -90,7 +90,7 @@ var SHSBoard = (function () {
       cards += hubCard('sched', '노회 일정', '');
       if (!isSuper) {
         cards += hubCard('church', '나의 교회', '');
-        cards += hubCard('sichal', '나의 시찰', '납부 현황');
+        cards += hubCard('sichal', '나의 시찰');
         cards += hubCard('mydues', '나의 상회비', '세례의무금');
         cards += hubCard('com', '내가 맡은 부서', '');
       }
