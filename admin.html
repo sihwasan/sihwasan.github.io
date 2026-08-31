@@ -140,10 +140,12 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<div class="tabs" id="eld-tabs" style="margin-bottom:14px">' +
         '<button class="active" data-et="selder">시무장로</button>' +
         '<button data-et="elder">총대장로</button>' +
-        '<button data-et="relder">원로장로</button></div>';
+        '<button data-et="relder">원로장로</button>' +
+        '<button data-et="xelder">은퇴장로</button></div>';
       html += '<div id="selder-area"><p style="color:var(--gray-5)">시무장로 명단을 불러오는 중...</p></div>';
       html += '<div id="elder-area" class="hidden"><p style="color:var(--gray-5)">장로 총대를 불러오는 중...</p></div>';
       html += '<div id="relder-area" class="hidden"><p style="color:var(--gray-5)">원로장로 명단을 불러오는 중...</p></div>';
+      html += '<div id="xelder-area" class="hidden"><p style="color:var(--gray-5)">은퇴장로 명단을 불러오는 중...</p></div>';
       html += '<h2>안수·인허 명단</h2>';
       html += '<div id="ord-area"><p style="color:var(--gray-5)">안수·인허 명단을 불러오는 중...</p></div>';
       html += '<h2>총회 총대 명단</h2>';
@@ -184,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function () {
             area.querySelectorAll('#eld-tabs button').forEach(function (x) {
               x.classList.toggle('active', x === b);
             });
-            ['selder', 'elder', 'relder'].forEach(function (k) {
+            ['selder', 'elder', 'relder', 'xelder'].forEach(function (k) {
               document.getElementById(k + '-area').classList.toggle('hidden', k !== b.dataset.et);
             });
           });
@@ -1783,7 +1785,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       drawList(sbox, ['시무장로'], '시무장로', true);
-      drawList(rbox, ['원로장로', '은퇴장로'], '원로장로·은퇴장로', false);
+      drawList(rbox, ['원로장로'], '원로장로', false);
+      drawList(document.getElementById('xelder-area'), ['은퇴장로'], '은퇴장로', false);
     });
   }
 
