@@ -1466,7 +1466,7 @@ document.addEventListener('DOMContentLoaded', function () {
         SHSCloud.init().then(function (c) {
           return c.from('committees').select('*').order('sort');
         }).then(function (r) {
-          var cell = mo.ov.querySelector('#rv-coms td');
+          var cell = mo.ov.querySelector('#rv-coms td:last-child');
           if (!cell) return;
           function firstWord(s) { return String(s || '').trim().split(/[\s(]/)[0]; }
           function names(s) {
