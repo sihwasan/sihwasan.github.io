@@ -33,10 +33,11 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 고시 과목 (노회규칙 제7장 22~23조 / 고시부 가이드북) */
   var TRACKS = [
     { v: '목사',       subs: '목회학 · 권징조례 · 신조 · 예배모범' },
-    { v: '장로',       subs: '정치 · 권징조례 · 신조 · 상식 · 소요리' },
-    { v: '전도사',     subs: '상식 · 영어' },
-    { v: '목사후보생', subs: '상식 · 영어' }
+    { v: '장로',       subs: '성경 · 정치 · 권징조례 · 신조 · 상식 · 소요리' },
+    { v: '전도사',     subs: '성경 · 상식 · 영어' },
+    { v: '목사후보생', subs: '성경 · 상식 · 영어' }
   ];
+  var exBibleOff = false;   /* 성경 제외하기: 수료증으로 대체하는 분을 위한 선택 */
 
   function subjectTable() {
     return '<h2>구분별 고시 과목</h2>' +
@@ -47,7 +48,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }).join('') + '</tbody></table>' +
       '<p style="font-size:0.84rem;color:var(--gray-5)">' +
       '· 면접은 모든 응시자 공통이며 필기가 아니므로 모의고사에서 제외됩니다.<br>' +
-      '· 성경 과목은 성경통신 신구약 수료증으로 대체되므로 모의고사에 포함되지 않습니다.<br>' +
+      '· 성경은 성경통신 신구약 수료증으로 대체할 수 있습니다. 수료증으로 대체하실 분은 ' +
+      '시험 시작 전 <strong>성경 제외하기</strong>를 누르시면 성경을 빼고 출제됩니다.<br>' +
       '· 실제 고시 합격 기준은 전 과목 평균 60점 이상입니다.</p>';
   }
 
@@ -94,6 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var t = TRACKS.filter(function (x) { return x.v === track; })[0];
     if (!t) return { total: 0, rows: [] };
     var subs = t.subs.split(' · ');
+    if (exBibleOff) subs = subs.filter(function (s) { return s !== '성경'; });
     var rows = subs.map(function (name) {
       var have = counts[name] || 0;
       return { name: name, have: have, take: Math.min(have, per) };
@@ -124,8 +127,13 @@ document.addEventListener('DOMContentLoaded', function () {
       [5, 10, 15, 20, 25, 30].map(function (n) {
         return '<option value="' + n + '"' + (n === 10 ? ' selected' : '') + '>' + n + '문항</option>';
       }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>성경 과목</label>' +
+      '<button class="btn ' + (exBibleOff ? '' : 'ghost ') + 'sm" id="ex-bible" type="button" ' +
+      'style="width:100%">' + (exBibleOff ? '성경 제외됨 (다시 넣기)' : '성경 제외하기') + '</button></div>' +
       '<button class="btn" id="ex-start">시험 시작</button>' +
       '</div>' +
+      '<p style="font-size:0.8rem;color:var(--gray-5);margin:6px 0 0">성경은 성경통신 신구약 수료증으로 ' +
+      '대체할 수 있습니다. 수료증으로 대체하실 분은 성경 제외하기를 누르고 응시하세요.</p>' +
       '<div id="ex-plan" style="margin-top:12px"></div>' +
       '<div class="form-msg" id="ex-smsg"></div></div>';
 
@@ -180,6 +188,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('ex-track').addEventListener('change', showPlan);
     document.getElementById('ex-count').addEventListener('change', showPlan);
+    document.getElementById('ex-bible').addEventListener('click', function () {
+      exBibleOff = !exBibleOff;
+      var b = document.getElementById('ex-bible');
+      b.textContent = exBibleOff ? '성경 제외됨 (다시 넣기)' : '성경 제외하기';
+      b.className = 'btn ' + (exBibleOff ? '' : 'ghost ') + 'sm';
+      showPlan();
+    });
     showPlan();
 
     document.getElementById('ex-start').addEventListener('click', function () {
@@ -189,7 +204,8 @@ document.addEventListener('DOMContentLoaded', function () {
       db().then(function (c) {
         return c.rpc('start_exam', {
           p_track: track,
-          p_per_subject: parseInt(document.getElementById('ex-count').value, 10) || 10
+          p_per_subject: parseInt(document.getElementById('ex-count').value, 10) || 10,
+          p_exclude: exBibleOff ? ['성경'] : null
         });
       }).then(function (r) {
         if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }

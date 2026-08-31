@@ -46,12 +46,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 분류. 순서대로 위쪽 띠에 나타난다. */
   var SECTIONS = [
+    { key: '서식',     desc: '노회에 올리는 각종 청원 서식입니다.' },
+    { key: '고시',     desc: '목사·장로·전도사·목사후보생 고시 모의고사입니다.' },
     { key: '회의자료', desc: '정기노회 회의순서(노회 책자)와 각 부 보고서 등 회의에 쓰인 자료입니다.' },
     { key: '결의사항', desc: '정기노회와 임원회에서 결의한 내용입니다.' },
     { key: '규칙',     desc: '노회규칙 전문입니다.' },
     { key: '내규',     desc: '각 위원회와 부서의 내규입니다.' },
-    { key: '서식',     desc: '노회에 올리는 각종 청원 서식입니다.' },
-    { key: '고시',     desc: '목사·장로·전도사·목사후보생 고시 모의고사입니다.' },
     { key: '회의록',   desc: '역대 정기노회·임시노회의 회의록입니다. 결의서는 결의사항에 있습니다.' },
     { key: '임원회의록', desc: '임원회 회의록입니다.' },
     { key: '발송 공문', desc: '노회와 각 부서가 보낸 공문입니다.' },
@@ -196,16 +196,16 @@ document.addEventListener('DOMContentLoaded', function () {
     return '<div class="admin-card" style="max-width:720px;margin-top:16px">' +
       '<h3 style="margin-top:0">고시 모의고사</h3>' +
       '<p style="font-size:0.9rem;color:var(--gray-7)">고시집의 과목별 예상 문제로 실제 고시처럼 풀어 보고 ' +
-      '바로 채점받으실 수 있습니다. 응시하시려면 <strong>고시부의 승인</strong>이 필요하며, ' +
-      '개인당 <strong>2회</strong>까지 보실 수 있습니다.</p>' +
+      '바로 채점받으실 수 있습니다. 로그인만 하시면 <strong>횟수 제한 없이</strong> 자유롭게 보실 수 있습니다.</p>' +
       '<table class="tbl" style="max-width:640px"><thead><tr><th style="width:130px">구분</th><th>필기 과목</th></tr></thead><tbody>' +
       '<tr><td>목사</td><td class="left">목회학 · 권징조례 · 신조 · 예배모범</td></tr>' +
-      '<tr><td>장로</td><td class="left">정치 · 권징조례 · 신조 · 상식 · 소요리</td></tr>' +
-      '<tr><td>전도사</td><td class="left">상식 · 영어</td></tr>' +
-      '<tr><td>목사후보생</td><td class="left">상식 · 영어</td></tr>' +
+      '<tr><td>장로</td><td class="left">성경 · 정치 · 권징조례 · 신조 · 상식 · 소요리</td></tr>' +
+      '<tr><td>전도사</td><td class="left">성경 · 상식 · 영어</td></tr>' +
+      '<tr><td>목사후보생</td><td class="left">성경 · 상식 · 영어</td></tr>' +
       '</tbody></table>' +
       '<p style="font-size:0.84rem;color:var(--gray-5)">노회규칙 제7장 22~23조에 따른 배정입니다. ' +
-      '면접은 필기가 아니므로, 성경은 성경통신 신구약 수료증으로 대체되므로 모의고사에서 제외했습니다.</p>' +
+      '면접은 필기가 아니므로 모의고사에서 제외했으며, 성경은 성경통신 신구약 수료증으로 대체할 수 있습니다. ' +
+      '(모의고사에서 성경을 빼고 볼 수도 있습니다)</p>' +
       '<a class="btn" href="exam.html">모의고사 보러 가기</a></div>';
   }
 
@@ -273,6 +273,9 @@ document.addEventListener('DOMContentLoaded', function () {
       (canManage ? ' <a class="btn sm" style="margin-left:10px" href="archive-edit.html">자료 관리</a>' : '') +
       '</div>';
 
+    /* 구비서류 안내를 맨 앞에 둔다 */
+    html += formsHtml();
+
     SECTIONS.forEach(function (s) {
       var list = items.filter(function (a) { return a.section === s.key; });
       if (s.key === '결의사항') {
@@ -292,7 +295,6 @@ document.addEventListener('DOMContentLoaded', function () {
         levelNote(list);
       /* 고시 분류는 올려 둔 자료가 없으면 목록을 비우고 모의고사 안내만 보인다 */
       if (s.key !== '고시' || list.length) html += itemRows(list, s.key);
-      if (s.key === '서식') html += formsHtml();
       if (s.key === '고시') html += examHtml();
     });
 
