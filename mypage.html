@@ -126,8 +126,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<div class="field"><label>부임(위임)일</label>' +
           '<input type="text" value="' +
           (sv ? sv.date + ' — 위임 ' + sv.span : '아직 등록되지 않았습니다') + '" disabled>' +
-          '<span style="font-size:0.8rem;color:var(--gray-5)">부임(위임)일은 재직증명서의 재직 기간에 쓰입니다. ' +
-          '수정이 필요하시면 노회 서기에게 문의해 주세요.</span></div>';
+          '<span style="font-size:0.8rem;color:var(--gray-5)">수정이 필요하시면 노회 서기에게 문의해 주세요.</span></div>';
       })() +
       '<div class="inline-form" style="margin-bottom:16px">' +
       '<div class="field" style="flex:0 0 130px"><label>우편번호</label>' +
@@ -137,9 +136,6 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="btn ghost sm" data-addrsearch="q-addr,q-post" ' +
       'style="align-self:flex-end;margin-bottom:2px">주소 검색</button>' +
       '</div>' +
-      '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:-8px">주소는 한 칸입니다. 증명서·보고서 등 모든 문서에 이 주소가 쓰입니다.</p>' +
-      '<p style="font-size:0.82rem;color:var(--gray-5)">여기 적으신 내용은 <strong>노회 명단</strong>에 그대로 저장되어, ' +
-      '회원명단 카드와 주소록에 함께 반영됩니다. 성명·교회·직분을 고치면 명단과 다시 대조하여 등급이 갱신됩니다.</p>' +
       '<button class="btn" id="q-save" style="width:100%">저장</button>' +
       '<div class="form-msg" id="q-msg"></div>' +
       '</div>';
