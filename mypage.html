@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     html += '<h2>회원 정보</h2>';
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
-      '<div class="field"><label>이메일 (구글 계정)</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
+      '<div class="field"><label id="q-emailtag">이메일</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
       '<div class="field"><label>성명</label><input type="text" id="q-name" value="' + e(p.name || '') + '"></div>' +
       '<div class="field"><label>직분</label><select id="q-pos">' +
       ['목사', '위임목사', '부목사', '강도사', '전도사', '장로', '간사'].map(function (x) {
@@ -238,6 +238,27 @@ document.addEventListener('DOMContentLoaded', function () {
     setupPhoto();
     setupSeal('church', 'sl', '직인', '교회 직인');
     setupSeal('pastor', 'ps', '도장', '목사(당회장) 도장');
+
+    /* 어떤 계정으로 로그인했는지 로고와 함께 표기한다 (구글 / 네이버 / 이메일) */
+    if (window.SHSCloud && SHSCloud.enabled()) {
+      SHSCloud.init().then(function (c) { return c.auth.getUser(); }).then(function (r) {
+        var u = r && r.data && r.data.user;
+        var el = document.getElementById('q-emailtag');
+        if (!u || !el) return;
+        var prov = (u.app_metadata && u.app_metadata.provider) || 'email';
+        if (u.user_metadata && u.user_metadata.provider === 'naver') prov = 'naver';
+        var G = '<svg viewBox="0 0 48 48" width="13" height="13" style="vertical-align:-2px;margin:0 2px">' +
+          '<path fill="#4285F4" d="M45.1 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2 5-4.4 6.6v5.5h7.1c4.1-3.8 6.6-9.4 6.6-16.1z"/>' +
+          '<path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.6-3.9-12.3-9.1H4.3v5.7C7.9 41 15.3 46 24 46z"/>' +
+          '<path fill="#FBBC05" d="M11.7 28.1c-.4-1.3-.7-2.7-.7-4.1s.3-2.8.7-4.1v-5.7H4.3C2.8 17.2 2 20.5 2 24s.8 6.8 2.3 9.8l7.4-5.7z"/>' +
+          '<path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.1 29.9 2 24 2 15.3 2 7.9 7 4.3 14.2l7.4 5.7c1.7-5.2 6.6-9.1 12.3-9.1z"/></svg>';
+        var N = '<svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:-2px;margin:0 2px;background:#03C75A;border-radius:3px;padding:1px">' +
+          '<path fill="#fff" d="M16.3 4v8.4L7.7 4H2v16h5.7v-8.4L16.3 20H22V4z"/></svg>';
+        if (prov === 'google') el.innerHTML = '이메일 (' + G + ' 구글 계정)';
+        else if (prov === 'naver') el.innerHTML = '이메일 (' + N + ' 네이버 계정)';
+        else el.textContent = '이메일 (이메일 가입)';
+      }).catch(function () {});
+    }
 
     /* 노회 명단(회원 DB)과 연동: 내 교회에 장로가 있으면(당회 조직)
      * 목사가 곧 당회장이므로 "당회장 도장"으로 표기한다. */
