@@ -140,21 +140,54 @@ document.addEventListener('DOMContentLoaded', function () {
     h += subjectTable();
 
     if (done.length) {
-      h += '<h2>지난 응시 결과 (' + done.length + '회)</h2><table class="tbl"><thead><tr>' +
+      h += '<h2>지난 응시 결과 (' + done.length + '회)</h2>' +
+        '<p style="color:var(--gray-5);font-size:0.86rem">다시 보기를 누르면 문항마다 내 답과 정답을 확인할 수 있습니다.</p>' +
+        '<table class="tbl"><thead><tr>' +
         '<th style="width:110px">구분</th><th style="width:170px">응시일</th>' +
-        '<th style="width:120px">점수</th><th>백분율</th></tr></thead><tbody>';
+        '<th style="width:120px">점수</th><th>백분율</th>' +
+        '<th style="width:170px">관리</th></tr></thead><tbody>';
       done.slice(0, 20).forEach(function (a) {
         var pct = a.total ? Math.round(a.score * 100 / a.total) : 0;
         h += '<tr><td>' + e(a.track) + '</td>' +
           '<td>' + e(String(a.submitted_at).replace('T', ' ').slice(0, 16)) + '</td>' +
           '<td>' + a.score + ' / ' + a.total + '</td>' +
           '<td class="left"><span class="' + (pct >= 60 ? 'pass' : 'fail') + '">' + pct + '점' +
-          (pct >= 60 ? ' (합격 기준 이상)' : ' (합격 기준 미만)') + '</span></td></tr>';
+          (pct >= 60 ? ' (합격 기준 이상)' : ' (합격 기준 미만)') + '</span></td>' +
+          '<td><button class="btn sm" data-exrev="' + a.id + '">다시 보기</button> ' +
+          '<button class="btn danger sm" data-exdel="' + a.id + '">삭제</button></td></tr>';
       });
       h += '</tbody></table>';
     }
 
     area.innerHTML = h;
+
+    /* 지난 응시 다시 보기·삭제 */
+    area.querySelectorAll('[data-exrev]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true; b.textContent = '여는 중...';
+        db().then(function (c) {
+          return c.rpc('review_exam', { p_attempt: Number(b.dataset.exrev) });
+        }).then(function (r) {
+          b.disabled = false; b.textContent = '다시 보기';
+          if (r.error) { alert(r.error.message); return; }
+          var rows = (r.data || []);
+          var score = rows.filter(function (x) { return x.chosen === x.correct; }).length;
+          rows.forEach(function (x) { x.score = score; x.total = rows.length; });
+          go('result', function () { showResult(rows); });
+        });
+      });
+    });
+    area.querySelectorAll('[data-exdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('이 응시 결과를 삭제할까요? 되돌릴 수 없습니다.')) return;
+        db().then(function (c) {
+          return c.from('exam_attempts').delete().eq('id', b.dataset.exdel);
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          load();
+        });
+      });
+    });
 
     /* 고른 구분·문항 수로 실제 몇 문항이 나오는지 미리 보여준다 */
     function showPlan() {
@@ -200,12 +233,23 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('ex-start').addEventListener('click', function () {
       var msg = document.getElementById('ex-smsg');
       var track = document.getElementById('ex-track').value;
+      /* 제출하지 않고 나간 시험이 있으면, 이어서 볼지 새로 시작할지 묻는다.
+       * 이어보기를 고르면 지금 고른 구분·문항 수·성경 제외는 적용되지 않는다. */
+      var fresh = false;
+      var unfinished = attempts.filter(function (a) { return !a.submitted_at; })[0];
+      if (unfinished) {
+        fresh = !confirm('제출하지 않은 진행 중인 시험(' + unfinished.track + ' · ' +
+          unfinished.total + '문항)이 있습니다.\n\n' +
+          '확인 = 그 시험을 이어서 봅니다.\n' +
+          '취소 = 그 시험을 버리고 지금 고른 설정으로 새로 시작합니다.');
+      }
       msg.className = 'form-msg'; msg.textContent = '문제를 준비하는 중입니다...';
       db().then(function (c) {
         return c.rpc('start_exam', {
           p_track: track,
           p_per_subject: parseInt(document.getElementById('ex-count').value, 10) || 10,
-          p_exclude: exBibleOff ? ['성경'] : null
+          p_exclude: exBibleOff ? ['성경'] : null,
+          p_fresh: fresh
         });
       }).then(function (r) {
         if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
