@@ -130,22 +130,29 @@ document.addEventListener('DOMContentLoaded', function () {
         '총대 자격 관리는 <strong>장로 총대 자격</strong> 탭에서 합니다.<br>' +
         '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
 
-      /* 노회 명단·상비부 관리 영역 */
+      /* 노회 명단·상비부 관리 영역
+       * 회원 신상관리 안에서 전체회원 / 목사회원 / 장로회원으로 나누고,
+       * 장로회원은 다시 시무·총대·원로·은퇴장로로 나눈다 (옛 장로 명단 탭 통합) */
       html += '<h2>회원 신상관리</h2>';
       html += '<p>가입 시 등급 자동 부여의 기준이 되는 명단입니다. 성명과 소속 교회가 이 명단과 일치하면 해당 등급이 자동으로 부여됩니다.</p>';
+      html += '<div class="tabs" id="mem-type" style="margin-bottom:14px">' +
+        '<button class="active" data-mt="all">전체회원</button>' +
+        '<button data-mt="pastor">목사회원</button>' +
+        '<button data-mt="elder">장로회원</button></div>';
       html += '<div id="roster-area"><p style="color:var(--gray-5)">명단을 불러오는 중...</p></div>';
-      html += '<h2>교회 관리</h2>';
-      html += '<div id="church-area"><p style="color:var(--gray-5)">교회 명부를 불러오는 중...</p></div>';
-      html += '<h2>장로 명단</h2>';
-      html += '<div class="tabs" id="eld-tabs" style="margin-bottom:14px">' +
+      html += '<div id="elder-wrap" class="hidden">' +
+        '<div class="tabs" id="eld-tabs" style="margin-bottom:14px">' +
         '<button class="active" data-et="selder">시무장로</button>' +
         '<button data-et="elder">총대장로</button>' +
         '<button data-et="relder">원로장로</button>' +
-        '<button data-et="xelder">은퇴장로</button></div>';
-      html += '<div id="selder-area"><p style="color:var(--gray-5)">시무장로 명단을 불러오는 중...</p></div>';
-      html += '<div id="elder-area" class="hidden"><p style="color:var(--gray-5)">장로 총대를 불러오는 중...</p></div>';
-      html += '<div id="relder-area" class="hidden"><p style="color:var(--gray-5)">원로장로 명단을 불러오는 중...</p></div>';
-      html += '<div id="xelder-area" class="hidden"><p style="color:var(--gray-5)">은퇴장로 명단을 불러오는 중...</p></div>';
+        '<button data-et="xelder">은퇴장로</button></div>' +
+        '<div id="selder-area"><p style="color:var(--gray-5)">시무장로 명단을 불러오는 중...</p></div>' +
+        '<div id="elder-area" class="hidden"><p style="color:var(--gray-5)">장로 총대를 불러오는 중...</p></div>' +
+        '<div id="relder-area" class="hidden"><p style="color:var(--gray-5)">원로장로 명단을 불러오는 중...</p></div>' +
+        '<div id="xelder-area" class="hidden"><p style="color:var(--gray-5)">은퇴장로 명단을 불러오는 중...</p></div>' +
+        '</div>';
+      html += '<h2>교회 관리</h2>';
+      html += '<div id="church-area"><p style="color:var(--gray-5)">교회 명부를 불러오는 중...</p></div>';
       html += '<h2>안수·인허 명단</h2>';
       html += '<div id="ord-area"><p style="color:var(--gray-5)">안수·인허 명단을 불러오는 중...</p></div>';
       html += '<h2>총회 총대 명단</h2>';
@@ -180,6 +187,19 @@ document.addEventListener('DOMContentLoaded', function () {
         renderChurches();
         renderServingElders();
         renderElders();
+        /* 회원 구분 탭 (전체회원 / 목사회원 / 장로회원) */
+        area.querySelectorAll('#mem-type button').forEach(function (b) {
+          b.addEventListener('click', function () {
+            area.querySelectorAll('#mem-type button').forEach(function (x) {
+              x.classList.toggle('active', x === b);
+            });
+            memType = b.dataset.mt;
+            document.getElementById('roster-area').classList.toggle('hidden', memType === 'elder');
+            document.getElementById('elder-wrap').classList.toggle('hidden', memType !== 'elder');
+            if (memType !== 'elder' && rosterApplyFilter) rosterApplyFilter();
+          });
+        });
+
         /* 장로 명단 하위 탭 (시무장로 / 총대장로 / 원로장로) */
         area.querySelectorAll('#eld-tabs button').forEach(function (b) {
           b.addEventListener('click', function () {
@@ -1074,7 +1094,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var shown = 0, n = 0;
         box.querySelectorAll('#ro-tbl tbody tr[data-ro]').forEach(function (tr) {
-          var ok = (!q || (tr.dataset.find || '').indexOf(q) !== -1)
+          /* 위의 전체회원/목사회원 구분 탭을 함께 적용한다 */
+          var typeOk = memType !== 'pastor' ||
+            ['목사', '부목사', '강도사', '전도사', '원로목사', '은퇴목사', '무임목사'].indexOf(tr.dataset.cat) !== -1;
+          var ok = typeOk
+                && (!q || (tr.dataset.find || '').indexOf(q) !== -1)
                 && (!c || tr.dataset.cat === c)
                 && (!g || tr.dataset.grade === g)
                 && (view !== 'officers' || isOfficerGrade(tr.dataset.grade));
@@ -1091,6 +1115,8 @@ document.addEventListener('DOMContentLoaded', function () {
         el.addEventListener('input', applyFilter);
         el.addEventListener('change', applyFilter);
       });
+      rosterApplyFilter = applyFilter;
+      if (memType === 'pastor') applyFilter();
       document.getElementById('ro-qclear').addEventListener('click', function () {
         qBox.value = ''; fCat.value = ''; fGrade.value = '';
         applyFilter(); qBox.focus();
@@ -1537,6 +1563,8 @@ document.addEventListener('DOMContentLoaded', function () {
    * 저장은 그 회기의 시작·끝 날짜로 한다. (자동 연장 기능과 호환) */
   var SESSIONS = { current: 19, list: [] };
   var elderSes = null;   /* 장로 총대 탭에서 보고 있는 회기 (기본: 현재 회기) */
+  var memType = 'all';   /* 회원 신상관리 구분: all(전체) | pastor(목사회원) | elder(장로회원) */
+  var rosterApplyFilter = null;   /* 명단 조회 필터를 밖에서 다시 적용할 때 쓴다 */
 
   function sesList() { return SESSIONS.list || []; }
   function sesFind(no) {
