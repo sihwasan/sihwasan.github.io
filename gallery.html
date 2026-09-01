@@ -10,7 +10,7 @@
 <meta property="og:title" content="갤러리 - 시화산노회">
 <meta property="og:description" content="시화산노회 갤러리 — 노회 행사 사진입니다.">
 <meta property="og:url" content="https://sihwasan.org/gallery.html">
-<link rel="stylesheet" href="css/style.css?v=20260831zl">
+<link rel="stylesheet" href="css/style.css?v=20260901a">
 </head>
 <body>
 
@@ -39,8 +39,14 @@
 
   <div class="news-actions">
     <button class="btn-round" id="nw-more">소식 더 보기</button>
-    <button class="btn-round solid" id="nw-add">+ 사진 올리기</button>
+    <button class="btn-round solid" id="nw-add">+ 사진 · 유튜브 올리기</button>
   </div>
+
+  <!-- 유튜브 영상 (사진과 따로 모아 둔다) -->
+  <section class="alb-sec" id="videos" style="display:none">
+    <h2>영상</h2>
+    <div class="vid-grid" id="vid-grid"></div>
+  </section>
 
   <!-- 회기별 앨범 -->
   <section class="alb-sec" id="albums">
@@ -77,7 +83,12 @@
 <div class="mdl" id="up-mdl">
   <div class="mdl-box">
     <button class="mdl-close" id="up-close">&times;</button>
-    <h2>사진 올리기</h2>
+    <h2>사진 · 유튜브 올리기</h2>
+
+    <div class="tabs" id="up-kind" style="margin-bottom:16px">
+      <button type="button" class="active" data-uk="photo">사진</button>
+      <button type="button" data-uk="video">유튜브 영상</button>
+    </div>
 
     <div class="drop" id="up-drop">
       <div>여기로 사진을 끌어다 놓거나</div>
@@ -93,13 +104,27 @@
       <input type="file" id="up-camera" accept="image/*" capture="environment" class="hidden">
     </div>
 
-    <div class="mdl-divider">또는</div>
-
-    <div class="field">
-      <label>인스타그램·유튜브 링크로 올리기 (선택)</label>
-      <input type="url" id="up-link" placeholder="https://www.instagram.com/… 또는 https://youtu.be/…">
+    <!-- 유튜브 영상 올리기 (사진과 따로 모인다) -->
+    <div id="up-vidbox" style="display:none">
+      <div class="field">
+        <label>유튜브 주소</label>
+        <input type="url" id="up-link" placeholder="https://youtu.be/… 또는 https://www.youtube.com/watch?v=…">
+        <div class="field-hint">영상은 사진 앨범과 따로 <strong>영상</strong> 칸에 모입니다.</div>
+      </div>
+      <div class="field">
+        <label>영상 제목</label>
+        <input type="text" id="up-vtitle" placeholder="예: 제19회 정기노회 개회예배">
+      </div>
+      <div class="field">
+        <label>날짜</label>
+        <input type="date" id="up-vdate">
+      </div>
+      <div id="up-vprev" class="hidden" style="margin-bottom:14px">
+        <img id="up-vthumb" alt="" style="width:100%;max-width:320px;border-radius:10px;display:block">
+      </div>
     </div>
-    <div class="field">
+
+    <div class="field" id="up-albumbox">
       <label>어느 앨범에 넣을까요?</label>
       <select id="up-album"></select>
       <div class="field-hint" id="up-album-hint"></div>
@@ -160,6 +185,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var likeCount = {};
   var comments = {};
   var albums = [];       /* 회기별 앨범 */
+  var videos = [];       /* 유튜브 영상 (사진과 따로 모은다) */
   var albCat = '전체';
   var feedShown = 30;    /* 소식 피드는 나눠서 보여 준다 */
 
@@ -201,9 +227,59 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('nw-prev').addEventListener('click', function () { idx--; renderSlide(); });
   document.getElementById('nw-next').addEventListener('click', function () { idx++; renderSlide(); });
 
+  /* ---------- 유튜브 영상 ----------
+   * 영상은 사진 앨범에 섞지 않고 따로 모아 둔다. */
+  function ytId(url) {
+    var m = String(url || '').match(
+      /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{6,})/);
+    return m ? m[1] : '';
+  }
+  function isVideo(it) { return !!ytId(it && it.link_url); }
+  function ytThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
+
+  function renderVideos() {
+    var sec = document.getElementById('videos');
+    var box = document.getElementById('vid-grid');
+    if (!videos.length) { sec.style.display = 'none'; return; }
+    sec.style.display = '';
+    box.innerHTML = videos.map(function (v, i) {
+      var id = ytId(v.link_url);
+      return '<a class="vid-card" href="' + e(v.link_url) + '" target="_blank" rel="noopener" ' +
+        'data-vid="' + i + '">' +
+        '<span class="vid-thumb"><img loading="lazy" src="' +
+        e(v.thumb_url || v.image_url || ytThumb(id)) + '" alt="">' +
+        '<span class="vid-play">&#9654;</span></span>' +
+        '<span class="vid-cap"><span class="t">' + e(v.title || '노회 영상') + '</span>' +
+        '<span class="d">' + e(dateText(v.taken)) + '</span></span></a>';
+    }).join('');
+    /* 관리자·올린 이는 목록에서 바로 지울 수 있다 */
+    box.querySelectorAll('a[data-vid]').forEach(function (a) {
+      var v = videos[+a.dataset.vid];
+      if (!canFix(v)) return;
+      var del = document.createElement('button');
+      del.className = 'vid-del';
+      del.type = 'button';
+      del.textContent = '삭제';
+      del.addEventListener('click', function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        if (!confirm('"' + (v.title || '영상') + '"을(를) 지우시겠습니까?')) return;
+        SHSCloud.init().then(function (c) {
+          return c.from('gallery_items').delete().eq('id', v.id);
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          load(true);
+        });
+      });
+      a.appendChild(del);
+    });
+  }
+
   /* ---------- 회기별 앨범 ---------- */
   /* 제목이 같은 사진을 한 권으로 묶는다 (예: 제19회 정기노회) */
   function buildAlbums() {
+    /* 영상은 앨범·슬라이드에 섞지 않고 따로 뽑아 둔다 */
+    videos = items.filter(isVideo);
+    items = items.filter(function (it) { return !isVideo(it); });
     var by = {};
     items.forEach(function (it) {
       var k = it.title || '노회 소식';
@@ -511,7 +587,9 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     if (!user.cloud) { alert('사진 올리기는 서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.'); return; }
-    document.getElementById('up-date').value = new Date().toISOString().slice(0, 10);
+    var td = new Date().toISOString().slice(0, 10);
+    document.getElementById('up-date').value = td;
+    if (!document.getElementById('up-vdate').value) document.getElementById('up-vdate').value = td;
     fillAlbumPicker();
     openM('up-mdl');
   });
@@ -543,6 +621,35 @@ document.addEventListener('DOMContentLoaded', function () {
       : '새 앨범은 아래에 적은 이름으로 만들어집니다.';
   }
   document.getElementById('up-album').addEventListener('change', syncAlbumPicker);
+
+  /* ---------- 사진 / 유튜브 갈아 끼우기 ---------- */
+  var upKind = 'photo';
+  (function () {
+    var bar = document.getElementById('up-kind');
+    bar.querySelectorAll('button[data-uk]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        upKind = b.dataset.uk;
+        bar.querySelectorAll('button').forEach(function (x) {
+          x.classList.toggle('active', x === b);
+        });
+        var vid = upKind === 'video';
+        document.getElementById('up-drop').style.display = vid ? 'none' : '';
+        document.getElementById('up-vidbox').style.display = vid ? '' : 'none';
+        document.getElementById('up-albumbox').style.display = vid ? 'none' : '';
+        document.getElementById('up-new').style.display = vid ? 'none' : '';
+        if (!vid) syncAlbumPicker();
+        document.getElementById('up-msg').textContent = '';
+      });
+    });
+    /* 유튜브 주소를 넣으면 미리보기 그림을 보여 준다 */
+    document.getElementById('up-link').addEventListener('input', function () {
+      var id = ytId(this.value);
+      var box = document.getElementById('up-vprev');
+      if (!id) { box.classList.add('hidden'); return; }
+      document.getElementById('up-vthumb').src = ytThumb(id);
+      box.classList.remove('hidden');
+    });
+  })();
 
   var lb = document.getElementById('lightbox');
   document.getElementById('lb-close').addEventListener('click', function () { lb.classList.remove('open'); });
@@ -650,6 +757,46 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.getElementById('up-send').addEventListener('click', function () {
     var msg = document.getElementById('up-msg');
+
+    /* ----- 유튜브 영상 올리기 (사진 앨범과 따로 모인다) ----- */
+    if (upKind === 'video') {
+      var vurl = document.getElementById('up-link').value.trim();
+      var vid = ytId(vurl);
+      if (!vid) {
+        msg.className = 'form-msg err';
+        msg.textContent = '유튜브 주소를 확인해 주세요. (예: https://youtu.be/영상번호)';
+        return;
+      }
+      var vtitle = document.getElementById('up-vtitle').value.trim() || '노회 영상';
+      var vdate = document.getElementById('up-vdate').value || new Date().toISOString().slice(0, 10);
+      msg.className = 'form-msg';
+      msg.textContent = '올리는 중입니다...';
+      SHSCloud.init().then(function (c) {
+        return c.from('gallery_items').insert({
+          title: vtitle, taken: vdate, category: '영상',
+          caption: document.getElementById('up-caption').value.trim(),
+          link_url: 'https://www.youtube.com/watch?v=' + vid,
+          image_url: ytThumb(vid), thumb_url: ytThumb(vid),
+          author_id: user.id, author_name: user.name, sort: 0
+        });
+      }).then(function (r) {
+        if (r.error) throw r.error;
+        SHSCloud.log('create', '갤러리 영상 등록', vtitle);
+        ['up-link', 'up-vtitle', 'up-caption'].forEach(function (id) {
+          document.getElementById(id).value = '';
+        });
+        document.getElementById('up-vprev').classList.add('hidden');
+        msg.className = 'form-msg ok';
+        msg.textContent = '영상을 올렸습니다.';
+        closeM('up-mdl');
+        load(true);
+      }).catch(function (err) {
+        msg.className = 'form-msg err';
+        msg.textContent = '올리기 실패: ' + err.message;
+      });
+      return;
+    }
+
     var into = albums.filter(function (x) {
       return x.title === document.getElementById('up-album').value;
     })[0];
@@ -667,11 +814,12 @@ document.addEventListener('DOMContentLoaded', function () {
       into.photos.forEach(function (p) { if ((p.sort || 0) > sort) sort = p.sort || 0; });
     }
     var caption = document.getElementById('up-caption').value.trim();
-    var link = document.getElementById('up-link').value.trim();
+    /* 링크(유튜브)는 위쪽 <유튜브 영상> 칸에서 따로 올린다 */
+    var link = '';
 
-    if (!picked.length && !link) {
+    if (!picked.length) {
       msg.className = 'form-msg err';
-      msg.textContent = '사진을 선택하거나 링크를 입력해 주세요.';
+      msg.textContent = '올릴 사진을 골라 주세요. (유튜브 영상은 위쪽 유튜브 영상 칸에서 올립니다)';
       return;
     }
     if (!into && !title) {
@@ -772,6 +920,7 @@ document.addEventListener('DOMContentLoaded', function () {
       buildAlbums();
       renderSlide();
       renderAlbums();
+      renderVideos();
       return;
     }
     SHSCloud.init().then(function (c) {
@@ -800,6 +949,7 @@ document.addEventListener('DOMContentLoaded', function () {
       buildAlbums();
       renderSlide();
       renderAlbums();
+      renderVideos();
       openLinkedPhoto();
       if (keepFeed && document.getElementById('feed-mdl').classList.contains('open')) renderFeed();
     }).catch(function () {
@@ -809,6 +959,7 @@ document.addEventListener('DOMContentLoaded', function () {
       buildAlbums();
       renderSlide();
       renderAlbums();
+      renderVideos();
     });
   }
 

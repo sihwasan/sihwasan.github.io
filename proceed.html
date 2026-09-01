@@ -5,21 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>노회 진행 관리자 - 시화산노회</title>
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20260831zl">
+<link rel="stylesheet" href="css/style.css?v=20260901a">
 <style>
 /* 진행 현황 막대 */
 .pc-bar { background:var(--gray-2,#e8eaef); border-radius:6px; height:14px; overflow:hidden; }
 .pc-bar > div { height:100%; background:#2a7a2a; transition:width .3s; }
-/* 지금 순서 카드 */
-.pc-now { border:2px solid var(--accent,#b08d3e); border-radius:12px; background:#fff;
-  padding:22px 26px; margin:14px 0; }
-.pc-now .pc-sec { font-size:0.82rem; color:var(--gray-5); letter-spacing:1px; }
-.pc-now h2 { margin:4px 0 8px; font-size:1.5rem; color:var(--navy,#4b3f33); }
-.pc-now .pc-lead { font-size:0.95rem; color:var(--gray-7); margin:0 0 4px; }
-.pc-now .pc-detail { font-size:0.86rem; color:var(--gray-6); white-space:pre-wrap; margin:0 0 10px; }
-.pc-next { border-left:3px solid var(--gray-3,#d8dbe2); padding:2px 0 2px 12px; margin:12px 0;
-  font-size:0.88rem; color:var(--gray-6); }
+/* 지금 순서 카드 — 회의장에서 멀리서도 보이도록 큼직하게 */
+.pc-now { border:3px solid var(--accent,#b08d3e); border-radius:16px; background:#fff;
+  padding:34px 38px; margin:18px 0 22px; box-shadow:0 6px 24px rgba(0,0,0,0.10); }
+.pc-now .pc-sec { font-size:1rem; color:var(--gray-5); letter-spacing:2px; }
+.pc-now h2 { margin:8px 0 16px; font-size:2.5rem; line-height:1.25; color:var(--navy,#4b3f33); }
+/* 진행 담당자 — 가장 크게 보여 준다 */
+.pc-now .pc-lead { margin:0 0 14px; padding:14px 20px; border-radius:12px;
+  background:var(--gray-1,#f4f2ec); font-size:1.15rem; color:var(--gray-6);
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.pc-now .pc-lead strong { font-size:2.1rem; line-height:1.2; color:#b03a3a; font-weight:800; }
+.pc-now .pc-detail { font-size:1.08rem; line-height:1.65; color:var(--gray-6);
+  white-space:pre-wrap; margin:0 0 16px; }
+.pc-now .field label { font-size:0.95rem; }
+.pc-now .field input { font-size:1.05rem; padding:12px 14px; }
+.pc-now .btn { font-size:1.05rem; padding:13px 24px; }
+.pc-next { border-left:4px solid var(--gray-3,#d8dbe2); padding:6px 0 6px 14px; margin:16px 0 0;
+  font-size:1.02rem; color:var(--gray-6); }
 .pc-next strong { color:var(--gray-7); }
+@media (max-width:640px) {
+  .pc-now { padding:22px 20px; }
+  .pc-now h2 { font-size:1.8rem; }
+  .pc-now .pc-lead strong { font-size:1.6rem; }
+}
 /* 순서 목록 상태 표시 */
 .pc-st { display:inline-block; font-size:0.74rem; border-radius:10px; padding:1px 8px; white-space:nowrap; }
 .pc-st.s대기 { background:var(--gray-2,#e8eaef); color:var(--gray-6); }
@@ -77,7 +90,28 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var sessions = [], cur = null, items = [];
+  var meetings = [];       /* 정기노회 일정 (사이트 관리 → 운영일정) */
   var SESSION_NO = null;   /* 현재 회기 (site_settings.sessions) */
+
+  /* 정기노회 일정에서 회기 번호를 헤아린다.
+   * 회기는 봄 정기노회에서 새로 시작하므로, 다음 봄이면 한 회기 뒤다. */
+  function meetingNo(m) {
+    if (!SESSION_NO) return null;
+    var no = Number(SESSION_NO);
+    if (/^봄/.test(m.kind || '') && m.meet_date && m.meet_date > new Date().toISOString().slice(0, 10)) {
+      no += 1;
+    }
+    return no;
+  }
+  /* 정기노회 일정 한 줄을 회의 이름으로 바꾼다 — 예: 제20회 가을 정기노회 */
+  function meetingTitle(m) {
+    var no = meetingNo(m);
+    return (no ? '제' + no + '회 ' : '') + (m.kind || '정기노회');
+  }
+  function meetingLabel(m) {
+    return meetingTitle(m) + (m.meet_date ? ' — ' + m.meet_date : '') +
+      (m.place ? ' · ' + m.place : '') + (m.confirmed ? '' : ' (미확정)');
+  }
 
   /* ---------------- 순서지 틀 ----------------
    * 제19회 봄 정기노회 회의록(본 노회 실제 진행)을 바탕으로 만든 기본 틀.
@@ -100,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function () {
       ['Ⅲ. 계속 회무처리 (오후)', '각 시찰 보고', '각 시찰 서기', ''],
       ['Ⅲ. 계속 회무처리 (오후)', '각 부 보고', '각 부 서기', '감사부 · 서기부 · 임원회 · 고시규칙부 등'],
       ['Ⅲ. 계속 회무처리 (오후)', '정치부 보고 (헌의안건 처리)', '정치부 서기', '청빙 · 사면 · 청원 안건'],
-      ['Ⅲ. 계속 회무처리 (오후)', '총회 결의 헌법 개정안 수의', '노회장', '투표'],
       ['Ⅲ. 계속 회무처리 (오후)', '재정부 회계 보고', '재정부', '결산 · 예산'],
       ['Ⅲ. 계속 회무처리 (오후)', '이사 선정', '노회장', ''],
       ['Ⅲ. 계속 회무처리 (오후)', '기타 안건 · 긴급동의안', '노회장', ''],
@@ -139,6 +172,9 @@ document.addEventListener('DOMContentLoaded', function () {
         c.from('meeting_sessions').select('*')
           .order('meet_on', { ascending: false }).order('id', { ascending: false }),
         c.from('site_settings').select('value').eq('key', 'sessions')
+          .then(function (x) { return x; }, function () { return { data: [] }; }),
+        /* 정기노회 일정 — 회의 이름·날짜·장소를 여기서 가져온다 */
+        c.from('meetings').select('*').order('meet_date', { ascending: false })
           .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
@@ -152,6 +188,7 @@ document.addEventListener('DOMContentLoaded', function () {
       sessions = rs[0].data || [];
       var ses = rs[1].data && rs[1].data[0] && rs[1].data[0].value;
       if (ses && ses.current) SESSION_NO = ses.current;
+      meetings = (rs[2] && rs[2].data) || [];
 
       if (openId) {
         cur = sessions.filter(function (s) { return s.id === openId; })[0] || null;
@@ -202,9 +239,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     h += '<div class="admin-card" style="margin-top:18px"><h3 style="margin-top:0">새 회의 만들기</h3>' +
+      (meetings.length
+        ? '<div class="field" style="max-width:520px"><label>정기노회 일정에서 가져오기</label>' +
+          '<select id="ns-meet"><option value="">직접 적기</option>' +
+          meetings.map(function (m, i) {
+            return '<option value="' + i + '">' + e(meetingLabel(m)) + '</option>';
+          }).join('') + '</select>' +
+          '<div class="field-hint" style="font-size:0.8rem;color:var(--gray-5);margin-top:4px">' +
+          '고르면 회의 이름 · 날짜 · 장소 · 순서지 틀이 그 일정에 맞추어 채워집니다. ' +
+          '(일정은 <a href="ops.html" style="text-decoration:underline">사이트 관리 → 운영일정</a>에서 정합니다)</div></div>'
+        : '') +
       '<div class="inline-form">' +
       '<div class="field" style="flex:0 0 110px"><label>회기</label>' +
-      '<input type="number" id="ns-no" value="' + (SESSION_NO ? Number(SESSION_NO) + 1 : '') + '"></div>' +
+      '<input type="number" id="ns-no" value="' + (SESSION_NO ? Number(SESSION_NO) : '') + '"></div>' +
       '<div class="field"><label>회의 이름</label>' +
       '<input type="text" id="ns-title" placeholder="예: 제20회 가을 정기노회"></div>' +
       '<div class="field" style="flex:0 0 160px"><label>날짜</label><input type="date" id="ns-date"></div>' +
@@ -244,6 +291,21 @@ document.addEventListener('DOMContentLoaded', function () {
           load();
         });
       });
+    });
+
+    /* 정기노회 일정을 고르면 이름·날짜·장소·틀을 그대로 채운다 */
+    var msel = document.getElementById('ns-meet');
+    if (msel) msel.addEventListener('change', function () {
+      if (this.value === '') return;
+      var m = meetings[Number(this.value)];
+      if (!m) return;
+      var no = meetingNo(m);
+      if (no) document.getElementById('ns-no').value = no;
+      document.getElementById('ns-title').value = meetingTitle(m);
+      document.getElementById('ns-date').value = m.meet_date || '';
+      document.getElementById('ns-place').value = m.place || '';
+      /* 봄은 임원선거가 있는 긴 순서지, 가을은 짧은 순서지 */
+      document.getElementById('ns-tpl').value = /^봄/.test(m.kind || '') ? 'spring' : 'fall';
     });
 
     var mk = document.getElementById('ns-make');
@@ -391,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<div class="pc-now">' +
         (it.section ? '<div class="pc-sec">' + e(it.section) + '</div>' : '') +
         '<h2>지금 순서 — ' + e(it.title) + '</h2>' +
-        (it.leader ? '<p class="pc-lead">담당: <strong>' + e(it.leader) + '</strong></p>' : '') +
+        (it.leader ? '<p class="pc-lead"><span>진행 담당</span><strong>' + e(it.leader) + '</strong></p>' : '') +
         (it.detail ? '<p class="pc-detail">' + e(it.detail) + '</p>' : '') +
         '<div class="field"><label>처리 결과 (선택 — 예: 가결, 유인물대로 받기로 함)</label>' +
         '<input type="text" id="pc-result" value="' + e(it.result || '') + '"></div>' +

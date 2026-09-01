@@ -1570,6 +1570,34 @@ input.dp-bad { border-color: var(--red); }
 .alb-cap .t { display: block; font-size: 0.95rem; font-weight: 500; line-height: 1.35; }
 .alb-cap .d { display: block; font-size: 0.78rem; opacity: 0.82; margin-top: 3px; }
 
+/* ---------- 유튜브 영상 (사진 앨범과 따로 모아 둔다) ---------- */
+.vid-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); gap: 16px;
+  margin-bottom: 34px;
+}
+.vid-card {
+  position: relative; display: block; text-decoration: none; color: inherit;
+  border-radius: 10px; overflow: hidden; background: var(--gray-1);
+}
+.vid-thumb { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; }
+.vid-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s ease; }
+.vid-card:hover .vid-thumb img { transform: scale(1.045); }
+.vid-play {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 54px; height: 38px; border-radius: 9px; background: rgba(200, 32, 32, 0.92);
+  color: #fff; font-size: 1.05rem; line-height: 38px; text-align: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+.vid-card:hover .vid-play { background: #c82020; }
+.vid-cap { display: block; padding: 10px 12px 12px; }
+.vid-cap .t { display: block; font-size: 0.92rem; font-weight: 500; line-height: 1.4; }
+.vid-cap .d { display: block; font-size: 0.78rem; color: var(--gray-5); margin-top: 3px; }
+.vid-del {
+  position: absolute; top: 8px; right: 8px; border: none; cursor: pointer;
+  background: rgba(0, 0, 0, 0.55); color: #fff; border-radius: 8px;
+  padding: 2px 9px; font-size: 0.74rem;
+}
+
 /* 앨범 한 권을 펼친 화면 */
 .alb-head { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--gray-2); }
 .alb-head h2 { margin-bottom: 4px; }
