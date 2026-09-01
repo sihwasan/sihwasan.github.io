@@ -547,7 +547,10 @@ var SHSBoard = (function () {
         soft(c.from('sichal_report_submissions').select('*').eq('year', year)),
         soft(c.from('church_staff').select('church').eq('role', '시무장로')),
         soft(c.from('delegates').select('*').eq('active', true).order('sort')),
-        soft(c.from('board_members').select('*').eq('active', true).order('sort'))
+        soft(c.from('board_members').select('*').eq('active', true).order('sort')),
+        soft(c.from('assembly_news').select('*').order('id', { ascending: false }).limit(12)),
+        soft(c.from('gallery_items').select('id,title,image_url,thumb_url')
+              .eq('category', '총회 활동').order('id', { ascending: false }).limit(8))
       ]);
     }).then(function (rs) {
       drawNoti((rs[0] && rs[0].data) || []);
@@ -558,7 +561,8 @@ var SHSBoard = (function () {
       drawMine((rs[6] && rs[6].data) || [], (rs[7] && rs[7].data) || [],
                (rs[8] && rs[8].data) || '');
       drawDanghoi((rs[6] && rs[6].data) || [], (rs[10] && rs[10].data) || []);
-      drawAssembly((rs[11] && rs[11].data) || [], (rs[12] && rs[12].data) || []);
+      drawAssembly((rs[11] && rs[11].data) || [], (rs[12] && rs[12].data) || [],
+                   (rs[13] && rs[13].data) || [], (rs[14] && rs[14].data) || []);
     }).catch(function () {});
 
     /* ---------- 나의 교회 · 나의 시찰 ----------
@@ -1058,10 +1062,16 @@ var SHSBoard = (function () {
     }
 
     /* ---------- 총회 활동 현황 ----------
-     * 이 노회가 총회에 보낸 총대와 파송 이사·실행위원을 한자리에 보여 준다. */
-    function drawAssembly(dels, boards) {
+     * 이 노회가 총회에 보낸 총대·파송 이사와 함께,
+     * 관리자가 등록한 총회 기사(스크랩)와 활동 사진을 보여 준다.
+     * 기사는 주소만 넣으면 제목·사진·요약을 저절로 채운다. (Edge Function og-meta)
+     * 활동 사진은 메인 갤러리의 '총회 활동' 갈래에 올라가 자동으로 연동된다. */
+    function drawAssembly(dels, boards, news, photos) {
       var el = document.getElementById('dash-assembly');
       if (!el) return;
+      var admin = SHSAuth.canManageMembers(user);
+      var today = new Date().toISOString().slice(0, 10);
+
       function group(rows, kinds, keyOf) {
         var by = {};
         rows.forEach(function (x) { (by[keyOf(x)] = by[keyOf(x)] || []).push(x); });
@@ -1084,13 +1094,243 @@ var SHSBoard = (function () {
       var bdHtml = group(boards, bdKinds, function (x) { return x.kind; });
       h += '<h3 class="mn-sub" style="margin:18px 0 8px">총회 파송 이사 · 위원</h3>' +
         (bdHtml || '<p class="dash-none">등록된 파송 이사가 없습니다.</p>');
+
+      /* 총회 소식 · 기사 */
+      h += '<h3 class="mn-sub" style="margin:20px 0 8px">총회 소식 · 기사</h3>' +
+        '<div id="asm-news"></div>';
+      if (admin) {
+        h += '<div style="margin-top:10px;padding:12px 14px;background:var(--gray-1,#f4f2ec);border-radius:10px">' +
+          '<div style="font-size:0.84rem;font-weight:700;margin-bottom:6px">기사 등록 (관리자)</div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<input type="text" id="asm-url" placeholder="기사 주소(URL)를 붙여 넣으세요" style="flex:1 1 280px">' +
+          '<button type="button" class="btn sm" id="asm-fetch">가져오기</button></div>' +
+          '<div id="asm-preview" class="hidden" style="margin-top:10px">' +
+          '<div class="field"><label>제목</label><input type="text" id="asm-title"></div>' +
+          '<div class="field"><label>요약 (선택)</label><input type="text" id="asm-desc"></div>' +
+          '<div class="field"><label>사진 주소 (선택)</label><input type="text" id="asm-img"></div>' +
+          '<img id="asm-imgprev" class="hidden" alt="" style="max-width:220px;border-radius:8px;margin:4px 0 8px">' +
+          '<div><button type="button" class="btn sm" id="asm-add">기사 추가</button></div></div>' +
+          '<div class="form-msg" id="asm-msg"></div></div>';
+      }
+
+      /* 활동 사진 — 메인 갤러리 '총회 활동' 갈래와 연동 */
+      h += '<h3 class="mn-sub" style="margin:20px 0 8px">활동 사진</h3>' +
+        '<div id="asm-photos"></div>';
+      if (admin) {
+        h += '<div style="margin-top:8px">' +
+          '<input type="file" id="asm-photo" accept="image/*" multiple style="max-width:320px">' +
+          ' <span style="font-size:0.76rem;color:var(--gray-5)">올린 사진은 노회 메인 갤러리의 ' +
+          '<strong>총회 활동</strong> 앨범에도 함께 실립니다.</span>' +
+          '<div class="form-msg" id="asm-pmsg"></div></div>';
+      }
+
       h += '<div class="dash-more" style="margin-top:14px">' +
         '<a href="organization.html#delegates-body">총대 명단</a>' +
+        ' · <a href="gallery.html">메인 갤러리</a>' +
         ' · <a href="assembly-constitution.html">총회 헌법</a>' +
         ' · <a href="assembly-rules.html">총회 규칙</a>' +
         ' · <a href="assembly-resolution.html">총회 결의</a>' +
         ' · <a href="assembly-report.html">총회 보고</a></div>';
       el.innerHTML = h;
+
+      /* ----- 기사 갤러리 그리기 ----- */
+      function renderNews(list) {
+        var box = document.getElementById('asm-news');
+        if (!box) return;
+        if (!list.length) {
+          box.innerHTML = '<p class="dash-none">등록된 기사가 없습니다.' +
+            (admin ? ' 아래에서 기사 주소를 넣어 등록해 주세요.' : '') + '</p>';
+          return;
+        }
+        box.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px">' +
+          list.map(function (n) {
+            return '<a href="' + esc(n.url) + '" target="_blank" rel="noopener" ' +
+              'style="display:block;border:1px solid var(--gray-2,#e8e5df);border-radius:10px;overflow:hidden;' +
+              'background:#fff;text-decoration:none;color:inherit;position:relative">' +
+              (n.image_url
+                ? '<img src="' + esc(n.image_url) + '" alt="" loading="lazy" ' +
+                  'style="width:100%;height:122px;object-fit:cover;display:block">'
+                : '<div style="height:122px;background:var(--gray-1,#f2efe9)"></div>') +
+              '<div style="padding:10px 12px">' +
+              '<div style="font-weight:700;font-size:0.88rem;line-height:1.4;max-height:2.8em;overflow:hidden">' +
+              esc(n.title) + '</div>' +
+              (n.description
+                ? '<div style="font-size:0.76rem;color:var(--gray-6);margin-top:4px;max-height:3em;overflow:hidden">' +
+                  esc(n.description) + '</div>'
+                : '') +
+              '<div style="font-size:0.7rem;color:var(--gray-5);margin-top:6px">' + esc(n.source || '') +
+              (n.news_date ? ' · ' + esc(n.news_date) : '') + '</div></div>' +
+              (admin
+                ? '<button type="button" data-ndel="' + n.id + '" ' +
+                  'style="position:absolute;top:6px;right:6px;border:none;background:rgba(0,0,0,0.55);' +
+                  'color:#fff;border-radius:8px;padding:2px 8px;font-size:0.72rem;cursor:pointer">삭제</button>'
+                : '') +
+              '</a>';
+          }).join('') + '</div>';
+        box.querySelectorAll('button[data-ndel]').forEach(function (b) {
+          b.addEventListener('click', function (ev) {
+            ev.preventDefault(); ev.stopPropagation();
+            if (!confirm('이 기사를 목록에서 지우시겠습니까?')) return;
+            SHSCloud.init().then(function (c) {
+              return c.from('assembly_news').delete().eq('id', parseInt(b.dataset.ndel, 10));
+            }).then(function (r) {
+              if (r.error) { alert(r.error.message); return; }
+              refreshNews();
+            });
+          });
+        });
+      }
+      function refreshNews() {
+        SHSCloud.init().then(function (c) {
+          return c.from('assembly_news').select('*').order('id', { ascending: false }).limit(12);
+        }).then(function (r) { renderNews((r && r.data) || []); });
+      }
+      renderNews(news);
+
+      /* ----- 활동 사진 그리기 ----- */
+      function renderPhotos(list) {
+        var box = document.getElementById('asm-photos');
+        if (!box) return;
+        if (!list.length) {
+          box.innerHTML = '<p class="dash-none">올린 활동 사진이 없습니다.</p>';
+          return;
+        }
+        box.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          list.map(function (p) {
+            return '<a href="gallery.html" title="' + esc(p.title || '') + '">' +
+              '<img src="' + esc(p.thumb_url || p.image_url) + '" alt="" loading="lazy" ' +
+              'style="width:112px;height:84px;object-fit:cover;border-radius:8px;display:block">' + '</a>';
+          }).join('') + '</div>';
+      }
+      function refreshPhotos() {
+        SHSCloud.init().then(function (c) {
+          return c.from('gallery_items').select('id,title,image_url,thumb_url')
+                  .eq('category', '총회 활동').order('id', { ascending: false }).limit(8);
+        }).then(function (r) { renderPhotos((r && r.data) || []); });
+      }
+      renderPhotos(photos);
+
+      if (!admin) return;
+
+      /* ----- 기사 등록: 주소를 넣으면 제목·사진·요약을 저절로 채운다 ----- */
+      var msg = document.getElementById('asm-msg');
+      function say(t, err) { msg.className = 'form-msg' + (err ? ' err' : ''); msg.textContent = t || ''; }
+      var fetched = { source: '' };
+      document.getElementById('asm-fetch').addEventListener('click', function () {
+        var url = document.getElementById('asm-url').value.trim();
+        if (!/^https?:\/\//i.test(url)) { say('http:// 또는 https:// 로 시작하는 기사 주소를 넣어 주세요.', true); return; }
+        say('기사 정보를 가져오는 중입니다...');
+        SHSCloud.init().then(function (c) {
+          return c.functions.invoke('og-meta', { body: { url: url } });
+        }).then(function (r) {
+          var d = r && r.data;
+          if (!d || r.error || d.error) {
+            throw new Error((d && d.error) || (r.error && r.error.message) || '가져오지 못했습니다.');
+          }
+          fetched.source = d.source || '';
+          document.getElementById('asm-title').value = d.title || '';
+          document.getElementById('asm-desc').value = d.description || '';
+          document.getElementById('asm-img').value = d.image || '';
+          var pv = document.getElementById('asm-imgprev');
+          pv.src = d.image || '';
+          pv.classList.toggle('hidden', !d.image);
+          document.getElementById('asm-preview').classList.remove('hidden');
+          say(d.title ? '내용을 확인하고 기사 추가를 눌러 주세요.'
+                      : '제목을 읽지 못했습니다. 직접 적은 뒤 기사 추가를 눌러 주세요.', !d.title);
+        }).catch(function (x) {
+          /* 자동 수집이 안 되는 기사면 직접 적어서라도 등록할 수 있게 한다 */
+          document.getElementById('asm-preview').classList.remove('hidden');
+          say('자동으로 가져오지 못했습니다 (' + ((x && x.message) || x) + '). 제목을 직접 적어 주세요.', true);
+        });
+      });
+      document.getElementById('asm-add').addEventListener('click', function () {
+        var url = document.getElementById('asm-url').value.trim();
+        var title = document.getElementById('asm-title').value.trim();
+        if (!url || !title) { say('기사 주소와 제목을 확인해 주세요.', true); return; }
+        say('등록 중입니다...');
+        SHSCloud.init().then(function (c) {
+          return c.from('assembly_news').insert({
+            url: url, title: title,
+            description: document.getElementById('asm-desc').value.trim() || null,
+            image_url: document.getElementById('asm-img').value.trim() || null,
+            source: fetched.source || (url.match(/^https?:\/\/(?:www\.)?([^\/]+)/i) || [])[1] || null,
+            news_date: today, created_by: user.name
+          });
+        }).then(function (r) {
+          if (r.error) { say(r.error.message, true); return; }
+          document.getElementById('asm-url').value = '';
+          document.getElementById('asm-preview').classList.add('hidden');
+          say('기사를 등록했습니다.');
+          SHSCloud.log('create', '총회 기사 등록', title);
+          refreshNews();
+        });
+      });
+
+      /* ----- 활동 사진 올리기 → 메인 갤러리 '총회 활동' 앨범 ----- */
+      function shrink(file, maxW, quality) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          var url = URL.createObjectURL(file);
+          img.onload = function () {
+            var w = img.width, ht = img.height;
+            if (w > maxW) { ht = Math.round(ht * maxW / w); w = maxW; }
+            var cv = document.createElement('canvas');
+            cv.width = w; cv.height = ht;
+            cv.getContext('2d').drawImage(img, 0, 0, w, ht);
+            URL.revokeObjectURL(url);
+            cv.toBlob(function (b) {
+              if (b) resolve(b); else reject(new Error('사진을 줄이지 못했습니다.'));
+            }, 'image/jpeg', quality);
+          };
+          img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진을 읽지 못했습니다.')); };
+          img.src = url;
+        });
+      }
+      var pin = document.getElementById('asm-photo');
+      if (pin) pin.addEventListener('change', function () {
+        var files = Array.prototype.slice.call(this.files || []);
+        if (!files.length) return;
+        if (!window.SHSPhotos) {
+          document.getElementById('asm-pmsg').textContent = '사진 도구를 불러오지 못했습니다. 갤러리 화면에서 올려 주세요.';
+          return;
+        }
+        var pmsg = document.getElementById('asm-pmsg');
+        pmsg.className = 'form-msg'; pmsg.textContent = '사진을 올리는 중입니다... (0/' + files.length + ')';
+        SHSCloud.init().then(function (c) {
+          return c.from('gallery_items').select('sort').order('sort', { ascending: false }).limit(1);
+        }).then(function (r) {
+          var sort = (r && r.data && r.data[0] && Number(r.data[0].sort)) || 0;
+          var chain = Promise.resolve();
+          files.forEach(function (f, i) {
+            chain = chain.then(function () {
+              return Promise.all([shrink(f, 1400, 0.8), shrink(f, 640, 0.72)]).then(function (bs) {
+                return SHSPhotos.putPair(bs[0], bs[1]);
+              }).then(function (u) {
+                return SHSCloud.init().then(function (c) {
+                  return c.from('gallery_items').insert({
+                    title: '총회 활동', taken: today, category: '총회 활동',
+                    image_url: u.full, thumb_url: u.thumb,
+                    author_id: user.id, author_name: user.name, sort: sort + i + 1
+                  });
+                });
+              }).then(function (r2) {
+                if (r2.error) throw r2.error;
+                pmsg.textContent = '사진을 올리는 중입니다... (' + (i + 1) + '/' + files.length + ')';
+              });
+            });
+          });
+          return chain;
+        }).then(function () {
+          pmsg.className = 'form-msg ok';
+          pmsg.textContent = files.length + '장을 올렸습니다. 메인 갤러리의 총회 활동 앨범에서도 볼 수 있습니다.';
+          pin.value = '';
+          SHSCloud.log('create', '총회 활동 사진 등록', files.length + '장');
+          refreshPhotos();
+        }).catch(function (x) {
+          pmsg.className = 'form-msg err';
+          pmsg.textContent = '올리지 못했습니다: ' + ((x && x.message) || x);
+        });
+      });
     }
 
     /* ---------- 교회상황 보고서 ---------- */
