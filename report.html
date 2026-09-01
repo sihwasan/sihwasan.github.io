@@ -312,6 +312,16 @@ document.addEventListener('DOMContentLoaded', function () {
         : carried ? ' — <strong>' + prevRecord.year + '년 보고서 내용을 그대로 가져왔습니다.</strong> ' +
           '바뀐 부분만 고친 뒤 저장·제출해 주세요.' : '') + '</div>';
 
+    /* 한글 파일(HWPX)로 자동 입력 */
+    h += '<div class="admin-card rf-sec"><h3>&#128196; 한글 파일(HWPX)로 자동 입력</h3>' +
+      '<p class="rf-hint">한글(HWP)로 작성한 노회 서식 교회상황 보고서 파일을 올리면 아래 항목들이 ' +
+      '자동으로 채워집니다. 파일은 <strong>반드시 HWPX 형식</strong>으로 올려 주세요. ' +
+      '한글에서 <strong>파일 → 다른 이름으로 저장 → 파일 형식: HWPX 문서(*.hwpx)</strong>를 고르시면 됩니다.</p>' +
+      '<div class="field"><input type="file" id="rp-hwpx" accept=".hwpx"></div>' +
+      '<p class="rf-hint">채워진 내용을 확인하고 고치신 뒤 맨 아래 <strong>저장하기</strong> 또는 ' +
+      '<strong>시찰 서기에게 제출</strong>을 누르시면 기록됩니다.</p>' +
+      '<div class="form-msg" id="rp-hwpx-msg"></div></div>';
+
     /* ① 기본 정보 */
     h += '<div class="admin-card rf-sec"><h3>① 기본 정보</h3>' +
       '<p class="rf-hint">교회명·시찰·주소는 회원 명단에서 자동으로 가져왔습니다.</p>' +
@@ -513,6 +523,16 @@ document.addEventListener('DOMContentLoaded', function () {
     area.addEventListener('input', sums);
     sums();
 
+    /* HWPX 파일을 올리면 분석해 항목을 채운다 */
+    var hf = document.getElementById('rp-hwpx');
+    if (hf) {
+      if (SHS.dropZone) SHS.dropZone(hf, { what: 'HWPX 파일' });
+      hf.addEventListener('change', function () {
+        var f = this.files[0];
+        if (f) importHwpx(f, sums);
+      });
+    }
+
     document.getElementById('rp-preview').addEventListener('click', function () {
       openSheet(collect(), mySeal);
     });
@@ -567,6 +587,351 @@ document.addEventListener('DOMContentLoaded', function () {
       window.scrollTo(0, keepY);
       msg.className = 'form-msg err'; msg.textContent = (err && err.message) || String(err);
     });
+  }
+
+  /* ================================================================
+   *  HWPX 자동 입력
+   *  HWPX는 XML을 담은 압축(zip) 파일이다. 압축을 풀어
+   *  Contents/section*.xml 안의 표를 (행,열)=글 그리드로 만들고,
+   *  노회 서식의 표 배치에 맞춰 항목을 찾아 채운다.
+   * ================================================================ */
+  var zipLoading = null;
+  function loadZipTool() {
+    if (window.JSZip) return Promise.resolve(window.JSZip);
+    if (zipLoading) return zipLoading;
+    zipLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+      sc.onload = function () { resolve(window.JSZip); };
+      sc.onerror = function () { zipLoading = null; reject(new Error('압축 해제 도구를 불러오지 못했습니다.')); };
+      document.head.appendChild(sc);
+    });
+    return zipLoading;
+  }
+
+  /* section XML의 표들을 { '행,열': 글 } 그리드 목록으로 만든다 */
+  function hwpxGrids(xmlText) {
+    var doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    var all = doc.getElementsByTagName('*');
+    var tbls = [], i;
+    for (i = 0; i < all.length; i++) if (all[i].localName === 'tbl') tbls.push(all[i]);
+    return tbls.map(function (tbl) {
+      var grid = {};
+      var els = tbl.getElementsByTagName('*');
+      for (var j = 0; j < els.length; j++) {
+        if (els[j].localName !== 'tc') continue;
+        var tc = els[j], addr = null, txt = [];
+        var kids = tc.getElementsByTagName('*');
+        for (var k = 0; k < kids.length; k++) {
+          if (kids[k].localName === 'cellAddr') addr = kids[k];
+          else if (kids[k].localName === 't') txt.push(kids[k].textContent);
+        }
+        if (!addr) continue;
+        grid[addr.getAttribute('rowAddr') + ',' + addr.getAttribute('colAddr')] =
+          txt.join('').replace(/\s+/g, ' ').trim();
+      }
+      return grid;
+    });
+  }
+
+  function importHwpx(file, after) {
+    var msg = document.getElementById('rp-hwpx-msg');
+    function say(t, err) { msg.className = 'form-msg' + (err ? ' err' : ' ok'); msg.textContent = t; }
+    if (!/\.hwpx$/i.test(file.name)) {
+      say('HWPX 파일이 아닙니다. 한글에서 다른 이름으로 저장 → HWPX 문서(*.hwpx)로 저장해 올려 주세요.', true);
+      return;
+    }
+    msg.className = 'form-msg'; msg.textContent = '파일을 분석하는 중입니다...';
+    loadZipTool().then(function (JSZip) {
+      return JSZip.loadAsync(file);
+    }).then(function (zip) {
+      var names = Object.keys(zip.files).filter(function (n) {
+        return /^Contents\/section\d+\.xml$/i.test(n);
+      }).sort();
+      if (!names.length) throw new Error('본문(section)을 찾을 수 없습니다. 올바른 HWPX 파일인지 확인해 주세요.');
+      return Promise.all(names.map(function (n) { return zip.files[n].async('string'); }));
+    }).then(function (xmls) {
+      var grids = [];
+      var fullText = '';
+      xmls.forEach(function (x) {
+        grids = grids.concat(hwpxGrids(x));
+        fullText += x.replace(/<[^>]+>/g, ' ');
+      });
+      var n = fillFromHwpx(grids, fullText);
+      if (after) after();
+      if (!n) {
+        say('노회 서식의 표를 찾지 못해 채우지 못했습니다. 노회 서식(hwpx)으로 작성한 파일인지 확인해 주세요.', true);
+        return;
+      }
+      /* 파일 속 교회명이 지금 작성 중인 교회와 다르면 알려 준다 */
+      var warn = '';
+      var tAddr2 = grids.filter(function (g) { return gHas(g, /노회명/); })[0];
+      if (tAddr2) {
+        var fileCh = gRight(tAddr2, /^교회명$/);
+        if (fileCh && chKey(fileCh) !== chKey(CHURCH)) {
+          warn = ' (주의: 파일의 교회명은 "' + fileCh + '"입니다. 지금은 ' + CHURCH + ' 보고서를 작성 중입니다.)';
+        }
+      }
+      say('파일에서 ' + n + '개 항목을 자동으로 채웠습니다. 내용을 확인하신 뒤 저장·제출해 주세요.' + warn, !!warn);
+    }).catch(function (x) {
+      say('분석하지 못했습니다: ' + ((x && x.message) || x) +
+        ' — HWP 형식이라면 한글에서 HWPX로 다시 저장해 주세요.', true);
+    });
+  }
+
+  /* ----- 그리드에서 자리 찾기 도우미 ----- */
+  function gHas(g, re) {
+    return Object.keys(g).some(function (k) { return re.test(g[k]); });
+  }
+  function gPos(g, re) {
+    var best = null;
+    Object.keys(g).forEach(function (k) {
+      if (!re.test(g[k])) return;
+      var p = k.split(',');
+      var r = +p[0], c = +p[1];
+      if (!best || r < best.r || (r === best.r && c < best.c)) best = { r: r, c: c };
+    });
+    return best;
+  }
+  /* 라벨 오른쪽의 첫 칸 값 */
+  function gRight(g, re) {
+    var p = gPos(g, re);
+    if (!p) return null;
+    for (var c = p.c + 1; c <= p.c + 5; c++) {
+      var v = g[p.r + ',' + c];
+      if (v !== undefined) return v;
+    }
+    return null;
+  }
+  /* 라벨 아래 칸 값 (같은 열) */
+  function gBelow(g, re, dr) {
+    var p = gPos(g, re);
+    if (!p) return null;
+    var v = g[(p.r + (dr || 1)) + ',' + p.c];
+    return v === undefined ? null : v;
+  }
+
+  /* 서식의 표들을 화면 입력칸에 채운다. 채운 칸 수를 돌려 준다. */
+  function fillFromHwpx(grids, fullText) {
+    var filled = 0;
+    function put(id, v) {
+      var el = document.getElementById(id);
+      if (!el || v == null) return;
+      v = String(v).trim();
+      if (!v) return;
+      if (el.tagName === 'SELECT') {
+        var hit = false;
+        for (var i = 0; i < el.options.length; i++) {
+          if (el.options[i].value === v || el.options[i].text === v) { hit = true; break; }
+        }
+        if (!hit) return;
+      }
+      el.value = v;
+      filled++;
+    }
+    function putNum(id, v) {
+      if (v == null) return;
+      var d = String(v).replace(/[^\d]/g, '');
+      put(id, d);
+    }
+
+    /* 표를 서식 이름표로 알아본다 */
+    function pick(re) {
+      return grids.filter(function (g) { return gHas(g, re); })[0] || null;
+    }
+    var tAddr = pick(/노회명/);
+    var tStaff = pick(/담임구분/);
+    var tMem = pick(/유아부/);
+    var tFam = pick(/교역자\s*사례비|월지급액/);
+    var tFin = pick(/전년이월/);
+    var tAsset = pick(/수량\(면적\)|임대보증금/);
+    var tSup = pick(/선교사명/);
+
+    /* ① 기본 정보 · ② 주소 */
+    if (tAddr) {
+      put('f-pastor', gBelow(tAddr, /^담임교역자$/));
+      put('f-ptype', gBelow(tAddr, /^구분\(위임/));
+      put('f-prrn', gBelow(tAddr, /^주민등록번호$/));
+      put('f-danghoi', gBelow(tAddr, /^당회구성$/));
+      put('f-finance', gBelow(tAddr, /^재\s*정$|^재정$/));
+      put('f-region', gBelow(tAddr, /^지\s*역$|^지역$/));
+      put('f-achurch', gRight(tAddr, /^교회주소$/));
+      put('f-amanse', gRight(tAddr, /^사택주소$/));
+      /* 전화는 교회주소 줄과 사택주소 줄에 하나씩 있다 */
+      var chRow = gPos(tAddr, /^교회주소$/), mnRow = gPos(tAddr, /^사택주소$/);
+      Object.keys(tAddr).forEach(function (k) {
+        var p = k.split(','), r = +p[0], c = +p[1], v = tAddr[k];
+        function rightVal() {
+          for (var c2 = c + 1; c2 <= c + 5; c2++) {
+            if (tAddr[r + ',' + c2] !== undefined) return tAddr[r + ',' + c2];
+          }
+          return null;
+        }
+        /* 전화 칸은 교회주소 줄과 사택주소 줄에 하나씩 — 사택주소 줄 아래면 사택 전화다 */
+        if (/^전\s*화$/.test(v)) {
+          if (mnRow && r >= mnRow.r) put('f-amtel', rightVal());
+          else if (chRow && r >= chRow.r) put('f-atel', rightVal());
+        }
+        if (/^팩\s*스$/.test(v)) put('f-afax', rightVal());
+        if (/^홈페이지$/.test(v)) put('f-ahome', rightVal());
+        if (/^핸드폰$/.test(v)) put('f-amobile', rightVal());
+        if (/^E-?mail$/i.test(v)) put('f-aemail', rightVal());
+      });
+    }
+
+    /* ③ 교역자 수 · 제직자 수 */
+    if (tStaff) {
+      /* 교역자: 머리칸 라벨의 열을 찾아 두 줄 아래 값을 읽는다 */
+      var cl = gPos(tStaff, /^담임구분$/);
+      if (cl) {
+        var vRow = cl.r + 2;
+        [[/^담임구분$/, 'damim'], [/^원로$/, 'wonro'], [/^부목사/, 'bumok'],
+         [/^협동$/, 'hyup'], [/^기타$/, 'gita'], [/^강도사$/, 'gangdosa']]
+          .forEach(function (mch) {
+            /* 교역자 머리줄(cl.r)에 있는 라벨만 본다 */
+            var pos = null;
+            Object.keys(tStaff).forEach(function (k) {
+              var p = k.split(',');
+              if (+p[0] === cl.r && mch[0].test(tStaff[k]) &&
+                  (!pos || +p[1] < pos.c)) pos = { r: +p[0], c: +p[1] };
+            });
+            if (pos) putNum('f-c-' + mch[1], tStaff[vRow + ',' + pos.c]);
+          });
+        /* 전도사 남·여: 전도사 라벨 아래 줄의 남·여 열 */
+        var jd = gPos(tStaff, /^전도사/);
+        if (jd) {
+          var cols = [];
+          Object.keys(tStaff).forEach(function (k) {
+            var p = k.split(',');
+            if (+p[0] === jd.r + 1 && /^[남여]$/.test(tStaff[k]) && +p[1] >= jd.c) {
+              cols.push({ c: +p[1], v: tStaff[k] });
+            }
+          });
+          cols.sort(function (a, b) { return a.c - b.c; });
+          if (cols[0]) putNum('f-c-jd_m', tStaff[vRow + ',' + cols[0].c]);
+          if (cols[1]) putNum('f-c-jd_f', tStaff[vRow + ',' + cols[1].c]);
+        }
+      }
+      /* 제직: 장로 줄 아래 머리줄의 라벨을 순서대로 값과 짝지운다 */
+      var jr = gPos(tStaff, /^장\s*로$/);
+      if (jr) {
+        var hRow = jr.r + 1, vRow2 = jr.r + 2;
+        var heads = [];
+        Object.keys(tStaff).forEach(function (k) {
+          var p = k.split(',');
+          if (+p[0] === hRow && tStaff[k]) heads.push({ c: +p[1], v: tStaff[k] });
+        });
+        heads.sort(function (a, b) { return a.c - b.c; });
+        var JKEYS = ['jr_simu', 'jr_wonro', 'jr_euntoe', 'jr_hyup', 'jr_gita',
+                     'as_simu', 'as_gita', 'ks_simu', 'ks_gita', 'ss_m', 'ss_f'];
+        heads.slice(0, JKEYS.length).forEach(function (hd, i) {
+          putNum('f-j-' + JKEYS[i], tStaff[vRow2 + ',' + hd.c]);
+        });
+      }
+    }
+
+    /* ④ 교인수: 부서 이름 줄을 찾아 1~10열을 그대로 읽는다 */
+    if (tMem) {
+      DEPTS.forEach(function (dp) {
+        var p = gPos(tMem, new RegExp('^' + dp + '$'));
+        if (!p) return;
+        MCOLS.forEach(function (c, i) {
+          putNum('f-m-' + dp + '-' + c[0], tMem[p.r + ',' + (i + 1)]);
+        });
+      });
+    }
+
+    /* ⑤ 교역자 가족 · 사례비 */
+    if (tFam) {
+      var hRel = gPos(tFam, /^관계$/), hName = gPos(tFam, /^성명$/),
+          hSex = gPos(tFam, /^성별$/), hAge = gPos(tFam, /^연령$/),
+          hJob = gPos(tFam, /직업/);
+      var payRow = gPos(tFam, /사례비|월지급액/);
+      if (hName) {
+        var endR = payRow ? payRow.r : 99;
+        var fi = 0;
+        for (var r = hName.r + 1; r < endR && fi < 4; r++) {
+          var nm = tFam[r + ',' + hName.c];
+          var rel = hRel ? tFam[r + ',' + hRel.c] : '';
+          if (!nm && !rel) continue;
+          put('f-fam-rel-' + fi, rel);
+          put('f-fam-name-' + fi, nm);
+          if (hSex) put('f-fam-sex-' + fi, tFam[r + ',' + hSex.c]);
+          if (hAge) putNum('f-fam-age-' + fi, tFam[r + ',' + hAge.c]);
+          if (hJob) put('f-fam-job-' + fi, tFam[r + ',' + hJob.c]);
+          fi++;
+        }
+      }
+      putNum('f-pay-monthly', gRight(tFam, /^월지급액$/));
+      putNum('f-pay-extra', gRight(tFam, /^기타지급액$/));
+      /* 개월 칸: 월지급액 쪽이 먼저, 기타지급액 쪽이 다음 */
+      if (payRow) {
+        var mon = [];
+        Object.keys(tFam).forEach(function (k) {
+          var p2 = k.split(',');
+          if (+p2[0] === payRow.r && /개월/.test(tFam[k])) mon.push({ c: +p2[1], v: tFam[k] });
+        });
+        mon.sort(function (a, b) { return a.c - b.c; });
+        if (mon[0]) putNum('f-pay-mmon', mon[0].v);
+        if (mon[1]) putNum('f-pay-emon', mon[1].v);
+      }
+    }
+
+    /* ⑥ 교회 재정 */
+    if (tFin) {
+      [[/^전년이월$/, 'f-fi-carry'], [/^헌금/, 'f-fi-offer'], [/^특별헌금/, 'f-fi-special'],
+       [/^선교[,·]\s*구제/, 'f-fi-mission'], [/^기타수입$/, 'f-fi-etc'],
+       [/^교회운영비/, 'f-fo-oper'], [/^인건비/, 'f-fo-labor'], [/^선\s*교\s*비$/, 'f-fo-mission'],
+       [/^교\s*육\s*비$/, 'f-fo-edu'], [/^예\s*비\s*비$/, 'f-fo-reserve'], [/^차년도이월/, 'f-fo-carry']]
+        .forEach(function (mch) {
+          var p = gPos(tFin, mch[0]);
+          if (p) putNum(mch[1], tFin[p.r + ',' + (p.c + 1)]);
+        });
+    }
+
+    /* ⑦ 교회 자산: 부동산 4줄 · 임대보증금 1줄 · 차량 3줄 순서 그대로 */
+    if (tAsset) {
+      var aStart = gPos(tAsset, /^부동산$/);
+      if (aStart) {
+        for (var ai = 0; ai < 8; ai++) {
+          var r2 = aStart.r + ai;
+          put('f-as-qty-' + ai, tAsset[r2 + ',1']);
+          putNum('f-as-val-' + ai, tAsset[r2 + ',2']);
+          put('f-as-use-' + ai, tAsset[r2 + ',3']);
+          put('f-as-own-' + ai, tAsset[r2 + ',4']);
+        }
+      }
+    }
+
+    /* ⑧ 후원 · 선교사 */
+    if (tSup) {
+      var hNo = gPos(tSup, /^노회$/), hMi = gPos(tSup, /^선교사명$/);
+      if (hNo) {
+        for (var si = 0; si < 5; si++) {
+          var r3 = hNo.r + 1 + si;
+          put('f-su-nohoi-' + si, tSup[r3 + ',' + hNo.c]);
+          put('f-su-church-' + si, tSup[r3 + ',' + (hNo.c + 1)]);
+          put('f-su-pastor-' + si, tSup[r3 + ',' + (hNo.c + 2)]);
+          putNum('f-su-amount-' + si, tSup[r3 + ',' + (hNo.c + 3)]);
+          put('f-su-region-' + si, tSup[r3 + ',' + (hNo.c + 4)]);
+          if (hMi) {
+            put('f-mi-name-' + si, tSup[r3 + ',' + hMi.c]);
+            put('f-mi-country-' + si, tSup[r3 + ',' + (hMi.c + 1)]);
+            put('f-mi-org-' + si, tSup[r3 + ',' + (hMi.c + 2)]);
+            putNum('f-mi-monthly-' + si, tSup[r3 + ',' + (hMi.c + 3)]);
+            put('f-mi-date-' + si, tSup[r3 + ',' + (hMi.c + 4)]);
+          }
+        }
+      }
+    }
+
+    /* 보고일: 본문 글에서 "주후 ○년 ○월 ○일"을 찾는다 */
+    var dm = String(fullText || '').match(/주후\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (dm) {
+      put('f-date', dm[1] + '-' + ('0' + dm[2]).slice(-2) + '-' + ('0' + dm[3]).slice(-2));
+    }
+
+    return filled;
   }
 
   /* 화면의 값을 하나의 자료로 모은다 */
