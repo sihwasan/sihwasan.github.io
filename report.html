@@ -72,42 +72,13 @@
 
 <div class="page-head">
   <div class="container">
-    <h1>보고서</h1>
-    <div class="crumb">홈 &gt; 자료실 &gt; 보고서</div>
+    <h1>교회상황 보고서</h1>
+    <div class="crumb">홈 &gt; 자료실 &gt; 교회상황 보고서</div>
   </div>
 </div>
 
 <main class="page-body container" id="main">
-  <!-- 보고서 종류 탭: 교회상황은 이 화면에서, 나머지 보고서 서식은 이 자리에 바로 열린다 -->
-  <div class="tabs" style="margin-bottom:16px" id="rp-tabs">
-    <button type="button" class="active" data-rt="">교회상황 보고서</button>
-    <button type="button" data-rt="sichalreport">시찰보고서</button>
-    <button type="button" data-rt="deptreport">부 사업보고서</button>
-    <button type="button" data-rt="deptorg">부 조직 보고서</button>
-  </div>
   <div id="rp-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
-  <div id="rp-embed" class="hidden">
-    <iframe id="rp-embed-frame" title="보고서 작성" style="width:100%;height:1700px;border:0;background:transparent"></iframe>
-  </div>
-  <script>
-  /* 탭 전환: 교회상황은 이 화면, 나머지는 청원 서식을 이 자리에 끼워 보여 준다 */
-  document.addEventListener('DOMContentLoaded', function () {
-    var tabs = document.querySelectorAll('#rp-tabs button');
-    tabs.forEach(function (b) {
-      b.addEventListener('click', function () {
-        tabs.forEach(function (x) { x.classList.toggle('active', x === b); });
-        var f = b.dataset.rt;
-        document.getElementById('rp-area').classList.toggle('hidden', !!f);
-        document.getElementById('rp-embed').classList.toggle('hidden', !f);
-        if (f) {
-          var fr = document.getElementById('rp-embed-frame');
-          var src = 'petition.html?embed=1&form=' + f;
-          if (fr.getAttribute('src') !== src) fr.setAttribute('src', src);
-        }
-      });
-    });
-  });
-  </script>
 </main>
 
 <div id="sheet-wrap"></div>
@@ -116,7 +87,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260901k"></script>
+<script src="js/main.js?v=20260901l"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -132,23 +103,6 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function db() { return SHSCloud.init(); }
-
-  /* 시찰보고서는 시찰 서기가 작성한다 — 시찰 임원(시찰장·서기)과 관리자에게만 탭을 보인다 */
-  (function () {
-    var tb = document.querySelector('#rp-tabs button[data-rt="sichalreport"]');
-    if (!tb) return;
-    if (SHSAuth.canManageMembers(user)) return;
-    tb.style.display = 'none';   /* 확인될 때까지 감춰 둔다 */
-    db().then(function (c) {
-      return c.from('sichals').select('head,clerk');
-    }).then(function (r) {
-      var first = function (s) { return String(s || '').trim().split(/[\s(]/)[0]; };
-      var mine = ((r && r.data) || []).some(function (s) {
-        return first(s.head) === user.name || first(s.clerk) === user.name;
-      });
-      if (mine) tb.style.display = '';
-    }).catch(function () {});
-  })();
 
   function qs(k) {
     var m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)'));

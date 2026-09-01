@@ -71,7 +71,8 @@ var SHSBoard = (function () {
       report: hicon('<rect x="12" y="8" width="24" height="34" rx="3"/><path d="M19 6h10v6H19z"/><path d="M18 22h12M18 28h12M18 34h8"/>'),
       dues: hicon('<path d="M8 40h32"/><rect x="11" y="26" width="6" height="14"/><rect x="21" y="18" width="6" height="22"/><rect x="31" y="10" width="6" height="30"/>'),
       me: hicon('<circle cx="24" cy="17" r="8"/><path d="M9 41a15 15 0 0 1 30 0"/>'),
-      schedmgr: hicon('<rect x="8" y="12" width="32" height="28" rx="3"/><path d="M8 20h32M16 8v8M32 8v8"/><path d="M24 26v8M20 30h8"/>')
+      schedmgr: hicon('<rect x="8" y="12" width="32" height="28" rx="3"/><path d="M8 20h32M16 8v8M32 8v8"/><path d="M24 26v8M20 30h8"/>'),
+      assembly: hicon('<path d="M6 18 24 8l18 10"/><path d="M11 22v14M19 22v14M29 22v14M37 22v14"/><path d="M6 40h36"/><path d="M8 18h32"/>')
     };
 
     function hubCard(id, title, sub, extra) {
@@ -88,17 +89,17 @@ var SHSBoard = (function () {
     {
       var cards = '';
       cards += hubCard('noti', '나의 알림', '', { badge: 'hub-badge-noti' });
-      cards += hubCard('notice', '노회 공지', '');
-      /* 노회장·서기·간사는 아래 노회 일정관리 카드로 일정을 보므로 따로 두지 않는다 */
-      if (!SHSAuth.canManageMembers(user)) cards += hubCard('sched', '노회 일정', '');
+      /* 공지와 일정은 한 카드에서 함께 본다 */
+      cards += hubCard('notice', '노회 공지·일정', '');
+      cards += hubCard('assembly', '총회 활동 현황', '총대 · 파송 이사');
       if (!isSuper) {
         cards += hubCard('church', '나의 교회', '');
         cards += hubCard('sichal', '나의 시찰');
         cards += hubCard('mydues', '나의 상회비', '상회비 · 세례의무금');
-        cards += hubCard('com', '내가 맡은 부서', '');
+        cards += hubCard('com', '상비부', '');
       }
       cards += hubCard('doc', '서류 발급', '');
-      cards += hubCard('report', '교회상황 보고서', '');
+      cards += hubCard('report', '교회상황 보고서', '', { cid: 'hub-card-report' });
       cards += hubCard('me', '내 정보', '사진 · 도장 · 연락처');
       /* 노회장·서기·간사에게는 노회 일정 카드 대신 노회 일정관리 카드를 둔다 */
       if (SHSAuth.canManageMembers(user)) cards += hubCard('schedmgr', '노회 일정관리', '달력 · 임직식');
@@ -121,8 +122,12 @@ var SHSBoard = (function () {
         '<button type="button" class="btn ghost sm" id="hub-back">&#8592; 대시보드</button>' +
         '<h2 id="hub-detail-title" style="margin:0"></h2></div>' +
         '<div class="hub-panel hidden" data-hp="noti"><div id="dash-noti"></div></div>' +
-        '<div class="hub-panel hidden" data-hp="notice"><div id="dash-notice">' + LOADING + '</div></div>' +
-        '<div class="hub-panel hidden" data-hp="sched"><div id="dash-sched">' + LOADING + '</div></div>' +
+        '<div class="hub-panel hidden" data-hp="notice">' +
+        '<h3 class="mn-sub" style="margin:0 0 10px">노회 공지</h3>' +
+        '<div id="dash-notice">' + LOADING + '</div>' +
+        '<h3 class="mn-sub" style="margin:20px 0 10px">노회 일정</h3>' +
+        '<div id="dash-sched">' + LOADING + '</div></div>' +
+        '<div class="hub-panel hidden" data-hp="assembly"><div id="dash-assembly">' + LOADING + '</div></div>' +
         (isSuper ? '' :
           '<div class="hub-panel hidden" data-hp="church"><div id="dash-church">' + LOADING + '</div></div>' +
           '<div class="hub-panel hidden" data-hp="sichal"><div id="dash-sichal">' + LOADING + '</div></div>' +
@@ -148,9 +153,9 @@ var SHSBoard = (function () {
         '</div>';
 
       var HUB_TITLES = {
-        noti: '나의 알림', notice: '노회 공지', sched: '노회 일정', church: '나의 교회',
+        noti: '나의 알림', notice: '노회 공지·일정', assembly: '총회 활동 현황', church: '나의 교회',
         sichal: '나의 시찰 · 납부 현황', mydues: '나의 상회비 · 세례의무금',
-        com: '내가 맡은 부서', doc: '서류 발급', report: '교회상황 보고서', dues: '상회비 전체'
+        com: '상비부', doc: '서류 발급', report: '교회상황 보고서', dues: '상회비 전체'
       };
       /* 상세로 들어가면 주소 뒤에 #hub-항목 이 붙어, 브라우저의
        * <뒤로 가기>를 눌러도 이전 단계(허브)로 돌아온다. */
@@ -540,7 +545,9 @@ var SHSBoard = (function () {
         soft(c.from('sichals').select('name,area,head,clerk,treasurer').order('sort')),
         soft(c.rpc('my_sichal_name')),
         soft(c.from('sichal_report_submissions').select('*').eq('year', year)),
-        soft(c.from('church_staff').select('church').eq('role', '시무장로'))
+        soft(c.from('church_staff').select('church').eq('role', '시무장로')),
+        soft(c.from('delegates').select('*').eq('active', true).order('sort')),
+        soft(c.from('board_members').select('*').eq('active', true).order('sort'))
       ]);
     }).then(function (rs) {
       drawNoti((rs[0] && rs[0].data) || []);
@@ -551,6 +558,7 @@ var SHSBoard = (function () {
       drawMine((rs[6] && rs[6].data) || [], (rs[7] && rs[7].data) || [],
                (rs[8] && rs[8].data) || '');
       drawDanghoi((rs[6] && rs[6].data) || [], (rs[10] && rs[10].data) || []);
+      drawAssembly((rs[11] && rs[11].data) || [], (rs[12] && rs[12].data) || []);
     }).catch(function () {});
 
     /* ---------- 나의 교회 · 나의 시찰 ----------
@@ -1049,6 +1057,42 @@ var SHSBoard = (function () {
         ' <span class="dash-dim">— 교회 관리의 시무장로 기준</span></p>');
     }
 
+    /* ---------- 총회 활동 현황 ----------
+     * 이 노회가 총회에 보낸 총대와 파송 이사·실행위원을 한자리에 보여 준다. */
+    function drawAssembly(dels, boards) {
+      var el = document.getElementById('dash-assembly');
+      if (!el) return;
+      function group(rows, kinds, keyOf) {
+        var by = {};
+        rows.forEach(function (x) { (by[keyOf(x)] = by[keyOf(x)] || []).push(x); });
+        return kinds.filter(function (k) { return by[k] && by[k].length; }).map(function (k) {
+          return '<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--gray-1,#f2efe9)">' +
+            '<span style="flex:0 0 110px;color:var(--gray-5);font-size:0.84rem">' + esc(k) + '</span>' +
+            '<span style="flex:1;font-size:0.92rem">' + by[k].map(function (x) {
+              return esc(x.name) + (x.title ? ' <span style="color:var(--gray-5);font-size:0.8rem">(' +
+                esc(x.title) + ')</span>' : '');
+            }).join(', ') + '</span></div>';
+        }).join('');
+      }
+      var h = '';
+      var delHtml = group(dels, ['목사 정총대', '목사 부총대', '장로 정총대', '장로 부총대'],
+        function (x) { return x.kind; });
+      h += '<h3 class="mn-sub" style="margin:0 0 8px">총회 총대</h3>' +
+        (delHtml || '<p class="dash-none">등록된 총회 총대가 없습니다.</p>');
+      var bdKinds = [];
+      boards.forEach(function (x) { if (bdKinds.indexOf(x.kind) === -1) bdKinds.push(x.kind); });
+      var bdHtml = group(boards, bdKinds, function (x) { return x.kind; });
+      h += '<h3 class="mn-sub" style="margin:18px 0 8px">총회 파송 이사 · 위원</h3>' +
+        (bdHtml || '<p class="dash-none">등록된 파송 이사가 없습니다.</p>');
+      h += '<div class="dash-more" style="margin-top:14px">' +
+        '<a href="organization.html#delegates-body">총대 명단</a>' +
+        ' · <a href="assembly-constitution.html">총회 헌법</a>' +
+        ' · <a href="assembly-rules.html">총회 규칙</a>' +
+        ' · <a href="assembly-resolution.html">총회 결의</a>' +
+        ' · <a href="assembly-report.html">총회 보고</a></div>';
+      el.innerHTML = h;
+    }
+
     /* ---------- 교회상황 보고서 ---------- */
     function drawReports(rows, subs) {
       subs = subs || [];
@@ -1057,6 +1101,18 @@ var SHSBoard = (function () {
       var officer = SHSAuth.isOfficer(user);
       var myChurch = user.church || '';
       var mine = rows.filter(function (r) { return r.church === myChurch; })[0];
+
+      /* 허브 카드에 우리 교회의 제출 여부를 표시한다 */
+      var card = document.getElementById('hub-card-report');
+      if (card && user.role !== 'superadmin' && myChurch) {
+        var tSpan = card.querySelector('.hc-t > span');
+        if (tSpan && !tSpan.querySelector('.hc-rp')) {
+          tSpan.insertAdjacentHTML('beforeend',
+            '<span class="hc-s hc-rp" style="font-weight:700;color:' +
+            (mine ? '#2a7a2a">' + year + '년 제출 완료' : '#b03a3a">' + year + '년 미제출') +
+            '</span>');
+        }
+      }
 
       var h = '';
       if (user.role === 'superadmin') {
