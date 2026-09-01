@@ -307,6 +307,8 @@ var SHSBoard = (function () {
           if (b.dataset.hub === 'schedmgr') { location.href = 'schedule.html'; return; }
           /* 서류 발급은 서류 신청 화면으로 바로 간다 */
           if (b.dataset.hub === 'doc') { location.href = 'request.html'; return; }
+          /* 교회상황 보고서는 보고서 작성·열람 화면으로 바로 간다 */
+          if (b.dataset.hub === 'report') { location.href = 'report.html'; return; }
           /* 내 정보는 내 정보 화면으로 바로 간다 */
           if (b.dataset.hub === 'me') { location.href = 'mypage.html'; return; }
           /* 나의 시찰은 그 시찰 화면으로 바로 간다 */
