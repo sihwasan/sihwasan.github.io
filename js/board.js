@@ -1114,6 +1114,8 @@ var SHSBoard = (function () {
           '<div class="field"><label>제목</label><input type="text" id="asm-title"></div>' +
           '<div class="field"><label>요약 (선택)</label><input type="text" id="asm-desc"></div>' +
           '<div class="field"><label>사진 주소 (선택)</label><input type="text" id="asm-img"></div>' +
+          '<div class="field"><label>또는 사진 파일 올리기 (선택)</label>' +
+          '<input type="file" id="asm-imgfile" accept="image/*"></div>' +
           '<img id="asm-imgprev" class="hidden" alt="" ' +
           'style="max-width:220px;border-radius:10px;margin:4px 0 10px;box-shadow:0 3px 10px rgba(0,0,0,0.14)">' +
           '<div><button type="button" class="btn" id="asm-add">기사 추가</button></div></div>' +
@@ -1269,9 +1271,39 @@ var SHSBoard = (function () {
           if (r.error) { say(r.error.message, true); return; }
           document.getElementById('asm-url').value = '';
           document.getElementById('asm-preview').classList.add('hidden');
+          var fIn = document.getElementById('asm-imgfile');
+          if (fIn) { fIn.value = ''; fIn.dispatchEvent(new Event('change', { bubbles: true })); }
           say('기사를 등록했습니다.');
           SHSCloud.log('create', '총회 기사 등록', title);
           refreshNews();
+        });
+      });
+
+      /* 기사 사진: 주소를 적어도 되고, 파일을 끌어다 놓아도 된다.
+       * 파일을 올리면 사진 보관소에 저장하고 그 주소가 사진 주소 칸에 채워진다. */
+      var imgIn = document.getElementById('asm-img');
+      if (imgIn) imgIn.addEventListener('change', function () {
+        var pv = document.getElementById('asm-imgprev');
+        pv.src = this.value.trim();
+        pv.classList.toggle('hidden', !this.value.trim());
+      });
+      var imgFile = document.getElementById('asm-imgfile');
+      if (imgFile && SHS.dropZone) SHS.dropZone(imgFile, { what: '기사 사진', accept: 'image' });
+      if (imgFile) imgFile.addEventListener('change', function () {
+        var f = this.files && this.files[0];
+        if (!f) return;
+        if (!window.SHSPhotos) { say('사진 도구를 불러오지 못했습니다.', true); return; }
+        say('사진을 올리는 중입니다...');
+        Promise.all([shrink(f, 1200, 0.82), shrink(f, 640, 0.72)]).then(function (bs) {
+          return SHSPhotos.putPair(bs[0], bs[1]);
+        }).then(function (u) {
+          document.getElementById('asm-img').value = u.full;
+          var pv = document.getElementById('asm-imgprev');
+          pv.src = u.full;
+          pv.classList.remove('hidden');
+          say('사진을 올렸습니다. 내용을 확인하고 기사 추가를 눌러 주세요.');
+        }).catch(function (x) {
+          say('사진을 올리지 못했습니다: ' + ((x && x.message) || x), true);
         });
       });
 
