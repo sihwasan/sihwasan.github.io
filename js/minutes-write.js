@@ -402,45 +402,45 @@ document.addEventListener('DOMContentLoaded', function () {
         '</div>' +
         '<div class="inline-form">' +
         fld('church', '장소 (교회)', { width: '220px', ph: '섬기는교회' }) +
-        fld('pastor', '그 교회 시무 목사', { width: '180px', ph: '김종수' }) +
+        fld('pastor', '그 교회 시무 목사', { width: '180px', ph: '○○○' }) +
         fld('tel', '전화', { width: '160px', ph: '031-356-6726' }) +
         '</div>' +
         '<div class="inline-form">' + fld('addr', '교회 주소', { ph: '경기도 화성시 수노을2로 15' }) + '</div>' +
         '<div class="inline-form">' +
-        fld('moderator', '노회장', { width: '200px', ph: '박흥열' }) +
-        fld('clerk', '서기', { width: '200px', ph: '권병렬' }) +
-        fld('minutes_clerk', '회록서기', { width: '200px', ph: '김지수' }) +
+        fld('moderator', '노회장', { width: '200px', ph: '○○○' }) +
+        fld('clerk', '서기', { width: '200px', ph: '○○○' }) +
+        fld('minutes_clerk', '회록서기', { width: '200px', ph: '○○○' }) +
         '</div>' +
-        '<p class="mw-hint">이름만 적으시면 "○○○ 목사"로 붙습니다. 장로시면 "이신영 장로"처럼 직분까지 적어 주세요.</p>';
+        '<p class="mw-hint">이름만 적으시면 "○○○ 목사"로 붙습니다. 장로시면 "○○○ 장로"처럼 직분까지 적어 주세요.</p>';
     }
     if (step === 2) {
       return '<h3 style="margin-top:0">② 개회예배</h3>' +
         '<div class="inline-form">' +
         fld('worship.from', '시작', { width: '150px', ph: '오전 10:00' }) +
         fld('worship.to', '마침', { width: '130px', ph: '10:30' }) +
-        fld('worship.chair', '사회', { width: '240px', ph: '노회장 박흥열 목사' }) +
+        fld('worship.chair', '사회', { width: '240px', ph: '노회장 ○○○ 목사' }) +
         fld('worship.end_time', '예배 마친 시각', { width: '170px', ph: '오전 11시 10분' }) +
         '</div>' +
         '<div class="inline-form">' +
         fld('worship.hymn1', '찬송 (첫째)', { width: '260px', ph: '35장(큰 영화로신 주)' }) +
-        fld('worship.prayer', '기도', { width: '240px', ph: '부노회장 이신영 장로' }) +
+        fld('worship.prayer', '기도', { width: '240px', ph: '부노회장 ○○○ 장로' }) +
         '</div>' +
         '<div class="inline-form">' +
-        fld('worship.scripture', '성경봉독', { ph: '로마서 1:17 / 서기 권병렬 목사' }) +
+        fld('worship.scripture', '성경봉독', { ph: '본문 / 봉독자' }) +
         '</div>' +
         '<div class="inline-form">' +
-        fld('worship.sermon', '설교 (제목 / 설교자)', { ph: '오직 믿음으로 / 노회장 박흥열 목사' }) +
+        fld('worship.sermon', '설교 (제목 / 설교자)', { ph: '설교 제목 / 설교자' }) +
         '</div>' +
         '<div class="inline-form">' +
         fld('worship.hymn2', '찬송 (둘째)', { width: '260px', ph: '292장(주 없이 살수 없네)' }) +
-        fld('worship.benediction', '축도', { width: '260px', ph: '증경노회장 박양수 목사' }) +
+        fld('worship.benediction', '축도', { width: '260px', ph: '○○○ 목사' }) +
         '</div>' +
         '<h3>성찬예식 (봄 정기노회)</h3>' +
         '<div class="inline-form">' +
         fld('communion.on', '성찬예식', { type: 'check', ph: '있었음', width: '140px' }) +
         fld('communion.from', '시작', { width: '140px', ph: '오전 10:40' }) +
         fld('communion.to', '마침', { width: '120px', ph: '11:10' }) +
-        fld('communion.chair', '집례', { width: '240px', ph: '김종수 목사(증경 북부시찰장)' }) +
+        fld('communion.chair', '집례', { width: '240px', ph: '○○○ 목사' }) +
         '</div>' +
         '<div class="inline-form">' +
         fld('communion.hymn1', '찬송', { width: '240px' }) +
@@ -451,8 +451,8 @@ document.addEventListener('DOMContentLoaded', function () {
         fld('communion.sermon', '설교 (제목 / 설교자)', {}) +
         '</div>' +
         '<div class="inline-form">' +
-        fld('communion.bread', '분병 위원', { width: '260px', ph: '윤성복 김득철 김완수' }) +
-        fld('communion.cup', '분잔 위원', { width: '260px', ph: '정재영 이신영 김동수' }) +
+        fld('communion.bread', '분병 위원', { width: '260px', ph: '위원 이름을 띄어쓰기로' }) +
+        fld('communion.cup', '분잔 위원', { width: '260px', ph: '위원 이름을 띄어쓰기로' }) +
         fld('communion.hymn2', '찬송 (마침)', { width: '220px' }) +
         '</div>';
     }
@@ -462,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function () {
         fld('business.time', '회무처리 시작 시각', { width: '190px', ph: '오전 11시 25분' }) +
         fld('business.hymn', '찬송', { width: '220px', ph: '309장(목마른 내 영혼)' }) +
         fld('business.scripture', '성경봉독 (선택)', { width: '200px', ph: '시편 133편' }) +
-        fld('business.prayer', '기도', { width: '240px', ph: '상록시찰장 손영득 목사' }) +
+        fld('business.prayer', '기도', { width: '240px', ph: '○○○ 목사' }) +
         '</div>' +
         '<h3>출석</h3>' +
         (rosterCnt
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="inline-form">' +
         fld('close.hymn', '폐회 예배 찬송', { width: '180px', ph: '28장' }) +
         fld('close.scripture', '폐회 예배 성경', { width: '200px', ph: '시편 121편' }) +
-        fld('close.prayer', '폐회기도 (예배 없이 기도만 할 때)', { width: '260px', ph: '남부시찰장 김성중 목사' }) +
+        fld('close.prayer', '폐회기도 (예배 없이 기도만 할 때)', { width: '260px', ph: '○○○ 목사' }) +
         fld('close.time', '폐회 시각', { width: '160px', ph: '오후 5시 20분' }) +
         '</div>' +
         '<p class="mw-hint">찬송·성경을 적으면 총회 표준(별지1)대로 "노회장 ○○○ 목사의 사회로 찬송 ○장을 제창하고 … 축도함으로 폐회예배를 마치다."로 적힙니다.</p>' +
@@ -566,14 +566,14 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="field"><label>항목 이름</label>' +
         '<input type="text" data-it-title value="' + e(it.title || '') + '" placeholder="예: 정치부 보고 (회의순서 p.40)"></div>' +
         '<div class="field" style="flex:0 0 200px"><label>보고자</label>' +
-        '<input type="text" data-it-who value="' + e(it.who || '') + '" placeholder="서기 김동석 목사"></div>' +
+        '<input type="text" data-it-who value="' + e(it.who || '') + '" placeholder="서기 ○○○ 목사"></div>' +
         '<div style="align-self:flex-end;white-space:nowrap">' +
         '<button class="btn ghost sm" data-it-up="' + i + '">&#8593;</button>' +
         '<button class="btn ghost sm" data-it-down="' + i + '">&#8595;</button> ' +
         '<button class="btn danger sm" data-it-rm="' + i + '">삭제</button></div>' +
         '</div>' +
         '<div class="field"><label>본문 (자동 문장 뒤에 이어 붙습니다 — 안건별 처리 결과를 줄마다 적으세요)</label>' +
-        '<textarea data-it-body rows="3" placeholder="1 반월교회 당회장 김지수씨가 제출한 노종한씨 장로고시 추천 청원은 가결하다">' +
+        '<textarea data-it-body rows="3" placeholder="예: 1 ○○교회 당회장 ○○○씨가 제출한 ○○ 청원은 가결하다">' +
         e(it.body || '') + '</textarea></div>' +
         '<p class="mw-hint">' + e(SHSMinutes.itemBody(doc, it).split('\n')[0] || '') + '</p>' +
         '</div>';
