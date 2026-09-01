@@ -54,7 +54,8 @@
       { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
       { t: '고시 모의고사', h: 'exam.html' }
     ]},
-    { title: '총회자료실', href: 'assembly-constitution.html', sub: [
+    { title: '총회', href: 'assembly-constitution.html', sub: [
+      { t: '총회 활동현황', h: 'dashboard.html#hub-assembly' },
       { t: '총회 헌법', h: 'assembly-constitution.html' },
       { t: '총회 규정', h: 'assembly-rules.html' },
       { t: '총회 회의결의', h: 'assembly-resolution.html' },
