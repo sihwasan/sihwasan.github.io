@@ -28,6 +28,16 @@ var SHSMinutes = (function () {
     return '주후 ' + Number(p[0]) + '년 ' + Number(p[1]) + '월 ' + Number(p[2]) + '일(' +
       WEEK[dt.getDay()] + ')';
   }
+  /* 제 1 일 2026년 10월 12일(월) — 총회 표준 별지1의 날짜 표기 */
+  function dateDay(d) {
+    if (!d) return '';
+    var p = String(d).split('-');
+    if (p.length < 3) return String(d);
+    var dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    return '제 1 일 ' + Number(p[0]) + '년 ' + Number(p[1]) + '월 ' + Number(p[2]) + '일(' +
+      WEEK[dt.getDay()] + '요일)';
+  }
+
   function dateSign(d) {
     if (!d) return '';
     var p = String(d).split('-');
@@ -66,12 +76,12 @@ var SHSMinutes = (function () {
         hymn2: '', benediction: '', end_time: '' },
       communion: { on: false, from: '', to: '', chair: '', hymn1: '', prayer: '',
         scripture: '', sermon: '', bread: '', cup: '', hymn2: '', benediction: '' },
-      business: { time: '', hymn: '', prayer: '' },
+      business: { time: '', hymn: '', scripture: '', prayer: '' },
       roll: { pt: '', pp: '', et: '', ep: '', vt: '', vp: '',
         pastors: '', assoc: '', elders: '', emeritus: '', retired: '' },
       items: [],
       close: { prayer: '', decision: '미진안건 처리는 임원회에 맡기기로 하고 폐회하기로 하다.',
-        time: '', benediction: '' },
+        hymn: '', scripture: '', time: '', benediction: '' },
       attach: []
     };
   }
@@ -91,8 +101,16 @@ var SHSMinutes = (function () {
     business: function (doc) {
       var b = doc.business || {};
       return '동일 ' + t(b.time) + ' 같은 장소에서 노회장 ' + withTitle(doc.moderator) +
-        '의 사회로 모여 찬송가 ' + t(b.hymn) + '을 부르고 ' + t(b.prayer) +
-        '가 기도하므로 회무처리를 시작하다.';
+        '의 사회로 모여 찬송가 ' + t(b.hymn) + '을 부르고 ' +
+        (t(b.scripture) ? '사회자가 성경 ' + t(b.scripture) + '을 봉독한 후 ' : '') +
+        t(b.prayer) + '가 기도함으로 회무처리를 시작하다.';
+    },
+    /* 폐회 예배 (총회 표준 별지1 Ⅲ-2) */
+    closeWorship: function (doc) {
+      var c = doc.close || {};
+      return '노회장 ' + withTitle(doc.moderator) + '의 사회로 찬송 ' + t(c.hymn) +
+        '을 제창하고 인도자가 성경 ' + t(c.scripture) +
+        '을 봉독하고 기도한 후 축도함으로 폐회예배를 마치다.';
     },
     /* 회원점명 */
     roll: function (doc) {
@@ -176,9 +194,9 @@ var SHSMinutes = (function () {
     if (t(doc.tel)) L.push('TEL : ' + t(doc.tel));
     L.push('');
     /* 속표지 */
-    L.push('대한예수교 장로회 시화산노회');
+    L.push('대한예수교장로회 시화산노회');
     L.push(docTitle(doc));
-    L.push(dateKo(doc.meet_on));
+    L.push(dateDay(doc.meet_on));
     L.push('');
     L.push(S.open(doc));
     L.push('');
@@ -232,11 +250,15 @@ var SHSMinutes = (function () {
     });
     L.push('');
 
-    /* Ⅲ. 폐회 */
-    L.push('III. 폐회');
+    /* Ⅲ. 폐회 — 결의 → 예배 → 선언 (총회 표준 별지1 순서) */
+    L.push('Ⅲ. 폐회');
     var cn = 0;
-    if (t(c.prayer)) { cn++; L.push(cn + '. 폐회기도'); L.push(t(c.prayer) + '가 기도 하다.'); }
     if (t(c.decision)) { cn++; L.push(cn + '. 폐회 결의'); L.push(t(c.decision)); }
+    if (t(c.hymn) || t(c.scripture)) {
+      cn++; L.push(cn + '. 폐회 예배'); L.push(S.closeWorship(doc));
+    } else if (t(c.prayer)) {
+      cn++; L.push(cn + '. 폐회기도'); L.push(t(c.prayer) + '가 기도 하다.');
+    }
     cn++;
     L.push(cn + '. 폐회 선언');
     L.push(S.closeDeclare(doc));
@@ -245,7 +267,7 @@ var SHSMinutes = (function () {
 
     /* 날짜와 서명 */
     L.push(dateSign(doc.meet_on));
-    L.push('대한예수교 장로회 시화산노회');
+    L.push('대한예수교장로회 시화산노회');
     L.push('노 회 장  ' + withTitle(doc.moderator) + '  (인)');
     L.push('서    기  ' + withTitle(doc.clerk) + '  (인)');
     L.push('회록서기  ' + withTitle(doc.minutes_clerk) + '  (인)');
@@ -268,12 +290,22 @@ var SHSMinutes = (function () {
     function p(s, cls) { return '<p' + (cls ? ' class="' + cls + '"' : '') + '>' + esc(s) + '</p>'; }
     var h = '<div class="mw-paper">';
 
-    h += '<div class="mw-cover"><div class="k">대한예수교장로회 시화산노회</div>' +
-      '<h2>' + esc(docTitle(doc)) + '</h2>' +
+    /* 표지 (본 노회의 관행 — 제15~18회 회의록과 같다) */
+    h += '<div class="mw-cover">' +
+      '<div class="cv-org">대한예수교장로회 시화산노회</div>' +
+      '<div class="cv-title">' + esc(docTitle(doc)) + '</div>' +
+      '<div class="cv-meta">' +
       '<p>일시 : ' + esc(dateKo(doc.meet_on)) + ' ' + esc(doc.open_time) + '부터~폐회시까지</p>' +
       '<p>장소 : ' + esc(doc.church) + (t(doc.pastor) ? ' (' + esc(withTitle(doc.pastor)) + ' 시무)' : '') + '</p>' +
       (t(doc.addr) ? '<p>' + esc(doc.addr) + '</p>' : '') +
-      (t(doc.tel) ? '<p>TEL : ' + esc(doc.tel) + '</p>' : '') + '</div>';
+      (t(doc.tel) ? '<p>TEL : ' + esc(doc.tel) + '</p>' : '') + '</div>' +
+      '<div class="cv-bottom">대한예수교장로회 시화산노회</div></div>';
+
+    /* 상단 중앙 회의명 · 제N일 (총회 표준 별지1) */
+    h += '<div class="mw-inner">' +
+      '<div class="in-org">대한예수교장로회 시화산노회</div>' +
+      '<div class="in-title">' + esc(docTitle(doc)) + '</div>' +
+      '<div class="in-day">' + esc(dateDay(doc.meet_on)) + '</div></div>';
 
     h += p(S.open(doc));
 
@@ -330,25 +362,28 @@ var SHSMinutes = (function () {
       }
     });
 
-    h += '<h3>III. 폐회</h3>';
+    h += '<h3>Ⅲ. 폐회</h3>';
     var cn = 0;
-    if (t(c.prayer)) {
-      cn++;
-      h += p(cn + '. 폐회기도', 'mw-num') + '<div class="mw-ind">' + p(t(c.prayer) + '가 기도 하다.') + '</div>';
-    }
     if (t(c.decision)) {
       cn++;
       h += p(cn + '. 폐회 결의', 'mw-num') + '<div class="mw-ind">' + p(t(c.decision)) + '</div>';
+    }
+    if (t(c.hymn) || t(c.scripture)) {
+      cn++;
+      h += p(cn + '. 폐회 예배', 'mw-num') + '<div class="mw-ind">' + p(S.closeWorship(doc)) + '</div>';
+    } else if (t(c.prayer)) {
+      cn++;
+      h += p(cn + '. 폐회기도', 'mw-num') + '<div class="mw-ind">' + p(t(c.prayer) + '가 기도 하다.') + '</div>';
     }
     cn++;
     h += p(cn + '. 폐회 선언', 'mw-num') +
       '<div class="mw-ind">' + p(S.closeDeclare(doc)) + p(S.closeQuote(doc), 'mw-quote') + '</div>';
 
     h += '<div class="mw-sign"><div class="d">' + esc(dateSign(doc.meet_on)) + '</div>' +
-      '<div>대한예수교 장로회 시화산노회</div>' +
-      '<div>노 회 장&nbsp;&nbsp;' + esc(withTitle(doc.moderator)) + '&nbsp;&nbsp;(인)</div>' +
-      '<div>서&nbsp;&nbsp;&nbsp;&nbsp;기&nbsp;&nbsp;' + esc(withTitle(doc.clerk)) + '&nbsp;&nbsp;(인)</div>' +
-      '<div>회록서기&nbsp;&nbsp;' + esc(withTitle(doc.minutes_clerk)) + '&nbsp;&nbsp;(인)</div></div>';
+      '<div class="o">대한예수교장로회 시화산노회</div>' +
+      '<div class="nm">노 회 장&nbsp;&nbsp;' + esc(withTitle(doc.moderator)) + '&nbsp;&nbsp;(인)</div>' +
+      '<div class="nm">서&nbsp;&nbsp;&nbsp;&nbsp;기&nbsp;&nbsp;' + esc(withTitle(doc.clerk)) + '&nbsp;&nbsp;(인)</div>' +
+      '<div class="nm">회록서기&nbsp;&nbsp;' + esc(withTitle(doc.minutes_clerk)) + '&nbsp;&nbsp;(인)</div></div>';
 
     (doc.attach || []).forEach(function (a, i) {
       if (!t(a.title) && !t(a.body)) return;

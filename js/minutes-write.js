@@ -460,8 +460,9 @@ document.addEventListener('DOMContentLoaded', function () {
       return '<h3 style="margin-top:0">③ 회원점명 · 회무처리 시작</h3>' +
         '<div class="inline-form">' +
         fld('business.time', '회무처리 시작 시각', { width: '190px', ph: '오전 11시 25분' }) +
-        fld('business.hymn', '찬송', { width: '240px', ph: '309장(목마른 내 영혼)' }) +
-        fld('business.prayer', '기도', { width: '260px', ph: '상록시찰장 손영득 목사' }) +
+        fld('business.hymn', '찬송', { width: '220px', ph: '309장(목마른 내 영혼)' }) +
+        fld('business.scripture', '성경봉독 (선택)', { width: '200px', ph: '시편 133편' }) +
+        fld('business.prayer', '기도', { width: '240px', ph: '상록시찰장 손영득 목사' }) +
         '</div>' +
         '<h3>출석</h3>' +
         (rosterCnt
@@ -493,11 +494,14 @@ document.addEventListener('DOMContentLoaded', function () {
     if (step === 5) {
       var att = doc.attach || [];
       var h = '<h3 style="margin-top:0">⑤ 폐회</h3>' +
-        '<div class="inline-form">' +
-        fld('close.prayer', '폐회기도', { width: '260px', ph: '남부시찰장 김성중 목사' }) +
-        fld('close.time', '폐회 시각', { width: '180px', ph: '오후 5시 20분' }) +
-        '</div>' +
         '<div class="inline-form">' + fld('close.decision', '폐회 결의', { ph: '미진안건 처리는 임원회에 맡기기로 하고 폐회하기로 하다.' }) + '</div>' +
+        '<div class="inline-form">' +
+        fld('close.hymn', '폐회 예배 찬송', { width: '180px', ph: '28장' }) +
+        fld('close.scripture', '폐회 예배 성경', { width: '200px', ph: '시편 121편' }) +
+        fld('close.prayer', '폐회기도 (예배 없이 기도만 할 때)', { width: '260px', ph: '남부시찰장 김성중 목사' }) +
+        fld('close.time', '폐회 시각', { width: '160px', ph: '오후 5시 20분' }) +
+        '</div>' +
+        '<p class="mw-hint">찬송·성경을 적으면 총회 표준(별지1)대로 "노회장 ○○○ 목사의 사회로 찬송 ○장을 제창하고 … 축도함으로 폐회예배를 마치다."로 적힙니다.</p>' +
         '<p class="mw-hint">' + e(SHSMinutes.sentences.closeQuote(doc)) + '</p>' +
         '<h3>별첨</h3><div id="mw-attach">';
       att.forEach(function (a, i) {
