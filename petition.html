@@ -341,10 +341,11 @@ body.pt-embed main { padding-top: 10px; }
         '부목사로 청빙하고자 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>';
     } },
 
-  /* 전도사(목사후보생)를 강도사 인허 뒤 부목사로 청빙하는 경우 */
+  /* 강도사 인허를 받은 뒤 부목사로 청빙하는 경우 —
+   * 전도사 신분으로는 부목사가 될 수 없으므로 신분 표기 없이 적는다 */
   { id: 'callassoclic', cat: '청빙', title: '부목사 청빙청원서 (강도사 인허 후)',
     fields: [
-      { k: 'name', label: '청빙 대상자(전도사) 성명' },
+      { k: 'name', label: '청빙 대상자 성명' },
       { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
       { k: 'date', label: '작성일', type: 'date' }
     ],
@@ -352,23 +353,8 @@ body.pt-embed main { padding-top: 10px; }
       return '<h1 class="pt-title">부목사 청빙청원서</h1>' +
         '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
         signChurch(d.church, '당회장', d.dang) + addr() +
-        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + ' 전도사를 강도사 인허 후 ' +
+        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + '을(를) 강도사 인허 후 ' +
         '부목사로 청빙하고자 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>';
-    } },
-
-  /* 전도사(목사후보생)를 강도사 인허 뒤 부목사로 청빙하는 경우 */
-  { id: 'callassoclic', cat: '청빙', title: '부목사 청빙청원서 (강도사 인허 후)',
-    fields: [
-      { k: 'name', label: '청빙 대상자(전도사·목사후보생) 성명' },
-      { k: 'church', label: '교회명' }, { k: 'dang', label: '당회장 성명' },
-      { k: 'date', label: '작성일', type: 'date' }
-    ],
-    render: function (d) {
-      return '<h1 class="pt-title">부목사 청빙청원서</h1>' +
-        '<div class="pt-date">' + juhu(d.date) + '</div>' + sbox() +
-        signChurch(d.church, '당회장', d.dang) + addr() +
-        '<p class="body">금번 ' + u(d.church) + '교회에서 ' + u(d.name) + ' 전도사(목사후보생)를 ' +
-        '강도사 인허 후 부목사로 청빙하고자 별지 첨부하여 청원하오니 허락하여 주시기를 바랍니다.</p>';
     } },
 
   /* ---------- 고시·신학 ---------- */
