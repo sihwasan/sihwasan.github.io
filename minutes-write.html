@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>회의록 작성 매니저 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20260901b">
+<style>
+/* 단계 안내 */
+.mw-steps { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
+.mw-steps button { border:1px solid var(--gray-3,#d8dbe2); background:#fff; border-radius:20px;
+  padding:7px 16px; font-size:0.86rem; color:var(--gray-6); cursor:pointer; font-family:inherit; }
+.mw-steps button.on { background:var(--navy,#4b3f33); border-color:var(--navy,#4b3f33); color:#fff; }
+/* 회의록 미리보기 — 실제 회의록 모양 그대로 */
+.mw-paper { background:#fff; border:1px solid var(--gray-2,#e8eaef); border-radius:8px;
+  padding:44px 52px; margin:0; font-family:'Noto Serif KR', serif; color:#1a1a1a;
+  line-height:1.85; font-size:0.96rem; white-space:normal; }
+.mw-paper .mw-cover { text-align:center; padding:10px 0 26px; border-bottom:1px solid var(--gray-2,#e8eaef); margin-bottom:26px; }
+.mw-paper .mw-cover .k { font-size:1.05rem; letter-spacing:4px; }
+.mw-paper .mw-cover h2 { font-size:1.7rem; margin:14px 0 18px; letter-spacing:6px; border:none; padding:0; }
+.mw-paper .mw-cover p { margin:2px 0; font-size:0.92rem; }
+.mw-paper h3 { font-size:1.12rem; margin:26px 0 10px; letter-spacing:2px; }
+.mw-paper p { margin:0 0 6px; }
+.mw-paper .mw-ind { padding-left:14px; }
+.mw-paper .mw-num { margin-top:12px; font-weight:700; }
+.mw-paper .mw-sign { margin-top:34px; text-align:center; line-height:2.2; }
+.mw-paper .mw-sign .d { margin-bottom:14px; }
+.mw-paper .mw-quote { margin:8px 0; padding-left:14px; }
+.mw-hint { font-size:0.8rem; color:var(--gray-5); margin:4px 0 0; }
+.mw-row { border-top:1px solid var(--gray-2,#e8eaef); padding:12px 0; }
+.mw-row:first-child { border-top:none; }
+.mw-row .mw-rt { font-weight:700; color:var(--navy,#4b3f33); }
+.mw-tag { display:inline-block; font-size:0.72rem; border-radius:10px; padding:1px 8px;
+  background:var(--gray-2,#e8eaef); color:var(--gray-6); margin-left:6px; }
+@media print {
+  body > *:not(#mw-print) { display:none !important; }
+  #mw-print { display:block !important; }
+  .mw-paper { border:none; padding:0; }
+}
+#mw-print { display:none; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>회의록 작성 매니저</h1>
+    <div class="crumb">홈 &gt; 임원방 &gt; 회의록 작성</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="mw-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+<div id="mw-print"></div>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20260901n"></script>
+<script src="js/minutes-doc.js?v=20260901a"></script>
+<script src="js/minutes-write.js?v=20260901a"></script>
+</body>
+</html>
