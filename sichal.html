@@ -1092,6 +1092,23 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="ds"><div class="n">' + n2 + '/' + names.length + '곳</div><div class="l">하반기 납부 (' + sum2.toLocaleString('ko-KR') + '만원)</div></div>' +
         '</div>';
 
+      /* 납부율 그래프 — 상회비 진행률과 같은 붉은 계열 막대 */
+      (function () {
+        function feeBar(label, paid, total, color) {
+          var pct = total ? Math.round(paid / total * 100) : 0;
+          return '<div style="flex:1 1 220px;min-width:200px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--gray-6)">' +
+            '<span>' + label + '</span><span><strong>' + pct + '%</strong> ' +
+            '<span style="color:var(--gray-5)">(' + paid + '/' + total + '곳)</span></span></div>' +
+            '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:10px;overflow:hidden">' +
+            '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + '"></div></div></div>';
+        }
+        h += '<div style="display:flex;gap:16px;flex-wrap:wrap;max-width:760px;margin-bottom:16px">' +
+          feeBar('상반기 납부율', n1, names.length, '#b03a3a') +
+          feeBar('하반기 납부율', n2, names.length, '#d97b6c') +
+          '</div>';
+      })();
+
       /* 완납(상·하반기 모두 납부) / 미납 필터 */
       var fullNames = names.filter(function (nm) { return feeOf(nm, 1) && feeOf(nm, 2); });
       var lateNames = names.filter(function (nm) { return !(feeOf(nm, 1) && feeOf(nm, 2)); });
@@ -1298,6 +1315,124 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* ---------- 시찰 전체 통계 ----------
+   * 제출된 보고서(church_reports)를 합산해 표와 그래프로 보여 준다.
+   * 교세 항목은 시찰보고서의 교세보고 칸과 같은 기준으로 센다. */
+  function reportStat(r) {
+    function n(v) { return Number(v || 0) || 0; }
+    function pick(o, ks) { var s = 0; ks.forEach(function (k) { s += n(o && o[k]); }); return s; }
+    var d = (r && r.data) || {};
+    var cg = d.clergy || {}, jj = d.jejik || {};
+    return {
+      pastors: pick(cg, ['damim', 'wonro', 'bumok', 'hyup', 'gita']),
+      gangdosa: n(cg.gangdosa),
+      jeondosa: pick(cg, ['jd_m', 'jd_f']),
+      elders: n(jj.jr_simu),
+      muim: pick(jj, ['jr_wonro', 'jr_euntoe', 'jr_hyup', 'jr_gita']),
+      kwonsa: pick(jj, ['ks_simu', 'ks_gita']),
+      deacons: pick(jj, ['as_simu', 'as_gita', 'ss_m', 'ss_f']),
+      total: n(r.members_total), baptized: n(r.members_baptized),
+      wavg: n(r.worship_avg), school: n(r.school_total), offer: n(r.offering_year)
+    };
+  }
+
+  function statsBox(rows) {
+    var wonf = function (n) { return Number(n || 0).toLocaleString('ko-KR'); };
+    var made = rows.length, all = churches.length;
+
+    var per = rows.map(function (r) {
+      var s = reportStat(r);
+      s.church = r.church;
+      return s;
+    }).sort(function (a, b) { return b.total - a.total; });
+
+    var sum = { pastors: 0, gangdosa: 0, jeondosa: 0, elders: 0, muim: 0, kwonsa: 0,
+                deacons: 0, total: 0, baptized: 0, wavg: 0, school: 0, offer: 0 };
+    per.forEach(function (s) {
+      Object.keys(sum).forEach(function (k) { sum[k] += s[k]; });
+    });
+
+    var h = '<div class="admin-card" style="margin-top:18px" id="rp-stats">' +
+      '<h3 style="margin-top:0">' + year + '년 ' + e(NAME) + ' 교회상황 통계</h3>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin:0 0 12px">관내 ' + all +
+      '곳 가운데 제출된 보고서 <strong>' + made + '건</strong>을 집계한 값입니다. ' +
+      '미제출 교회 몫은 들어 있지 않습니다.</p>';
+
+    if (!made) {
+      return h + '<p style="color:var(--gray-5)">아직 제출된 보고서가 없어 통계를 낼 수 없습니다.</p></div>';
+    }
+
+    /* 요약 숫자판 */
+    h += '<div class="dues-stats" style="margin-bottom:16px">' +
+      '<div class="ds"><div class="n">' + made + '/' + all + '곳</div><div class="l">보고서 제출</div></div>' +
+      '<div class="ds"><div class="n">' + wonf(sum.total) + '명</div><div class="l">전체 교인</div></div>' +
+      '<div class="ds"><div class="n">' + wonf(sum.baptized) + '명</div><div class="l">세례교인</div></div>' +
+      '<div class="ds"><div class="n">' + wonf(sum.wavg) + '명</div><div class="l">주일 평균 출석</div></div>' +
+      '</div>';
+
+    /* 교세 합계 — 시찰보고서 교세보고 칸과 같은 기준 */
+    h += '<h4 class="mn-sub">교세 합계</h4>' +
+      '<div style="overflow-x:auto"><table class="tbl" style="max-width:760px"><thead><tr>' +
+      '<th>목사</th><th>장로(시무)</th><th>강도사</th><th>전도사</th>' +
+      '<th>무임장로</th><th>권사</th><th>집사</th><th>교인</th></tr></thead><tbody><tr>' +
+      '<td>' + sum.pastors + '</td><td>' + sum.elders + '</td><td>' + sum.gangdosa + '</td>' +
+      '<td>' + sum.jeondosa + '</td><td>' + sum.muim + '</td><td>' + sum.kwonsa + '</td>' +
+      '<td>' + sum.deacons + '</td><td>' + wonf(sum.total) + '</td>' +
+      '</tr></tbody></table></div>';
+
+    /* 교회별 교인 수 그래프 */
+    var max = per[0] && per[0].total || 0;
+    if (max > 0) {
+      h += '<h4 class="mn-sub" style="margin-top:16px">교회별 교인 현황</h4>' +
+        '<div style="max-width:760px">';
+      per.forEach(function (s) {
+        var wT = Math.round(s.total / max * 100);
+        var wB = Math.round(s.baptized / max * 100);
+        h += '<div style="margin-bottom:10px">' +
+          '<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--gray-6)">' +
+          '<span>' + e(s.church) + '</span><span>전체 ' + wonf(s.total) + '명 · 세례 ' + wonf(s.baptized) + '명</span></div>' +
+          '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:12px;overflow:hidden;position:relative">' +
+          '<div style="height:100%;width:' + wT + '%;background:#8a7a63"></div>' +
+          '<div style="height:5px;width:' + wB + '%;background:#b03a3a;position:absolute;left:0;bottom:0"></div>' +
+          '</div></div>';
+      });
+      h += '<p style="font-size:0.76rem;color:var(--gray-5);margin:4px 0 0">' +
+        '굵은 막대는 전체 교인, 아래 붉은 막대는 세례교인입니다.</p></div>';
+    }
+
+    /* 교회별 상세 표 */
+    h += '<h4 class="mn-sub" style="margin-top:16px">교회별 상세</h4>' +
+      '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.84rem"><thead><tr>' +
+      '<th class="left">교회</th><th>전체 교인</th><th>세례교인</th><th>평균 출석</th>' +
+      '<th>교회학교</th><th>목사</th><th>장로</th><th>집사</th><th>권사</th>' +
+      '<th style="width:130px">연간 수입(원)</th></tr></thead><tbody>';
+    per.forEach(function (s) {
+      h += '<tr><td class="left">' + e(s.church) + '</td>' +
+        '<td>' + wonf(s.total) + '</td><td>' + wonf(s.baptized) + '</td><td>' + wonf(s.wavg) + '</td>' +
+        '<td>' + wonf(s.school) + '</td><td>' + s.pastors + '</td><td>' + s.elders + '</td>' +
+        '<td>' + s.deacons + '</td><td>' + s.kwonsa + '</td>' +
+        '<td style="text-align:right">' + (s.offer ? wonf(s.offer) : '-') + '</td></tr>';
+    });
+    h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td class="left">합계</td>' +
+      '<td>' + wonf(sum.total) + '</td><td>' + wonf(sum.baptized) + '</td><td>' + wonf(sum.wavg) + '</td>' +
+      '<td>' + wonf(sum.school) + '</td><td>' + sum.pastors + '</td><td>' + sum.elders + '</td>' +
+      '<td>' + sum.deacons + '</td><td>' + sum.kwonsa + '</td>' +
+      '<td style="text-align:right">' + (sum.offer ? wonf(sum.offer) : '-') + '</td></tr>';
+    h += '</tbody></table></div>';
+
+    /* 시찰보고서 연동 — 누르면 아래에 작성 칸이 열리고 위 통계가 교세에 채워진다 */
+    h += '<div style="margin-top:16px">' +
+      '<button class="btn" id="rp-sichalreport">시찰보고서 작성</button> ' +
+      '<span style="font-size:0.8rem;color:var(--gray-5)">시찰명·시찰장·서기·교세보고 칸에 ' +
+      '지금 보고서 내용이 자동으로 채워집니다.</span></div>' +
+      '<div id="rp-srbox" class="hidden" style="margin-top:12px;border:1px solid var(--gray-3,#d8dbe2);' +
+      'border-radius:8px;overflow:hidden;background:#fff">' +
+      '<iframe id="rp-srframe" title="시찰보고서 작성" ' +
+      'style="width:100%;height:1700px;border:0;background:transparent"></iframe></div>';
+
+    return h + '</div>';
+  }
+
   function drawReports() {
     var box = document.getElementById('si-body');
     var years = {};
@@ -1328,14 +1463,23 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (isOfficer) {
+      /* 보고서를 골라 한 번에 인쇄한다 — 제출된 보고서만 고를 수 있다 */
+      h += '<div style="margin:0 0 8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+        '<button class="btn sm" id="rp-printsel" disabled>선택한 보고서 인쇄하기</button>' +
+        '<span style="font-size:0.8rem;color:var(--gray-5)">맨 앞 칸에서 보고서를 고르시면 ' +
+        '한 번의 인쇄로 모두 찍힙니다. 머리칸을 누르면 전체선택됩니다.</span></div>';
+
       /* 관내 교회를 모두 늘어놓고, 낸 곳과 안 낸 곳을 함께 보여 준다 */
-      h += '<table class="tbl"><thead><tr><th style="width:170px">교회</th><th style="width:110px">담임</th>' +
+      h += '<table class="tbl"><thead><tr>' +
+        '<th style="width:36px"><input type="checkbox" id="rp-selall" title="전체선택" style="width:auto"></th>' +
+        '<th style="width:170px">교회</th><th style="width:110px">담임</th>' +
         '<th style="width:100px">전체 교인</th><th style="width:100px">세례교인</th>' +
         '<th style="width:110px">평균 출석</th><th style="width:110px">제출</th>' +
         '<th style="width:190px">관리</th></tr></thead><tbody>';
       churches.forEach(function (ch) {
         var r = rows.filter(function (x) { return x.church === ch.name; })[0];
         h += '<tr' + (r ? '' : ' style="opacity:.6"') + '>' +
+          '<td>' + (r ? '<input type="checkbox" class="rp-sel" value="' + r.id + '" style="width:auto">' : '') + '</td>' +
           '<td>' + e(ch.name) + '</td><td>' + e(ch.pastor || '-') + '</td>' +
           '<td>' + (r && r.members_total != null ? r.members_total : '-') + '</td>' +
           '<td>' + (r && r.members_baptized != null ? r.members_baptized : '-') + '</td>' +
@@ -1350,6 +1494,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '</td></tr>';
       });
       h += '</tbody></table>';
+
+      h += statsBox(rows);
     } else if (!canWriteFor.length) {
       h += '<div class="notice-banner">가입 정보에 소속 교회가 없어 보고서를 올릴 수 없습니다. ' +
         '마이페이지에서 소속 교회를 먼저 채워 주세요.</div>';
@@ -1377,6 +1523,51 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('rp-year').addEventListener('change', function () {
       year = parseInt(this.value, 10);
       drawReports();
+    });
+
+    /* 전체선택·선택 → 선택한 보고서 일괄 인쇄 */
+    var selAll = document.getElementById('rp-selall');
+    var printSel = document.getElementById('rp-printsel');
+    if (selAll && printSel) {
+      function selUpdate() {
+        var boxes = box.querySelectorAll('.rp-sel');
+        var picked = box.querySelectorAll('.rp-sel:checked').length;
+        printSel.disabled = !picked;
+        printSel.textContent = '선택한 보고서 인쇄하기' + (picked ? ' (' + picked + '건)' : '');
+        selAll.checked = boxes.length > 0 && picked === boxes.length;
+      }
+      selAll.addEventListener('change', function () {
+        box.querySelectorAll('.rp-sel').forEach(function (cb) { cb.checked = selAll.checked; });
+        selUpdate();
+      });
+      box.querySelectorAll('.rp-sel').forEach(function (cb) {
+        cb.addEventListener('change', selUpdate);
+      });
+      printSel.addEventListener('click', function () {
+        var ids = Array.prototype.map.call(box.querySelectorAll('.rp-sel:checked'),
+          function (cb) { return cb.value; });
+        if (!ids.length) return;
+        window.open('report.html?ids=' + ids.join(',') + '&print=1', '_blank', 'noopener');
+      });
+      selUpdate();
+    }
+
+    /* 시찰보고서 작성 — 아래에 작성 칸을 열고 시찰·연도를 넘겨 자동 기입한다 */
+    var srBtn = document.getElementById('rp-sichalreport');
+    if (srBtn) srBtn.addEventListener('click', function () {
+      var bx = document.getElementById('rp-srbox');
+      var fr = document.getElementById('rp-srframe');
+      if (bx.classList.contains('hidden')) {
+        var src = 'petition.html?embed=1&form=sichalreport&sichal=' +
+          encodeURIComponent(NAME) + '&year=' + year;
+        if (fr.getAttribute('src') !== src) fr.setAttribute('src', src);
+        bx.classList.remove('hidden');
+        srBtn.textContent = '시찰보고서 닫기';
+        bx.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        bx.classList.add('hidden');
+        srBtn.textContent = '시찰보고서 작성';
+      }
     });
 
     box.querySelectorAll('button[data-rpfile]').forEach(function (b) {

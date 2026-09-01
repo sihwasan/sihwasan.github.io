@@ -37,6 +37,7 @@ var SHSLedger = (function () {
     var ownerKind = opts.kind === 'committee' ? 'committee' : 'sichal';
     var books = [], book = null, entries = [];
     var year = new Date().getFullYear();
+    var viewKind = '수입';   /* 지금 보고 있는 탭 — 수입 또는 지출 */
     /* 적을 수 있는가. 데이터베이스에 물어본 답으로 채운다. */
     var canEdit = !!opts.canEdit;
 
@@ -165,42 +166,58 @@ var SHSLedger = (function () {
           '</div><div class="form-msg" id="lg-omsg"></div>';
       }
 
-      /* 항목 */
-      if (!entries.length) {
-        h += '<p style="color:var(--gray-5)">적어 둔 수입·지출이 없습니다.</p>';
+      /* 수입·지출을 탭으로 나눠 본다 */
+      var incRows = entries.filter(function (x) { return x.kind === '수입'; });
+      var outRows = entries.filter(function (x) { return x.kind !== '수입'; });
+      h += '<div class="tabs" id="lg-tabs" style="margin:14px 0 12px">' +
+        KINDS.map(function (k) {
+          var n = k === '수입' ? incRows.length : outRows.length;
+          return '<button class="' + (viewKind === k ? 'active' : '') + '" data-lk="' + k + '">' +
+            k + ' (' + n + '건)</button>';
+        }).join('') + '</div>';
+
+      /* 입력 섹션이 먼저, 그 아래에 장부가 쌓인다 */
+      if (canWrite) h += entryForm();
+
+      var shown = viewKind === '수입' ? incRows : outRows;
+      var shownSum = 0;
+      shown.forEach(function (x) { shownSum += Number(x.amount) || 0; });
+
+      if (!shown.length) {
+        h += '<p style="color:var(--gray-5)">적어 둔 ' + viewKind + '이 없습니다.' +
+          (canWrite ? ' 위 입력 칸에 기록하시면 이 자리에 장부가 만들어집니다.' : '') + '</p>';
       } else {
-        var run = s.open;
-        h += '<table class="tbl"><thead><tr><th style="width:110px">날짜</th>' +
-          '<th style="width:70px">구분</th><th style="width:110px">항목</th><th>내용</th>' +
-          '<th style="width:120px">금액</th><th style="width:120px">잔액</th>' +
+        h += '<table class="tbl"><thead><tr><th style="width:120px">일자</th>' +
+          '<th>항목</th><th style="width:140px">금액 (원)</th><th style="width:220px">비고</th>' +
           (canWrite ? '<th style="width:110px">관리</th>' : '') + '</tr></thead><tbody>';
-        entries.forEach(function (x, i) {
+        shown.forEach(function (x) {
           var amt = Number(x.amount) || 0;
-          run += (x.kind === '수입' ? amt : -amt);
           h += '<tr><td>' + esc(x.entry_date || '-') + '</td>' +
-            '<td><span class="role-badge">' + esc(x.kind) + '</span></td>' +
-            '<td>' + esc(x.category || '-') + '</td>' +
             '<td class="left">' + esc(x.title) +
-            (x.note ? '<div style="font-size:0.8rem;color:var(--gray-5)">' + esc(x.note) + '</div>' : '') +
+            (x.category ? ' <span style="font-size:0.8rem;color:var(--gray-5)">(' + esc(x.category) + ')</span>' : '') +
             '</td>' +
-            '<td class="' + (x.kind === '수입' ? 'lg-inc' : 'lg-out') + '">' +
-            (x.kind === '수입' ? '+' : '−') + won(amt) + '</td>' +
-            '<td>' + won(run) + '</td>' +
+            '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
+            (viewKind === '수입' ? '+' : '−') + won(amt) + '</td>' +
+            '<td class="left">' + (x.note ? esc(x.note) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             (canWrite
-              ? '<td><button class="btn ghost sm" data-lgedit="' + i + '">수정</button> ' +
-                '<button class="btn danger sm" data-lgdel="' + i + '">삭제</button></td>'
+              ? '<td><button class="btn ghost sm" data-lgedit="' + x.id + '">수정</button> ' +
+                '<button class="btn danger sm" data-lgdel="' + x.id + '">삭제</button></td>'
               : '') +
             '</tr>';
         });
+        h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td>합계</td><td></td>' +
+          '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
+          (viewKind === '수입' ? '+' : '−') + won(shownSum) + '</td><td></td>' +
+          (canWrite ? '<td></td>' : '') + '</tr>';
         h += '</tbody></table>';
       }
 
-      if (canWrite) h += entryForm();
       h += '<div id="lg-audit" style="margin-top:16px">' +
         SHSAuditMark.panel(book, { isAuditor: opts.isAuditor }) + '</div>';
 
       box.innerHTML = h;
       bindYear();
+      bindTabs();
       if (canWrite) { bindOpening(); bindEntryForm(); bindEntryList(); }
       SHSAuditMark.bind(document.getElementById('lg-audit'), {
         kind: 'ledger_books', label: opts.owner + ' ' + year + '년 회계 장부', after: load
@@ -212,6 +229,15 @@ var SHSLedger = (function () {
       if (sel) sel.addEventListener('change', function () {
         year = parseInt(this.value, 10);
         load();
+      });
+    }
+
+    function bindTabs() {
+      box.querySelectorAll('#lg-tabs button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          viewKind = b.dataset.lk;
+          draw();
+        });
       });
     }
 
@@ -268,24 +294,24 @@ var SHSLedger = (function () {
 
     function entryForm() {
       var today = new Date().toISOString().slice(0, 10);
-      return '<div class="admin-card" style="margin-top:18px">' +
-        '<h3 style="margin-top:0" id="lg-ftitle">수입·지출 적기</h3>' +
+      return '<div class="admin-card" style="margin-bottom:16px">' +
+        '<h3 style="margin-top:0" id="lg-ftitle">' + viewKind + ' 적기</h3>' +
         '<input type="hidden" id="lg-id" value="">' +
         '<div class="inline-form">' +
-        '<div class="field" style="flex:0 0 160px"><label>날짜</label>' +
+        '<div class="field" style="flex:0 0 160px"><label>일자</label>' +
         '<input type="date" id="lg-date" value="' + today + '"></div>' +
-        '<div class="field" style="flex:0 0 120px"><label>구분</label><select id="lg-kind">' +
-        KINDS.map(function (k) { return '<option>' + k + '</option>'; }).join('') + '</select></div>' +
-        '<div class="field" style="flex:0 0 150px"><label>항목</label>' +
-        '<input type="text" id="lg-cat" list="lg-cats" placeholder="예: 회비">' +
+        '<div class="field"><label>항목</label>' +
+        '<input type="text" id="lg-title" list="lg-cats" placeholder="' +
+        (viewKind === '수입' ? '예: 3월 시찰회 회비' : '예: 시찰회 식비') + '">' +
         '<datalist id="lg-cats">' +
-        ['회비', '노회 지원금', '사업비', '교통비', '식비', '인쇄비', '기타'].map(function (x) {
-          return '<option value="' + x + '"></option>';
-        }).join('') + '</datalist></div>' +
+        (viewKind === '수입'
+          ? ['회비', '노회 지원금', '이자', '기타 수입']
+          : ['사업비', '교통비', '식비', '인쇄비', '경조비', '기타 지출']
+        ).map(function (x) { return '<option value="' + x + '"></option>'; }).join('') +
+        '</datalist></div>' +
         '<div class="field" style="flex:0 0 170px"><label>금액 (원)</label>' +
         '<input type="number" id="lg-amt" min="0" step="1"></div>' +
         '</div>' +
-        '<div class="field"><label>내용</label><input type="text" id="lg-title" placeholder="예: 3월 시찰회 회비"></div>' +
         '<div class="field"><label>비고 (선택)</label><input type="text" id="lg-note"></div>' +
         '<button class="btn" id="lg-save">저장</button> ' +
         '<button class="btn ghost hidden" id="lg-cancel">취소</button>' +
@@ -293,10 +319,10 @@ var SHSLedger = (function () {
     }
 
     function clearEntryForm() {
-      ['lg-id', 'lg-cat', 'lg-amt', 'lg-title', 'lg-note'].forEach(function (id) {
+      ['lg-id', 'lg-amt', 'lg-title', 'lg-note'].forEach(function (id) {
         document.getElementById(id).value = '';
       });
-      document.getElementById('lg-ftitle').textContent = '수입·지출 적기';
+      document.getElementById('lg-ftitle').textContent = viewKind + ' 적기';
       document.getElementById('lg-cancel').classList.add('hidden');
     }
 
@@ -308,14 +334,13 @@ var SHSLedger = (function () {
         var d = {
           book_id: book.id,
           entry_date: document.getElementById('lg-date').value || null,
-          kind: document.getElementById('lg-kind').value,
-          category: document.getElementById('lg-cat').value.trim() || null,
+          kind: viewKind,
           title: document.getElementById('lg-title').value.trim(),
           amount: parseInt(document.getElementById('lg-amt').value, 10) || 0,
           note: document.getElementById('lg-note').value.trim() || null,
           updated_at: new Date().toISOString()
         };
-        if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '내용을 적어 주세요.'; return; }
+        if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '항목을 적어 주세요.'; return; }
         if (d.amount < 0) { msg.className = 'form-msg err'; msg.textContent = '금액은 0원 이상이어야 합니다.'; return; }
         if (!id) d.created_by = opts.user.name;
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
@@ -332,25 +357,29 @@ var SHSLedger = (function () {
       });
     }
 
+    function findEntry(id) {
+      return entries.filter(function (x) { return String(x.id) === String(id); })[0];
+    }
+
     function bindEntryList() {
       box.querySelectorAll('button[data-lgedit]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var x = entries[+b.dataset.lgedit];
+          var x = findEntry(b.dataset.lgedit);
+          if (!x) return;
           document.getElementById('lg-id').value = x.id;
           document.getElementById('lg-date').value = x.entry_date || '';
-          document.getElementById('lg-kind').value = x.kind;
-          document.getElementById('lg-cat').value = x.category || '';
           document.getElementById('lg-amt').value = x.amount;
           document.getElementById('lg-title').value = x.title;
           document.getElementById('lg-note').value = x.note || '';
-          document.getElementById('lg-ftitle').textContent = '수입·지출 수정';
+          document.getElementById('lg-ftitle').textContent = viewKind + ' 수정';
           document.getElementById('lg-cancel').classList.remove('hidden');
           document.getElementById('lg-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
         });
       });
       box.querySelectorAll('button[data-lgdel]').forEach(function (b) {
         b.addEventListener('click', function () {
-          var x = entries[+b.dataset.lgdel];
+          var x = findEntry(b.dataset.lgdel);
+          if (!x) return;
           if (!confirm('"' + x.title + '" (' + won(x.amount) + '원) 항목을 지우시겠습니까?')) return;
           SHSCloud.init().then(function (c) {
             return c.from('ledger_entries').delete().eq('id', x.id);

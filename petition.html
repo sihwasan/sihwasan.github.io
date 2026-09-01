@@ -947,25 +947,33 @@ body.pt-embed main { padding-top: 10px; }
       }).join('');
       inp.parentElement.querySelector('label').textContent = '시찰 (고르면 시찰장·서기·교세가 자동 입력)';
       inp.replaceWith(sel);
+      function fillOfficers(name) {
+        var s = sichals.filter(function (x) { return x.name === name; })[0];
+        if (!s) return;
+        data.sichaljang = firstWord(s.head);
+        data.clerk = firstWord(s.clerk);
+        var a = box.querySelector('#ptf-sichaljang'), b = box.querySelector('#ptf-clerk');
+        if (a) a.value = data.sichaljang;
+        if (b) b.value = data.clerk;
+      }
       sel.addEventListener('change', function () {
         data.sichal = sel.value;
-        var s = sichals.filter(function (x) { return x.name === sel.value; })[0];
-        if (s) {
-          data.sichaljang = firstWord(s.head);
-          data.clerk = firstWord(s.clerk);
-          var a = box.querySelector('#ptf-sichaljang'), b = box.querySelector('#ptf-clerk');
-          if (a) a.value = data.sichaljang;
-          if (b) b.value = data.clerk;
-        }
+        fillOfficers(sel.value);
         renderPaper();
         if (sel.value) loadSichalStats(sel.value);
       });
-      if (data.sichal) loadSichalStats(data.sichal);
+      if (data.sichal) {
+        /* 시찰 화면에서 미리 채워 들어온 경우 — 시찰장·서기도 함께 채운다 */
+        if (!data.sichaljang && !data.clerk) { fillOfficers(data.sichal); renderPaper(); }
+        loadSichalStats(data.sichal);
+      }
     }).catch(function () {});
   }
 
   function loadSichalStats(sichal) {
-    var year = new Date().getFullYear();
+    /* 시찰 화면에서 ?year=연도 로 들어오면 그 해 보고서를 합산한다 */
+    var year = parseInt((location.search.match(/[?&]year=(\d{4})/) || [])[1], 10) ||
+               new Date().getFullYear();
     SHSCloud.init().then(function (c) {
       return Promise.all([
         c.from('church_reports').select('church,pastor,members_total,data,updated_at')
@@ -1603,11 +1611,18 @@ body.pt-embed main { padding-top: 10px; }
     if (f0) cur = f0;
   }
 
+  /* 시찰 화면에서 ?sichal=이름 으로 들어오면 시찰보고서에 그 시찰을 미리 채운다 */
+  var sm0 = location.search.match(/[?&]sichal=([^&]*)/);
+  if (sm0) data.sichal = decodeURIComponent(sm0[1]).replace(/\+/g, ' ');
+
   renderMenu(); renderForm(); renderPaper();
   if (window.SHS && SHS.getUser) {
     SHS.getUser().then(function (u) {
       user = u;
       loadMine(); loadSeal(); loadInbox(); openFromUrl();
+      /* 시찰보고서 연동(회기·시찰장·교세 자동 입력)은 로그인 확인 후에야
+       * 돌 수 있으므로, 처음부터 시찰보고서로 들어왔다면 다시 그린다 */
+      if (cur.id === 'sichalreport' && !editingId) { renderForm(); renderPaper(); }
     });
   } else {
     loadMine();

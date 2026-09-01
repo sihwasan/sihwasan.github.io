@@ -47,6 +47,12 @@
 .sheet .s-note { font-size: 10.5px; color: #333; }
 /* 인쇄할 때 표 머리칸 음영이 사라지지 않게 배경색을 그대로 찍는다 */
 .sheet, .sheet * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* 여러 보고서 일괄 인쇄: 화면에서는 사이를 띄우고, 인쇄에서는 한 장씩 나눠 찍는다 */
+#sheet-wrap .sheet + .sheet { margin-top: 24px; }
+@media print {
+  .sheet { page-break-after: always; }
+  .sheet:last-child { page-break-after: auto; }
+}
 @media print {
   .sheet, .sheet * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   body > *:not(#sheet-wrap) { display: none !important; }
@@ -155,6 +161,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- 무엇을 할지 정한다 ---------- */
   var VIEW_ID = num(qs('id')) || null;                 /* 저장된 보고서 열람 */
+  /* 시찰 화면에서 여러 보고서를 골라 한 번에 인쇄 (?ids=1,2,3&print=1) */
+  var VIEW_IDS = qs('ids').split(',').map(num).filter(Boolean);
   var CHURCH = qs('church') || user.church || '';      /* 작성 대상 교회 */
   var YEAR = num(qs('year')) || new Date().getFullYear();
 
@@ -199,7 +207,9 @@ document.addEventListener('DOMContentLoaded', function () {
         c.from('member_seals').select('image').eq('user_id', user.id).eq('kind', 'church')
           .then(null, function () { return { data: null }; })
       ];
-      if (VIEW_ID) {
+      if (VIEW_IDS.length) {
+        jobs.push(c.from('church_reports').select('*').in('id', VIEW_IDS).order('church'));
+      } else if (VIEW_ID) {
         jobs.push(c.from('church_reports').select('*').eq('id', VIEW_ID));
       } else {
         jobs.push(c.from('church_reports').select('*').eq('year', YEAR).eq('church', CHURCH));
@@ -214,6 +224,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }).then(function (rs) {
       meRow = rs[0].data && rs[0].data[0] || null;
       mySeal = rs[1].data && rs[1].data[0] ? rs[1].data[0].image : null;
+
+      if (VIEW_IDS.length) {
+        renderDocs((rs[2] && rs[2].data) || []);
+        return;
+      }
 
       if (VIEW_ID) {
         record = rs[2].data && rs[2].data[0];
@@ -702,6 +717,44 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('doc-print').addEventListener('click', function () { window.print(); });
   }
 
+  /* 여러 보고서를 한 화면에 이어 붙여 한 번의 인쇄로 모두 찍는다 (?ids=) */
+  function renderDocs(list) {
+    var tabs = document.getElementById('rp-tabs');
+    if (tabs) tabs.style.display = 'none';
+    if (!list.length) {
+      area.innerHTML = '<div class="notice-banner">인쇄할 보고서를 찾을 수 없거나 열람 권한이 없습니다.</div>';
+      return;
+    }
+    var printable = list.filter(function (r) { return r.data; });
+    var olds = list.filter(function (r) { return !r.data; });
+    var h = '<div class="notice-banner"><strong>교회상황 보고서 일괄 인쇄</strong> — ' +
+      printable.map(function (r) { return e(r.church); }).join(', ') +
+      ' <span style="color:var(--gray-5)">(' + printable.length + '건)</span></div>';
+    if (olds.length) {
+      h += '<div class="notice-banner">' + olds.map(function (r) { return e(r.church); }).join(', ') +
+        ' — 예전 요약 방식으로 제출되어 인쇄할 서식이 없으므로 빼고 인쇄합니다.</div>';
+    }
+    if (printable.length) {
+      h += '<div style="margin:12px 0 18px"><button class="btn" id="doc-print">' +
+        printable.length + '건 모두 인쇄</button> ' +
+        '<span style="font-size:0.82rem;color:var(--gray-5)">보고서 한 건이 한 장씩 이어서 인쇄됩니다.</span></div>';
+    }
+    area.innerHTML = h;
+    if (!printable.length) return;
+    var wrap = document.getElementById('sheet-wrap');
+    wrap.innerHTML = printable.map(function (r) {
+      /* 각 보고서에 저장된 직인 사용 여부·위치를 그대로 쓴다 */
+      var s = (r.data && r.data._seal) || {};
+      sealOn = s.on !== false;
+      sealPos = { dx: Number(s.dx) || 0, dy: Number(s.dy) || 0 };
+      return buildSheet(r.data, r.seal_image, r, true);
+    }).join('');
+    wrap.classList.add('show');
+    document.getElementById('doc-print').addEventListener('click', function () { window.print(); });
+    SHSCloud.log('view', '교회상황 보고서 일괄 인쇄', printable[0].year + '년 ' + printable.length + '건');
+    if (qs('print')) setTimeout(function () { window.print(); }, 600);
+  }
+
   function openSheet(d, seal, rec) {
     var wrap = document.getElementById('sheet-wrap');
     wrap.innerHTML = buildSheet(d, seal, rec);
@@ -738,7 +791,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function sv(x) { return x == null || x === '' ? '&nbsp;' : e(String(x)); }
   function sn(x) { return x ? comma(num(x)) : '&nbsp;'; }
 
-  function buildSheet(d, seal, rec) {
+  function buildSheet(d, seal, rec, bare) {
     var church = (rec && rec.church) || CHURCH;
     var year = (rec && rec.year) || YEAR;
     var head = d.head || {}, addr = d.addr || {}, clergy = d.clergy || {}, jejik = d.jejik || {};
@@ -746,7 +799,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var assets = d.assets || [], support = d.support || { rows: [], mis: [] };
     var dt = (d.date || today()).split('-');
 
-    var h = '<div class="sheet-tools">' +
+    /* bare: 일괄 인쇄처럼 종이만 여러 장 이어 붙일 때 — 도구 줄을 빼고 그린다 */
+    var h = bare ? '' : '<div class="sheet-tools">' +
       '<button class="btn" id="sheet-print">인쇄</button>' +
       (VIEW_ID ? '' : '<button class="btn ghost" id="sheet-close">미리보기 닫기</button>') +
       '</div>';
