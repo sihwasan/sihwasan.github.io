@@ -154,6 +154,21 @@
     else sub.insertBefore(a, sub.firstChild);
   }
 
+  /* 회록서기(부회록서기)와 노회장·서기·간사에게 임원방 하위에
+   * <회의록 작성>을 붙인다. 회의록을 규격대로 적는 매니저다. */
+  function addMinutesWriteMenu() {
+    var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
+    if (!links.length) return;
+    var sub = links[0].parentNode.querySelector('.gnb-sub');
+    if (!sub || sub.querySelector('a[href="minutes-write.html"]')) return;
+    var a = document.createElement('a');
+    a.href = 'minutes-write.html';
+    a.textContent = '회의록 작성';
+    /* 노회 회의록 바로 위 자리 (없으면 맨 아래) */
+    var minutes = sub.querySelector('a[href="minutes.html"]');
+    if (minutes) sub.insertBefore(a, minutes); else sub.appendChild(a);
+  }
+
   function addAdminMenu() {
     var list = document.querySelector('.gnb-list');
     if (!list || document.getElementById('gnb-admin')) return;
@@ -479,6 +494,12 @@
           addAdminMenu();
           addScheduleMenu();
           addProceedMenu();
+        }
+
+        /* 회의록 작성 매니저 — 회록서기(부회록서기)와 노회장·서기·간사 */
+        if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1 ||
+            (p.role === 'officer' && p.title && p.title.indexOf('회록서기') !== -1)) {
+          addMinutesWriteMenu();
         }
 
         /* 내가 맡은 상비부는 대시보드에서 본다. 상단 메뉴에 따로 두지 않는다. */
