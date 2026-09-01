@@ -400,7 +400,11 @@
     setupInstall();
 
     document.body.insertAdjacentHTML('afterbegin', buildTopbar() + buildHeader() + buildGnb());
-    document.body.insertAdjacentHTML('beforeend', buildFooter());
+    /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.
+     * (검색로봇은 자바스크립트를 돌리지 않으므로, 적어 둔 것이 있어야 읽는다) */
+    if (!document.querySelector('footer.site-footer')) {
+      document.body.insertAdjacentHTML('beforeend', buildFooter());
+    }
     setupGnbTap();
 
     /* 로그아웃: 이메일 세션과 구글(서버) 세션을 모두 정리한다.
