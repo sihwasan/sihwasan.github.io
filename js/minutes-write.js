@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var doc = null;         /* 그 내용 */
   var step = 1;
   var HAS_TABLE = true;
+  var rosterCnt = null;   /* 회원 명단에서 센 재적 {pt, et, vt} */
 
   var SICHALS = ((window.SHSData && SHSData.sichals) || []).map(function (s) { return s.name; });
   if (!SICHALS.length) SICHALS = ['북부시찰', '상록시찰', '남부시찰'];
@@ -135,6 +136,9 @@ document.addEventListener('DOMContentLoaded', function () {
           .order('meet_on', { ascending: false }).order('id', { ascending: false }),
         c.from('meeting_sessions').select('*')
           .order('meet_on', { ascending: false }).order('id', { ascending: false })
+          .then(function (x) { return x; }, function () { return { data: [] }; }),
+        /* 회원 명단 — 재적 수를 자동으로 채우기 위해 구분만 읽는다 */
+        c.from('roster').select('category')
           .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
@@ -148,6 +152,16 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       rows = rs[0].data || [];
       sessions = (rs[1] && rs[1].data) || [];
+      /* 재적: 목사회원 = 목사·부목사·무임목사 / 장로회원 = 장로 /
+       * 언권회원 = 원로목사·은퇴목사 (실제 회의록의 셈과 같다) */
+      var cats = ((rs[2] && rs[2].data) || []).map(function (r) { return r.category; });
+      if (cats.length) {
+        rosterCnt = {
+          pt: cats.filter(function (c) { return c === '목사' || c === '부목사' || c === '무임목사'; }).length,
+          et: cats.filter(function (c) { return c === '장로'; }).length,
+          vt: cats.filter(function (c) { return c === '원로목사' || c === '은퇴목사'; }).length
+        };
+      }
       if (openId) {
         cur = rows.filter(function (r) { return r.id === openId; })[0] || null;
       } else if (cur) {
@@ -157,9 +171,18 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* 재적이 비어 있으면 회원 명단에서 센 수로 채운다 */
+  function fillRoster(d) {
+    if (!rosterCnt) return;
+    if (!d.roll.pt) d.roll.pt = String(rosterCnt.pt);
+    if (!d.roll.et) d.roll.et = String(rosterCnt.et);
+    if (!d.roll.vt) d.roll.vt = String(rosterCnt.vt);
+  }
+
   function openDoc(row) {
     cur = row;
     doc = Object.assign(SHSMinutes.blank(), row.doc || {});
+    fillRoster(doc);
     step = 1;
     drawEdit();
   }
@@ -256,6 +279,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (o.role === '서기') d.clerk = SHSMinutes.withTitle(o.name, o.position);
         if (o.role === '회록서기') d.minutes_clerk = SHSMinutes.withTitle(o.name, o.position);
       });
+      fillRoster(d);
       if (!d.no) { msg.className = 'form-msg err'; msg.textContent = '회기를 적어 주세요.'; return; }
       msg.className = 'form-msg'; msg.textContent = '만드는 중입니다...';
 
@@ -440,6 +464,11 @@ document.addEventListener('DOMContentLoaded', function () {
         fld('business.prayer', '기도', { width: '260px', ph: '상록시찰장 손영득 목사' }) +
         '</div>' +
         '<h3>출석</h3>' +
+        (rosterCnt
+          ? '<p class="mw-hint">재적은 회원 명단에서 자동으로 가져왔습니다 — 목사회원 ' + rosterCnt.pt +
+            '명(목사·부목사·무임목사) · 장로회원 ' + rosterCnt.et + '명 · 언권회원 ' + rosterCnt.vt +
+            '명(원로·은퇴). 다르면 고쳐 적으세요.</p>'
+          : '') +
         '<div class="inline-form">' +
         fld('roll.pt', '목사회원 재적', { type: 'number', width: '140px' }) +
         fld('roll.pp', '목사회원 출석', { type: 'number', width: '140px' }) +
