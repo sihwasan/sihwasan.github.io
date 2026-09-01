@@ -1099,17 +1099,24 @@ var SHSBoard = (function () {
       h += '<h3 class="mn-sub" style="margin:20px 0 8px">총회 소식 · 기사</h3>' +
         '<div id="asm-news"></div>';
       if (admin) {
-        h += '<div style="margin-top:10px;padding:12px 14px;background:var(--gray-1,#f4f2ec);border-radius:10px">' +
-          '<div style="font-size:0.84rem;font-weight:700;margin-bottom:6px">기사 등록 (관리자)</div>' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          '<input type="text" id="asm-url" placeholder="기사 주소(URL)를 붙여 넣으세요" style="flex:1 1 280px">' +
-          '<button type="button" class="btn sm" id="asm-fetch">가져오기</button></div>' +
-          '<div id="asm-preview" class="hidden" style="margin-top:10px">' +
+        h += '<div class="admin-card" style="margin-top:12px">' +
+          '<h4 class="mn-sub" style="margin-top:0">기사 등록 ' +
+          '<span style="font-weight:400;font-size:0.8rem;color:var(--gray-5)">(관리자)</span></h4>' +
+          '<div class="inline-form">' +
+          '<div class="field" style="flex:1 1 300px"><label>기사 주소 (URL)</label>' +
+          '<input type="text" id="asm-url" placeholder="https:// 기사 주소를 붙여 넣으세요"></div>' +
+          '<button type="button" class="btn" id="asm-fetch" style="align-self:flex-end">가져오기</button>' +
+          '</div>' +
+          '<p style="font-size:0.78rem;color:var(--gray-5);margin:2px 0 0">' +
+          '주소를 넣고 가져오기를 누르면 제목·사진·요약이 저절로 채워집니다.</p>' +
+          '<div id="asm-preview" class="hidden" ' +
+          'style="margin-top:12px;border-top:1px solid var(--gray-2,#e8e5df);padding-top:12px">' +
           '<div class="field"><label>제목</label><input type="text" id="asm-title"></div>' +
           '<div class="field"><label>요약 (선택)</label><input type="text" id="asm-desc"></div>' +
           '<div class="field"><label>사진 주소 (선택)</label><input type="text" id="asm-img"></div>' +
-          '<img id="asm-imgprev" class="hidden" alt="" style="max-width:220px;border-radius:8px;margin:4px 0 8px">' +
-          '<div><button type="button" class="btn sm" id="asm-add">기사 추가</button></div></div>' +
+          '<img id="asm-imgprev" class="hidden" alt="" ' +
+          'style="max-width:220px;border-radius:10px;margin:4px 0 10px;box-shadow:0 3px 10px rgba(0,0,0,0.14)">' +
+          '<div><button type="button" class="btn" id="asm-add">기사 추가</button></div></div>' +
           '<div class="form-msg" id="asm-msg"></div></div>';
       }
 
@@ -1117,10 +1124,12 @@ var SHSBoard = (function () {
       h += '<h3 class="mn-sub" style="margin:20px 0 8px">활동 사진</h3>' +
         '<div id="asm-photos"></div>';
       if (admin) {
-        h += '<div style="margin-top:8px">' +
-          '<input type="file" id="asm-photo" accept="image/*" multiple style="max-width:320px">' +
-          ' <span style="font-size:0.76rem;color:var(--gray-5)">올린 사진은 노회 메인 갤러리의 ' +
-          '<strong>총회 활동</strong> 앨범에도 함께 실립니다.</span>' +
+        h += '<div class="admin-card" style="margin-top:12px">' +
+          '<h4 class="mn-sub" style="margin-top:0">활동 사진 올리기 ' +
+          '<span style="font-weight:400;font-size:0.8rem;color:var(--gray-5)">(관리자)</span></h4>' +
+          '<div class="field"><input type="file" id="asm-photo" accept="image/*" multiple></div>' +
+          '<p style="font-size:0.78rem;color:var(--gray-5);margin:2px 0 0">올린 사진은 노회 메인 갤러리의 ' +
+          '<strong>총회 활동</strong> 앨범에도 함께 실립니다.</p>' +
           '<div class="form-msg" id="asm-pmsg"></div></div>';
       }
 
@@ -1287,6 +1296,8 @@ var SHSBoard = (function () {
         });
       }
       var pin = document.getElementById('asm-photo');
+      /* 끌어다 놓기(드래그 앤 드롭)로도 올릴 수 있는 상자로 바꾼다 */
+      if (pin && SHS.dropZone) SHS.dropZone(pin, { what: '활동 사진', accept: 'image' });
       if (pin) pin.addEventListener('change', function () {
         var files = Array.prototype.slice.call(this.files || []);
         if (!files.length) return;
@@ -1324,6 +1335,7 @@ var SHSBoard = (function () {
           pmsg.className = 'form-msg ok';
           pmsg.textContent = files.length + '장을 올렸습니다. 메인 갤러리의 총회 활동 앨범에서도 볼 수 있습니다.';
           pin.value = '';
+          pin.dispatchEvent(new Event('change', { bubbles: true }));   /* 드롭존 목록 비우기 */
           SHSCloud.log('create', '총회 활동 사진 등록', files.length + '장');
           refreshPhotos();
         }).catch(function (x) {
