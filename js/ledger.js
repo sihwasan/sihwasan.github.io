@@ -486,5 +486,152 @@ var SHSLedger = (function () {
     Promise.all([SHSAuditMark.ready(), askCanEdit()]).then(load, load);
   }
 
-  return { mount: mount };
+  /* ================= 재정보고서 =================
+   * 장부 내용을 수입·지출 두 단으로 정리한 보고서.
+   * 장부 입력·관리는 임원이 하지만, 보고서는 회원이 상시로 열람한다.
+   *
+   *   SHSLedger.report(자리, { kind, owner })
+   */
+  function report(box, opts) {
+    if (!box) return;
+    var ownerKind = opts.kind === 'committee' ? 'committee' : 'sichal';
+    var now0 = new Date();
+    var year = now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1;
+    function fyLabel(y) { return y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)'; }
+
+    function load() {
+      box.innerHTML = '<p style="color:var(--gray-5)">재정보고서를 불러오는 중...</p>';
+      var books = [], book = null, entries = [];
+      SHSCloud.init().then(function (c) {
+        return c.from('ledger_books').select('*')
+                .eq('owner_kind', ownerKind).eq('owner', opts.owner)
+                .order('year', { ascending: false });
+      }).then(function (r) {
+        if (r.error) throw r.error;
+        books = r.data || [];
+        book = books.filter(function (b) { return b.year === year; })[0] || null;
+        if (!book) return { data: [] };
+        return SHSCloud.init().then(function (c) {
+          return c.from('ledger_entries').select('*').eq('book_id', book.id)
+                  .order('entry_date').order('id');
+        });
+      }).then(function (r2) {
+        entries = (r2 && r2.data) || [];
+        draw(books, book, entries);
+      }).catch(function (x) {
+        box.innerHTML = '<p style="color:var(--gray-5)">재정보고서를 불러오지 못했습니다: ' +
+          esc((x && x.message) || '') + '</p>';
+      });
+    }
+
+    function draw(books, book, entries) {
+      var inc = entries.filter(function (x) { return x.kind === '수입'; });
+      var out = entries.filter(function (x) { return x.kind !== '수입'; });
+      var sumIn = 0, sumOut = 0;
+      inc.forEach(function (x) { sumIn += Number(x.amount) || 0; });
+      out.forEach(function (x) { sumOut += Number(x.amount) || 0; });
+      var open = book ? Number(book.opening_balance) || 0 : 0;
+      var left = open + sumIn - sumOut;
+
+      var ys = {};
+      books.forEach(function (b) { ys[b.year] = 1; });
+      ys[year] = 1;
+      var yearOpts = Object.keys(ys).map(Number).sort(function (a, b) { return b - a; });
+
+      /* 적요: 날짜 · 교회 · 비고를 한 줄로 */
+      function brief(x) {
+        var parts = [];
+        if (x.entry_date) parts.push(String(x.entry_date).slice(5).replace('-', '.'));
+        if (x.church) parts.push(x.church);
+        if (x.note) parts.push(x.note);
+        return parts.length ? esc(parts.join(' · ')) : '';
+      }
+      function cellRow(x) {
+        if (!x) return '<td></td><td></td><td></td>';
+        return '<td class="left">' + esc(x.title) + '</td>' +
+          '<td class="left" style="font-size:0.8rem;color:var(--gray-6)">' + brief(x) + '</td>' +
+          '<td style="text-align:right">' + won(x.amount) + '</td>';
+      }
+
+      var h = '<div class="inline-form" style="margin-bottom:10px;align-items:flex-end">' +
+        '<div class="field" style="flex:0 0 260px"><label>회계 연도</label>' +
+        '<select id="fr-year">' + yearOpts.map(function (y) {
+          return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + fyLabel(y) + '</option>';
+        }).join('') + '</select></div>' +
+        '<button class="btn ghost" id="fr-print">인쇄</button>' +
+        '</div>';
+
+      if (!book) {
+        h += '<p style="color:var(--gray-5)">' + fyLabel(year) + ' 장부가 아직 없습니다.</p>';
+        box.innerHTML = h;
+        bind();
+        return;
+      }
+
+      var rows = Math.max(inc.length, out.length, 1);
+      var t = '<div id="fr-sheet">' +
+        '<h3 style="text-align:center;margin:6px 0 2px">재정보고서</h3>' +
+        '<p style="text-align:center;font-size:0.84rem;color:var(--gray-6);margin:0 0 10px">' +
+        esc(opts.owner) + ' · ' + fyLabel(year) +
+        (book.closed_yn ? ' · 마감' : '') +
+        (book.audited_yn ? ' · 감사필' : '') + '</p>' +
+        '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.86rem"><thead><tr>' +
+        '<th style="width:16%">수입항목</th><th style="width:22%">적요</th><th style="width:12%">금액</th>' +
+        '<th style="width:16%">지출항목</th><th style="width:22%">적요</th><th style="width:12%">금액</th>' +
+        '</tr></thead><tbody>';
+      if (!entries.length) {
+        t += '<tr><td colspan="6" style="text-align:center;color:var(--gray-5);padding:16px">' +
+          '기록된 수입·지출이 없습니다.</td></tr>';
+      } else {
+        for (var i = 0; i < rows; i++) {
+          t += '<tr>' + cellRow(inc[i]) + cellRow(out[i]) + '</tr>';
+        }
+      }
+      t += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)">' +
+        '<td>수입합계</td><td></td><td style="text-align:right">' + won(sumIn) + '</td>' +
+        '<td>지출합계</td><td></td><td style="text-align:right">' + won(sumOut) + '</td></tr>' +
+        '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)">' +
+        '<td>이월금</td><td></td><td style="text-align:right">' + won(open) + '</td>' +
+        '<td>차인잔액</td><td></td><td style="text-align:right">' + won(left) + '</td></tr>' +
+        '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)">' +
+        '<td>합계</td><td></td><td style="text-align:right">' + won(open + sumIn) + '</td>' +
+        '<td>합계</td><td></td><td style="text-align:right">' + won(sumOut + left) + '</td></tr>';
+      t += '</tbody></table></div>' +
+        '<p style="font-size:0.78rem;color:var(--gray-5);margin-top:6px">차인잔액 = 이월금 + 수입합계 − 지출합계. ' +
+        '장부 입력·관리는 임원이 하며, 이 보고서는 회원이 상시로 열람합니다.</p></div>';
+
+      box.innerHTML = h + t;
+      bind();
+
+      function bind() {
+        var sel = document.getElementById('fr-year');
+        if (sel) sel.addEventListener('change', function () {
+          year = parseInt(this.value, 10);
+          load();
+        });
+        var pr = document.getElementById('fr-print');
+        if (pr) pr.addEventListener('click', function () {
+          var sheet = document.getElementById('fr-sheet');
+          if (!sheet) return;
+          var w = window.open('', '_blank', 'noopener,width=900,height=700');
+          if (!w) return;
+          w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">' +
+            '<title>재정보고서 - ' + esc(opts.owner) + '</title>' +
+            '<style>body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;padding:24px;color:#111}' +
+            'table{width:100%;border-collapse:collapse;font-size:12px}' +
+            'th,td{border:1px solid #333;padding:4px 6px}' +
+            'th{background:#f2f2f2}h3{text-align:center}' +
+            'td.left{text-align:left}td{text-align:center}</style></head><body>' +
+            sheet.innerHTML + '</body></html>');
+          w.document.close();
+          w.focus();
+          setTimeout(function () { w.print(); }, 300);
+        });
+      }
+    }
+
+    load();
+  }
+
+  return { mount: mount, report: report };
 })();

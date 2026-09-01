@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노회 진행 관리자 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20260831zl">
+<style>
+/* 진행 현황 막대 */
+.pc-bar { background:var(--gray-2,#e8eaef); border-radius:6px; height:14px; overflow:hidden; }
+.pc-bar > div { height:100%; background:#2a7a2a; transition:width .3s; }
+/* 지금 순서 카드 */
+.pc-now { border:2px solid var(--accent,#b08d3e); border-radius:12px; background:#fff;
+  padding:22px 26px; margin:14px 0; }
+.pc-now .pc-sec { font-size:0.82rem; color:var(--gray-5); letter-spacing:1px; }
+.pc-now h2 { margin:4px 0 8px; font-size:1.5rem; color:var(--navy,#4b3f33); }
+.pc-now .pc-lead { font-size:0.95rem; color:var(--gray-7); margin:0 0 4px; }
+.pc-now .pc-detail { font-size:0.86rem; color:var(--gray-6); white-space:pre-wrap; margin:0 0 10px; }
+.pc-next { border-left:3px solid var(--gray-3,#d8dbe2); padding:2px 0 2px 12px; margin:12px 0;
+  font-size:0.88rem; color:var(--gray-6); }
+.pc-next strong { color:var(--gray-7); }
+/* 순서 목록 상태 표시 */
+.pc-st { display:inline-block; font-size:0.74rem; border-radius:10px; padding:1px 8px; white-space:nowrap; }
+.pc-st.s대기 { background:var(--gray-2,#e8eaef); color:var(--gray-6); }
+.pc-st.s진행중 { background:#b03a3a; color:#fff; }
+.pc-st.s완료 { background:#2a7a2a; color:#fff; }
+.pc-st.s건너뜀 { background:#b0731f; color:#fff; }
+.pc-done td { opacity:.62; }
+.pc-cur td { background:#fdf6ea; }
+.pc-sechead td { background:var(--gray-1,#f4f5f8); font-weight:700; color:var(--navy,#4b3f33); }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>노회 진행 관리자</h1>
+    <div class="crumb">홈 &gt; 임원방 &gt; 노회 진행 관리자</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="pc-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20260901k"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('pc-area');
+  var e = SHS.esc;
+
+  if (!user || !SHSAuth.canManageMembers(user)) {
+    area.innerHTML =
+      '<div class="notice-banner">노회 진행 관리자는 <strong>노회장·서기·간사</strong>가 이용할 수 있습니다.' +
+      (user ? '' : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') + '</div>';
+    return;
+  }
+  if (!user.cloud || !window.SHSCloud || !SHSCloud.enabled()) {
+    area.innerHTML =
+      '<div class="notice-banner">회의 진행 기록이 서버에 저장되므로 서버 로그인이 필요합니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  function db() { return SHSCloud.init(); }
+  function nowIso() { return new Date().toISOString(); }
+  function hhmm(ts) {
+    if (!ts) return '';
+    var d = new Date(ts);
+    return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+
+  var sessions = [], cur = null, items = [];
+  var SESSION_NO = null;   /* 현재 회기 (site_settings.sessions) */
+
+  /* ---------------- 순서지 틀 ----------------
+   * 제19회 봄 정기노회 회의록(본 노회 실제 진행)을 바탕으로 만든 기본 틀.
+   * 만들고 나서 자유롭게 더하고 빼고 순서를 바꿀 수 있다. */
+  var TPL = {
+    spring: [
+      ['Ⅰ. 개회예배', '개회예배', '노회장', '찬송 · 기도 · 성경봉독 · 설교 · 축도'],
+      ['Ⅰ. 개회예배', '성찬식', '시찰장 집례', '설교 · 분병 · 분잔'],
+      ['Ⅱ. 회무처리 (오전)', '회원점명 · 성수 보고', '서기', '목사회원 · 장로총대 출석 확인'],
+      ['Ⅱ. 회무처리 (오전)', '개회선언', '노회장', ''],
+      ['Ⅱ. 회무처리 (오전)', '회의순서(회순) 채택', '노회장', '유인물대로 받기로 가결'],
+      ['Ⅱ. 회무처리 (오전)', '임원선거', '선거관리위원장', '노회장 · 부노회장 · 서기 · 회계 등'],
+      ['Ⅱ. 회무처리 (오전)', '총회총대 선거', '선거관리위원장', '목사 · 장로 정총대와 부총대'],
+      ['Ⅱ. 회무처리 (오전)', '위원 선정', '노회장', '광고위원 · 출결위원 지명'],
+      ['Ⅱ. 회무처리 (오전)', '감사헌의부 보고', '감사헌의부 서기', '헌의안건 접수 · 각 부 이관'],
+      ['Ⅱ. 회무처리 (오전)', '공천부 보고', '공천부 서기', '상비부 공천'],
+      ['Ⅱ. 회무처리 (오전)', '정회 (오찬)', '', ''],
+      ['Ⅲ. 계속 회무처리 (오후)', '속회', '노회장', ''],
+      ['Ⅲ. 계속 회무처리 (오후)', '각 상비부 조직보고', '각 부 서기', '부장 · 서기 · 회계 조직'],
+      ['Ⅲ. 계속 회무처리 (오후)', '각 시찰 보고', '각 시찰 서기', ''],
+      ['Ⅲ. 계속 회무처리 (오후)', '각 부 보고', '각 부 서기', '감사부 · 서기부 · 임원회 · 고시규칙부 등'],
+      ['Ⅲ. 계속 회무처리 (오후)', '정치부 보고 (헌의안건 처리)', '정치부 서기', '청빙 · 사면 · 청원 안건'],
+      ['Ⅲ. 계속 회무처리 (오후)', '총회 결의 헌법 개정안 수의', '노회장', '투표'],
+      ['Ⅲ. 계속 회무처리 (오후)', '재정부 회계 보고', '재정부', '결산 · 예산'],
+      ['Ⅲ. 계속 회무처리 (오후)', '이사 선정', '노회장', ''],
+      ['Ⅲ. 계속 회무처리 (오후)', '기타 안건 · 긴급동의안', '노회장', ''],
+      ['Ⅲ. 계속 회무처리 (오후)', '회의록 채택', '회록서기', '미진 안건은 임원회에 위임'],
+      ['Ⅲ. 계속 회무처리 (오후)', '감사패 · 임명장 증정', '노회장', ''],
+      ['Ⅳ. 폐회', '폐회예배', '노회장', '기도 · 말씀'],
+      ['Ⅳ. 폐회', '폐회선언 · 축도', '노회장', '']
+    ],
+    fall: [
+      ['Ⅰ. 개회예배', '개회예배', '노회장', '찬송 · 기도 · 성경봉독 · 설교 · 축도'],
+      ['Ⅱ. 회무처리', '회원점명 · 성수 보고', '서기', ''],
+      ['Ⅱ. 회무처리', '개회선언', '노회장', ''],
+      ['Ⅱ. 회무처리', '회의순서(회순) 채택', '노회장', ''],
+      ['Ⅱ. 회무처리', '신입 · 이명 회원 소개', '서기', ''],
+      ['Ⅱ. 회무처리', '감사헌의부 보고', '감사헌의부 서기', '헌의안건 접수 · 각 부 이관'],
+      ['Ⅱ. 회무처리', '각 시찰 보고', '각 시찰 서기', ''],
+      ['Ⅱ. 회무처리', '각 부 보고', '각 부 서기', ''],
+      ['Ⅱ. 회무처리', '총회총대 총회 참석 보고', '총대', ''],
+      ['Ⅱ. 회무처리', '고시부 보고', '고시규칙부', '강도사고시 추천 등'],
+      ['Ⅱ. 회무처리', '정치부 보고 (청원안건 처리)', '정치부 서기', ''],
+      ['Ⅱ. 회무처리', '재정부 보고', '재정부', ''],
+      ['Ⅱ. 회무처리', '기타 안건', '노회장', ''],
+      ['Ⅱ. 회무처리', '회의록 채택', '회록서기', ''],
+      ['Ⅲ. 폐회', '폐회예배 · 폐회선언', '노회장', '']
+    ],
+    empty: [
+      ['', '개회선언', '노회장', ''],
+      ['', '폐회선언', '노회장', '']
+    ]
+  };
+
+  /* ---------------- 불러오기 ---------------- */
+  function load(openId) {
+    db().then(function (c) {
+      return Promise.all([
+        c.from('meeting_sessions').select('*')
+          .order('meet_on', { ascending: false }).order('id', { ascending: false }),
+        c.from('site_settings').select('value').eq('key', 'sessions')
+          .then(function (x) { return x; }, function () { return { data: [] }; })
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) {
+        area.innerHTML = '<div class="notice-banner">회의 목록을 불러오지 못했습니다: ' +
+          e(rs[0].error.message) +
+          '<br><span style="font-size:0.85rem;color:var(--gray-5)">Supabase에서 <strong>61_proceedings.sql</strong>을 ' +
+          '아직 실행하지 않으셨다면 먼저 실행해 주세요.</span></div>';
+        return;
+      }
+      sessions = rs[0].data || [];
+      var ses = rs[1].data && rs[1].data[0] && rs[1].data[0].value;
+      if (ses && ses.current) SESSION_NO = ses.current;
+
+      if (openId) {
+        cur = sessions.filter(function (s) { return s.id === openId; })[0] || null;
+      } else if (cur) {
+        cur = sessions.filter(function (s) { return s.id === cur.id; })[0] || null;
+      }
+      if (!cur) {
+        /* 진행 중인 회의가 있으면 바로 연다 */
+        cur = sessions.filter(function (s) { return s.status === '진행' || s.status === '정회'; })[0] || null;
+      }
+      if (!cur) { drawList(); return; }
+      loadItems();
+    });
+  }
+
+  function loadItems() {
+    db().then(function (c) {
+      return c.from('meeting_items').select('*').eq('session_id', cur.id)
+              .order('sort').order('id');
+    }).then(function (r) {
+      items = (r && r.data) || [];
+      drawSession();
+    });
+  }
+
+  /* ---------------- 회의 목록 ---------------- */
+  function drawList() {
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">회의 순서지를 미리 만들어 두고, ' +
+      '회의 당일 순서를 하나씩 진행 · 완료 처리하면서 회의를 이끄는 도구입니다. ' +
+      '한 순서가 끝나면 <strong>완료</strong>를 누르세요. 다음 순서가 저절로 안내됩니다.</p>';
+
+    if (!sessions.length) {
+      h += '<p style="color:var(--gray-5)">만들어 둔 회의가 없습니다. 아래에서 첫 회의를 만들어 주세요.</p>';
+    } else {
+      h += '<table class="tbl"><thead><tr><th style="width:120px">날짜</th><th>회의</th>' +
+        '<th style="width:160px">장소</th><th style="width:90px">상태</th>' +
+        '<th style="width:150px">관리</th></tr></thead><tbody>';
+      sessions.forEach(function (s) {
+        h += '<tr><td>' + e(s.meet_on || '-') + '</td>' +
+          '<td class="left"><strong>' + e(s.title) + '</strong></td>' +
+          '<td>' + e(s.place || '-') + '</td>' +
+          '<td><span class="pc-st s' + (s.status === '폐회' ? '완료' : s.status === '준비' ? '대기' : '진행중') + '">' +
+          e(s.status) + '</span></td>' +
+          '<td><button class="btn sm" data-open="' + s.id + '">열기</button> ' +
+          '<button class="btn danger sm" data-del="' + s.id + '">삭제</button></td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+
+    h += '<div class="admin-card" style="margin-top:18px"><h3 style="margin-top:0">새 회의 만들기</h3>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 110px"><label>회기</label>' +
+      '<input type="number" id="ns-no" value="' + (SESSION_NO ? Number(SESSION_NO) + 1 : '') + '"></div>' +
+      '<div class="field"><label>회의 이름</label>' +
+      '<input type="text" id="ns-title" placeholder="예: 제20회 가을 정기노회"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>날짜</label><input type="date" id="ns-date"></div>' +
+      '<div class="field" style="flex:0 0 200px"><label>장소</label><input type="text" id="ns-place" placeholder="예: 섬기는교회"></div>' +
+      '</div>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 260px"><label>순서지 틀</label><select id="ns-tpl">' +
+      '<option value="fall">가을 정기노회 틀 (15개 순서)</option>' +
+      '<option value="spring">봄 정기노회 틀 (24개 순서 · 임원선거 포함)</option>' +
+      '<option value="empty">빈 순서지 (직접 작성)</option>' +
+      '</select></div>' +
+      '<button class="btn" id="ns-make" style="align-self:flex-end">회의 만들기</button>' +
+      '</div>' +
+      '<p style="font-size:0.8rem;color:var(--gray-5);margin:6px 0 0">틀은 제19회 봄 정기노회 회의록을 바탕으로 만들었습니다. ' +
+      '만든 뒤 순서를 자유롭게 더하고 빼고 바꿀 수 있습니다.</p>' +
+      '<div class="form-msg" id="ns-msg"></div></div>';
+
+    area.innerHTML = h;
+
+    area.querySelectorAll('button[data-open]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        cur = sessions.filter(function (s) { return String(s.id) === b.dataset.open; })[0];
+        loadItems();
+      });
+    });
+    area.querySelectorAll('button[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var s = sessions.filter(function (x) { return String(x.id) === b.dataset.del; })[0];
+        if (!s) return;
+        if (!confirm('"' + s.title + '" 회의와 그 순서지를 모두 지우시겠습니까? 되돌릴 수 없습니다.')) return;
+        db().then(function (c) {
+          return c.from('meeting_sessions').delete().eq('id', s.id);
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('delete', '노회 진행 회의 삭제', s.title);
+          cur = null;
+          load();
+        });
+      });
+    });
+
+    var mk = document.getElementById('ns-make');
+    if (mk) mk.addEventListener('click', function () {
+      var msg = document.getElementById('ns-msg');
+      var title = document.getElementById('ns-title').value.trim();
+      var no = parseInt(document.getElementById('ns-no').value, 10) || null;
+      if (!title && no) {
+        title = '제' + no + '회 정기노회';
+      }
+      if (!title) { msg.className = 'form-msg err'; msg.textContent = '회의 이름을 적어 주세요.'; return; }
+      var tpl = TPL[document.getElementById('ns-tpl').value] || TPL.empty;
+      msg.className = 'form-msg'; msg.textContent = '만드는 중입니다...';
+      db().then(function (c) {
+        return c.from('meeting_sessions').insert({
+          title: title, session_no: no,
+          meet_on: document.getElementById('ns-date').value || null,
+          place: document.getElementById('ns-place').value.trim() || null,
+          created_by: user.name, updated_by: user.name
+        }).select().single();
+      }).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        var sid = r.data.id;
+        var rows = tpl.map(function (t, i) {
+          return { session_id: sid, sort: (i + 1) * 10,
+                   section: t[0] || null, title: t[1], leader: t[2] || null,
+                   detail: t[3] || null, updated_by: user.name };
+        });
+        return db().then(function (c) {
+          return c.from('meeting_items').insert(rows);
+        }).then(function (r2) {
+          if (r2.error) { msg.className = 'form-msg err'; msg.textContent = r2.error.message; return; }
+          SHSCloud.log('create', '노회 진행 회의 개설', title + ' (순서 ' + rows.length + '개)');
+          load(sid);
+        });
+      });
+    });
+  }
+
+  /* ---------------- 회의 진행 화면 ---------------- */
+  function upSession(patch, then) {
+    patch.updated_at = nowIso();
+    patch.updated_by = user.name;
+    db().then(function (c) {
+      return c.from('meeting_sessions').update(patch).eq('id', cur.id).select();
+    }).then(function (r) {
+      var w = SHS.wrote(r);
+      if (!w.ok) { alert(w.why); return; }
+      cur = r.data[0];
+      if (then) then(); else drawSession();
+    });
+  }
+
+  function upItem(id, patch, then) {
+    patch.updated_at = nowIso();
+    patch.updated_by = user.name;
+    db().then(function (c) {
+      return c.from('meeting_items').update(patch).eq('id', id).select();
+    }).then(function (r) {
+      var w = SHS.wrote(r);
+      if (!w.ok) { alert(w.why); return; }
+      if (then) then(); else loadItems();
+    });
+  }
+
+  function currentItem() {
+    return items.filter(function (x) { return x.status === '진행중'; })[0] || null;
+  }
+  function nextWaiting(afterSort) {
+    return items.filter(function (x) {
+      return x.status === '대기' && (afterSort == null || x.sort > afterSort);
+    })[0] || items.filter(function (x) { return x.status === '대기'; })[0] || null;
+  }
+
+  /* 한 순서를 마치고 다음 순서로 넘어간다 */
+  function finishCurrent(skip) {
+    var it = currentItem();
+    if (!it) return;
+    var result = (document.getElementById('pc-result') || { value: '' }).value.trim() || null;
+    var nxt = nextWaiting(it.sort);
+    upItem(it.id, {
+      status: skip ? '건너뜀' : '완료',
+      result: skip ? (result || '다음에 다루기로 함') : result,
+      done_at: nowIso()
+    }, function () {
+      SHSCloud.log('update', '노회 순서 ' + (skip ? '건너뜀' : '완료'), cur.title + ' / ' + it.title);
+      if (nxt) {
+        upItem(nxt.id, { status: '진행중', started_at: nowIso() }, function () { loadItems(); });
+      } else {
+        loadItems();
+      }
+    });
+  }
+
+  function drawSession() {
+    var done = items.filter(function (x) { return x.status === '완료' || x.status === '건너뜀'; }).length;
+    var total = items.length;
+    var pct = total ? Math.round(done / total * 100) : 0;
+    var it = currentItem();
+    var running = cur.status === '진행' || cur.status === '정회';
+
+    var h = '<div style="margin-bottom:12px"><button class="btn ghost sm" id="pc-back">&#8592; 회의 목록</button></div>';
+
+    /* 머리: 회의 정보와 진행 단추 */
+    h += '<div class="cm-head"><div class="cm-officers" style="align-items:center">' +
+      '<span><strong>' + e(cur.title) + '</strong></span>' +
+      (cur.meet_on ? '<span>' + e(cur.meet_on) + '</span>' : '') +
+      (cur.place ? '<span>' + e(cur.place) + '</span>' : '') +
+      '<span class="pc-st s' + (cur.status === '폐회' ? '완료' : cur.status === '준비' ? '대기' : '진행중') + '">' +
+      e(cur.status) + '</span>' +
+      (cur.started_at ? '<span style="color:var(--gray-5)">개회 ' + hhmm(cur.started_at) + '</span>' : '') +
+      (cur.ended_at ? '<span style="color:var(--gray-5)">폐회 ' + hhmm(cur.ended_at) + '</span>' : '') +
+      '</div>' +
+      '<div style="margin-top:10px">' +
+      (cur.status === '준비'
+        ? '<button class="btn" id="pc-start">개회 — 진행 시작</button>'
+        : '') +
+      (cur.status === '진행'
+        ? '<button class="btn ghost" id="pc-pause">정회</button> <button class="btn" id="pc-end">폐회</button>'
+        : '') +
+      (cur.status === '정회'
+        ? '<button class="btn" id="pc-resume">속회</button> <button class="btn ghost" id="pc-end">폐회</button>'
+        : '') +
+      (cur.status === '폐회'
+        ? '<button class="btn ghost sm" id="pc-reopen">다시 열기</button> <button class="btn sm" id="pc-draft">회의 기록 정리</button>'
+        : '') +
+      '</div></div>';
+
+    /* 성수 보고 */
+    h += '<div class="inline-form" style="margin:12px 0 4px">' +
+      '<div class="field" style="flex:1 1 380px"><label>성수 보고 (예: 목사 29/37 · 장로 16/26 — 성수)</label>' +
+      '<input type="text" id="pc-quorum" value="' + e(cur.quorum_note || '') + '"></div>' +
+      '<button class="btn ghost sm" id="pc-quorum-save" style="align-self:flex-end">저장</button>' +
+      '</div>';
+
+    /* 진행 현황 */
+    h += '<div style="max-width:760px;margin:10px 0 4px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:0.82rem;color:var(--gray-6)">' +
+      '<span>진행 현황</span><span><strong>' + done + '</strong> / ' + total + ' 순서 (' + pct + '%)</span></div>' +
+      '<div class="pc-bar"><div style="width:' + pct + '%"></div></div></div>';
+
+    /* 지금 순서 */
+    if (running && it) {
+      var nxts = items.filter(function (x) { return x.status === '대기' && x.sort > it.sort; }).slice(0, 2);
+      h += '<div class="pc-now">' +
+        (it.section ? '<div class="pc-sec">' + e(it.section) + '</div>' : '') +
+        '<h2>지금 순서 — ' + e(it.title) + '</h2>' +
+        (it.leader ? '<p class="pc-lead">담당: <strong>' + e(it.leader) + '</strong></p>' : '') +
+        (it.detail ? '<p class="pc-detail">' + e(it.detail) + '</p>' : '') +
+        '<div class="field"><label>처리 결과 (선택 — 예: 가결, 유인물대로 받기로 함)</label>' +
+        '<input type="text" id="pc-result" value="' + e(it.result || '') + '"></div>' +
+        '<div style="margin-top:8px">' +
+        '<button class="btn" id="pc-done">이 순서 완료 — 다음으로</button> ' +
+        '<button class="btn ghost" id="pc-skip">건너뛰고 다음으로</button></div>' +
+        (nxts.length
+          ? '<div class="pc-next">다음 순서: ' + nxts.map(function (n2) {
+              return '<strong>' + e(n2.title) + '</strong>' + (n2.leader ? ' (' + e(n2.leader) + ')' : '');
+            }).join(' &#8594; ') + '</div>'
+          : '<div class="pc-next">이 순서가 <strong>마지막</strong>입니다. 완료 후 폐회 처리를 해주세요.</div>') +
+        '</div>';
+    } else if (running && !it) {
+      h += '<div class="notice-banner">모든 순서가 끝났습니다. <strong>폐회</strong>를 눌러 마무리해 주세요. ' +
+        '(순서 목록에서 항목을 눌러 다시 진행할 수도 있습니다)</div>';
+    } else if (cur.status === '준비') {
+      h += '<div class="notice-banner">아래 순서지를 확인하고 <strong>개회 — 진행 시작</strong>을 누르면 ' +
+        '첫 순서부터 안내가 시작됩니다.</div>';
+    }
+
+    /* 순서 목록 */
+    h += '<h3 class="mn-sub" style="margin-top:20px">순서지 (' + total + '개)</h3>';
+    h += '<table class="tbl"><thead><tr><th style="width:46px">#</th><th>순서</th>' +
+      '<th style="width:130px">담당</th><th style="width:86px">상태</th>' +
+      '<th class="left">처리 결과</th><th style="width:200px">관리</th></tr></thead><tbody>';
+    var lastSec = null, num = 0;
+    items.forEach(function (x, i) {
+      if (x.section && x.section !== lastSec) {
+        lastSec = x.section;
+        h += '<tr class="pc-sechead"><td colspan="6" class="left">' + e(x.section) + '</td></tr>';
+      }
+      num++;
+      var cls = x.status === '진행중' ? ' class="pc-cur"'
+              : (x.status === '완료' || x.status === '건너뜀') ? ' class="pc-done"' : '';
+      h += '<tr' + cls + '><td>' + num + '</td>' +
+        '<td class="left"><strong>' + e(x.title) + '</strong>' +
+        (x.detail ? '<div style="font-size:0.78rem;color:var(--gray-5)">' + e(x.detail) + '</div>' : '') + '</td>' +
+        '<td>' + e(x.leader || '-') + '</td>' +
+        '<td><span class="pc-st s' + e(x.status) + '">' + e(x.status) + '</span>' +
+        (x.done_at ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + hhmm(x.done_at) + '</div>' : '') + '</td>' +
+        '<td class="left">' + (x.result ? e(x.result) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+        '<td>' +
+        (running && x.status === '대기'
+          ? '<button class="btn sm" data-go="' + x.id + '">이 순서로</button> ' : '') +
+        '<button class="btn ghost sm" data-edit="' + x.id + '">수정</button> ' +
+        '<button class="btn ghost sm" data-up="' + x.id + '"' + (i === 0 ? ' disabled' : '') + '>&#8593;</button>' +
+        '<button class="btn ghost sm" data-down="' + x.id + '"' + (i === items.length - 1 ? ' disabled' : '') + '>&#8595;</button> ' +
+        '<button class="btn danger sm" data-rm="' + x.id + '">삭제</button>' +
+        '</td></tr>';
+    });
+    h += '</tbody></table>';
+
+    /* 순서 추가·수정 */
+    h += '<div class="admin-card" style="margin-top:18px"><h3 style="margin-top:0" id="it-ftitle">순서 추가</h3>' +
+      '<input type="hidden" id="it-id" value="">' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 220px"><label>구분 (선택 — 예: Ⅱ. 회무처리)</label>' +
+      '<input type="text" id="it-sec" list="it-secs"><datalist id="it-secs">' +
+      (function () {
+        var seen = {};
+        return items.map(function (x) { return x.section; }).filter(function (s) {
+          if (!s || seen[s]) return false; seen[s] = 1; return true;
+        }).map(function (s) { return '<option value="' + e(s) + '"></option>'; }).join('');
+      })() + '</datalist></div>' +
+      '<div class="field"><label>순서 이름</label><input type="text" id="it-title" placeholder="예: 정치부 보고"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>담당 (선택)</label><input type="text" id="it-leader"></div>' +
+      '</div>' +
+      '<div class="field"><label>준비 메모 (선택)</label><input type="text" id="it-detail"></div>' +
+      '<button class="btn" id="it-save">저장</button> ' +
+      '<button class="btn ghost hidden" id="it-cancel">취소</button>' +
+      '<div class="form-msg" id="it-msg"></div></div>';
+
+    /* 회의 기록 정리 (회의록 초안) */
+    h += '<div id="pc-draft-box" class="hidden" style="margin-top:18px">' +
+      '<h3 class="mn-sub">회의 기록 정리 — 회의록 초안</h3>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5)">진행하며 적은 결과를 그대로 모았습니다. ' +
+      '복사해서 회의록 작성에 쓰시면 됩니다.</p>' +
+      '<textarea id="pc-draft-text" rows="16" style="width:100%;font-size:0.86rem"></textarea>' +
+      '<div style="margin-top:8px"><button class="btn sm" id="pc-copy">복사</button></div></div>';
+
+    area.innerHTML = h;
+    bindSession();
+  }
+
+  function bindSession() {
+    document.getElementById('pc-back').addEventListener('click', function () {
+      cur = null;
+      db().then(function (c) {
+        return c.from('meeting_sessions').select('*')
+                .order('meet_on', { ascending: false }).order('id', { ascending: false });
+      }).then(function (r) {
+        sessions = (r && r.data) || sessions;
+        drawList();
+      });
+    });
+
+    var el;
+    if ((el = document.getElementById('pc-start'))) el.addEventListener('click', function () {
+      var first = nextWaiting(null);
+      upSession({ status: '진행', started_at: cur.started_at || nowIso() }, function () {
+        SHSCloud.log('update', '노회 개회', cur.title);
+        if (first) upItem(first.id, { status: '진행중', started_at: nowIso() }, loadItems);
+        else loadItems();
+      });
+    });
+    if ((el = document.getElementById('pc-pause'))) el.addEventListener('click', function () {
+      upSession({ status: '정회' }, function () {
+        SHSCloud.log('update', '노회 정회', cur.title);
+        loadItems();
+      });
+    });
+    if ((el = document.getElementById('pc-resume'))) el.addEventListener('click', function () {
+      upSession({ status: '진행' }, function () {
+        SHSCloud.log('update', '노회 속회', cur.title);
+        loadItems();
+      });
+    });
+    if ((el = document.getElementById('pc-end'))) el.addEventListener('click', function () {
+      var remain = items.filter(function (x) { return x.status === '대기' || x.status === '진행중'; }).length;
+      if (!confirm('폐회 처리하시겠습니까?' +
+            (remain ? '\n아직 마치지 않은 순서가 ' + remain + '개 있습니다.' : ''))) return;
+      upSession({ status: '폐회', ended_at: nowIso() }, function () {
+        SHSCloud.log('update', '노회 폐회', cur.title);
+        loadItems();
+      });
+    });
+    if ((el = document.getElementById('pc-reopen'))) el.addEventListener('click', function () {
+      upSession({ status: '진행', ended_at: null }, function () { loadItems(); });
+    });
+    if ((el = document.getElementById('pc-quorum-save'))) el.addEventListener('click', function () {
+      upSession({ quorum_note: document.getElementById('pc-quorum').value.trim() || null }, function () {
+        loadItems();
+      });
+    });
+    if ((el = document.getElementById('pc-done'))) el.addEventListener('click', function () { finishCurrent(false); });
+    if ((el = document.getElementById('pc-skip'))) el.addEventListener('click', function () { finishCurrent(true); });
+
+    /* 회의 기록 정리 */
+    if ((el = document.getElementById('pc-draft'))) el.addEventListener('click', function () {
+      var box = document.getElementById('pc-draft-box');
+      var t = [];
+      t.push(cur.title);
+      t.push('일시: ' + (cur.meet_on || '') +
+        (cur.started_at ? ' ' + hhmm(cur.started_at) : '') +
+        (cur.ended_at ? ' ~ ' + hhmm(cur.ended_at) : ''));
+      if (cur.place) t.push('장소: ' + cur.place);
+      if (cur.quorum_note) t.push('성수: ' + cur.quorum_note);
+      t.push('');
+      var lastSec = null, n = 0;
+      items.forEach(function (x) {
+        if (x.section && x.section !== lastSec) { lastSec = x.section; t.push('[' + x.section + ']'); }
+        n++;
+        var line = n + '. ' + x.title;
+        if (x.leader) line += ' (' + x.leader + ')';
+        if (x.status === '건너뜀') line += ' — 건너뜀';
+        if (x.result) line += ' — ' + x.result;
+        if (x.done_at) line += ' [' + hhmm(x.done_at) + ']';
+        t.push(line);
+      });
+      document.getElementById('pc-draft-text').value = t.join('\n');
+      box.classList.remove('hidden');
+      box.scrollIntoView({ behavior: 'smooth' });
+    });
+    if ((el = document.getElementById('pc-copy'))) el.addEventListener('click', function () {
+      var ta = document.getElementById('pc-draft-text');
+      ta.select();
+      try { document.execCommand('copy'); } catch (x2) {}
+      if (navigator.clipboard) navigator.clipboard.writeText(ta.value).catch(function () {});
+      this.textContent = '복사됨';
+    });
+
+    /* 순서 목록 관리 */
+    area.querySelectorAll('button[data-go]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var it = currentItem();
+        var go = function () {
+          upItem(parseInt(b.dataset.go, 10), { status: '진행중', started_at: nowIso() }, loadItems);
+        };
+        if (it) upItem(it.id, { status: '대기', started_at: null }, go);
+        else go();
+      });
+    });
+    area.querySelectorAll('button[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var x = items.filter(function (i2) { return String(i2.id) === b.dataset.edit; })[0];
+        if (!x) return;
+        document.getElementById('it-id').value = x.id;
+        document.getElementById('it-sec').value = x.section || '';
+        document.getElementById('it-title').value = x.title;
+        document.getElementById('it-leader').value = x.leader || '';
+        document.getElementById('it-detail').value = x.detail || '';
+        document.getElementById('it-ftitle').textContent = '순서 수정';
+        document.getElementById('it-cancel').classList.remove('hidden');
+        document.getElementById('it-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    area.querySelectorAll('button[data-rm]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var x = items.filter(function (i2) { return String(i2.id) === b.dataset.rm; })[0];
+        if (!x) return;
+        if (!confirm('"' + x.title + '" 순서를 지우시겠습니까?')) return;
+        db().then(function (c) {
+          return c.from('meeting_items').delete().eq('id', x.id);
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          loadItems();
+        });
+      });
+    });
+    function swap(idA, dir) {
+      var idx = -1;
+      items.forEach(function (x, i) { if (String(x.id) === idA) idx = i; });
+      var j = idx + dir;
+      if (idx < 0 || j < 0 || j >= items.length) return;
+      var a = items[idx], b2 = items[j];
+      upItem(a.id, { sort: b2.sort }, function () {
+        upItem(b2.id, { sort: a.sort }, loadItems);
+      });
+    }
+    area.querySelectorAll('button[data-up]').forEach(function (b) {
+      b.addEventListener('click', function () { swap(b.dataset.up, -1); });
+    });
+    area.querySelectorAll('button[data-down]').forEach(function (b) {
+      b.addEventListener('click', function () { swap(b.dataset.down, 1); });
+    });
+
+    /* 순서 추가·수정 저장 */
+    document.getElementById('it-cancel').addEventListener('click', function () {
+      ['it-id', 'it-sec', 'it-title', 'it-leader', 'it-detail'].forEach(function (id) {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('it-ftitle').textContent = '순서 추가';
+      this.classList.add('hidden');
+    });
+    document.getElementById('it-save').addEventListener('click', function () {
+      var msg = document.getElementById('it-msg');
+      var id = document.getElementById('it-id').value;
+      var d = {
+        section: document.getElementById('it-sec').value.trim() || null,
+        title: document.getElementById('it-title').value.trim(),
+        leader: document.getElementById('it-leader').value.trim() || null,
+        detail: document.getElementById('it-detail').value.trim() || null,
+        updated_by: user.name, updated_at: nowIso()
+      };
+      if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '순서 이름을 적어 주세요.'; return; }
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      db().then(function (c) {
+        if (id) return c.from('meeting_items').update(d).eq('id', id).select();
+        d.session_id = cur.id;
+        d.sort = (items.length ? Math.max.apply(null, items.map(function (x) { return x.sort; })) : 0) + 10;
+        return c.from('meeting_items').insert(d).select();
+      }).then(function (r) {
+        var w = SHS.wrote(r);
+        if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+        loadItems();
+      });
+    });
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>

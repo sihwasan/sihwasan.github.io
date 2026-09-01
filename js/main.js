@@ -138,6 +138,21 @@
     sub.insertBefore(a, sub.firstChild);   /* 맨 위 자리 */
   }
 
+  /* 노회장·서기·간사에게 임원방 하위에 <노회 진행 관리자>를 붙인다.
+   * 회의 순서지를 만들어 두고 당일 순서를 하나씩 진행하는 도구다. */
+  function addProceedMenu() {
+    var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
+    if (!links.length) return;
+    var sub = links[0].parentNode.querySelector('.gnb-sub');
+    if (!sub || sub.querySelector('a[href="proceed.html"]')) return;
+    var a = document.createElement('a');
+    a.href = 'proceed.html';
+    a.textContent = '노회 진행 관리자';
+    var sched = sub.querySelector('a[href="schedule.html"]');
+    if (sched && sched.nextSibling) sub.insertBefore(a, sched.nextSibling);
+    else sub.insertBefore(a, sub.firstChild);
+  }
+
   function addAdminMenu() {
     var list = document.querySelector('.gnb-list');
     if (!list || document.getElementById('gnb-admin')) return;
@@ -458,6 +473,7 @@
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) {
           addAdminMenu();
           addScheduleMenu();
+          addProceedMenu();
         }
 
         /* 내가 맡은 상비부는 대시보드에서 본다. 상단 메뉴에 따로 두지 않는다. */

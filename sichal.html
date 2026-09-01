@@ -24,11 +24,11 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260901j"></script>
+<script src="js/main.js?v=20260901k"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/minutes-box.js"></script>
-<script src="js/ledger.js?v=20260901a"></script>
+<script src="js/ledger.js?v=20260901b"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -1013,10 +1013,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function drawLedger() {
     var body = document.getElementById('si-body');
+    /* 장부 열람·기록은 시찰 임원(시찰장·서기·회계)과 감사부가 한다.
+     * 재정보고서는 시찰 회원 누구나 상시로 열람한다. */
+    var canBook = isOfficer || isTreasurer() || isAuditor;
+    if (accTab === 'ledger' && !canBook) accTab = 'fee';
     body.innerHTML =
       '<div class="tabs" id="acc-tabs" style="margin-bottom:14px">' +
       '<button class="' + (accTab === 'fee' ? 'active' : '') + '" data-a="fee">회비 납부 현황</button>' +
-      '<button class="' + (accTab === 'ledger' ? 'active' : '') + '" data-a="ledger">회계 장부</button>' +
+      (canBook
+        ? '<button class="' + (accTab === 'ledger' ? 'active' : '') + '" data-a="ledger">회계 장부</button>'
+        : '') +
+      '<button class="' + (accTab === 'report' ? 'active' : '') + '" data-a="report">재정보고서</button>' +
       '</div><div id="acc-body"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
     body.querySelectorAll('#acc-tabs button').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -1029,6 +1036,10 @@ document.addEventListener('DOMContentLoaded', function () {
         kind: 'sichal', owner: NAME, user: user,
         canEdit: isOfficer || isTreasurer(), isAuditor: isAuditor,
         churches: churches.map(function (x) { return x.name; })
+      });
+    } else if (accTab === 'report') {
+      SHSLedger.report(document.getElementById('acc-body'), {
+        kind: 'sichal', owner: NAME
       });
     } else {
       drawFees();
