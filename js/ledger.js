@@ -36,8 +36,12 @@ var SHSLedger = (function () {
     if (!box) return;
     var ownerKind = opts.kind === 'committee' ? 'committee' : 'sichal';
     var books = [], book = null, entries = [];
-    var year = new Date().getFullYear();
+    /* 회계연도는 4월에 시작해 다음 해 3월에 끝난다. year는 시작 연도다. */
+    var now0 = new Date();
+    var year = now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1;
     var viewKind = '수입';   /* 지금 보고 있는 탭 — 수입 또는 지출 */
+
+    function fyLabel(y) { return y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)'; }
     /* 적을 수 있는가. 데이터베이스에 물어본 답으로 채운다. */
     var canEdit = !!opts.canEdit;
 
@@ -96,24 +100,25 @@ var SHSLedger = (function () {
       var ys = {};
       books.forEach(function (b) { ys[b.year] = 1; });
       ys[year] = 1;
-      ys[new Date().getFullYear()] = 1;
+      ys[now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1] = 1;
       return Object.keys(ys).map(Number).sort(function (a, b) { return b - a; });
     }
 
     function draw() {
       var lock = SHSAuditMark.locked(book);
-      var canWrite = canEdit && !lock;
+      var closed = !!(book && book.closed_yn);
+      var canWrite = canEdit && !lock && !closed;
       var s = sums();
 
       var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-        '이월금으로 시작해 수입과 지출을 적으면 남은 돈이 저절로 셈해집니다. ' +
-        '해가 바뀌면 새 장부를 쓰고, 지난해 남은 돈을 이월금으로 가져올 수 있습니다. ' +
+        '회계연도는 <strong>4월부터 다음 해 3월까지</strong>이며, 회계연도 마감을 누르면 ' +
+        '남은 돈이 다음 회계연도 이월금으로 저절로 넘어갑니다. ' +
         '<strong>봄·가을 정기노회 전에 감사부의 감사를 받습니다.</strong></p>';
 
       h += '<div class="inline-form" style="margin-bottom:6px">' +
-        '<div class="field" style="flex:0 0 170px"><label>회계 연도</label>' +
+        '<div class="field" style="flex:0 0 260px"><label>회계 연도</label>' +
         '<select id="lg-year">' + yearList().map(function (y) {
-          return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + y + '년</option>';
+          return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + fyLabel(y) + '</option>';
         }).join('') + '</select></div>' +
         (books.length ? '' :
           '<div class="field"><label>&nbsp;</label>' +
@@ -121,10 +126,10 @@ var SHSLedger = (function () {
         '</div>';
 
       if (!book) {
-        h += '<div class="notice-banner">' + year + '년 장부가 아직 없습니다.' +
+        h += '<div class="notice-banner">' + fyLabel(year) + ' 장부가 아직 없습니다.' +
           (canEdit ? ' 아래에서 만들어 주세요.' : ' 장부는 ' + who() + '가 만듭니다.') + '</div>';
         if (canEdit) {
-          h += '<div class="admin-card"><h3 style="margin-top:0">' + year + '년 장부 만들기</h3>' +
+          h += '<div class="admin-card"><h3 style="margin-top:0">' + fyLabel(year) + ' 장부 만들기</h3>' +
             '<div class="inline-form">' +
             '<div class="field" style="flex:0 0 220px"><label>이월금 (원)</label>' +
             '<input type="number" id="lg-open" value="0" step="1"></div>' +
@@ -154,6 +159,13 @@ var SHSLedger = (function () {
       if (lock) {
         h += '<div class="notice-banner">이 장부는 <strong>감사가 끝났습니다.</strong> ' +
           '더 이상 고치거나 지울 수 없습니다.</div>';
+      } else if (closed) {
+        h += '<div class="notice-banner">이 장부는 <strong>' + fyLabel(year) + ' 마감</strong>되었습니다. ' +
+          '남은 돈 ' + won(s.left) + '원이 ' + (year + 1) + ' 회계연도 이월금으로 넘어갔습니다.' +
+          (canEdit
+            ? ' <button class="btn ghost sm" id="lg-reopen" style="margin-left:8px">마감 취소</button>'
+            : '') +
+          '</div>';
       }
 
       if (canWrite) {
@@ -163,6 +175,7 @@ var SHSLedger = (function () {
           '<button class="btn ghost" id="lg-opensave">이월금 저장</button>' +
           (books.filter(function (b) { return b.year === year - 1; }).length
             ? '<button class="btn ghost" id="lg-carry">지난해 잔액 가져오기</button>' : '') +
+          '<button class="btn ghost" id="lg-close">회계연도 마감</button>' +
           '</div><div class="form-msg" id="lg-omsg"></div>';
       }
 
@@ -188,24 +201,32 @@ var SHSLedger = (function () {
           (canWrite ? ' 위 입력 칸에 기록하시면 이 자리에 장부가 만들어집니다.' : '') + '</p>';
       } else {
         h += '<table class="tbl"><thead><tr><th style="width:120px">일자</th>' +
-          '<th>항목</th><th style="width:140px">금액 (원)</th><th style="width:220px">비고</th>' +
+          '<th style="width:140px">교회</th>' +
+          '<th>항목</th><th style="width:140px">금액 (원)</th><th style="width:200px">비고</th>' +
           (canWrite ? '<th style="width:110px">관리</th>' : '') + '</tr></thead><tbody>';
         shown.forEach(function (x) {
           var amt = Number(x.amount) || 0;
           h += '<tr><td>' + esc(x.entry_date || '-') + '</td>' +
+            '<td>' + (x.church ? esc(x.church) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             '<td class="left">' + esc(x.title) +
-            (x.category ? ' <span style="font-size:0.8rem;color:var(--gray-5)">(' + esc(x.category) + ')</span>' : '') +
+            (x.category && !x.fee_id
+              ? ' <span style="font-size:0.8rem;color:var(--gray-5)">(' + esc(x.category) + ')</span>' : '') +
+            (x.fee_id
+              ? ' <span style="font-size:0.74rem;color:#b03a3a">회비 연동</span>' : '') +
             '</td>' +
             '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
             (viewKind === '수입' ? '+' : '−') + won(amt) + '</td>' +
             '<td class="left">' + (x.note ? esc(x.note) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             (canWrite
-              ? '<td><button class="btn ghost sm" data-lgedit="' + x.id + '">수정</button> ' +
-                '<button class="btn danger sm" data-lgdel="' + x.id + '">삭제</button></td>'
+              ? (x.fee_id
+                  /* 회비 연동 항목은 회비 납부 현황에서 취소하면 함께 지워진다 */
+                  ? '<td><span style="font-size:0.78rem;color:var(--gray-5)">납부 현황에서 관리</span></td>'
+                  : '<td><button class="btn ghost sm" data-lgedit="' + x.id + '">수정</button> ' +
+                    '<button class="btn danger sm" data-lgdel="' + x.id + '">삭제</button></td>')
               : '') +
             '</tr>';
         });
-        h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td>합계</td><td></td>' +
+        h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td>합계</td><td></td><td></td>' +
           '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
           (viewKind === '수입' ? '+' : '−') + won(shownSum) + '</td><td></td>' +
           (canWrite ? '<td></td>' : '') + '</tr>';
@@ -219,6 +240,20 @@ var SHSLedger = (function () {
       bindYear();
       bindTabs();
       if (canWrite) { bindOpening(); bindEntryForm(); bindEntryList(); }
+
+      /* 마감 취소 — 잘못 마감했을 때 임원이 되돌린다 */
+      var ro = document.getElementById('lg-reopen');
+      if (ro) ro.addEventListener('click', function () {
+        if (!confirm(fyLabel(year) + ' 마감을 취소하시겠습니까?\n' +
+                     '다음 회계연도 이월금은 그대로 두므로, 장부를 고친 뒤 다시 마감해 주세요.')) return;
+        SHSCloud.init().then(function (c) {
+          return c.rpc('reopen_ledger_year', { p_book: book.id });
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('update', '회계연도 마감 취소', opts.owner + ' ' + year + ' 회계연도');
+          load();
+        });
+      });
       SHSAuditMark.bind(document.getElementById('lg-audit'), {
         kind: 'ledger_books', label: opts.owner + ' ' + year + '년 회계 장부', after: load
       });
@@ -279,7 +314,7 @@ var SHSLedger = (function () {
       });
       var cy = document.getElementById('lg-carry');
       if (cy) cy.addEventListener('click', function () {
-        if (!confirm((year - 1) + '년 남은 돈을 ' + year + '년 이월금으로 가져옵니다.\n계속하시겠습니까?')) return;
+        if (!confirm((year - 1) + ' 회계연도 남은 돈을 ' + year + ' 회계연도 이월금으로 가져옵니다.\n계속하시겠습니까?')) return;
         var msg = document.getElementById('lg-omsg');
         msg.className = 'form-msg'; msg.textContent = '가져오는 중입니다...';
         SHSCloud.init().then(function (c) {
@@ -287,6 +322,31 @@ var SHSLedger = (function () {
         }).then(function (r) {
           if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
           SHSCloud.log('update', '지난해 잔액 이월', opts.owner + ' ' + year + '년 ← ' + won(r.data) + '원');
+          load();
+        });
+      });
+
+      /* 회계연도 마감 — 남은 돈이 다음 회계연도 이월금으로 넘어간다 */
+      var cl = document.getElementById('lg-close');
+      if (cl) cl.addEventListener('click', function () {
+        var s2 = sums();
+        if (!confirm(fyLabel(year) + '를 마감합니다.\n\n남은 돈 ' + won(s2.left) + '원이 ' +
+              (year + 1) + ' 회계연도 이월금으로 저절로 넘어가고,\n마감된 장부에는 더 적을 수 없습니다.\n\n' +
+              '계속하시겠습니까?')) return;
+        var msg = document.getElementById('lg-omsg');
+        msg.className = 'form-msg'; msg.textContent = '마감 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.rpc('close_ledger_year', { p_book: book.id });
+        }).then(function (r) {
+          if (r.error) {
+            msg.className = 'form-msg err';
+            msg.textContent = r.error.message +
+              ' (60_sichal_fee_ledger.sql 실행이 필요할 수 있습니다)';
+            return;
+          }
+          SHSCloud.log('update', '회계연도 마감',
+            opts.owner + ' ' + year + ' 회계연도 → 이월금 ' + won(r.data) + '원');
+          year = year + 1;
           load();
         });
       });
@@ -300,6 +360,12 @@ var SHSLedger = (function () {
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 160px"><label>일자</label>' +
         '<input type="date" id="lg-date" value="' + today + '"></div>' +
+        '<div class="field" style="flex:0 0 170px"><label>교회명 (선택)</label>' +
+        '<input type="text" id="lg-church" list="lg-churches" placeholder="예: 반석교회">' +
+        '<datalist id="lg-churches">' +
+        (opts.churches || []).map(function (x) {
+          return '<option value="' + esc(x) + '"></option>';
+        }).join('') + '</datalist></div>' +
         '<div class="field"><label>항목</label>' +
         '<input type="text" id="lg-title" list="lg-cats" placeholder="' +
         (viewKind === '수입' ? '예: 3월 시찰회 회비' : '예: 시찰회 식비') + '">' +
@@ -319,7 +385,7 @@ var SHSLedger = (function () {
     }
 
     function clearEntryForm() {
-      ['lg-id', 'lg-amt', 'lg-title', 'lg-note'].forEach(function (id) {
+      ['lg-id', 'lg-church', 'lg-amt', 'lg-title', 'lg-note'].forEach(function (id) {
         document.getElementById(id).value = '';
       });
       document.getElementById('lg-ftitle').textContent = viewKind + ' 적기';
@@ -335,6 +401,7 @@ var SHSLedger = (function () {
           book_id: book.id,
           entry_date: document.getElementById('lg-date').value || null,
           kind: viewKind,
+          church: document.getElementById('lg-church').value.trim() || null,
           title: document.getElementById('lg-title').value.trim(),
           amount: parseInt(document.getElementById('lg-amt').value, 10) || 0,
           note: document.getElementById('lg-note').value.trim() || null,
@@ -368,6 +435,7 @@ var SHSLedger = (function () {
           if (!x) return;
           document.getElementById('lg-id').value = x.id;
           document.getElementById('lg-date').value = x.entry_date || '';
+          document.getElementById('lg-church').value = x.church || '';
           document.getElementById('lg-amt').value = x.amount;
           document.getElementById('lg-title').value = x.title;
           document.getElementById('lg-note').value = x.note || '';

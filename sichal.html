@@ -1027,7 +1027,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (accTab === 'ledger') {
       SHSLedger.mount(document.getElementById('acc-body'), {
         kind: 'sichal', owner: NAME, user: user,
-        canEdit: isOfficer, isAuditor: isAuditor
+        canEdit: isOfficer || isTreasurer(), isAuditor: isAuditor,
+        churches: churches.map(function (x) { return x.name; })
       });
     } else {
       drawFees();
@@ -1084,7 +1085,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var h = '<div class="notice-banner">시찰회비는 한 해에 <strong>상반기·하반기 두 차례</strong> 내며, ' +
         '따로 정하지 않으면 1회분은 <strong>노회 상회비 한 달치</strong>를 기준으로 합니다. ' +
         '금액은 <strong>시찰회가 정할 수 있습니다</strong>.' +
-        (canFee ? ' 기준액의 수정 단추로 회비를 바꾸고, 납부를 누르면 기준액으로 기록됩니다.'
+        (canFee ? ' 기준액의 수정 단추로 회비를 바꾸고, 납부를 누르면 달력에서 납부 날짜를 골라 기록합니다. ' +
+                  '납부 기록은 <strong>회계 장부에 수입으로 자동 반영</strong>됩니다.'
                 : ' 입력·수정은 시찰장·서기·회계가 합니다.') +
         '</div>';
       h += '<div class="dues-stats" style="margin-bottom:14px">' +
@@ -1131,6 +1133,7 @@ document.addEventListener('DOMContentLoaded', function () {
           var f = feeOf(nm, half);
           if (f) {
             return '<span style="color:#2a7a2a;font-weight:700">납부</span>' +
+              (f.paid_on ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(f.paid_on) + '</div>' : '') +
               (canFee ? ' <button class="btn ghost sm" data-feedel="' + f.id + '" data-fc="' + e(nm) + '">취소</button>' : '');
           }
           return '<span style="color:#b0731f">미납</span>' +
@@ -1179,30 +1182,64 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       });
 
-      box.querySelectorAll('button[data-feepay]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var amt = Number(b.dataset.fa) || 0;
-          var v = prompt(b.dataset.feepay + ' — ' + (b.dataset.fh === '1' ? '상반기' : '하반기') +
-            ' 시찰회비 납부액(만원)을 확인해 주세요.', amt || '');
-          if (v === null) return;
-          amt = parseInt(v, 10) || 0;
+      /* 납부 입력 — 달력에서 납부 날짜를 고르고 금액을 확인해 기록한다.
+       * 저장하면 데이터베이스 트리거가 회계 장부에 수입으로 자동 기록한다. */
+      function openFeePay(church, half, baseAmt) {
+        var old = document.getElementById('fee-modal');
+        if (old) old.remove();
+        var ov = document.createElement('div');
+        ov.id = 'fee-modal';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,25,45,.55);z-index:300;' +
+          'display:flex;align-items:center;justify-content:center;padding:16px';
+        ov.innerHTML = '<div style="background:#fff;border-radius:8px;max-width:380px;width:100%;' +
+          'box-shadow:0 10px 40px rgba(0,0,0,.25);padding:20px 22px">' +
+          '<h3 style="margin:0 0 4px">' + e(church) + '</h3>' +
+          '<p style="margin:0 0 14px;font-size:0.86rem;color:var(--gray-6)">' +
+          year + '년 ' + (half === '1' ? '상반기' : '하반기') + ' 시찰회비 납부를 기록합니다.</p>' +
+          '<div class="field"><label>납부 날짜</label>' +
+          '<input type="date" id="fee-date" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+          '<div class="field"><label>납부액 (만원)</label>' +
+          '<input type="number" id="fee-amt" min="0" step="1" value="' + (baseAmt || '') + '"></div>' +
+          '<p style="font-size:0.78rem;color:var(--gray-5);margin:0 0 12px">' +
+          '저장하면 ' + e(NAME) + ' 회계 장부에 수입으로 자동 기록됩니다.</p>' +
+          '<button class="btn" id="fee-save">납부 기록</button> ' +
+          '<button class="btn ghost" id="fee-close">취소</button>' +
+          '<div class="form-msg" id="fee-msg"></div></div>';
+        document.body.appendChild(ov);
+        function shut() { ov.remove(); }
+        ov.addEventListener('click', function (ev) { if (ev.target === ov) shut(); });
+        ov.querySelector('#fee-close').addEventListener('click', shut);
+        ov.querySelector('#fee-save').addEventListener('click', function () {
+          var msg = ov.querySelector('#fee-msg');
+          var date = ov.querySelector('#fee-date').value;
+          var amt = parseInt(ov.querySelector('#fee-amt').value, 10) || 0;
+          if (!date) { msg.className = 'form-msg err'; msg.textContent = '납부 날짜를 골라 주세요.'; return; }
+          msg.className = 'form-msg'; msg.textContent = '기록 중입니다...';
           db().then(function (c) {
             return c.from('sichal_fees').insert({
-              year: year, sichal: NAME, church: b.dataset.feepay,
-              half: Number(b.dataset.fh), amount: amt,
-              paid_on: new Date().toISOString().slice(0, 10), entered_by: user.name
+              year: year, sichal: NAME, church: church,
+              half: Number(half), amount: amt,
+              paid_on: date, entered_by: user.name
             });
           }).then(function (res) {
-            if (res.error) { alert(res.error.message); return; }
+            if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
             SHS.logAction('create', '시찰회비 납부 입력',
-              year + '년 ' + NAME + ' ' + b.dataset.feepay + ' ' + (b.dataset.fh === '1' ? '상반기' : '하반기') + ' ' + amt + '만원');
+              year + '년 ' + NAME + ' ' + church + ' ' + (half === '1' ? '상반기' : '하반기') +
+              ' ' + amt + '만원 (' + date + ')');
+            shut();
             drawFees();
           });
+        });
+      }
+
+      box.querySelectorAll('button[data-feepay]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          openFeePay(b.dataset.feepay, b.dataset.fh, Number(b.dataset.fa) || 0);
         });
       });
       box.querySelectorAll('button[data-feedel]').forEach(function (b) {
         b.addEventListener('click', function () {
-          if (!confirm(b.dataset.fc + '의 납부 기록을 취소할까요?')) return;
+          if (!confirm(b.dataset.fc + '의 납부 기록을 취소할까요?\n회계 장부의 자동 기록도 함께 지워집니다.')) return;
           db().then(function (c) {
             return c.from('sichal_fees').delete().eq('id', b.dataset.feedel);
           }).then(function (res) {
@@ -1445,24 +1482,23 @@ document.addEventListener('DOMContentLoaded', function () {
       ? churches.map(function (c) { return c.name; })
       : (myChurch ? [myChurch] : []);
 
-    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-      (isOfficer
-        ? '관내 교회의 해마다의 상황 보고서입니다. 시찰장·서기는 교회를 골라 대신 올려 드릴 수 있습니다.'
-        : '자기 교회의 상황 보고서를 올리는 곳입니다. 올린 보고서는 노회 임원방에서도 열람합니다.') +
-      '</p>';
+    var h = isOfficer ? '' :
+      '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      '자기 교회의 상황 보고서를 올리는 곳입니다. 올린 보고서는 노회 임원방에서도 열람합니다.</p>';
 
     h += '<div class="field" style="max-width:200px"><label>연도</label>' +
       '<select id="rp-year">' + yearList.map(function (y) {
         return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + y + '년</option>';
       }).join('') + '</select></div>';
 
-    h += submitBox();
-
     var rows = reports.filter(function (r) {
       return r.year === year && (!mineOnly || r.church === myChurch);
     });
 
     if (isOfficer) {
+      /* 통계를 위에, 교회별 목록을 가운데, 노회 제출을 아래에 둔다 */
+      h += statsBox(rows);
+
       /* 보고서를 골라 한 번에 인쇄한다 — 제출된 보고서만 고를 수 있다 */
       h += '<div style="margin:0 0 8px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
         '<button class="btn sm" id="rp-printsel" disabled>선택한 보고서 인쇄하기</button>' +
@@ -1495,11 +1531,13 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       h += '</tbody></table>';
 
-      h += statsBox(rows);
+      h += submitBox();
     } else if (!canWriteFor.length) {
+      h += submitBox();
       h += '<div class="notice-banner">가입 정보에 소속 교회가 없어 보고서를 올릴 수 없습니다. ' +
         '마이페이지에서 소속 교회를 먼저 채워 주세요.</div>';
     } else {
+      h += submitBox();
       var mine = rows[0];
       h += '<div class="notice-banner"><strong>' + e(myChurch) + '</strong>의 ' + year + '년 보고서 ' +
         (mine ? '— 제출하셨습니다. 아래에서 보거나 고치실 수 있습니다.' : '— 아직 제출하지 않으셨습니다.') +
