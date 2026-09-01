@@ -811,6 +811,12 @@ td.sat .cal-d { color: #2a4d8f; }
 .doc-item .d-name { font-weight: 700; color: var(--navy); margin-bottom: 4px; }
 .doc-item .d-desc { font-size: 0.84rem; color: var(--gray-5); margin-bottom: 14px; }
 
+/* 서류 상자를 누르면 신청 양식의 서류 종류가 그대로 선택된다 */
+.doc-item[data-doc] { cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.doc-item[data-doc]:hover { border-color: var(--navy); box-shadow: 0 5px 16px rgba(8, 18, 38, 0.08); transform: translateY(-2px); }
+.doc-item[data-doc]:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; }
+
+
 /* print certificate */
 .cert-sheet {
   border: 2px solid var(--navy); max-width: 720px; margin: 30px auto;

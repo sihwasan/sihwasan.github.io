@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://sihwasan.org/images/og-cover.png">
 <meta property="og:site_name" content="시화산노회">
 <meta property="og:locale" content="ko_KR">
-<link rel="stylesheet" href="css/style.css?v=20260901a">
+<link rel="stylesheet" href="css/style.css?v=20260901b">
 </head>
 <body>
 
@@ -30,13 +30,13 @@
 
   <h2 id="docs">발급 서류 안내</h2>
   <div class="doc-list">
-    <div class="doc-item"><div class="d-name">소속증명서</div><div class="d-desc">노회 소속 교역자임을 증명합니다. 연말정산, 기관 제출 등에 사용합니다.</div></div>
-    <div class="doc-item"><div class="d-name">재직증명서</div><div class="d-desc">해당 교회에 재직 중임을 증명합니다.</div></div>
-    <div class="doc-item"><div class="d-name">대표자증명서</div><div class="d-desc">해당 교회의 대표자임을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
-    <div class="doc-item"><div class="d-name">직인증명서</div><div class="d-desc">교회 직인을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
-    <div class="doc-item"><div class="d-name">은퇴목사확인서</div><div class="d-desc">은퇴목사임을 확인합니다.</div></div>
-    <div class="doc-item"><div class="d-name">안수증명서</div><div class="d-desc">시화산노회에서 목사 안수를 받았음을 증명합니다. 타노회로 이적하셨어도 시화산노회에서 안수받으셨다면 신청할 수 있습니다.</div></div>
-    <div class="doc-item"><div class="d-name">그 밖의 증명</div><div class="d-desc">필요한 내용을 신청 시 메모란에 적어 주시면 서기가 확인 후 처리합니다.</div></div>
+    <div class="doc-item" data-doc="소속증명서" role="button" tabindex="0" title="이 서류로 신청하기"><div class="d-name">소속증명서</div><div class="d-desc">노회 소속 교역자임을 증명합니다. 연말정산, 기관 제출 등에 사용합니다.</div></div>
+    <div class="doc-item" data-doc="재직증명서" role="button" tabindex="0" title="이 서류로 신청하기"><div class="d-name">재직증명서</div><div class="d-desc">해당 교회에 재직 중임을 증명합니다.</div></div>
+    <div class="doc-item" data-doc="대표자증명서" role="button" tabindex="0" title="이 서류로 신청하기"><div class="d-name">대표자증명서</div><div class="d-desc">해당 교회의 대표자임을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
+    <div class="doc-item" data-doc="직인증명서" role="button" tabindex="0" title="이 서류로 신청하기"><div class="d-name">직인증명서</div><div class="d-desc">교회 직인을 증명합니다. 은행 제출 등에 사용합니다.</div></div>
+    <div class="doc-item" data-doc="은퇴목사확인서" role="button" tabindex="0" title="이 서류로 신청하기"><div class="d-name">은퇴목사확인서</div><div class="d-desc">은퇴목사임을 확인합니다.</div></div>
+    <div class="doc-item" data-doc="안수증명서" role="button" tabindex="0" title="이 서류로 신청하기"><div class="d-name">안수증명서</div><div class="d-desc">시화산노회에서 목사 안수를 받았음을 증명합니다. 타노회로 이적하셨어도 시화산노회에서 안수받으셨다면 신청할 수 있습니다.</div></div>
+    <div class="doc-item" data-doc="기타" role="button" tabindex="0" title="이 서류로 신청하기"><div class="d-name">그 밖의 증명</div><div class="d-desc">필요한 내용을 신청 시 메모란에 적어 주시면 서기가 확인 후 처리합니다.</div></div>
   </div>
 
   <h2>발급 절차</h2>
@@ -67,6 +67,33 @@
 <script src="js/certs.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+ /* ---------- 발급 서류 안내 상자 → 신청 양식 ----------
+  * 상자를 누르면 신청 양식으로 올라가면서 그 서류가 미리 선택된다.
+  * 로그인 전이거나 신청할 수 없는 서류면 양식 자리로 올려 주기만 한다.
+  * 로그인 확인(SHS.getUser)을 기다리지 않고 곧바로 붙인다. */
+ function gotoDoc(name) {
+   /* 내 신청 내역(#list)을 보던 중이면 신청 양식으로 되돌린다 */
+   if (!document.getElementById('rq-doc') && window.SHS_REQ_TOFORM) window.SHS_REQ_TOFORM();
+   var sel = document.getElementById('rq-doc');
+   if (sel) {
+     var has = Array.prototype.some.call(sel.options, function (o) { return o.value === name; });
+     if (has) {
+       sel.value = name;
+       sel.dispatchEvent(new Event('change'));
+     }
+   }
+   var box = document.getElementById('req-area');
+   if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+   if (sel) setTimeout(function () { sel.focus(); }, 350);
+ }
+ Array.prototype.forEach.call(document.querySelectorAll('.doc-item[data-doc]'), function (item) {
+   item.addEventListener('click', function () { gotoDoc(item.getAttribute('data-doc')); });
+   item.addEventListener('keydown', function (ev) {
+     if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); gotoDoc(item.getAttribute('data-doc')); }
+   });
+ });
+
  SHS.getUser().then(function (user) {
   var area = document.getElementById('req-area');
   var e = SHS.esc;
@@ -354,6 +381,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     }   /* mode === 'list' 끝 */
     area.innerHTML = html;
+
+    window.SHS_REQ_TOFORM = function () {
+      history.replaceState(null, '', location.pathname);
+      render(lastList);
+    };
 
     var toForm = document.getElementById('rq-toform');
     if (toForm) toForm.addEventListener('click', function (ev) {

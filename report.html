@@ -282,7 +282,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ① 기본 정보 */
     h += '<div class="admin-card rf-sec"><h3>① 기본 정보</h3>' +
-      '<p class="rf-hint">교회명·시찰·주소는 회원 명단에서 자동으로 가져왔습니다.</p>' +
       '<div class="inline-form">' +
       '<div class="field" style="flex:0 0 130px"><label>보고 연도</label><select id="rp-year">' +
       (function () {
@@ -299,9 +298,13 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="inline-form">' +
       '<div class="field" style="flex:0 0 160px"><label>담임교역자</label><input type="text" id="f-pastor" value="' + e(prePastor) + '"></div>' +
       '<div class="field" style="flex:0 0 140px"><label>구분</label><select id="f-ptype">' +
-      ['위임', '임시', '전도사'].map(function (x) {
-        return '<option' + ((head.ptype || '위임') === x ? ' selected' : '') + '>' + x + '</option>';
-      }).join('') + '</select></div>' +
+      (function () {
+        var opts = ['위임', '시무', '강도사', '전도사'];
+        if (head.ptype && opts.indexOf(head.ptype) < 0) opts.push(head.ptype);
+        return opts.map(function (x) {
+          return '<option' + ((head.ptype || '위임') === x ? ' selected' : '') + '>' + x + '</option>';
+        }).join('');
+      })() + '</select></div>' +
       '<div class="field" style="flex:0 0 200px"><label>주민등록번호 (선택)</label><input type="text" id="f-prrn" value="' + e(head.prrn || '') + '" placeholder="인쇄 후 자필 기입 가능"></div>' +
       '</div>' +
       '<div class="inline-form">' +
