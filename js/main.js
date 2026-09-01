@@ -139,7 +139,7 @@
     sub.insertBefore(a, sub.firstChild);   /* 맨 위 자리 */
   }
 
-  /* 노회장·서기·간사에게 임원방 하위에 <노회 진행 관리자>를 붙인다.
+  /* 노회장·서기·간사에게 임원방 하위에 <노회 진행 매니저>를 붙인다.
    * 회의 순서지를 만들어 두고 당일 순서를 하나씩 진행하는 도구다. */
   function addProceedMenu() {
     var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
@@ -148,7 +148,7 @@
     if (!sub || sub.querySelector('a[href="proceed.html"]')) return;
     var a = document.createElement('a');
     a.href = 'proceed.html';
-    a.textContent = '노회 진행 관리자';
+    a.textContent = '노회 진행 매니저';
     var sched = sub.querySelector('a[href="schedule.html"]');
     if (sched && sched.nextSibling) sub.insertBefore(a, sched.nextSibling);
     else sub.insertBefore(a, sub.firstChild);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>노회 진행 관리자 - 시화산노회</title>
+<title>노회 진행 매니저 - 시화산노회</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="css/style.css?v=20260901a">
 <style>
@@ -62,8 +62,8 @@
 
 <div class="page-head">
   <div class="container">
-    <h1>노회 진행 관리자</h1>
-    <div class="crumb">홈 &gt; 임원방 &gt; 노회 진행 관리자</div>
+    <h1>노회 진행 매니저</h1>
+    <div class="crumb">홈 &gt; 임원방 &gt; 노회 진행 매니저</div>
   </div>
 </div>
 
@@ -75,7 +75,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260901n"></script>
+<script src="js/main.js?v=20260902a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (!user || !SHSAuth.canManageMembers(user)) {
     area.innerHTML =
-      '<div class="notice-banner">노회 진행 관리자는 <strong>노회장·서기·간사</strong>가 이용할 수 있습니다.' +
+      '<div class="notice-banner">노회 진행 매니저는 <strong>노회장·서기·간사</strong>가 이용할 수 있습니다.' +
       (user ? '' : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') + '</div>';
     return;
   }

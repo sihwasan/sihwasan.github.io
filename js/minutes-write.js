@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function nowIso() { return new Date().toISOString(); }
 
   var rows = [];          /* 적어 둔 회의록들 */
-  var sessions = [];      /* 노회 진행 관리자의 회의들 */
+  var sessions = [];      /* 노회 진행 매니저의 회의들 */
   var cur = null;         /* 지금 열어 둔 회의록 (표의 한 줄) */
   var doc = null;         /* 그 내용 */
   var step = 1;
@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------------- 목록 ---------------- */
   function drawList() {
     var h = '<p style="color:var(--gray-5);font-size:0.88rem">회의를 따라가며 회의록을 규격대로 적는 곳입니다. ' +
-      '노회 진행 관리자에서 진행한 회의를 그대로 가져오면 순서와 처리 결과가 회무처리 항목으로 옮겨집니다.</p>';
+      '노회 진행 매니저에서 진행한 회의를 그대로 가져오면 순서와 처리 결과가 회무처리 항목으로 옮겨집니다.</p>';
 
     if (!rows.length) {
       h += '<p style="color:var(--gray-5)">적어 둔 회의록이 없습니다. 아래에서 새로 시작해 주세요.</p>';
@@ -186,15 +186,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     h += '<div class="admin-card" style="margin-top:18px"><h3 style="margin-top:0">새 회의록 시작</h3>' +
       (sessions.length
-        ? '<div class="field" style="max-width:520px"><label>노회 진행 관리자의 회의에서 가져오기</label>' +
+        ? '<div class="field" style="max-width:520px"><label>노회 진행 매니저의 회의에서 가져오기</label>' +
           '<select id="mw-ns-session"><option value="">직접 적기</option>' +
           sessions.map(function (s) {
             return '<option value="' + s.id + '">' + e(s.title) +
               (s.meet_on ? ' — ' + e(s.meet_on) : '') + '</option>';
           }).join('') + '</select>' +
           '<p class="mw-hint">고르면 회의 이름 · 날짜 · 장소와 진행한 순서가 그대로 옮겨집니다. ' +
-          '(<a href="proceed.html" style="text-decoration:underline">노회 진행 관리자</a>)</p></div>'
-        : '<p class="mw-hint">노회 진행 관리자에 만들어 둔 회의가 없습니다. 직접 적으셔도 됩니다.</p>') +
+          '(<a href="proceed.html" style="text-decoration:underline">노회 진행 매니저</a>)</p></div>'
+        : '<p class="mw-hint">노회 진행 매니저에 만들어 둔 회의가 없습니다. 직접 적으셔도 됩니다.</p>') +
       '<div class="inline-form">' +
       '<div class="field" style="flex:0 0 150px"><label>회의 종류</label><select id="mw-ns-kind">' +
       '<option>정기노회</option><option>임시노회</option></select></div>' +
@@ -519,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="btn ghost sm" id="mw-add-sichal">시찰 보고 ' + SICHALS.length + '개 넣기</button> ' +
       '<button class="btn ghost sm" id="mw-add-buseo">상비부 보고 ' + BUSEO.length + '개 넣기</button> ' +
       '<button class="btn ghost sm" id="mw-add-one">항목 하나 더하기</button>' +
-      (cur.session_id ? ' <button class="btn ghost sm" id="mw-from-session">노회 진행 관리자에서 다시 가져오기</button>' : '') +
+      (cur.session_id ? ' <button class="btn ghost sm" id="mw-from-session">노회 진행 매니저에서 다시 가져오기</button>' : '') +
       '</div><div id="mw-items">';
 
     (doc.items || []).forEach(function (it, i) {
