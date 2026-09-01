@@ -154,8 +154,8 @@
     else sub.insertBefore(a, sub.firstChild);
   }
 
-  /* 회록서기(부회록서기)와 노회장·서기·간사에게 임원방 하위에
-   * <회의록 작성>을 붙인다. 회의록을 규격대로 적는 매니저다. */
+  /* 회록서기(부회록서기)에게 임원방 하위에 <회의록 작성 매니저>를 붙인다.
+   * 회의록을 규격대로 적는 매니저다. */
   function addMinutesWriteMenu() {
     var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
     if (!links.length) return;
@@ -163,10 +163,15 @@
     if (!sub || sub.querySelector('a[href="minutes-write.html"]')) return;
     var a = document.createElement('a');
     a.href = 'minutes-write.html';
-    a.textContent = '회의록 작성';
-    /* 노회 회의록 바로 위 자리 (없으면 맨 아래) */
-    var minutes = sub.querySelector('a[href="minutes.html"]');
-    if (minutes) sub.insertBefore(a, minutes); else sub.appendChild(a);
+    a.textContent = '회의록 작성 매니저';
+    /* 노회 진행 매니저 바로 뒤 (그 메뉴가 없으면 노회 회의록 바로 위) */
+    var proceed = sub.querySelector('a[href="proceed.html"]');
+    if (proceed && proceed.nextSibling) sub.insertBefore(a, proceed.nextSibling);
+    else if (proceed) sub.appendChild(a);
+    else {
+      var minutes = sub.querySelector('a[href="minutes.html"]');
+      if (minutes) sub.insertBefore(a, minutes); else sub.appendChild(a);
+    }
   }
 
   function addAdminMenu() {
@@ -493,11 +498,15 @@
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) {
           addAdminMenu();
           addScheduleMenu();
+        }
+
+        /* 노회 진행 매니저 — 서기만 (최고관리자는 관리를 위해 함께 본다) */
+        if (p.role === 'clerk' || p.role === 'superadmin') {
           addProceedMenu();
         }
 
-        /* 회의록 작성 매니저 — 회록서기(부회록서기)와 노회장·서기·간사 */
-        if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1 ||
+        /* 회의록 작성 매니저 — 회록서기(부회록서기)만 (최고관리자 포함) */
+        if (p.role === 'superadmin' ||
             (p.role === 'officer' && p.title && p.title.indexOf('회록서기') !== -1)) {
           addMinutesWriteMenu();
         }

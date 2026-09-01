@@ -24,7 +24,7 @@
 <script src="private/resolutions.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902b"></script>
+<script src="js/main.js?v=20260902c"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -52,18 +52,17 @@ document.addEventListener('DOMContentLoaded', function () {
   var html = '';
   html += '<div class="notice-banner"><strong>' + e(SHS.honorific(user)) + '</strong>, 임원방에 오신 것을 환영합니다.</div>';
 
-  /* 회의록 작성 매니저 — 회록서기(부회록서기)와 노회장·서기·간사에게만 보인다 */
-  var isMinutesClerk = SHSAuth.canManageMembers(user) ||
+  /* 회의록 작성 매니저 — 회록서기(부회록서기)에게만 보인다 (최고관리자 포함) */
+  var isMinutesClerk = user.role === 'superadmin' ||
     (user.role === 'officer' && !!user.title && user.title.indexOf('회록서기') !== -1);
   if (isMinutesClerk) {
     html += '<h2>회의록 작성</h2>';
     html += '<div class="dash-box"><div class="box-head">회의록 작성 매니저</div>' +
       '<div class="box-body"><p style="margin:0 0 12px">노회 회의를 따라가며 ' +
-      '<strong>제15~18회 회의록과 같은 규격</strong>으로 회의록을 적는 곳입니다. ' +
+      '<strong>총회 표준 회의록 규격</strong>으로 회의록을 적는 곳입니다. ' +
       '개회예배 · 회원점명 · 회무처리 · 폐회를 차례로 채우면 회의록 문장이 저절로 지어지고, ' +
       '노회 진행 매니저에서 진행한 순서를 그대로 가져올 수 있습니다.</p>' +
-      '<a class="btn" href="minutes-write.html">회의록 작성 매니저 열기</a> ' +
-      '<a class="btn ghost" href="proceed.html">노회 진행 매니저</a></div></div>';
+      '<a class="btn" href="minutes-write.html">회의록 작성 매니저 열기</a></div></div>';
   }
 
   /* 자료 아카이브 자리 (임원방에 들어오면 가장 먼저 보이는 영역) */
