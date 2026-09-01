@@ -36,6 +36,12 @@ var SHSLedger = (function () {
     if (!box) return;
     var ownerKind = opts.kind === 'committee' ? 'committee' : 'sichal';
     var books = [], book = null, entries = [];
+    /* 항목 목록 — 기본 항목에 더해, 직접 적어 저장한 항목이 저절로 등재된다 */
+    var CAT_BASE = {
+      '수입': ['회비', '찬조', '노회 지원금', '이자', '기타'],
+      '지출': ['사업비', '교통비', '식비', '인쇄비', '경조비', '기타']
+    };
+    var catUsed = { '수입': [], '지출': [] };
     /* 회계연도는 4월에 시작해 다음 해 3월에 끝난다. year는 시작 연도다. */
     var now0 = new Date();
     var year = now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1;
@@ -75,12 +81,29 @@ var SHSLedger = (function () {
         }
         books = r.data || [];
         book = books.filter(function (b) { return b.year === year; })[0] || null;
-        if (!book) { entries = []; draw(); return; }
+        var ids = books.map(function (b) { return b.id; });
         return SHSCloud.init().then(function (c) {
-          return c.from('ledger_entries').select('*').eq('book_id', book.id)
-                  .order('entry_date').order('id');
-        }).then(function (r2) {
-          entries = (r2 && r2.data) || [];
+          return Promise.all([
+            book ? c.from('ledger_entries').select('*').eq('book_id', book.id)
+                    .order('entry_date').order('id')
+                 : Promise.resolve({ data: [] }),
+            /* 여태 적어 온 항목 이름 — 목록에 저절로 등재된다 (회비 자동 기록은 뺀다) */
+            ids.length ? c.from('ledger_entries').select('kind,title').in('book_id', ids)
+                          .is('fee_id', null)
+                          .then(function (x) { return x; }, function () { return { data: [] }; })
+                       : Promise.resolve({ data: [] })
+          ]);
+        }).then(function (rs) {
+          entries = (rs[0] && rs[0].data) || [];
+          catUsed = { '수입': [], '지출': [] };
+          ((rs[1] && rs[1].data) || []).forEach(function (x) {
+            var k = x.kind === '수입' ? '수입' : '지출';
+            var t = String(x.title || '').trim();
+            if (t && catUsed[k].indexOf(t) === -1 && CAT_BASE[k].indexOf(t) === -1) {
+              catUsed[k].push(t);
+            }
+          });
+          catUsed['수입'].sort(); catUsed['지출'].sort();
           draw();
         });
       });
@@ -366,14 +389,13 @@ var SHSLedger = (function () {
         (opts.churches || []).map(function (x) {
           return '<option value="' + esc(x) + '"></option>';
         }).join('') + '</datalist></div>' +
-        '<div class="field"><label>항목</label>' +
+        '<div class="field"><label>항목 (고르거나 직접 입력)</label>' +
         '<input type="text" id="lg-title" list="lg-cats" placeholder="' +
-        (viewKind === '수입' ? '예: 3월 시찰회 회비' : '예: 시찰회 식비') + '">' +
+        (viewKind === '수입' ? '예: 회비, 찬조' : '예: 사업비, 식비') + '">' +
         '<datalist id="lg-cats">' +
-        (viewKind === '수입'
-          ? ['회비', '노회 지원금', '이자', '기타 수입']
-          : ['사업비', '교통비', '식비', '인쇄비', '경조비', '기타 지출']
-        ).map(function (x) { return '<option value="' + x + '"></option>'; }).join('') +
+        CAT_BASE[viewKind].concat(catUsed[viewKind]).map(function (x) {
+          return '<option value="' + esc(x) + '"></option>';
+        }).join('') +
         '</datalist></div>' +
         '<div class="field" style="flex:0 0 170px"><label>금액 (원)</label>' +
         '<input type="number" id="lg-amt" min="0" step="1"></div>' +
