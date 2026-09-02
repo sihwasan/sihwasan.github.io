@@ -539,7 +539,9 @@
       });
     }
 
-    /* 탭 */
+    /* 탭 — 누를 때 주소 해시에 기록을 남겨, 뒤로 가기를 누르면
+     * 홈이 아니라 직전에 보던 탭으로 돌아가게 한다 */
+    var tabRestoring = false;
     document.querySelectorAll('.tabs').forEach(function (tabs) {
       var btns = tabs.querySelectorAll('button');
       btns.forEach(function (b) {
@@ -550,6 +552,10 @@
           scope.querySelectorAll(':scope > .tab-panel').forEach(function (p) {
             p.classList.toggle('active', p.id === b.dataset.tab);
           });
+          if (!tabRestoring && b.dataset.tab && history.pushState &&
+              location.hash !== '#' + b.dataset.tab) {
+            history.pushState(null, '', '#' + b.dataset.tab);
+          }
         });
       });
     });
@@ -557,8 +563,23 @@
     /* 해시로 탭 열기 (#officers 등) */
     if (location.hash) {
       var target = document.querySelector('.tabs button[data-tab="' + location.hash.slice(1) + '"]');
-      if (target) target.click();
+      if (target) { tabRestoring = true; target.click(); tabRestoring = false; }
     }
+
+    /* 뒤로 가기·앞으로 가기: 해시에 적힌 탭을 다시 보여 준다 */
+    window.addEventListener('hashchange', function () {
+      var id = location.hash.slice(1);
+      var b = id && document.querySelector('.tabs button[data-tab="' + id + '"]');
+      if (!b) {
+        /* 해시가 비면(처음 들어온 상태) 첫 번째 탭 묶음의 첫 탭으로 되돌린다 */
+        if (!id) b = document.querySelector('.tabs button[data-tab]');
+        if (!b) return;
+      }
+      if (b.classList.contains('active')) return;
+      tabRestoring = true;
+      b.click();
+      tabRestoring = false;
+    });
 
     /* 관리자에게 운영 알림·서류 신청 안내 */
     getUser().then(function (u) {
