@@ -36,7 +36,7 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
-<script src="js/main.js?v=20260902h"></script>
+<script src="js/main.js?v=20260902i"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -366,6 +366,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     area.innerHTML = html;
     SHS.sectionize(area);
+
+    /* 메뉴의 <구비서류 안내>로 들어오면 청원서 작성·고시·회의자료·결의사항·
+     * 규칙·내규 탭 줄을 감추고 구비서류 안내만 보여 준다.
+     * 자료실 제목이나 다른 분류로 이동하면 탭 줄이 다시 나타난다. */
+    function soloForms() {
+      var nav = area.querySelector('.section-nav');
+      if (!nav) return;
+      var solo = decodeURIComponent(location.hash.slice(1)) === 'sec-구비서류-안내';
+      nav.style.display = solo ? 'none' : '';
+    }
+    soloForms();
+    if (!window.__soloFormsBound) {
+      window.__soloFormsBound = true;
+      window.addEventListener('hashchange', soloForms);
+    }
     bindForms();
 
     /* 분류별 제목 검색 */

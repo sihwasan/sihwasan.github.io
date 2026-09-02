@@ -43,7 +43,7 @@
       { t: '서류 신청', h: 'request.html' },
       { t: '신청서류 확인', h: 'request.html#list' },
       { t: '증명서 진위 확인', h: 'verify.html' },
-      { t: '구비서류 규정', h: 'archive.html#forms' }
+      { t: '구비서류 규정', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' }
     ]},
     { title: '자료실', href: 'archive.html', sub: [
       { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
