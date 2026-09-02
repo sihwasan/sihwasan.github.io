@@ -24,7 +24,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902c"></script>
+<script src="js/main.js?v=20260902d"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/minutes-box.js"></script>
@@ -369,8 +369,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var rd = SHS.retireDate(r.birth_date);
     if (rd) {
-      parts.push(rd <= today ? '정년 경과'
-        : '정년 ' + rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '.');
+      parts.push(SHS.isRetired(r.birth_date) ? '정년 경과'
+        : '정년 ' + rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.');
     }
     return { name: n, title: '총대장로', term: parts.join(' · ') };
   }
@@ -799,8 +799,9 @@ document.addEventListener('DOMContentLoaded', function () {
       var rd = SHS.retireDate(m.birth_date);
       if (!rd) return '<span style="color:var(--gray-5)">-</span>';
       var today = new Date();
-      if (rd <= today) return '<span class="fail">정년 경과</span>';
+      if (SHS.isRetired(m.birth_date)) return '<span class="fail">정년 경과</span>';
       var months = (rd.getFullYear() - today.getFullYear()) * 12 + (rd.getMonth() - today.getMonth());
+      if (rd.getDate() < today.getDate()) months--;
       var y = Math.floor(months / 12), mo2 = months % 12;
       return e((y ? y + '년 ' : '') + (mo2 ? mo2 + '개월' : (y ? '' : '한 달 미만')));
     }

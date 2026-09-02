@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902c"></script>
+<script src="js/main.js?v=20260902d"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
@@ -344,8 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 정년(만 70세)이 지났는가 — SHS 의 판정을 그대로 쓴다 */
   function overAge(birth) {
-    var rd = SHS.retireDate(birth);
-    return !!(rd && rd <= new Date());
+    return SHS.isRetired(birth);
   }
   /* 명단 한 줄의 등급 고르개 값.
    * 총회 정년(만 70세)이 지난 분은 정회원·임원 대신 일반회원으로 보여 준다. */
@@ -978,8 +977,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var today = new Date();
         var rd = SHS.retireDate(m.birth_date);
         if (!rd) return '<span style="color:var(--gray-5)">-</span>';
-        if (rd <= today) return '<span class="fail">정년 경과</span>';
+        if (SHS.isRetired(m.birth_date)) return '<span class="fail">정년 경과</span>';
         var months = (rd.getFullYear() - today.getFullYear()) * 12 + (rd.getMonth() - today.getMonth());
+        if (rd.getDate() < today.getDate()) months--;
         var y = Math.floor(months / 12), mo = months % 12;
         return (y ? y + '년 ' : '') + (mo ? mo + '개월' : (y ? '' : '한 달 미만'));
       }
@@ -1006,9 +1006,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:80px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
         /* 보기 방식 정렬에 쓸 값: 정년까지 남은 날수 */
-        var days = 999999;
-        var rd0 = SHS.retireDate(m.birth_date);
-        if (rd0) days = Math.ceil((rd0 - new Date()) / 86400000);
+        var days = SHS.daysToRetire(m.birth_date);
+        if (days === null) days = 999999;
         html += '<tr data-ro="' + m.id + '" data-find="' +
           e([m.name, m.church, m.category, m.sichal, m.note].filter(Boolean).join(' ')) + '"' +
           ' data-cat="' + e(m.category || '') + '" data-grade="' + e(rosterGrade(m)) + '"' +
@@ -1039,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 <strong>' + rows.length + '</strong>명' +
         '<span id="ro-count"></span>. ' +
         '<strong>수정</strong>을 누르면 팝업에서 모든 정보를 고칠 수 있습니다. 모든 변경은 감사 기록에 남습니다.<br>' +
-        '총회 정년은 만 70세입니다. <strong>생년월일을 적으시면 정년이 지난 분은 ' +
+        '총회 정년은 만 70세(만 70세가 되는 해 생일 하루 전까지 시무)입니다. <strong>생년월일을 적으시면 정년이 지난 분은 ' +
         '<em>일반회원</em>으로 저절로 바뀝니다.</strong> 직분을 <strong>직원</strong>으로 하시면 ' +
         '간사(관리자) 등급이 함께 붙습니다. 두 가지 모두 등급 칸에서 고치실 수 있습니다.</p>';
       box.innerHTML = html;
@@ -1811,9 +1810,9 @@ document.addEventListener('DOMContentLoaded', function () {
         function retireCell(birth) {
           var rd = SHS.retireDate(birth);
           if (!rd) return '<span style="color:var(--gray-5)">생년월일 미등록</span>';
-          var over = rd <= today2;
+          var over = SHS.isRetired(birth);
           return '<span class="' + (over ? 'fail' : '') + '">' +
-            rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '.' + (over ? ' (경과)' : '') + '</span>';
+            rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.' + (over ? ' (경과)' : '') + '</span>';
         }
         h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th style="width:50px">번호</th>' +
           '<th style="width:110px">성명</th><th style="width:160px">소속 교회</th>' +
@@ -2149,9 +2148,9 @@ document.addEventListener('DOMContentLoaded', function () {
       function retireText(x) {
         var rd = SHS.retireDate(x.birth_date);
         if (!rd) return '<span style="color:var(--gray-5)">생년월일 미등록</span>';
-        var over = rd <= today;
+        var over = SHS.isRetired(x.birth_date);
         return '<span class="' + (over ? 'fail' : '') + '">' +
-          rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '.' + (over ? ' (경과)' : '') + '</span>';
+          rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.' + (over ? ' (경과)' : '') + '</span>';
       }
       function termText(x) {
         var lab = sesLabel(x.term_from, x.term_until);

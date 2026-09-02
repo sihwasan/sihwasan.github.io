@@ -968,12 +968,30 @@
     return a;
   }
 
-  /* 만 70세가 되는 날 (정년일) */
+  /* 정년일 = 만 70세가 되는 해 생일 하루 전 (총회 규정).
+   * 이 날까지 시무하고, 만 70세 생일부터 정년 경과로 본다. */
   function retireDate(birth) {
     if (!birth) return null;
     var b = new Date(birth + 'T00:00:00');
     if (isNaN(b)) return null;
-    return new Date(b.getFullYear() + RETIRE_AGE, b.getMonth(), b.getDate());
+    return new Date(b.getFullYear() + RETIRE_AGE, b.getMonth(), b.getDate() - 1);
+  }
+
+  function todayStart() {
+    var d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  }
+
+  /* 정년일까지 남은 날수 (0 = 오늘이 정년일, 음수 = 경과, null = 생년월일 없음) */
+  function daysToRetire(birth) {
+    var rd = retireDate(birth);
+    if (!rd) return null;
+    return Math.round((rd - todayStart()) / 86400000);
+  }
+
+  /* 정년이 지났는가 — 만 70세 생일 당일부터 참 */
+  function isRetired(birth) {
+    var d = daysToRetire(birth);
+    return d !== null && d < 0;
   }
 
   /* 정년일 표기 (생년월일이 없으면 알 수 없다고 알린다) */
@@ -981,8 +999,9 @@
     var rd = retireDate(u && u.birth_date);
     if (!rd) return '생년월일 미등록';
     var y = rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.';
-    var days = Math.ceil((rd - new Date()) / 86400000);
-    if (days <= 0) return y + ' (정년 경과)';
+    var days = daysToRetire(u.birth_date);
+    if (days < 0) return y + ' (정년 경과)';
+    if (days === 0) return y + ' (오늘이 정년일)';
     if (days < 400) return y + ' (' + days + '일 남음)';
     return y + ' (' + Math.floor(days / 365) + '년 ' + Math.floor(days % 365 / 30) + '개월 남음)';
   }
@@ -990,10 +1009,10 @@
   /* 남은 임기 안내 문구 */
   function termLabel(u) {
     var parts = [];
-    var rd = retireDate(u.birth_date);
-    if (rd) {
-      var days = Math.ceil((rd - new Date()) / 86400000);
-      if (days <= 0) parts.push('정년 경과');
+    var days = daysToRetire(u.birth_date);
+    if (days !== null) {
+      if (days < 0) parts.push('정년 경과');
+      else if (days === 0) parts.push('오늘이 정년일');
       else if (days < 400) parts.push('정년까지 ' + days + '일');
       else parts.push('정년까지 ' + Math.floor(days / 365) + '년 ' + (Math.floor(days % 365 / 30)) + '개월');
     } else {
@@ -1011,8 +1030,7 @@
     if (!u) return '로그인이 필요합니다.';
     if (u.role === 'pending') return '승인대기 상태입니다.';
     if (u.suspended) return '정회원 자격이 정지되었습니다.';
-    var rd = retireDate(u.birth_date);
-    if (rd && rd <= new Date()) return '총회 정년(만 ' + RETIRE_AGE + '세)에 이르러 정회원 자격이 만료되었습니다.';
+    if (isRetired(u.birth_date)) return '총회 정년(만 ' + RETIRE_AGE + '세)에 이르러 정회원 자격이 만료되었습니다.';
     if (u.member_until) {
       var md = new Date(u.member_until + 'T00:00:00');
       if (md <= new Date()) return '총대 자격 기간이 만료되어 정회원 자격이 상실되었습니다.';
@@ -1025,8 +1043,7 @@
    * 그 밖의 사유(승인대기·총대 기간 만료 등)는 관리자·임원에게 적용하지 않는다. */
   function isActiveMember(u) {
     if (!u) return false;
-    var rd = retireDate(u.birth_date);
-    if (rd && rd <= new Date()) return false;
+    if (isRetired(u.birth_date)) return false;
     if (['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(u.role) !== -1) return true;
     return !membershipIssue(u);
   }
@@ -1332,6 +1349,8 @@
     retireLabel: retireLabel,
     ageOn: ageOn,
     retireDate: retireDate,
+    isRetired: isRetired,
+    daysToRetire: daysToRetire,
     nthMonday: nthMonday,
     opsActive: opsActive,
     opsRuleLabel: opsRuleLabel,

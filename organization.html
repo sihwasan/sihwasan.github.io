@@ -177,7 +177,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902c"></script>
+<script src="js/main.js?v=20260902d"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -592,8 +592,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!birth) return null;
     var rd = retire ? new Date(retire + 'T00:00:00') : SHS.retireDate(birth);
     if (!rd || isNaN(rd)) return null;
-    var today = new Date();
-    if (rd <= today) return '정년(만 70세) 경과';
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    if (rd < today) return '정년(만 70세) 경과';
     var months = (rd.getFullYear() - today.getFullYear()) * 12 + (rd.getMonth() - today.getMonth());
     if (rd.getDate() < today.getDate()) months--;
     var y = Math.floor(months / 12), mm = months % 12;
