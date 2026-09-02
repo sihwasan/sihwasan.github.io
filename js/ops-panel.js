@@ -42,9 +42,10 @@ var SHSOps = (function () {
     '<button class="active" data-tab="ops-alert">시스템 알림 설정</button>' +
     '<button data-tab="ops-meeting">노회 일정 설정</button>' +
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
-    (canHand ? '<button data-tab="ops-hand">노회장 권한 위임</button>' : '') +
     '<button data-tab="ops-aw">감사 기간</button>' +
     (canAudit ? '<button data-tab="ops-audit">감독 (감사 기록)</button>' : '') +
+    /* 노회장 권한 위임은 무게가 다른 일이라 맨 끝에 붉은색으로 둔다 */
+    (canHand ? '<button class="tab-danger" data-tab="ops-hand">노회장 권한 위임</button>' : '') +
     '</div>' +
     '<div class="tab-panel active" id="ops-alert"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     '<div class="tab-panel" id="ops-meeting"></div>' +

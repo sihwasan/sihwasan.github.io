@@ -325,6 +325,12 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .tabs.sub-tabs button.active {
   background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700;
 }
+/* 붉은 계열 하위 탭 — 노회장 권한 위임처럼 무게가 다른 일 */
+.tabs.sub-tabs button.tab-danger { color: #b03a3a; border-color: #d8a0a0; }
+.tabs.sub-tabs button.tab-danger:hover { color: #b03a3a; border-color: #b03a3a; }
+.tabs.sub-tabs button.tab-danger.active {
+  background: #b03a3a; border-color: #b03a3a; color: #fff;
+}
 
 /* tables */
 /* 표는 가로줄만 남긴다. 칸마다 테두리를 두르면 장부처럼 빽빽해 보인다. */
