@@ -732,6 +732,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ================= 목회자 명단 ================= */
+  var pastorSort = '';   /* '' 기본 | asc 남은 임기 짧은 순 | desc 긴 순 */
+
   function drawPastors() {
     var box = document.getElementById('si-body');
     if (!pastors.length) {
@@ -741,8 +743,26 @@ document.addEventListener('DOMContentLoaded', function () {
     var groups = {};
     pastors.forEach(function (m) { (groups[m.category || '기타'] = groups[m.category || '기타'] || []).push(m); });
 
+    /* 남은 임기(정년까지 남은 날수) 기준 정렬 — 생년월일이 없는 분은 맨 뒤로 */
+    function sorted(list) {
+      if (!pastorSort) return list;
+      return list.slice().sort(function (a, b) {
+        var da = SHS.daysToRetire(a.birth_date), db2 = SHS.daysToRetire(b.birth_date);
+        if (da === null && db2 === null) return 0;
+        if (da === null) return 1;
+        if (db2 === null) return -1;
+        return pastorSort === 'asc' ? da - db2 : db2 - da;
+      });
+    }
+
     var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-      '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다.</p>';
+      '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다.</p>' +
+      '<div class="field" style="max-width:240px"><label for="pa-sort">보기 순서</label>' +
+      '<select id="pa-sort">' +
+      '<option value=""' + (pastorSort === '' ? ' selected' : '') + '>기본 순서</option>' +
+      '<option value="asc"' + (pastorSort === 'asc' ? ' selected' : '') + '>남은 임기 짧은 순</option>' +
+      '<option value="desc"' + (pastorSort === 'desc' ? ' selected' : '') + '>남은 임기 긴 순</option>' +
+      '</select></div>';
 
     /* 남은 임기: 회원 명단의 생년월일로 정년(만 70세)까지 계산한다 */
     function remainLabel(m) {
@@ -762,7 +782,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:110px">직분</th><th>소속 교회</th>' +
         '<th style="width:120px">남은 임기</th><th style="width:160px">비고</th>' +
         '</tr></thead><tbody>';
-      groups[g].forEach(function (m) {
+      sorted(groups[g]).forEach(function (m) {
         var ch = churches.filter(function (x) { return x.name === m.church; })[0];
         var link = ch && (ch.url || '').trim();
         if (link && !/^https?:\/\//i.test(link)) link = 'https://' + link;
@@ -779,6 +799,10 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<p style="font-size:0.8rem;color:var(--gray-5)">남은 임기는 회원 명단의 생년월일로 ' +
       '총회 정년(만 70세)까지 계산한 값입니다. 생년월일이 없는 분은 -로 표시됩니다.</p>';
     box.innerHTML = h;
+    document.getElementById('pa-sort').addEventListener('change', function () {
+      pastorSort = this.value;
+      drawPastors();
+    });
   }
 
   /* ================= 시찰 자료실 ================= */
