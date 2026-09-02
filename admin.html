@@ -1202,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', function () {
           position: npos,
           category: ncat,
           birth_date: document.getElementById('ro-birth').value || null,
-          sichal: NO_CHURCH[ncat] ? null : (document.getElementById('ro-sichal').value || null),
+          sichal: document.getElementById('ro-sichal').value || null,
           role: g.role, officer_title: g.title
           /* 순서는 서버가 정한다. 직위 무리의 맨 뒤로 자동으로 들어간다. */
         };
@@ -1595,7 +1595,6 @@ document.addEventListener('DOMContentLoaded', function () {
               '무임목사·은퇴목사·원로목사로 바꾸시면 교회 칸을 비워 두셔도 됩니다.';
             return;
           }
-          if (NO_CHURCH[cat]) d.sichal = null;   /* 무임이 되면 시찰 소속도 없어진다 */
           msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
           SHSCloud.init().then(function (c) {
             return c.from('roster').update(d).eq('id', m.id);
