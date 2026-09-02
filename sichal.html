@@ -756,13 +756,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-      '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다.</p>' +
-      '<div class="field" style="max-width:240px"><label for="pa-sort">보기 순서</label>' +
-      '<select id="pa-sort">' +
-      '<option value=""' + (pastorSort === '' ? ' selected' : '') + '>기본 순서</option>' +
-      '<option value="asc"' + (pastorSort === 'asc' ? ' selected' : '') + '>남은 임기 짧은 순</option>' +
-      '<option value="desc"' + (pastorSort === 'desc' ? ' selected' : '') + '>남은 임기 긴 순</option>' +
-      '</select></div>';
+      '노회 명단에서 <strong>' + e(NAME) + '</strong> 소속으로 분류된 분들입니다.</p>';
+
+    /* 남은 임기 제목을 누르면 짧은 순 → 긴 순 → 기본 순으로 돌아가며 정렬된다 */
+    var paArrow = pastorSort === 'asc' ? ' &#9650;' : (pastorSort === 'desc' ? ' &#9660;' : ' &#8693;');
+    var paTitle = pastorSort === 'asc' ? '남은 임기 짧은 순 (누르면 긴 순)'
+                : pastorSort === 'desc' ? '남은 임기 긴 순 (누르면 기본 순)'
+                : '누르면 남은 임기 짧은 순으로 정렬';
 
     /* 남은 임기: 회원 명단의 생년월일로 정년(만 70세)까지 계산한다 */
     function remainLabel(m) {
@@ -780,7 +780,8 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<h3>' + e(g) + ' (' + groups[g].length + '명)</h3>';
       h += '<table class="tbl"><thead><tr><th style="width:120px">성명</th>' +
         '<th style="width:110px">직분</th><th>소속 교회</th>' +
-        '<th style="width:120px">남은 임기</th><th style="width:160px">비고</th>' +
+        '<th style="width:130px;cursor:pointer;user-select:none' + (pastorSort ? ';color:var(--accent);font-weight:700' : '') + '" ' +
+        'data-pasort title="' + paTitle + '">남은 임기' + paArrow + '</th><th style="width:160px">비고</th>' +
         '</tr></thead><tbody>';
       sorted(groups[g]).forEach(function (m) {
         var ch = churches.filter(function (x) { return x.name === m.church; })[0];
@@ -799,9 +800,11 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<p style="font-size:0.8rem;color:var(--gray-5)">남은 임기는 회원 명단의 생년월일로 ' +
       '총회 정년(만 70세)까지 계산한 값입니다. 생년월일이 없는 분은 -로 표시됩니다.</p>';
     box.innerHTML = h;
-    document.getElementById('pa-sort').addEventListener('change', function () {
-      pastorSort = this.value;
-      drawPastors();
+    box.querySelectorAll('th[data-pasort]').forEach(function (th) {
+      th.addEventListener('click', function () {
+        pastorSort = pastorSort === '' ? 'asc' : (pastorSort === 'asc' ? 'desc' : '');
+        drawPastors();
+      });
     });
   }
 
