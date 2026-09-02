@@ -63,7 +63,8 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 화면 구성 ---------- */
   area.innerHTML =
     '<div class="notice-banner">이 화면에서 수정하고 <strong>저장</strong>을 누르면 즉시 홈페이지에 반영됩니다. ' +
-    '모든 수정 내역은 감사 기록에 남습니다.</div>' +
+    '모든 수정 내역은 감사 기록에 남습니다. ' +
+    '운영일정 관리는 <a href="schedule.html" style="text-decoration:underline"><strong>노회 일정관리</strong></a>로 옮겼습니다.</div>' +
     '<div class="tabs">' +
     '<button class="active" data-tab="mg-notice">공지사항</button>' +
     '<button data-tab="mg-hero">메인 화면</button>' +
@@ -442,13 +443,16 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  /* ---------- 메인 화면 (히어로) ---------- */
+  /* ---------- 메인 화면 (히어로·정기노회 결과) ---------- */
   function loadHero() {
-    db.from('site_settings').select('*').eq('key', 'hero').then(function (r) {
+    db.from('site_settings').select('*').in('key', ['hero', 'meeting_result']).then(function (r) {
       var box = document.getElementById('mg-hero');
       if (r.error) { box.innerHTML = '<div class="notice-banner">불러오기 실패: ' + e(r.error.message) + '</div>'; return; }
-      var hero = {};
-      (r.data || []).forEach(function (row) { if (row.key === 'hero') hero = row.value || {}; });
+      var hero = {}, meet = {};
+      (r.data || []).forEach(function (row) {
+        if (row.key === 'hero') hero = row.value;
+        if (row.key === 'meeting_result') meet = row.value;
+      });
       box.innerHTML = '<h2>메인 큰 문구 (히어로)</h2>' +
         '<div class="admin-card" style="max-width:760px;margin-bottom:24px">' +
         '<div class="field"><label>작은 윗줄</label><input type="text" id="h-kicker" value="' + e(hero.kicker || '') + '"></div>' +
@@ -456,7 +460,66 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="field"><label>큰 제목 2줄</label><input type="text" id="h-line2" value="' + e(hero.line2 || '') + '"></div>' +
         '<div class="field"><label>설명 문장</label><textarea id="h-desc" rows="3">' + e(hero.desc || '') + '</textarea></div>' +
         '<div class="field"><label>말씀 구절</label><input type="text" id="h-verse" value="' + e(hero.verse || '') + '"></div>' +
-        '<button class="btn" id="h-save">저장</button><div class="form-msg" id="h-msg"></div></div>';
+        '<button class="btn" id="h-save">저장</button><div class="form-msg" id="h-msg"></div></div>' +
+        '<h2>메인 배경 사진</h2>' +
+        '<div class="admin-card" style="max-width:760px;margin-bottom:24px">' +
+        '<p style="font-size:0.86rem;color:var(--gray-7)">메인 화면 맨 위에 크게 깔리는 사진입니다. ' +
+        '가로로 넓은 사진이 잘 어울리며, 글자가 위에 얹히므로 가운데가 너무 복잡하지 않은 사진이 좋습니다.</p>' +
+        '<div id="h-prev" style="margin-bottom:10px">' +
+        (hero.image ? '<img src="' + e(hero.image) + '" style="width:100%;max-width:420px;border:1px solid var(--gray-2)">'
+                    : '<span style="color:var(--gray-5);font-size:0.86rem">아직 바꾸지 않아 기본 사진이 쓰이고 있습니다.</span>') + '</div>' +
+        '<div class="field"><label>새 배경 사진</label><input type="file" id="h-file" accept="image/*"></div>' +
+        '<button class="btn" id="h-imgsave">사진 바꾸기</button> ' +
+        (hero.image ? '<button class="btn ghost" id="h-imgreset">기본 사진으로 되돌리기</button>' : '') +
+        '<div class="form-msg" id="h-imgmsg"></div></div>' +
+        '<h2>메인 오른쪽 안내 상자</h2>' +
+        '<div class="admin-card" style="max-width:760px">' +
+        '<div class="field"><label>상자 제목</label><input type="text" id="m-title" value="' + e(meet.title || '') + '"></div>' +
+        '<div class="field"><label>내용 (한 줄에 한 항목)</label><textarea id="m-lines" rows="5">' + e((meet.lines || []).join('\n')) + '</textarea></div>' +
+        '<button class="btn" id="m-save">저장</button><div class="form-msg" id="m-msg"></div></div>';
+
+      /* 배경 사진 : 사진 보관소에 올리고 주소만 설정에 담는다 */
+      SHS.dropZone(document.getElementById('h-file'), { what: '배경 사진', accept: 'image' });
+
+      function saveHero(v, msg, okText, logText) {
+        db.from('site_settings').upsert({ key: 'hero', value: v, updated_at: new Date().toISOString() })
+          .then(function (res) {
+            if (res.error) { toast(msg, false, res.error.message); return; }
+            SHSCloud.log('update', logText, v.line1 || '');
+            toast(msg, true, okText);
+          });
+      }
+
+      document.getElementById('h-imgsave').addEventListener('click', function () {
+        var msg = document.getElementById('h-imgmsg');
+        var f = document.getElementById('h-file').files[0];
+        if (!f) { toast(msg, false, '바꿀 사진을 먼저 골라 주세요.'); return; }
+        toast(msg, true, '사진을 올리는 중입니다...');
+        msg.className = 'form-msg';
+        resizeImage(f, 1800, 0.82).then(function (blob) {
+          return SHSPhotos.enabled()
+            ? SHSPhotos.upload(blob, SHSPhotos.newKey('full'))
+            : SHSPhotos.putPair(blob, blob).then(function (u) { return u.full; });
+        }).then(function (url) {
+          hero.image = url;
+          saveHero(hero, msg, '배경 사진을 바꿨습니다. 메인 화면에 반영됩니다.', '메인 배경 사진 교체');
+          document.getElementById('h-prev').innerHTML =
+            '<img src="' + e(url) + '" style="width:100%;max-width:420px;border:1px solid var(--gray-2)">';
+        }).catch(function (err) {
+          toast(msg, false, '사진을 올리지 못했습니다: ' + (err.message || err));
+        });
+      });
+
+      if (document.getElementById('h-imgreset')) {
+        document.getElementById('h-imgreset').addEventListener('click', function () {
+          if (!confirm('기본 사진으로 되돌리시겠습니까?')) return;
+          var msg = document.getElementById('h-imgmsg');
+          hero.image = null;
+          saveHero(hero, msg, '기본 사진으로 되돌렸습니다.', '메인 배경 사진 되돌림');
+          document.getElementById('h-prev').innerHTML =
+            '<span style="color:var(--gray-5);font-size:0.86rem">기본 사진이 쓰이고 있습니다.</span>';
+        });
+      }
 
       document.getElementById('h-save').addEventListener('click', function () {
         var v = {
@@ -464,7 +527,8 @@ document.addEventListener('DOMContentLoaded', function () {
           line1: document.getElementById('h-line1').value.trim(),
           line2: document.getElementById('h-line2').value.trim(),
           desc: document.getElementById('h-desc').value.trim(),
-          verse: document.getElementById('h-verse').value.trim()
+          verse: document.getElementById('h-verse').value.trim(),
+          image: hero.image || null
         };
         db.from('site_settings').upsert({ key: 'hero', value: v, updated_at: new Date().toISOString() })
           .then(function (res) {
@@ -472,6 +536,19 @@ document.addEventListener('DOMContentLoaded', function () {
             if (res.error) { toast(msg, false, res.error.message); return; }
             SHSCloud.log('update', '메인 문구 수정', v.line1);
             toast(msg, true, '저장되었습니다. 메인 화면에 반영됩니다.');
+          });
+      });
+      document.getElementById('m-save').addEventListener('click', function () {
+        var v = {
+          title: document.getElementById('m-title').value.trim(),
+          lines: document.getElementById('m-lines').value.split('\n').map(function (x) { return x.trim(); }).filter(Boolean)
+        };
+        db.from('site_settings').upsert({ key: 'meeting_result', value: v, updated_at: new Date().toISOString() })
+          .then(function (res) {
+            var msg = document.getElementById('m-msg');
+            if (res.error) { toast(msg, false, res.error.message); return; }
+            SHSCloud.log('update', '메인 안내 상자 수정', v.title);
+            toast(msg, true, '저장되었습니다.');
           });
       });
     });

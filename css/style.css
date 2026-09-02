@@ -207,11 +207,6 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 }
 
 /* 관리자가 사이트 관리에서 배경 사진을 지정한 경우: 기존 사진 히어로로 복귀 */
-.hero.has-image { background: var(--navy-dark); }
-.hero.has-image::before { background: rgba(15, 36, 68, 0.62); }
-.hero.has-image::after,
-.hero.has-image .hero-canvas,
-.hero.has-image .hero-cities { display: none; }
 
 /* ---------- main sections ---------- */
 .home-grid {
@@ -2036,8 +2031,6 @@ td[data-duch]:hover { background: #eef2f8; }
 }
 .hero-cities-note { color: #e6ddcb; }
 .hero-cities-note.on { color: #fdf9ef; }
-.hero.has-image { background: var(--navy-dark); }
-.hero.has-image::before { background: rgba(58, 49, 38, 0.55); }
 
 /* ----- 하위 페이지 머리 ----- */
 .page-head {

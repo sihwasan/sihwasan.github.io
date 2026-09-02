@@ -112,20 +112,10 @@
       </div>
       <ul class="notice-list" id="home-notices"></ul>
     </section>
-    <aside aria-label="노회 일정과 정기노회 결과">
+    <aside aria-label="노회 일정">
       <section class="side-box">
         <h3 class="box-head">노회 일정</h3>
         <div class="box-body" id="home-schedule"></div>
-      </section>
-      <section class="side-box">
-        <h3 class="box-head" id="home-meet-title">제19회 정기노회 결과</h3>
-        <div class="box-body" id="home-meet-body">
-          <p><strong>일시</strong> 2026년 4월 13일(월)</p>
-          <p><strong>장소</strong> 섬기는교회 (화성특례시 수노을2로 15)</p>
-          <p><strong>신임 노회장</strong> 박흥열 목사 (시흥생수교회)</p>
-          <p><strong>서기</strong> 권병렬 목사 / <strong>회계</strong> 김득철 장로</p>
-          <p style="margin-top:10px"><a href="organization.html#officers" style="color:var(--navy);text-decoration:underline">임원 명단 전체 보기</a></p>
-        </div>
       </section>
     </aside>
   </div>
@@ -165,11 +155,6 @@
   var wrap = document.getElementById('hero-logo-draw');
   var hero = document.querySelector('.hero');
   if (!wrap || !hero) return;
-  if (hero.classList.contains('has-image')) {
-    wrap.style.display = 'none';
-    hero.classList.add('done');
-    return;
-  }
   var paths = [].slice.call(wrap.querySelectorAll('.hd-p'));
   var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var FILLS = ['url(#hg-l)', 'url(#hg-r)', 'url(#hg-c)', 'url(#hg-c)'];
@@ -444,7 +429,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderCommittees(coms, (cs[1] && cs[1].data) || [], (cs[2] && cs[2].data) || []);
       }).catch(function () {});
 
-      c.from('site_settings').select('*').in('key', ['hero', 'meeting_result']).then(function (r) {
+      c.from('site_settings').select('*').eq('key', 'hero').then(function (r) {
         (r.data || []).forEach(function (row) {
           if (row.key === 'hero') {
             var h = row.value || {};
@@ -454,23 +439,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (h.line1) hero.querySelector('h1').innerHTML = e(h.line1) + '<br>' + e(h.line2 || '');
             if (h.desc) hero.querySelector('p').textContent = h.desc;
             if (h.verse) hero.querySelector('.hero-verse').textContent = h.verse;
-            /* 관리자가 바꾼 배경 사진이 있으면 그것으로 깔고, 인터랙티브 배경은 멈춘다 */
-            if (h.image) {
-              hero.classList.add('has-image');
-              hero.style.backgroundImage = 'url("' + h.image.replace(/"/g, '%22') + '")';
-              hero.style.backgroundPosition = 'center 42%';
-              hero.style.backgroundSize = 'cover';
-              hero.style.backgroundRepeat = 'no-repeat';
-            }
-          }
-          if (row.key === 'meeting_result') {
-            var m = row.value || {};
-            if (m.title) document.getElementById('home-meet-title').textContent = m.title;
-            if (m.lines && m.lines.length) {
-              document.getElementById('home-meet-body').innerHTML =
-                m.lines.map(function (l) { return '<p>' + e(l) + '</p>'; }).join('') +
-                '<p style="margin-top:10px"><a href="organization.html#officers" style="color:var(--navy);text-decoration:underline">임원 명단 전체 보기</a></p>';
-            }
           }
         });
       });
