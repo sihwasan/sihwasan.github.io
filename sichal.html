@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var myOwnSichal = isOfficer || churches.some(function (x) { return x.name === myChurch; });
     if (!myOwnSichal && (tab === 'doc' || tab === 'ledger' || tab === 'minutes' || tab === 'report')) tab = 'church';
 
-    h += '<div class="tabs" id="si-tabs">' +
+    h += '<div class="tabs sub-tabs" id="si-tabs">' +
       '<button class="' + (tab === 'church'  ? 'active' : '') + '" data-t="church">관내 교회 (' + churches.length + ')</button>' +
       '<button class="' + (tab === 'pastor'  ? 'active' : '') + '" data-t="pastor">회원 명단 (' + pastors.length + ')</button>' +
       (myOwnSichal
