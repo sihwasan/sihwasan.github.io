@@ -69,6 +69,8 @@ var SHSAuth = (function () {
     staff: '간사',
     officer: '임원',
     member: '정회원',
+    advisory: '언권회원',
+    general: '일반회원',
     pending: '승인대기'
   };
 

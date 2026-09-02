@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902d"></script>
+<script src="js/main.js?v=20260902e"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
@@ -303,8 +303,9 @@ document.addEventListener('DOMContentLoaded', function () {
    * 서기·노회장·간사는 홈페이지 관리 권한을 함께 갖는다. */
   var GRADES = [
     { v: 'pending', t: '승인대기', role: 'pending', title: null },
-    /* 총회 정년(만 70세)이 지나면 정회원이 아니라 일반회원이 된다 */
     { v: 'general', t: '일반회원', role: 'general', title: null },
+    /* 총회 정년(만 70세)이 지나면 정회원·임원은 언권회원이 된다 */
+    { v: 'advisory', t: '언권회원', role: 'advisory', title: null },
     { v: 'member', t: '정회원', role: 'member', title: null },
     { v: 'staff', t: '간사', role: 'staff', title: '간사' },
     { v: 'officer:회록부서기', t: '회록부서기', role: 'officer', title: '회록부서기' },
@@ -339,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 노회 명단 관리 (추가·수정·삭제) ---------- */
-  var ROSTER_ROLES = { member: '정회원', general: '일반회원', officer: '임원',
+  var ROSTER_ROLES = { member: '정회원', general: '일반회원', advisory: '언권회원', officer: '임원',
                        president: '노회장', clerk: '서기', staff: '간사', pending: '승인대기' };
 
   /* 정년(만 70세)이 지났는가 — SHS 의 판정을 그대로 쓴다 */
@@ -347,14 +348,11 @@ document.addEventListener('DOMContentLoaded', function () {
     return SHS.isRetired(birth);
   }
   /* 명단 한 줄의 등급 고르개 값.
-   * 총회 정년(만 70세)이 지난 분은 정회원·임원 대신 일반회원으로 보여 준다. */
+   * 정년이 지난 분은 서버가 언권회원으로 바꾸어 두므로 저장된 등급을 그대로 쓴다.
+   * (관리자가 정년 뒤에 직접 정한 등급도 그대로 보인다) */
   function rosterGrade(m) {
-    var v = (m.role === 'officer' && m.officer_title) ? 'officer:' + m.officer_title
-                                                      : (m.role || 'member');
-    if (overAge(m.birth_date) && ['member', 'officer'].indexOf(parseGrade(v).role) !== -1) {
-      return 'general';
-    }
-    return v;
+    return (m.role === 'officer' && m.officer_title) ? 'officer:' + m.officer_title
+                                                     : (m.role || 'member');
   }
   function gradeOptions(v) {
     return assignable().map(function (g) {
@@ -1038,9 +1036,10 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 <strong>' + rows.length + '</strong>명' +
         '<span id="ro-count"></span>. ' +
         '<strong>수정</strong>을 누르면 팝업에서 모든 정보를 고칠 수 있습니다. 모든 변경은 감사 기록에 남습니다.<br>' +
-        '총회 정년은 만 70세(만 70세가 되는 해 생일 하루 전까지 시무)입니다. <strong>생년월일을 적으시면 정년이 지난 분은 ' +
-        '<em>일반회원</em>으로 저절로 바뀝니다.</strong> 직분을 <strong>직원</strong>으로 하시면 ' +
-        '간사(관리자) 등급이 함께 붙습니다. 두 가지 모두 등급 칸에서 고치실 수 있습니다.</p>';
+        '총회 정년은 만 70세(만 70세가 되는 해 생일 하루 전까지 시무)입니다. <strong>정년이 지난 정회원·임원은 ' +
+        '<em>언권회원</em>으로 저절로 바뀝니다.</strong> 정년이 지난 분이라도 등급 칸에서 직접 고치시면 ' +
+        '그 등급이 우선하며 다시 자동으로 바뀌지 않습니다. 직분을 <strong>직원</strong>으로 하시면 ' +
+        '간사(관리자) 등급이 함께 붙습니다.</p>';
       box.innerHTML = html;
 
       document.getElementById('ro-order').addEventListener('click', function () {
@@ -1124,12 +1123,13 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       /* 직분·생년월일을 고치면 등급을 규정대로 맞춰 준다.
-       * 정년(만 70세)이 지나면 일반회원, 직원은 간사(관리자). */
+       * 정년(만 70세)이 지나면 언권회원, 직원은 간사(관리자).
+       * 관리자가 그 뒤에 등급 칸을 직접 바꾸면 그 값이 저장된다. */
       function autoGrade(scope, catEl, birthEl, gradeEl) {
         function tune() {
           if (overAge(birthEl.value)) {
-            if (['member', 'officer'].indexOf(parseGrade(gradeEl.value).role) !== -1) {
-              gradeEl.value = 'general';
+            if (['member', 'officer', 'general'].indexOf(parseGrade(gradeEl.value).role) !== -1) {
+              gradeEl.value = 'advisory';
             }
           } else if (AUTO_GRADE[catEl.value] && gradeEl.value === 'member') {
             gradeEl.value = AUTO_GRADE[catEl.value];

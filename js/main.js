@@ -207,6 +207,8 @@
     if (role === 'president' || role === 'clerk' || role === 'staff') return '관리자';
     if (role === 'officer') return title || '임원';
     if (role === 'member') return '정회원';
+    if (role === 'advisory') return '언권회원';
+    if (role === 'general') return '일반회원';
     if (role === 'pending') return '승인대기';
     return role;
   }
@@ -484,6 +486,8 @@
           if (!localStorage.getItem(remKey)) {
             localStorage.setItem(remKey, '1');
             SHSCloud.init().then(function (c) {
+              /* 정년이 지난 분을 언권회원으로 바꾸는 일도 같은 자리에서 한다 */
+              c.rpc('apply_retirement').then(function () {}, function () {});
               return c.rpc('run_reminders');
             }).then(function () {
               loadUnread();
@@ -779,6 +783,7 @@
       phone: p.phone || '', birth_date: p.birth_date || '', address: p.address || '',
       role: p.role, title: p.title || null,
       suspended: !!p.suspended, member_until: p.member_until || null,
+      retire_applied: !!p.retire_applied,
       cloud: true
     };
   }
@@ -1030,7 +1035,10 @@
     if (!u) return '로그인이 필요합니다.';
     if (u.role === 'pending') return '승인대기 상태입니다.';
     if (u.suspended) return '정회원 자격이 정지되었습니다.';
-    if (isRetired(u.birth_date)) return '총회 정년(만 ' + RETIRE_AGE + '세)에 이르러 정회원 자격이 만료되었습니다.';
+    if (u.role === 'advisory') return '언권회원은 발언권만 있어 정회원 전용 자료를 열람할 수 없습니다.';
+    if (u.role === 'general') return '일반회원은 정회원 전용 자료를 열람할 수 없습니다.';
+    /* 정년이 지났는데 아직 정년 처리(언권회원 전환 또는 관리자 확정)가 안 된 경우 */
+    if (isRetired(u.birth_date) && !u.retire_applied) return '총회 정년(만 ' + RETIRE_AGE + '세)에 이르러 정회원 자격이 만료되었습니다.';
     if (u.member_until) {
       var md = new Date(u.member_until + 'T00:00:00');
       if (md <= new Date()) return '총대 자격 기간이 만료되어 정회원 자격이 상실되었습니다.';
@@ -1039,11 +1047,13 @@
   }
 
   /* 정회원 이상(자격 유효) 여부.
-   * 정년(만 70세)은 등급과 상관없이 모든 회원에게 적용된다. (총회 정년 규정)
+   * 정년(만 70세)이 지나면 언권회원으로 자동 전환된다. 다만 관리자가 정년이
+   * 지난 분의 등급을 직접 정한 경우(retire_applied)에는 그 등급을 따른다.
    * 그 밖의 사유(승인대기·총대 기간 만료 등)는 관리자·임원에게 적용하지 않는다. */
   function isActiveMember(u) {
     if (!u) return false;
-    if (isRetired(u.birth_date)) return false;
+    if (isRetired(u.birth_date) && !u.retire_applied) return false;
+    if (u.role === 'advisory' || u.role === 'general') return false;
     if (['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(u.role) !== -1) return true;
     return !membershipIssue(u);
   }
