@@ -154,16 +154,16 @@
     else sub.insertBefore(a, sub.firstChild);
   }
 
-  /* 회록서기(부회록서기)에게 임원방 하위에 <회의록 작성 매니저>를 붙인다.
-   * 회의록을 규격대로 적는 매니저다. */
+  /* 회록서기(부회록서기)에게 임원방 하위에 <회의록 작성 안내>를 붙인다.
+   * 총회 표준 회의록 작성 및 보존 규정을 정리한 안내와 샘플이다. */
   function addMinutesWriteMenu() {
     var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
     if (!links.length) return;
     var sub = links[0].parentNode.querySelector('.gnb-sub');
-    if (!sub || sub.querySelector('a[href="minutes-write.html"]')) return;
+    if (!sub || sub.querySelector('a[href="minutes-guide.html"]')) return;
     var a = document.createElement('a');
-    a.href = 'minutes-write.html';
-    a.textContent = '회의록 작성 매니저';
+    a.href = 'minutes-guide.html';
+    a.textContent = '회의록 작성 안내';
     /* 노회 진행 매니저 바로 뒤 (그 메뉴가 없으면 노회 회의록 바로 위) */
     var proceed = sub.querySelector('a[href="proceed.html"]');
     if (proceed && proceed.nextSibling) sub.insertBefore(a, proceed.nextSibling);
