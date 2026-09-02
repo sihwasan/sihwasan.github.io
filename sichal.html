@@ -431,10 +431,9 @@ document.addEventListener('DOMContentLoaded', function () {
       }).join('') + '</div>';
     }
 
-    if (isOfficer) h += churchForm();
+    /* 관내 교회 추가는 회원 관리·교회 관리에서만 한다 (여기서는 열람·수정만) */
     box.innerHTML = h;
     SHSNames.attachAll(box);
-    if (isOfficer) bindChurchForm();
 
     /* 홈페이지 이동 링크는 카드 열기와 겹치지 않게 한다 */
     box.querySelectorAll('a[data-chlink]').forEach(function (a) {
@@ -730,55 +729,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     SHS.logAction('view', '관내 교회 열람', NAME + ' / ' + ch.name);
-  }
-
-  function churchForm() {
-    return '<div class="admin-card" style="margin-top:18px">' +
-      '<h3 style="margin-top:0" id="ch-ftitle">관내 교회 추가</h3>' +
-      '<input type="hidden" id="ch-id" value="">' +
-      '<div class="field"><label>교회 이름</label><input type="text" id="ch-name" placeholder="예: 반월교회"></div>' +
-      '<p style="font-size:0.82rem;color:var(--gray-5)">담임목사·주소·연락처는 회원 명단에서 자동으로 가져오므로 따로 적지 않습니다.</p>' +
-      '<div class="field"><label>홈페이지 주소 (없으면 비워 두세요)</label>' +
-      '<input type="text" id="ch-url" placeholder="예: https://example.org"></div>' +
-      '<div class="field"><label>비고</label><input type="text" id="ch-note"></div>' +
-      '<button class="btn" id="ch-save">저장</button> ' +
-      '<button class="btn ghost hidden" id="ch-cancel">취소</button>' +
-      '<div class="form-msg" id="ch-msg"></div></div>';
-  }
-
-  function bindChurchForm() {
-    document.getElementById('ch-cancel').addEventListener('click', function () {
-      ['id', 'name', 'url', 'note'].forEach(function (k) {
-        document.getElementById('ch-' + k).value = '';
-      });
-      document.getElementById('ch-ftitle').textContent = '관내 교회 추가';
-      this.classList.add('hidden');
-    });
-    document.getElementById('ch-save').addEventListener('click', function () {
-      var msg = document.getElementById('ch-msg');
-      var id = document.getElementById('ch-id').value;
-      var d = { sichal: NAME, updated_at: new Date().toISOString(), updated_by: user.name };
-      ['name', 'url', 'note'].forEach(function (k) {
-        d[k] = document.getElementById('ch-' + k).value.trim() || null;
-      });
-      if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '교회 이름을 입력해 주세요.'; return; }
-      if (!id) d.sort = (churches.length + 1) * 10;
-      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
-      db().then(function (c) {
-        return id ? c.from('sichal_churches').update(d).eq('id', id).select()
-                  : c.from('sichal_churches').insert(d).select();
-      }).then(function (r) {
-        var w = SHS.wrote(r);
-        if (!w.ok) {
-          msg.className = 'form-msg err';
-          msg.textContent = (r.error && r.error.code === '23505')
-            ? '같은 이름의 교회가 이미 등록되어 있습니다.' : w.why;
-          return;
-        }
-        SHSCloud.log(id ? 'update' : 'create', '관내 교회 ' + (id ? '수정' : '추가'), NAME + ' / ' + d.name);
-        load();
-      });
-    });
   }
 
   /* ================= 목회자 명단 ================= */
