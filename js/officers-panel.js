@@ -67,9 +67,7 @@ var SHSOfficersPanel = (function () {
       }
 
       function drawOfficers() {
-        var html = '<h2>노회 임원 명부</h2>' +
-          '<p>조직 페이지의 임원 표에 표시됩니다. 봄 정기노회 후 새 임원으로 바꿔 주세요. ' +
-          '<strong>수정</strong>을 누르면 팝업에서 고칠 수 있고, 성명은 회원 명단과 연동됩니다.</p>';
+        var html = '<h2>노회 임원 명부</h2>';
         html += '<table class="tbl" style="max-width:820px"><thead><tr>' +
           '<th style="width:120px">직책</th><th style="width:110px">성명</th>' +
           '<th style="width:90px">직분</th><th>시무교회</th>' +
@@ -92,8 +90,6 @@ var SHSOfficersPanel = (function () {
 
         /* 증경노회장단: 권한 위임이 완료되면 자동 등재되고, 지난 기록은 손으로 넣는다 */
         html += '<h2>증경노회장단</h2>' +
-          '<p>퇴임하신 목사 노회장과 장로 부노회장으로 구성됩니다. ' +
-          '노회 운영의 <strong>권한 위임</strong>이 완료되거나 임원 수정에서 <strong>퇴임</strong> 처리를 하면 자동으로 오르며, 지난 기록은 여기서 직접 넣을 수 있습니다.</p>' +
           '<table class="tbl" style="max-width:820px"><thead><tr>' +
           '<th style="width:120px">구분</th><th style="width:110px">성명</th>' +
           '<th style="width:90px">직분</th><th>시무교회</th>' +
@@ -259,8 +255,7 @@ var SHSOfficersPanel = (function () {
               return canHand
                 ? '<div style="margin:4px 0 12px"><button class="btn" id="ofm-hand" ' +
                   'style="background:#b03a3a;border-color:#b03a3a">권한 위임</button>' +
-                  '<span style="font-size:0.8rem;color:var(--gray-5);margin-left:8px">노회장은 투표로 정하므로 ' +
-                  '권한 위임 절차로 교체합니다. 신임 노회장께서 수락하시면 자동으로 교체됩니다.</span></div>'
+                  '<span style="font-size:0.8rem;color:var(--gray-5);margin-left:8px">신임 노회장께서 수락하시면 자동으로 교체됩니다.</span></div>'
                 : '<p style="font-size:0.8rem;color:var(--gray-5)">노회장 교체는 노회장 또는 최고관리자가 ' +
                   '<strong>노회 운영 &#8594; 노회장 권한 위임</strong>에서 합니다.</p>';
             }
