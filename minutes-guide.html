@@ -20,10 +20,6 @@
   border-radius: 8px; padding: 14px 18px; margin: 10px 0 16px; font-size: 0.92rem; line-height: 1.8; }
 .mg-ex .t { font-weight: 700; color: var(--navy, #4b3f33); display: block; margin-bottom: 4px; font-size: 0.84rem; }
 /* 순서 흐름 */
-.mg-flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0 14px; }
-.mg-flow span { background: #fff; border: 1px solid var(--gray-3, #d8dbe2); border-radius: 16px;
-  padding: 5px 13px; font-size: 0.86rem; }
-.mg-flow b { color: var(--gray-4); font-weight: 400; }
 .mg-dl { background: #fff; border: 2px solid #b03a3a; border-radius: 12px; padding: 20px 24px; margin: 26px 0 10px; }
 </style>
 </head>
@@ -47,6 +43,15 @@
       따라 작성합니다. 노회는 강도사·전도사 인허, 목사의 임직·이명·별세, 후보생 명부, 교회 설립·분립·합병과
       각 교회 정황, 처리한 일반 사건을 일일이 기록하여 <strong>매년 상회(총회)에 보고</strong>하고
       (총회 헌법 정치 제10장 제7조), 노회록 검사부의 <strong>검사</strong>를 받습니다.
+    </div>
+
+    <div class="mg-dl" id="mg-dl">
+      <h3 style="margin:0 0 6px">회의록 샘플 (Word)</h3>
+      <p style="margin:0 0 12px;font-size:0.9rem">총회 규격(A4 · 여백 · 신명조 12호 · 줄간격 160%)을 그대로 맞춘
+        정기노회 회의록 워드 파일입니다. 내려받아 ○○ 자리만 채우면 규정대로 작성됩니다.</p>
+      <p style="margin:0" id="mg-dl-btn"><a class="btn" href="data/minutes-sample.docx"
+        download="노회 회의록 샘플.docx"
+        style="background:#b03a3a;border-color:#b03a3a;color:#fff">&#11015;&#65039; 회의록 샘플 내려받기 (.docx)</a></p>
     </div>
 
     <h2>1. 누가 작성하고 서명하나</h2>
@@ -77,33 +82,7 @@
     </ul>
     <p class="mg-note">※ 위·변조 방지를 위하여 회의록 장과 장 사이에 <strong>간인(또는 직인)</strong>을 날인합니다. (제6조 마항)</p>
 
-    <h2>3. 기본 항목과 순서</h2>
-    <h3>정기·임시노회 (대회의 — 별지 1)</h3>
-    <div class="mg-flow">
-      <span>회의명·회차 (상단 중앙)</span><b>·</b>
-      <span>일시 (년. 월. 일. 오전/오후 0시 0분)</span><b>·</b>
-      <span>장소 (명칭·주소)</span>
-    </div>
-    <div class="mg-flow">
-      <span><strong>Ⅰ. 개회예배</strong> — 사회자 · 찬송 · 기도 · 설교(말씀) · 축도</span>
-    </div>
-    <div class="mg-flow">
-      <span><strong>Ⅱ. 회무처리</strong></span><b>&#8594;</b>
-      <span>회원점명 · 개회선언</span><b>&#8594;</b>
-      <span>절차(회순) 채택</span><b>&#8594;</b>
-      <span>안건 상정 · 처리</span><b>&#8594;</b>
-      <span>정회 · 속회 (시간·사회자·기도자 명기)</span><b>&#8594;</b>
-      <span>안건 처리 계속</span><b>&#8594;</b>
-      <span>회록 채택</span>
-    </div>
-    <div class="mg-flow">
-      <span><strong>Ⅲ. 파회(폐회)</strong> — 폐회 예배 · 폐회 선언</span>
-    </div>
-    <h3>임원회 · 부 · 위원회 · 당회 (소회의 — 별지 2)</h3>
-    <p>회의명·회차 → 일시 → 장소 → 예배(사회자·찬송·기도·말씀·마침기도) → 회원점명·개회선언 →
-      안건 상정·결의 → 폐회(시간·기도자)</p>
-
-    <h2>4. 문장은 이렇게 적습니다</h2>
+    <h2>3. 문장은 이렇게 적습니다</h2>
     <p class="mg-note">별지 1 표준 서식의 문장 틀입니다. ○○ 자리에 실제 내용을 넣으면 됩니다.</p>
 
     <div class="mg-ex"><span class="t">개회예배</span>
@@ -140,7 +119,7 @@
       이 노회와 같이 조직된 노회가 다시 정한 날 정한 장소에서 회집할 것을 선언합니다.&rdquo;
     </div>
 
-    <h2>5. 채택된 회의록의 수정</h2>
+    <h2>4. 채택된 회의록의 수정</h2>
     <ul>
       <li>채택된 회의록은 <strong>채택한 회의의 결의 없이는 수정할 수 없습니다</strong>.</li>
       <li>수정할 때는 해당란에 <strong>붉은 줄</strong>을 긋고 수정한 후, 여백에 몇 자를 수정했음을 기재하고
@@ -149,7 +128,7 @@
         어느 부분을 수정했는지</strong>를 명기합니다.</li>
     </ul>
 
-    <h2>6. 검사와 보존</h2>
+    <h2>5. 검사와 보존</h2>
     <ul>
       <li>각 노회는 <strong>매년 8월 첫째 주까지</strong> 총회로 회의록을 제출하여 검사를 받습니다.
         (총회규칙 제3장 3항 13목, 규정 제7조)</li>
@@ -158,19 +137,7 @@
       <li>제출은 직접 또는 등기우편으로 하며, 문의는 총회 노회록검사부 (02-559-5626, 서울 강남구 영동대로 330 총회회관 3층)</li>
     </ul>
 
-    <div class="mg-dl" id="mg-dl">
-      <h3 style="margin:0 0 6px">회의록 샘플 (Word)</h3>
-      <p style="margin:0 0 12px;font-size:0.9rem">위 규격(A4 · 여백 · 신명조 12호 · 줄간격 160%)을 그대로 맞춘
-        정기노회 회의록 워드 파일입니다. 내려받아 ○○ 자리만 채우면 규정대로 작성됩니다.</p>
-      <p style="margin:0" id="mg-dl-btn"><a class="btn" href="data/minutes-sample.docx"
-        download="노회 회의록 샘플.docx"
-        style="background:#b03a3a;border-color:#b03a3a;color:#fff">&#11015;&#65039; 회의록 샘플 내려받기 (.docx)</a></p>
-    </div>
 
-    <p class="mg-note" style="margin-top:18px">
-      회의 당일 진행 기록은 <a href="proceed.html" style="text-decoration:underline">노회 진행 매니저</a>의
-      <strong>회의 기록 정리</strong>에서 순서별 처리 결과를 그대로 가져와 회의록 초안으로 쓸 수 있습니다.
-    </p>
   </div>
   </template>
 </main>
