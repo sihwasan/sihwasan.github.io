@@ -44,15 +44,6 @@
       <tbody id="officers-body"></tbody>
     </table>
 
-    <div id="veterans-wrap" style="display:none">
-      <h2>증경노회장단</h2>
-      <p>역대 노회를 섬기고 퇴임하신 목사 노회장과 장로 부노회장입니다.</p>
-      <table class="tbl" style="max-width:720px">
-        <thead><tr><th>구분</th><th>성명</th><th>직분</th><th>회기</th></tr></thead>
-        <tbody id="veterans-body"></tbody>
-      </table>
-    </div>
-
     <div id="hist-wrap" style="display:none">
       <h2>역대 노회 임원</h2>
       <p>서수원·경기서 노회 시절부터 이어 온 역대 임원 명단입니다.</p>
@@ -65,6 +56,15 @@
         </table>
       </div>
       <p id="hist-notes" style="font-size:0.86rem;color:var(--gray-6)"></p>
+    </div>
+
+    <div id="veterans-wrap" style="display:none">
+      <h2>증경노회장단</h2>
+      <p>역대 노회를 섬기고 퇴임하신 목사 노회장과 장로 부노회장입니다.</p>
+      <table class="tbl" style="max-width:720px">
+        <thead><tr><th>구분</th><th>성명</th><th>직분</th></tr></thead>
+        <tbody id="veterans-body"></tbody>
+      </table>
     </div>
 
     <h2>총회 총대</h2>
@@ -254,8 +254,7 @@ document.addEventListener('DOMContentLoaded', function () {
       wrap.style.display = '';
       tb.innerHTML = list.map(function (o) {
         return '<tr><td><span class="role-badge">' + e(o.role || '') + '</span></td>' +
-          '<td>' + e(o.name || '') + '</td><td>' + e(o.position || '-') + '</td>' +
-          '<td>' + (o.session_no ? '제' + e(o.session_no) + '회기' : '-') + '</td></tr>';
+          '<td>' + e(o.name || '') + '</td><td>' + e(o.position || '-') + '</td></tr>';
       }).join('');
     }
     /* 회원명단 탭에도 같은 명단을 보여 준다 */
