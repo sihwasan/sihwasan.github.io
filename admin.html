@@ -27,6 +27,7 @@
 <script src="js/name-picker.js"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
+<script src="js/officers-panel.js?v=20260902a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -143,6 +144,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div id="elder-area" class="hidden"><p style="color:var(--gray-5)">장로 총대를 불러오는 중...</p></div>' +
         '<div id="relder-area" class="hidden"><p style="color:var(--gray-5)">원로장로 명단을 불러오는 중...</p></div>' +
         '</div>';
+      html += '<h2>임원명단 관리</h2>';
+      html += '<div id="officers-area"><p style="color:var(--gray-5)">임원 명부를 불러오는 중...</p></div>';
       html += '<h2>교회 관리</h2>';
       html += '<div id="church-area"><p style="color:var(--gray-5)">교회 명부를 불러오는 중...</p></div>';
       html += '<h2>안수·인허 명단</h2>';
@@ -176,6 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderCommittees();
       } else {
         renderRoster();
+        SHSOfficersPanel.mount(document.getElementById('officers-area'), user);
         renderChurches();
         renderServingElders();
         renderElders();
