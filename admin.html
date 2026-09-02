@@ -65,12 +65,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (pendings.length) {
         html += '<h2>승인대기 회원</h2>';
-        html += '<p>가입 시 입력한 이름과 소속 교회가 노회 명단과 일치하지 않은 회원입니다. 확인 후 정회원으로 설정해 주세요.</p>';
-        html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속 교회</th><th style="width:130px">처리</th></tr></thead><tbody>';
+        html += '<p>가입 시 입력한 이름과 소속 교회가 노회 명단과 일치하지 않은 회원입니다. 확인 후 정회원으로 설정해 주세요.' +
+          (user.role === 'superadmin' ? ' 노회와 관계없는 가입이면 <strong>삭제</strong>로 계정을 지울 수 있습니다.' : '') + '</p>';
+        html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속 교회</th><th style="width:190px">처리</th></tr></thead><tbody>';
         pendings.forEach(function (p) {
           html += '<tr><td class="left">' + e(p.email) + '</td><td>' + e(p.name || '-') + '</td>' +
             '<td>' + e(p.position || '-') + '</td><td>' + e(p.church || '-') + '</td>' +
-            '<td>' + (canApprove ? '<button class="btn sm" data-capprove="' + e(p.id) + '">정회원 설정</button>' : '승인 권한 없음') + '</td></tr>';
+            '<td>' + (canApprove ? '<button class="btn sm" data-capprove="' + e(p.id) + '">정회원 설정</button>' : '승인 권한 없음') +
+            /* 승인대기자 삭제는 최고관리자만 (로그인 계정까지 지운다) */
+            (user.role === 'superadmin'
+              ? ' <button class="btn danger sm" data-cdelete="' + e(p.id) + '" data-cname="' + e(p.name || p.email || '') + '">삭제</button>'
+              : '') + '</td></tr>';
         });
         html += '</tbody></table>';
       }
@@ -223,6 +228,22 @@ document.addEventListener('DOMContentLoaded', function () {
           }).then(function (res) {
             if (res.error) { alert('처리하지 못했습니다: ' + res.error.message); return; }
             SHSCloud.log('update', '정회원 승인', '대상 ' + b.dataset.capprove);
+            renderCloud();
+          });
+        });
+      });
+      area.querySelectorAll('button[data-cdelete]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('"' + b.dataset.cname + '" 승인대기 회원을 삭제하시겠습니까?\n' +
+                       '로그인 계정까지 지워지며 되돌릴 수 없습니다.')) return;
+          SHSCloud.init().then(function (c) {
+            return c.rpc('delete_pending_member', { p_id: b.dataset.cdelete });
+          }).then(function (res) {
+            if (res.error) { alert('삭제하지 못했습니다: ' + res.error.message); return; }
+            SHSCloud.log('delete', '승인대기 회원 삭제', b.dataset.cname);
+            alert(res.data === 'profile_only'
+              ? '회원 정보를 지웠습니다. (로그인 계정은 남아 있어 다시 가입하면 승인대기로 올라옵니다)'
+              : '삭제되었습니다.');
             renderCloud();
           });
         });
