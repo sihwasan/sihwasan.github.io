@@ -978,14 +978,6 @@ document.addEventListener('DOMContentLoaded', function () {
         '<select id="ro-fgrade"><option value="">등급 전체</option>' +
         GRADES.map(function (g) { return '<option value="' + g.v + '">' + e(g.t) + '</option>'; }).join('') +
         '</select></div>' +
-        '<div class="field" style="flex:0 0 175px"><label for="ro-fview">보기 방식</label>' +
-        '<select id="ro-fview">' +
-        '<option value="">기본 (명부 순)</option>' +
-        '<option value="term">남은 임기 짧은 순</option>' +
-        '<option value="wiim">위임목사 먼저</option>' +
-        '<option value="member">정회원 먼저</option>' +
-        '<option value="officers">임원만 보기</option>' +
-        '</select></div>' +
         '<button class="btn ghost" id="ro-qclear">지우기</button>' +
         '</div>';
 
@@ -1022,11 +1014,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
       /* 명단 표 — 읽기 전용. [수정]을 누르면 팝업에서 고친다. */
       html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th>' +
-        '<th style="width:110px">성명</th><th style="width:110px">직분</th>' +
+        '<th style="width:110px">성명</th>' +
+        '<th style="width:110px;cursor:pointer;user-select:none" id="ro-th-pos"></th>' +
         '<th>소속 교회</th><th style="width:110px">시찰</th>' +
         '<th style="width:120px">임직일자</th>' +
         '<th style="width:120px">재직일(부임)</th>' +
-        '<th style="width:130px">남은 임기</th><th style="width:130px">부여 등급</th>' +
+        '<th style="width:140px;cursor:pointer;user-select:none" id="ro-th-term"></th>' +
+        '<th style="width:130px;cursor:pointer;user-select:none" id="ro-th-grade"></th>' +
         '<th style="width:80px">관리</th></tr></thead><tbody>';
       rows.forEach(function (m, i) {
         /* 보기 방식 정렬에 쓸 값: 정년까지 남은 날수 */
@@ -1090,13 +1084,38 @@ document.addEventListener('DOMContentLoaded', function () {
       var qBox = document.getElementById('ro-q');
       var fCat = document.getElementById('ro-fcat');
       var fGrade = document.getElementById('ro-fgrade');
-      var fView = document.getElementById('ro-fview');
       function isOfficerGrade(g2) {
         return g2 === 'president' || g2 === 'clerk' || String(g2).indexOf('officer:') === 0;
       }
+
+      /* 머리글에 지금 보기 순서를 화살표로 표기한다 */
+      function syncHeads() {
+        function put(id, label, mark, title, on) {
+          var th = document.getElementById(id);
+          if (!th) return;
+          th.innerHTML = label + (mark ? ' ' + mark : '');
+          th.title = title;
+          th.style.color = on ? 'var(--accent)' : '';
+          th.style.fontWeight = on ? '700' : '';
+        }
+        put('ro-th-pos', '직분', roView === 'wiim' ? '&#9660;' : '',
+          roView === 'wiim' ? '위임목사 먼저 — 누르면 기본 순' : '누르면 위임목사를 먼저 보여 줍니다',
+          roView === 'wiim');
+        put('ro-th-term', '남은 임기',
+          roView === 'term' ? '&#9650;' : (roView === 'termDesc' ? '&#9660;' : '&#8693;'),
+          roView === 'term' ? '남은 임기 짧은 순 — 누르면 긴 순'
+            : (roView === 'termDesc' ? '남은 임기 긴 순 — 누르면 기본 순' : '누르면 남은 임기 짧은 순'),
+          roView === 'term' || roView === 'termDesc');
+        put('ro-th-grade', '부여 등급',
+          roView === 'member' ? '&#9650;' : (roView === 'officers' ? '&#9670;' : ''),
+          roView === 'member' ? '정회원 먼저 — 누르면 임원만 보기'
+            : (roView === 'officers' ? '임원만 보는 중 — 누르면 기본 순' : '누르면 정회원 먼저, 한 번 더 누르면 임원만'),
+          roView === 'member' || roView === 'officers');
+      }
+
       function applyFilter() {
         var q = (qBox.value || '').trim();
-        var c = fCat.value, g = fGrade.value, view = fView.value;
+        var c = fCat.value, g = fGrade.value, view = roView;
 
         /* 보기 방식에 따라 줄 순서를 바꾼다 (기본은 명부 순) */
         var tbody = box.querySelector('#ro-tbl tbody');
@@ -1104,6 +1123,7 @@ document.addEventListener('DOMContentLoaded', function () {
         trs.sort(function (a, b) {
           var tie = (+a.dataset.idx) - (+b.dataset.idx);
           if (view === 'term') return ((+a.dataset.days) - (+b.dataset.days)) || tie;
+          if (view === 'termDesc') return ((+b.dataset.days) - (+a.dataset.days)) || tie;
           if (view === 'wiim') {
             return ((b.dataset.pos === '위임목사' ? 1 : 0) - (a.dataset.pos === '위임목사' ? 1 : 0)) || tie;
           }
@@ -1135,12 +1155,28 @@ document.addEventListener('DOMContentLoaded', function () {
           if (ok) { shown++; tr.querySelector('.ro-no').textContent = ++n; }
         });
         var el = document.getElementById('ro-count');
-        el.textContent = (q || c || g || fView.value === 'officers') ? ' 가운데 ' + shown + '명' : '';
+        el.textContent = (q || c || g || view === 'officers') ? ' 가운데 ' + shown + '명' : '';
+        syncHeads();
       }
-      [qBox, fCat, fGrade, fView].forEach(function (el) {
+      [qBox, fCat, fGrade].forEach(function (el) {
         el.addEventListener('input', applyFilter);
         el.addEventListener('change', applyFilter);
       });
+
+      /* 머리글 클릭으로 보기 순서 바꾸기 (한 번에 한 기준만) */
+      document.getElementById('ro-th-pos').addEventListener('click', function () {
+        roView = roView === 'wiim' ? '' : 'wiim';
+        applyFilter();
+      });
+      document.getElementById('ro-th-term').addEventListener('click', function () {
+        roView = roView === 'term' ? 'termDesc' : (roView === 'termDesc' ? '' : 'term');
+        applyFilter();
+      });
+      document.getElementById('ro-th-grade').addEventListener('click', function () {
+        roView = roView === 'member' ? 'officers' : (roView === 'officers' ? '' : 'member');
+        applyFilter();
+      });
+      syncHeads();
       rosterApplyFilter = applyFilter;
       if (memType === 'pastor') applyFilter();
       document.getElementById('ro-qclear').addEventListener('click', function () {
@@ -1747,6 +1783,10 @@ document.addEventListener('DOMContentLoaded', function () {
   var SESSIONS = { current: 19, list: [] };
   var elderSes = null;   /* 장로 총대 탭에서 보고 있는 회기 (기본: 현재 회기) */
   var memType = 'all';   /* 회원 신상관리 구분: all(전체) | pastor(목사회원) | elder(장로회원) */
+  /* 명단 보기 순서 — 표 머리글을 눌러 바꾼다.
+   * '' 기본(명부 순) | term 남은 임기 짧은 순 | termDesc 긴 순
+   * | wiim 위임목사 먼저 | member 정회원 먼저 | officers 임원만 보기 */
+  var roView = '';
   var rosterApplyFilter = null;   /* 명단 조회 필터를 밖에서 다시 적용할 때 쓴다 */
 
   function sesList() { return SESSIONS.list || []; }
