@@ -36,11 +36,11 @@ var SHSOps = (function () {
   /* 권한 위임(이·취임)은 노회장과 최고관리자만 다룬다 */
   var canHand = user.role === 'president' || user.role === 'superadmin';
 
-  /* 정기노회 일정·기준일은 아래 '정기노회 일정' 탭에서 다룬다 (mountSchedule 참조) */
+  /* 정기노회 일정·기준일은 아래 '노회 일정 설정' 탭에서 다룬다 (mountSchedule 참조) */
   area.innerHTML =
     '<div class="tabs">' +
     '<button class="active" data-tab="ops-alert">시스템 알림 설정</button>' +
-    '<button data-tab="ops-meeting">정기노회 일정</button>' +
+    '<button data-tab="ops-meeting">노회 일정 설정</button>' +
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
     (canHand ? '<button data-tab="ops-hand">권한 위임</button>' : '') +
     '<button data-tab="ops-aw">감사 기간</button>' +
@@ -586,14 +586,14 @@ var SHSOps = (function () {
 
   }
 
-  /* ================= 정기노회 일정 =================
-   * 사이트 관리 → 노회 운영 → 정기노회 일정 탭에서 부른다.
+  /* ================= 노회 일정 설정 =================
+   * 사이트 관리 → 노회 운영 → 노회 일정 설정 탭에서 부른다.
    * 정기노회 일정(확정되면 40일 전 알림)과 정기노회 기준일을 함께 다룬다. */
   function mountSchedule(area, user) {
     if (!area) return;
     var e = SHS.esc;
     if (!user || !SHSAuth.canManageMembers(user) || !user.cloud) {
-      area.innerHTML = '<div class="notice-banner">정기노회 일정 관리는 관리자 등급이 ' +
+      area.innerHTML = '<div class="notice-banner">노회 일정 설정은 관리자 등급이 ' +
         '서버 로그인(구글 또는 이메일) 후 볼 수 있습니다.</div>';
       return;
     }

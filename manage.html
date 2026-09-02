@@ -28,7 +28,7 @@
 <script src="js/main.js?v=20260902c"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/audit-view.js"></script>
-<script src="js/ops-panel.js?v=20260902a"></script>
+<script src="js/ops-panel.js?v=20260902b"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -68,17 +68,19 @@ document.addEventListener('DOMContentLoaded', function () {
     '<button class="active" data-tab="mg-notice">공지사항</button>' +
     '<button data-tab="mg-hero">메인 화면</button>' +
     '<button data-tab="mg-gallery">갤러리</button>' +
+    '<button data-tab="mg-officers-tab">임원명단 관리</button>' +
     '<button data-tab="mg-ops">노회 운영</button>' +
     '</div>' +
     '<div class="tab-panel active" id="mg-notice"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
     '<div class="tab-panel" id="mg-hero"></div>' +
     '<div class="tab-panel" id="mg-gallery"></div>' +
-    /* 노회 운영: 시스템 운영(알림 설정·매뉴얼·권한 위임·감사)을 위에,
-     * 회기·임원 명부·증경단을 아래에 둔다 */
+    /* 임원명단 관리: 노회 임원 명부와 증경노회장단 */
+    '<div class="tab-panel" id="mg-officers-tab"><div id="mg-officers"></div></div>' +
+    /* 노회 운영: 시스템 운영(알림 설정·노회 일정·매뉴얼·권한 위임·감사)을 위에,
+     * 회기 설정을 아래에 둔다 */
     '<div class="tab-panel" id="mg-ops">' +
     '<div id="mg-opsbody"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
-    '<div class="ops-cols" style="margin-top:22px"><div id="mg-terms"></div>' +
-    '<div id="mg-officers"></div></div></div>';
+    '<div id="mg-terms" style="margin-top:22px;max-width:760px"></div></div>';
 
   /* 탭 전환 (main.js의 탭 코드는 페이지 로드 시점에 실행되므로 여기서 직접 연결) */
   area.querySelectorAll('.tabs button').forEach(function (b) {
