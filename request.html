@@ -60,7 +60,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902e"></script>
+<script src="js/main.js?v=20260902f"></script>
 <script src="js/vendor/qrcode.js"></script>
 <script src="js/certs-config.js"></script>
 <script src="js/certificate.js?v=20260831a"></script>
@@ -105,6 +105,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   /* 정회원이 아니어도 안수증명서는 신청할 수 있다 (시화산노회에서 안수받은 기록이 있으면).
    * 그 밖의 서류는 정회원 전용이다. */
+  /* 언권회원은 서류 발급을 신청할 수 없다 */
+  var fmg = SHS.fullMemberGate(user, '서류 발급 신청');
+  if (fmg) { area.innerHTML = fmg; return; }
   var gate = SHS.memberGate(user, '서류 신청');
   var ORD_ONLY = !!gate;
 

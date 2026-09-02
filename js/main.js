@@ -1035,7 +1035,6 @@
     if (!u) return '로그인이 필요합니다.';
     if (u.role === 'pending') return '승인대기 상태입니다.';
     if (u.suspended) return '정회원 자격이 정지되었습니다.';
-    if (u.role === 'advisory') return '언권회원은 발언권만 있어 정회원 전용 자료를 열람할 수 없습니다.';
     if (u.role === 'general') return '일반회원은 정회원 전용 자료를 열람할 수 없습니다.';
     /* 정년이 지났는데 아직 정년 처리(언권회원 전환 또는 관리자 확정)가 안 된 경우 */
     if (isRetired(u.birth_date) && !u.retire_applied) return '총회 정년(만 ' + RETIRE_AGE + '세)에 이르러 정회원 자격이 만료되었습니다.';
@@ -1053,9 +1052,19 @@
   function isActiveMember(u) {
     if (!u) return false;
     if (isRetired(u.birth_date) && !u.retire_applied) return false;
-    if (u.role === 'advisory' || u.role === 'general') return false;
+    if (u.role === 'general') return false;
     if (['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(u.role) !== -1) return true;
     return !membershipIssue(u);
+  }
+
+  /* 언권회원 제한: 서류 발급·청원서·보고서 작성은 할 수 없다.
+   * 그 밖의 활동은 정회원과 동일하다. */
+  function fullMemberGate(u, what) {
+    if (u && u.role === 'advisory') {
+      return '<div class="notice-banner">언권회원은 <strong>' + (what || '이 기능') +
+        '</strong>을 이용하실 수 없습니다. 문의는 노회 사무실(031-486-9993)로 해주시기 바랍니다.</div>';
+    }
+    return null;
   }
 
   /* 정회원 전용 영역 안내 (자격이 없으면 안내 HTML 반환, 있으면 null) */
@@ -1355,6 +1364,7 @@
     isActiveMember: isActiveMember,
     membershipIssue: membershipIssue,
     memberGate: memberGate,
+    fullMemberGate: fullMemberGate,
     termLabel: termLabel,
     retireLabel: retireLabel,
     ageOn: ageOn,

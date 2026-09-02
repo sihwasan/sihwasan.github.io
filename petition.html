@@ -199,7 +199,7 @@ body.pt-embed main { padding-top: 10px; }
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902e"></script>
+<script src="js/main.js?v=20260902f"></script>
 <script>
 (function () {
   'use strict';
@@ -1605,6 +1605,12 @@ body.pt-embed main { padding-top: 10px; }
   if (window.SHS && SHS.getUser) {
     SHS.getUser().then(function (u) {
       user = u;
+      /* 언권회원은 청원서를 작성·제출할 수 없다 */
+      if (u && u.role === 'advisory') {
+        document.getElementById('main').innerHTML =
+          '<div style="padding:20px 0">' + SHS.fullMemberGate(u, '청원서 작성') + '</div>';
+        return;
+      }
       loadMine(); loadSeal(); loadInbox(); openFromUrl();
       /* 시찰보고서 연동(회기·시찰장·교세 자동 입력)은 로그인 확인 후에야
        * 돌 수 있으므로, 처음부터 시찰보고서로 들어왔다면 다시 그린다 */

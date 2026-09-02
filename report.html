@@ -87,7 +87,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902e"></script>
+<script src="js/main.js?v=20260902f"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -97,6 +97,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var gate = SHS.memberGate(user, '교회상황 보고서');
   if (gate) { area.innerHTML = gate; return; }
+  /* 언권회원은 보고서를 작성할 수 없다. 양식 내려받기만 안내한다. */
+  if (user.role === 'advisory') {
+    area.innerHTML = SHS.fullMemberGate(user, '교회상황 보고서 작성') +
+      '<div class="admin-card" style="max-width:640px"><h3 style="margin-top:0">교회상황보고서 양식</h3>' +
+      '<p style="font-size:0.9rem">한글(HWPX) 양식은 내려받으실 수 있습니다. 작성과 제출은 ' +
+      '담임목사(정회원)께 부탁해 주세요.</p>' +
+      '<p style="margin:0"><a class="btn" href="data/church-report-form.hwpx" ' +
+      'download="교회상황보고서 양식.hwpx" ' +
+      'style="background:#b03a3a;border-color:#b03a3a;color:#fff">&#11015;&#65039; 한글 양식 내려받기 (.hwpx)</a></p></div>';
+    return;
+  }
   if (!user.cloud || !window.SHSCloud || !SHSCloud.enabled()) {
     area.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.</div>';
     return;
