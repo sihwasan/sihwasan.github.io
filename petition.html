@@ -106,6 +106,9 @@
 #pt-paper .signrow {
   display: flex; justify-content: space-between; align-items: baseline;
   margin: 26px 0; font-size: 18px; font-weight: 700; flex-wrap: wrap; gap: 10px;
+  /* 도장이 (인) 오른쪽으로 삐져나와도 종이(인쇄 영역) 안에 들도록 오른쪽을 비워 둔다.
+   * 서명란이 오른쪽 끝에 붙으면 도장이 @page 여백 밖으로 나가 잘렸다. */
+  padding-right: 64px;
 }
 #pt-paper .signrow.r { justify-content: flex-end; }
 #pt-paper .addr { font-size: 21px; font-weight: 700; margin: 34px 0 24px; letter-spacing: 2px; }
@@ -159,10 +162,17 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
 @media print {
   body * { visibility: hidden; }
   #pt-paper, #pt-paper * { visibility: visible; }
+  /* 조상 어디에도 넘친 부분을 자르는 곳이 없게 한다 (도장이 잘리지 않도록) */
+  html, body, main, #pt-print-wrap, #pt-paper, #pt-paper .signrow, #pt-paper .inwrap { overflow: visible !important; }
   #pt-paper {
     position: absolute; left: 0; top: 0; width: 100%;
     border: none; box-shadow: none; padding: 0; margin: 0; max-width: none;
   }
+  /* 인쇄에서는 종이 안쪽 여백이 0 이 되어 서명 행이 곧 인쇄 영역 끝이다.
+   * 도장(높이 46px, 너비는 그림에 따라 더 넓을 수 있다)이 (인) 오른쪽으로
+   * 나가도 잘리지 않게 오른쪽을 화면과 같이 비워 둔다. */
+  #pt-paper .signrow { padding-right: 64px; }
+  #pt-paper .pt-seal { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   #pt-paper .pt-page + .pt-page {
     margin-top: 0; padding-top: 0; border-top: none;
     page-break-before: always; break-before: page;
@@ -1072,10 +1082,45 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
 
   /* 미리보기의 도장을 끌어서 원하는 자리에 찍는다.
    * 위치는 data._seal 에 저장되어 인쇄·PDF·저장본에 그대로 적용된다. */
+  /* 도장을 종이 안쪽(여백을 뺀 글 영역)에 가둔다.
+   * 인쇄에서는 종이의 안쪽 여백이 0 이 되어 글 영역이 곧 인쇄 영역이므로,
+   * 화면에서 글 영역 안에 있으면 인쇄에서도 잘리지 않는다. */
+  function placeSeal(img) {
+    img.style.left = (-8 + sealPos.dx) + 'px';
+    img.style.marginTop = (-23 + sealPos.dy) + 'px';
+  }
+  function clampSeal(img) {
+    var paper = document.getElementById('pt-paper');
+    if (!paper || !img.naturalWidth) return;
+    var cs = getComputedStyle(paper);
+    var pr = paper.getBoundingClientRect();
+    var left = pr.left + (parseFloat(cs.paddingLeft) || 0);
+    var right = pr.right - (parseFloat(cs.paddingRight) || 0);
+    var top = pr.top + (parseFloat(cs.paddingTop) || 0);
+    var bottom = pr.bottom - (parseFloat(cs.paddingBottom) || 0);
+    var ir = img.getBoundingClientRect();
+    if (!ir.width) return;
+    var mx = 0, my = 0;
+    if (ir.left < left) mx = left - ir.left;
+    else if (ir.right > right) mx = right - ir.right;
+    if (ir.top < top) my = top - ir.top;
+    else if (ir.bottom > bottom) my = bottom - ir.bottom;
+    if (!mx && !my) return false;
+    sealPos.dx += mx; sealPos.dy += my;
+    placeSeal(img);
+    return true;
+  }
+
   function bindSealDrag() {
     document.querySelectorAll('#pt-paper .pt-seal').forEach(function (img) {
       img.style.cursor = 'move';
       img.style.touchAction = 'none';
+      /* 예전에 종이 밖까지 끌어 둔 위치가 저장되어 있어도 안쪽으로 되돌린다 */
+      function settle() {
+        if (clampSeal(img) && data._seal) data._seal = { on: sealOn, dx: sealPos.dx, dy: sealPos.dy };
+      }
+      if (img.complete && img.naturalWidth) settle();
+      else img.addEventListener('load', settle);
       img.addEventListener('pointerdown', function (ev) {
         ev.preventDefault();
         var sx = ev.clientX, sy = ev.clientY;
@@ -1083,8 +1128,8 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
         function onMove(e2) {
           sealPos.dx = base.dx + (e2.clientX - sx);
           sealPos.dy = base.dy + (e2.clientY - sy);
-          img.style.left = (-8 + sealPos.dx) + 'px';
-          img.style.marginTop = (-23 + sealPos.dy) + 'px';
+          placeSeal(img);
+          clampSeal(img);
         }
         function onUp() {
           document.removeEventListener('pointermove', onMove);
