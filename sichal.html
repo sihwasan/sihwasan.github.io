@@ -58,7 +58,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var sichals = [], sic = null, isOfficer = false, myDuty = '', isAuditor = false;
   var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
-  var churchStaff = [], bapAll = [], sicFin = [];
+  var churchStaff = [], bapAll = [], sicFin = [], subs = [];
+  /* 서류 진단 — 상태 거르개와 지금 열람 중인 청원서 */
+  var REV_STATUS = ['전체', '제출됨', '적합', '보완요청', '반려'];
+  var revFilter = '전체', revOpenId = null;
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
   var year = new Date().getFullYear();
@@ -125,6 +128,10 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (x) { return x; }, function () { return { data: [] }; }),
           /* 시찰별 상회비·세례의무금 요약 (49 를 아직 실행하지 않았어도 넘어간다) */
           c.rpc('sichal_finance', { p_year: fyYear })
+            .then(function (x) { return x; }, function () { return { data: [] }; }),
+          /* 우리 시찰로 제출된 청원서 — 서류 진단 (54·70) */
+          c.from('petition_submissions').select('*').eq('sichal', NAME)
+            .order('created_at', { ascending: false })
             .then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
@@ -160,6 +167,7 @@ document.addEventListener('DOMContentLoaded', function () {
         docs     = (rs[4] && rs[4].data) || [];
         minutes  = (rs[5] && rs[5].data) || [];
         reports  = (rs[6] && rs[6].data) || [];
+        subs     = (rs[11] && rs[11].data) || [];
         draw();
       });
     }).catch(function (x) {
@@ -251,6 +259,11 @@ document.addEventListener('DOMContentLoaded', function () {
      * (시찰 임원·노회 관리자이거나, 내 교회가 이 시찰 소속일 때) */
     var myOwnSichal = isOfficer || churches.some(function (x) { return x.name === myChurch; });
     if (!myOwnSichal && (tab === 'doc' || tab === 'ledger' || tab === 'minutes' || tab === 'report')) tab = 'church';
+    /* 서류 진단은 시찰 임원(시찰장·서기)과 노회 관리자만 본다 */
+    if (!isOfficer && tab === 'review') tab = 'church';
+
+    /* 아직 진단하지 않은(제출됨) 청원서 건수 — 탭 옆 배지 */
+    var revWait = subs.filter(function (p) { return p.status === '제출됨'; }).length;
 
     h += '<div class="tabs sub-tabs" id="si-tabs">' +
       '<button class="' + (tab === 'church'  ? 'active' : '') + '" data-t="church">관내 교회 (' + churches.length + ')</button>' +
@@ -260,6 +273,14 @@ document.addEventListener('DOMContentLoaded', function () {
           '<button class="' + (tab === 'minutes' ? 'active' : '') + '" data-t="minutes">회의록 (' + minutes.length + ')</button>' +
           '<button class="' + (tab === 'ledger'  ? 'active' : '') + '" data-t="ledger">' + e(NAME) + ' 회계 관리</button>' +
           '<button class="' + (tab === 'report'  ? 'active' : '') + '" data-t="report">교회상황 보고서</button>'
+        : '') +
+      (isOfficer
+        ? '<button class="' + (tab === 'review' ? 'active' : '') + '" data-t="review">서류 진단' +
+          (revWait
+            ? ' <span style="display:inline-block;min-width:18px;padding:0 6px;margin-left:4px;' +
+              'border-radius:9px;background:#b03a3a;color:#fff;font-size:0.74rem;line-height:18px;' +
+              'font-weight:700;vertical-align:middle">' + revWait + '</span>'
+            : '') + '</button>'
         : '') +
       '</div><div id="si-body"></div>';
 
@@ -327,6 +348,7 @@ document.addEventListener('DOMContentLoaded', function () {
     else if (tab === 'minutes') drawMinutes();
     else if (tab === 'ledger') drawLedger();
     else if (tab === 'report') drawReports();
+    else if (tab === 'review') drawReview();
     else drawChurches();
   }
 
@@ -1624,6 +1646,191 @@ document.addEventListener('DOMContentLoaded', function () {
           if (res.error) { alert(res.error.message); return; }
           SHSCloud.log('delete', '교회상황 보고서 삭제', r.year + '년 ' + r.church);
           load();
+        });
+      });
+    });
+  }
+
+  /* ================= 서류 진단 =================
+   * 우리 시찰로 제출된 청원서(petition_submissions)를 열람하고
+   * 적합 · 보완요청 · 반려로 진단한다.
+   *
+   * 서식 렌더링·도장·인쇄·PDF 저장은 청원서 작성 화면(petition.html)의
+   * 것을 그대로 불러(iframe: petition.html?sub=번호) 쓴다. 여기서 다시
+   * 만들지 않는다. 인쇄는 그 안쪽 화면이 스스로 찍으므로 이 화면의
+   * 탭·단추·머리글은 종이에 나오지 않는다. */
+  function revStatusHtml(st) {
+    if (st === '적합')     return '<span class="pass">적합</span>';
+    if (st === '반려')     return '<span class="fail">반려</span>';
+    if (st === '보완요청') return '<span style="color:#b0731f;font-weight:700">보완요청</span>';
+    return '<span style="color:var(--gray-6);font-weight:700">제출됨</span>';
+  }
+  function when(t) { return t ? String(t).replace('T', ' ').slice(0, 16) : ''; }
+
+  function drawReview() {
+    var box = document.getElementById('si-body');
+    var counts = {};
+    REV_STATUS.forEach(function (s) { counts[s] = 0; });
+    subs.forEach(function (p) {
+      counts['전체'] += 1;
+      if (counts[p.status] !== undefined) counts[p.status] += 1;
+    });
+    var rows = subs.filter(function (p) {
+      return revFilter === '전체' || p.status === revFilter;
+    });
+    var open = revOpenId
+      ? subs.filter(function (p) { return String(p.id) === String(revOpenId); })[0]
+      : null;
+    if (!open) revOpenId = null;
+
+    var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
+      '관내 교회(당회장)가 <strong>' + e(NAME) + ' 서기</strong>에게 제출한 청원서입니다. ' +
+      '열람을 누르면 제출된 원본 서식이 도장까지 그대로 보이며, ' +
+      '적합 · 보완요청 · 반려로 진단하시면 신청자의 <strong>나의 서류</strong>에 ' +
+      '상태와 의견이 바로 나타납니다.</p>';
+
+    h += '<div class="tabs" style="margin-bottom:12px" id="rv-filter">' +
+      REV_STATUS.map(function (s) {
+        return '<button class="' + (revFilter === s ? 'active' : '') + '" data-rvf="' + e(s) + '">' +
+          e(s) + ' (' + counts[s] + ')</button>';
+      }).join('') + '</div>';
+
+    /* ----- 열람 · 진단 ----- */
+    if (open) {
+      h += '<div class="admin-card" id="rv-view" style="margin-bottom:18px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">' +
+        '<h3 style="margin:0">' + e(open.title) + '</h3>' +
+        '<button class="btn ghost sm" id="rv-close">닫기</button></div>' +
+        '<p style="font-size:0.85rem;color:var(--gray-6);margin:6px 0 12px">' +
+        e(open.user_name || '') + ' · ' + e(open.form_title) + ' · ' +
+        e(when(open.created_at)) + ' 접수 · 현재 ' + revStatusHtml(open.status) +
+        (open.reviewed_at ? ' <span style="color:var(--gray-5)">(' + e(when(open.reviewed_at)) + ' 진단)</span>' : '') +
+        '</p>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+        '<button class="btn sm" id="rv-print" disabled>인쇄</button>' +
+        '<button class="btn sm" id="rv-pdf" disabled>PDF 저장</button>' +
+        '<a class="btn ghost sm" href="petition.html?sub=' + open.id + '" target="_blank" rel="noopener">새 창으로 열기</a>' +
+        '</div>' +
+        '<div style="border:1px solid var(--gray-3,#d8dbe2);border-radius:8px;overflow:hidden;background:#fff">' +
+        '<iframe id="rv-frame" title="제출된 청원서" src="petition.html?embed=1&sub=' + open.id + '" ' +
+        'style="width:100%;height:1150px;border:0;background:#fff"></iframe></div>' +
+
+        '<h4 class="mn-sub" style="margin-top:18px">진단</h4>' +
+        '<div class="field" style="max-width:720px"><label for="rv-note">진단 의견 ' +
+        '(보완요청 · 반려는 사유를 반드시 적어 주세요. 신청자에게 그대로 보입니다)</label>' +
+        '<textarea id="rv-note" rows="3">' + e(open.note || '') + '</textarea></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+        '<button class="btn" data-rvdo="적합">적합</button>' +
+        '<button class="btn ghost" data-rvdo="보완요청">보완요청</button>' +
+        '<button class="btn danger" data-rvdo="반려">반려</button></div>' +
+        '<div class="form-msg" id="rv-msg"></div></div>';
+    }
+
+    /* ----- 목록 ----- */
+    if (!subs.length) {
+      h += '<div class="notice-banner">아직 제출된 청원서가 없습니다. ' +
+        '교회에서 청원서 작성 화면의 <strong>시찰 서기에게 전달하기</strong>를 누르면 여기에 쌓입니다.</div>';
+    } else if (!rows.length) {
+      h += '<p style="color:var(--gray-5)">「' + e(revFilter) + '」 상태의 청원서가 없습니다.</p>';
+    } else {
+      h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+        '<th style="width:150px">접수일</th><th style="width:110px">신청자</th>' +
+        '<th style="width:180px">서류종류</th><th class="left">제목</th>' +
+        '<th style="width:100px">상태</th><th style="width:110px">관리</th></tr></thead><tbody>';
+      rows.forEach(function (p) {
+        h += '<tr' + (String(p.id) === String(revOpenId) ? ' style="background:var(--gray-1,#f4f5f8)"' : '') + '>' +
+          '<td>' + e(when(p.created_at)) + '</td>' +
+          '<td>' + e(p.user_name || '-') + '</td>' +
+          '<td>' + e(p.form_title) + '</td>' +
+          '<td class="left">' + e(p.title) +
+          (p.note ? '<br><small style="color:var(--gray-5)">의견 : ' + e(p.note) + '</small>' : '') + '</td>' +
+          '<td>' + revStatusHtml(p.status) + '</td>' +
+          '<td><button class="btn sm" data-rvopen="' + p.id + '">열람</button></td></tr>';
+      });
+      h += '</tbody></table></div>';
+    }
+
+    box.innerHTML = h;
+
+    box.querySelectorAll('#rv-filter button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        revFilter = b.dataset.rvf;
+        drawReview();
+      });
+    });
+    box.querySelectorAll('[data-rvopen]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        revOpenId = b.dataset.rvopen;
+        drawReview();
+        var v = document.getElementById('rv-view');
+        if (v) v.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    var closeBtn = document.getElementById('rv-close');
+    if (closeBtn) closeBtn.addEventListener('click', function () {
+      revOpenId = null; drawReview();
+    });
+
+    if (!open) return;
+
+    /* 인쇄·PDF 는 안쪽 청원서 화면이 스스로 한다 (로직 중복 없음) */
+    var fr = document.getElementById('rv-frame');
+    var pBtn = document.getElementById('rv-print');
+    var dBtn = document.getElementById('rv-pdf');
+    fr.addEventListener('load', function () {
+      pBtn.disabled = false; dBtn.disabled = false;
+    });
+    pBtn.addEventListener('click', function () {
+      try {
+        fr.contentWindow.focus();
+        fr.contentWindow.print();
+      } catch (x) {
+        window.open('petition.html?sub=' + open.id, '_blank', 'noopener');
+      }
+    });
+    dBtn.addEventListener('click', function () {
+      var w = fr.contentWindow;
+      if (w && typeof w.SHSPetitionPdf === 'function') w.SHSPetitionPdf();
+      else window.open('petition.html?sub=' + open.id, '_blank', 'noopener');
+    });
+
+    /* ----- 진단 처리 ----- */
+    var msg = document.getElementById('rv-msg');
+    box.querySelectorAll('[data-rvdo]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var status = b.dataset.rvdo;
+        var note = document.getElementById('rv-note').value.trim();
+        if ((status === '보완요청' || status === '반려') && !note) {
+          msg.className = 'form-msg err';
+          msg.textContent = status + ' 사유를 적어 주세요. 신청자에게 그대로 전해집니다.';
+          return;
+        }
+        if (!confirm('「' + open.title + '」을(를) <' + status + '>으로 진단합니다.\n\n처리하시겠습니까?')) return;
+        var now = new Date().toISOString();
+        msg.className = 'form-msg';
+        msg.textContent = '처리 중입니다...';
+        db().then(function (c) {
+          return c.from('petition_submissions').update({
+            status: status, note: note || null,
+            reviewed_at: now, reviewed_by: user.id, updated_at: now
+          }).eq('id', open.id).select('*').single();
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          /* 신청자에게 알림 — 알림 넣기는 노회 관리자 권한이라
+           * 시찰 서기는 실패할 수 있다. 진단 자체는 그대로 남는다. */
+          db().then(function (c) {
+            return c.from('notifications').insert({
+              user_id: open.user_id, kind: '시찰',
+              title: '[' + NAME + '] 청원서 진단 결과 : ' + status,
+              body: '「' + open.title + '」' + (note ? '\n' + note : '')
+            });
+          }).catch(function () {});
+          Object.keys(r.data).forEach(function (k) { open[k] = r.data[k]; });
+          SHS.logAction('update', '청원서 진단', NAME + ' / ' + open.title + ' → ' + status);
+          draw();   /* 목록·배지를 곧바로 다시 그린다 */
+        }).catch(function (err) {
+          msg.className = 'form-msg err';
+          msg.textContent = '처리하지 못했습니다: ' + ((err && err.message) || err);
         });
       });
     });

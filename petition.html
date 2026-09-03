@@ -137,6 +137,22 @@ body.pt-embed main > .tabs, body.pt-embed main > p { display: none !important; }
 body.pt-embed { background: var(--paper, #fcfbf9); }
 body.pt-embed main { padding-top: 10px; }
 
+/* ----- 열람(view) 모드: 제출된 청원서를 원본 서식 그대로 보여 준다 -----
+ * 시찰 서기의 <서류 진단>에서 이 화면을 그대로 불러 씁니다.
+ * 입력칸·메뉴·목록은 감추고 종이(미리보기)만 남깁니다. */
+body.pt-view .pt-card, body.pt-view #pt-menu, body.pt-view #pt-mine,
+body.pt-view #pt-sent, body.pt-view #pt-inbox,
+body.pt-view main > .tabs, body.pt-view main > p, body.pt-view main > h2 { display: none !important; }
+body.pt-view #pt-viewbar { display: flex !important; }
+body.pt-view.pt-embed #pt-viewbar { display: none !important; }
+body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
+#pt-viewbar {
+  display: none; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin: 4px 0 18px; padding: 12px 14px;
+  border: 1px solid var(--gray-2); border-radius: 10px; background: var(--white);
+}
+#pt-viewbar .info { font-size: 0.88rem; color: var(--gray-7); flex: 1 1 260px; }
+
 /* ----- 인쇄: 종이만 나온다 ----- */
 @media print {
   body * { visibility: hidden; }
@@ -190,6 +206,12 @@ body.pt-embed main { padding-top: 10px; }
   <div id="pt-mine"></div>
   <div id="pt-sent"></div>
   <div id="pt-inbox"></div>
+
+  <div id="pt-viewbar">
+    <span class="info" id="pt-viewinfo"></span>
+    <button class="btn sm" type="button" id="pt-vprint">인쇄</button>
+    <button class="btn sm" type="button" id="pt-vpdf">PDF 저장</button>
+  </div>
 
   <h2 style="margin-top:8px">미리보기</h2>
   <div id="pt-print-wrap"><div id="pt-paper"></div></div>
@@ -789,6 +811,8 @@ body.pt-embed main { padding-top: 10px; }
   var viewSeal = null;    /* 받은 청원서를 열람할 때 제출자의 도장 */
   var sealOn = true;      /* 당회장 도장을 찍을지 (선택사항) */
   var sealPos = { dx: 0, dy: 0 };   /* 미리보기에서 끌어 옮긴 도장 위치 */
+  /* ?sub=번호 — 제출된 청원서를 원본 그대로 열람하는 모드 (시찰 서류 진단) */
+  var viewSubId = (location.search.match(/[?&]sub=(\d+)/) || [])[1] || null;
 
   function cloudOn() {
     return user && user.cloud && window.SHSCloud && SHSCloud.enabled();
@@ -887,7 +911,8 @@ body.pt-embed main { padding-top: 10px; }
     /* 시찰보고서는 노회 시스템과 연동한다 */
     var extra = document.getElementById('pt-extra');
     if (extra) extra.remove();
-    if (cur.id === 'sichalreport') enhanceSichalReport();
+    /* 열람 모드에서는 제출된 내용을 그대로 두어야 하므로 자동 채움을 하지 않는다 */
+    if (cur.id === 'sichalreport' && !viewSubId) enhanceSichalReport();
     /* 보고서 서식(시찰·부)은 당회장 도장이 들어가지 않는다.
      * 시찰보고서는 시찰 서기가 직접 노회에 내는 것이므로 '시찰 서기에게 전달' 도 뺀다. */
     var isReport = cur.cat === '보고서';
@@ -1320,75 +1345,80 @@ body.pt-embed main { padding-top: 10px; }
     });
   }
 
-  /* ----- 받은 청원서 (시찰장·서기·관리자) ----- */
+  /* ----- 받은 청원서 -----
+   * 열람과 진단(적합·보완요청·반려)은 시찰 화면의 <서류 진단> 탭에서 합니다.
+   * 여기서는 우리 시찰에 몇 건이 와 있는지만 알리고 그리로 안내합니다. */
   function loadInbox() {
     var box = document.getElementById('pt-inbox');
-    if (!cloudOn()) { box.innerHTML = ''; return; }
+    box.innerHTML = '';
+    if (!cloudOn()) return;
     SHSCloud.init().then(function (c) {
-      return c.from('petition_submissions').select('*')
-        .neq('user_id', user.id).order('created_at', { ascending: false });
-    }).then(function (r) {
-      var rows = r.data || [];
-      if (!rows.length) { box.innerHTML = ''; return; }
-      var h = '<h2>받은 청원서 (' + rows.length + ')</h2>' +
-        '<p style="color:var(--gray-5);font-size:0.86rem">우리 시찰로 제출된 청원서입니다. ' +
-        '열람을 누르면 위 미리보기에 도장까지 찍힌 내용이 보이며, 인쇄·PDF 저장할 수 있습니다.</p>' +
-        '<div style="overflow-x:auto"><table class="tbl" style="max-width:940px"><thead><tr>' +
-        '<th>제목</th><th style="width:100px">제출자</th><th style="width:110px">시찰</th>' +
-        '<th style="width:150px">받은 날</th><th style="width:100px">상태</th>' +
-        '<th style="width:200px">관리</th></tr></thead><tbody>';
+      return Promise.all([
+        c.from('petition_submissions').select('id,sichal,status')
+          .neq('user_id', user.id),
+        c.rpc('my_sichals').then(function (x) { return x; }, function () { return { data: [] }; })
+      ]);
+    }).then(function (rs) {
+      var rows = (rs[0] && rs[0].data) || [];
+      if (!rows.length) return;
+      var mine = ((rs[1] && rs[1].data) || []).map(function (m) { return m.sichal; });
+      /* 시찰별로 몇 건이 와 있는지 (내가 볼 수 있는 것만 데이터베이스가 내려 준다) */
+      var by = {};
       rows.forEach(function (p) {
-        var st = p.status === '접수' ? '<span class="pass">접수</span>'
-          : p.status === '반려' ? '<span class="fail">반려</span>' : e(p.status);
-        h += '<tr><td class="left">' + e(p.title) + '</td>' +
-          '<td>' + e(p.user_name || '') + '</td>' +
-          '<td>' + e(p.sichal) + '</td>' +
-          '<td>' + e(String(p.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
-          '<td>' + st + '</td>' +
-          '<td><button class="btn sm" data-ptview="' + p.id + '">열람</button>' +
-          (p.status === '제출됨'
-            ? '<button class="btn sm" data-ptok="' + p.id + '">접수</button>' +
-              '<button class="btn danger sm" data-ptno="' + p.id + '">반려</button>' : '') +
-          '</td></tr>';
+        by[p.sichal] = by[p.sichal] || { all: 0, wait: 0 };
+        by[p.sichal].all += 1;
+        if (p.status === '제출됨') by[p.sichal].wait += 1;
       });
-      box.innerHTML = h + '</tbody></table></div>';
-
-      function decide(id, status) {
-        var p = rows.filter(function (x) { return String(x.id) === String(id); })[0];
-        var note = status === '반려' ? (prompt('반려 사유를 적어 주세요. (제출자에게 알림으로 전달됩니다)', '') || '') : '';
-        SHSCloud.init().then(function (c) {
-          return c.from('petition_submissions').update({
-            status: status, note: note || null, updated_at: new Date().toISOString()
-          }).eq('id', id).then(function (r2) {
-            if (r2.error) throw r2.error;
-            return c.from('notifications').insert({
-              user_id: p.user_id, kind: '시찰',
-              title: '[' + p.sichal + '] 청원서가 ' + status + '되었습니다',
-              body: '「' + p.title + '」' + (note ? '\n' + note : '')
-            });
-          });
-        }).then(function () { loadInbox(); })
-          .catch(function (err) { alert(err.message || err); });
-      }
-      box.querySelectorAll('[data-ptview]').forEach(function (b) {
-        b.addEventListener('click', function () {
-          var p = rows.filter(function (x) { return String(x.id) === b.dataset.ptview; })[0];
-          var f = p && FORMS.filter(function (x) { return x.id === p.form_id; })[0];
-          if (!f) return;
-          cur = f; data = p.data || {}; editingId = null; viewSeal = p.seal || null;
-          renderMenu(); renderForm(); renderPaper();
-          msg(e(p.user_name || '') + ' 님이 제출한 청원서를 열람하는 중입니다. 인쇄·PDF 저장을 하실 수 있습니다.');
-          document.getElementById('pt-paper').scrollIntoView({ behavior: 'smooth' });
-        });
+      var names = Object.keys(by).sort(function (a, b) {
+        return (mine.indexOf(b) - mine.indexOf(a)) || a.localeCompare(b, 'ko');
       });
-      box.querySelectorAll('[data-ptok]').forEach(function (b) {
-        b.addEventListener('click', function () { decide(b.dataset.ptok, '접수'); });
-      });
-      box.querySelectorAll('[data-ptno]').forEach(function (b) {
-        b.addEventListener('click', function () { decide(b.dataset.ptno, '반려'); });
-      });
+      box.innerHTML = '<h2>받은 청원서</h2>' +
+        '<div class="notice-banner">우리 시찰로 제출된 청원서는 ' +
+        '<strong>시찰 화면 → 서류 진단</strong>에서 원본 서식 그대로 열람하고 ' +
+        '적합·보완요청·반려로 진단하실 수 있습니다.<div style="margin-top:10px">' +
+        names.map(function (n) {
+          return '<a class="btn sm" style="margin:0 6px 6px 0" href="sichal.html?s=' +
+            encodeURIComponent(n) + '#review">' + e(n) + ' 서류 진단 (' + by[n].all + '건' +
+            (by[n].wait ? ' · 미처리 ' + by[n].wait + '건' : '') + ')</a>';
+        }).join('') + '</div></div>';
     }).catch(function () {});
   }
+
+  /* ----- 제출된 청원서 열람 (?sub=번호) -----
+   * 시찰 서기의 <서류 진단>이 이 화면을 그대로 불러(iframe 또는 새 창) 씁니다.
+   * 서식 렌더링·도장·인쇄·PDF 로직을 한 곳에서만 두기 위한 통로입니다. */
+  function openSubmission(id) {
+    document.body.classList.add('pt-view');
+    if (!cloudOn()) {
+      document.getElementById('pt-paper').innerHTML =
+        '<p style="color:#666">청원서를 보시려면 로그인이 필요합니다.</p>';
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return c.from('petition_submissions').select('*').eq('id', id).single();
+    }).then(function (r) {
+      if (r.error || !r.data) throw (r.error || new Error('청원서를 찾지 못했습니다.'));
+      var p = r.data;
+      var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
+      if (!f) throw new Error('서식(' + p.form_id + ')을 찾지 못했습니다.');
+      cur = f; data = p.data || {}; editingId = null; viewSeal = p.seal || null;
+      renderForm(); renderPaper();
+      document.title = p.title + ' - 시화산노회';
+      var info = document.getElementById('pt-viewinfo');
+      if (info) {
+        info.innerHTML = '<strong>' + e(p.title) + '</strong><br>' +
+          e(p.user_name || '') + ' · ' + e(p.sichal) + ' · ' +
+          e(String(p.created_at).replace('T', ' ').slice(0, 16)) + ' 접수 · ' + e(p.status);
+      }
+    }).catch(function (err) {
+      document.getElementById('pt-paper').innerHTML =
+        '<p style="color:#a33">' + e(err.message || err) + '</p>';
+    });
+  }
+
+  /* 바깥 화면(서류 진단)에서 이 종이를 인쇄·PDF 저장하도록 열어 둔다 */
+  window.SHSPetitionPrint = function () { window.focus(); window.print(); };
+  window.SHSPetitionPdf = savePdf;
 
   /* ================= 청빙서류 작성 도우미 =================
    * 질문에 답하면 알맞은 청빙 서식을 골라 내용을 채워 준다. */
@@ -1587,8 +1617,14 @@ body.pt-embed main { padding-top: 10px; }
     renderPaper();
   });
 
+  /* 열람 모드 단추 (새 창으로 열었을 때 쓰는 인쇄·PDF) */
+  document.getElementById('pt-vprint').addEventListener('click', function () { window.print(); });
+  document.getElementById('pt-vpdf').addEventListener('click', savePdf);
+
   /* 구비서류 안내 박스 안에 끼워 넣어 보여 줄 때 */
   if (/[?&]embed=1/.test(location.search)) document.body.classList.add('pt-embed');
+  /* 제출된 청원서 열람 모드는 입력칸 없이 종이만 보여 준다 */
+  if (viewSubId) document.body.classList.add('pt-view');
 
   /* 구비서류 안내에서 ?form=아이디 로 들어오면 그 서식을 바로 연다 */
   var fm = location.search.match(/[?&]form=([a-z]+)/);
@@ -1611,6 +1647,7 @@ body.pt-embed main { padding-top: 10px; }
           '<div style="padding:20px 0">' + SHS.fullMemberGate(u, '청원서 작성') + '</div>';
         return;
       }
+      if (viewSubId) { openSubmission(viewSubId); return; }
       loadMine(); loadSeal(); loadInbox(); openFromUrl();
       /* 시찰보고서 연동(회기·시찰장·교세 자동 입력)은 로그인 확인 후에야
        * 돌 수 있으므로, 처음부터 시찰보고서로 들어왔다면 다시 그린다 */

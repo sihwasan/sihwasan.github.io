@@ -82,22 +82,41 @@ document.addEventListener('DOMContentLoaded', function () {
         h += '<p style="color:var(--gray-5)">시찰로 보낸 청원서가 없습니다. ' +
           '청원서 작성에서 <strong>시찰 서기에게 전달하기</strong>를 누르면 여기에 쌓입니다.</p>';
       } else {
-        h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:940px"><thead><tr>' +
-          '<th>제목</th><th style="width:110px">시찰</th><th style="width:150px">보낸 날</th>' +
-          '<th style="width:110px">상태</th><th style="width:90px">관리</th></tr></thead><tbody>';
+        h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+          '<th class="left">제목</th><th style="width:110px">시찰</th><th style="width:150px">보낸 날</th>' +
+          '<th style="width:110px">진단</th><th style="width:150px">진단한 날</th>' +
+          '<th style="width:90px">관리</th></tr></thead><tbody>';
         sent.forEach(function (p) {
-          var st = p.status === '접수' ? '<span class="pass">접수</span>'
-            : p.status === '반려' ? '<span class="fail">반려</span>' : e(p.status);
+          /* 시찰 서기의 진단 결과 — 적합 · 보완요청 · 반려 */
+          var st = p.status === '적합' ? '<span class="pass">적합</span>'
+            : p.status === '반려' ? '<span class="fail">반려</span>'
+            : p.status === '보완요청' ? '<span style="color:#b0731f;font-weight:700">보완요청</span>'
+            : '<span style="color:var(--gray-6);font-weight:700">' + e(p.status) + '</span>';
+          /* 보완요청·반려는 사유가 잘 보이도록 눈에 띄게 적는다 */
+          var noteHtml = '';
+          if (p.note) {
+            var warn = p.status === '보완요청' || p.status === '반려';
+            noteHtml = '<div style="margin-top:6px;padding:8px 10px;border-radius:6px;font-size:0.84rem;' +
+              (warn ? 'background:#fbf1ee;border-left:3px solid #b03a3a;color:#7a2b2b'
+                    : 'background:var(--gray-1,#f4f5f8);border-left:3px solid var(--gray-3,#d8dbe2);color:var(--gray-7)') +
+              '"><strong>시찰 서기 의견</strong><br>' + e(p.note).replace(/\n/g, '<br>') + '</div>';
+          }
           h += '<tr><td class="left">' + e(p.title) +
-            (p.note ? '<br><small style="color:var(--gray-5)">' + e(p.note) + '</small>' : '') + '</td>' +
+            '<br><small style="color:var(--gray-5)">' + e(p.form_title || '') + '</small>' +
+            noteHtml + '</td>' +
             '<td>' + e(p.sichal) + '</td>' +
             '<td>' + e(String(p.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
             '<td>' + st + '</td>' +
-            '<td>' + (p.status === '제출됨'
-              ? '<button class="btn danger sm" data-mdsdel="' + p.id + '">회수</button>' : '') + '</td></tr>';
+            '<td>' + (p.reviewed_at
+              ? e(String(p.reviewed_at).replace('T', ' ').slice(0, 16))
+              : '<span style="color:var(--gray-5)">대기 중</span>') + '</td>' +
+            '<td><a class="btn sm" href="petition.html?sub=' + p.id + '" target="_blank" rel="noopener">열람</a>' +
+            (p.status === '제출됨'
+              ? ' <button class="btn danger sm" data-mdsdel="' + p.id + '">회수</button>' : '') + '</td></tr>';
         });
         h += '</tbody></table></div>';
-        h += '<p style="font-size:0.82rem;color:var(--gray-5)">회수는 시찰에서 아직 처리하기 전(제출됨 상태)에만 할 수 있습니다.</p>';
+        h += '<p style="font-size:0.82rem;color:var(--gray-5)">회수는 시찰에서 아직 진단하기 전(제출됨 상태)에만 할 수 있습니다. ' +
+          '<strong>보완요청</strong>을 받으셨다면 의견대로 고쳐 청원서 작성 화면에서 다시 전달해 주세요.</p>';
       }
 
       area.innerHTML = h;
