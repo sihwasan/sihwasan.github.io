@@ -24,7 +24,8 @@
 <script src="private/resolutions.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902j"></script>
+<script src="js/main.js?v=20260903a"></script>
+<script src="js/church-report.js?v=20260903a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -111,6 +112,13 @@ document.addEventListener('DOMContentLoaded', function () {
   html += '<h2>교회상황 보고서</h2>';
   html += '<p>각 교회가 시찰회 화면에서 올린 해마다의 교회상황 보고서입니다. ' +
     '연도를 고르면 그 해에 낸 교회와 아직 내지 않은 교회를 함께 보실 수 있습니다.</p>';
+  if (SHSAuth.canManageMembers(user)) {
+    html += '<div class="notice-banner">시찰 서기가 노회로 올린 보고서를 받아 ' +
+      '<strong>반영</strong>하거나 <strong>보완요청</strong>하시려면 ' +
+      '<strong>교회상황 보고서 접수</strong> 화면을 쓰십시오. ' +
+      '시찰별 제출 현황과 교세 합계, 일괄 인쇄·일괄 반영이 그곳에 있습니다.' +
+      '<div style="margin-top:10px"><a class="btn sm" href="report-intake.html">교회상황 보고서 접수 열기</a></div></div>';
+  }
   html += '<div id="cr-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
 
   area.innerHTML = html;
@@ -186,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<table class="tbl"><thead><tr><th style="width:110px">시찰</th><th style="width:160px">교회</th>' +
       '<th style="width:100px">담임</th><th style="width:90px">전체 교인</th>' +
       '<th style="width:90px">세례교인</th><th style="width:100px">평균 출석</th>' +
-      '<th style="width:90px">제출</th><th style="width:150px">보기</th></tr></thead><tbody>';
+      '<th style="width:100px">단계</th><th style="width:150px">보기</th></tr></thead><tbody>';
     list.forEach(function (x) {
       var r = x.r;
       h += '<tr' + (r ? '' : ' style="opacity:.55"') + '>' +
@@ -195,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<td>' + (r && r.members_total != null ? r.members_total : '-') + '</td>' +
         '<td>' + (r && r.members_baptized != null ? r.members_baptized : '-') + '</td>' +
         '<td>' + (r && r.worship_avg != null ? r.worship_avg : '-') + '</td>' +
-        '<td>' + (r ? '<span class="role-badge">제출</span>' : '<span style="color:var(--gray-5)">미제출</span>') + '</td>' +
+        '<td>' + (r ? SHSReport.stage(r.status) : '<span style="color:var(--gray-5)">미제출</span>') + '</td>' +
         '<td>' +
         (r ? '<button class="btn sm" data-crview="' + r.id + '">내용</button> ' : '') +
         (r && r.file_path ? '<button class="btn ghost sm" data-crfile="' + r.id + '">첨부</button>' : '') +
@@ -257,7 +265,13 @@ document.addEventListener('DOMContentLoaded', function () {
       r.year + '년 ' + e(r.church) + ' 교회상황 보고서</h3>' +
       '<p style="color:var(--gray-5);font-size:0.85rem">' + e(r.sichal || '') +
       ' · 담임 ' + e(r.pastor || '-') + ' · 제출 ' + e(r.submitted_by || '-') +
-      ' · ' + e(String(r.updated_at || r.created_at || '').slice(0, 10)) + '</p>';
+      ' · ' + e(String(r.updated_at || r.created_at || '').slice(0, 10)) + '</p>' +
+      '<p style="font-size:0.88rem;margin:-6px 0 10px">지금 단계 : ' +
+      SHSReport.stage(r.status) + SHSReport.trail(r) + '</p>' +
+      (r.status === '보완요청' && r.review_note
+        ? '<p style="font-size:0.88rem;color:#7a2b2b"><strong>노회 서기 보완요청</strong> — ' +
+          '<span style="white-space:pre-wrap">' + e(r.review_note) + '</span></p>'
+        : '');
     var groups = {};
     CR_FIELDS.forEach(function (f) { (groups[f.g] = groups[f.g] || []).push(f); });
     Object.keys(groups).forEach(function (g) {

@@ -540,7 +540,8 @@ var SHSBoard = (function () {
         soft(c.from('doc_requests').select('*').order('id', { ascending: false }).limit(50)),
         soft(c.from('doc_issues').select('id,doc_no,doc_type,issued_on,void_yn,request_id')
               .order('id', { ascending: false }).limit(50)),
-        soft(c.from('church_reports').select('year,sichal,church,updated_at').eq('year', year)),
+        soft(c.from('church_reports')
+              .select('year,sichal,church,updated_at,status,approved_at').eq('year', year)),
         soft(c.from('sichal_churches').select('sichal,name,pastor,url,address,phone')),
         soft(c.from('sichals').select('name,area,head,clerk,treasurer').order('sort')),
         soft(c.rpc('my_sichal_name')),
@@ -1402,10 +1403,17 @@ var SHSBoard = (function () {
       if (user.role === 'superadmin') {
         h += '';   /* 노회 사무실 계정은 낼 보고서가 없다 — 아래 전체 현황만 */
       } else if (myChurch) {
+        /* 결재 흐름(71) : 작성 → 시찰접수 → 노회제출 → 반영완료 (보완요청은 되돌아온 것) */
+        var stage = window.SHSReport
+          ? SHSReport.stage(mine && mine.status)
+          : esc((mine && mine.status) || '');
         h += mine
-          ? '<div class="dash-ok"><strong>' + esc(myChurch) + '</strong>의 ' + year + '년 보고서를 ' +
-            '제출하셨습니다. <span class="dash-dim">(' +
-            esc(String(mine.updated_at || '').slice(0, 10)) + ')</span></div>'
+          ? (mine.status === '보완요청'
+              ? '<div class="dash-alert"><strong>' + esc(myChurch) + '</strong>의 ' + year +
+                '년 보고서에 <strong>노회 보완요청</strong>이 있습니다. 고쳐서 다시 내 주세요.</div>'
+              : '<div class="dash-ok"><strong>' + esc(myChurch) + '</strong>의 ' + year + '년 보고서 — ' +
+                stage + ' <span class="dash-dim">(' +
+                esc(String(mine.approved_at || mine.updated_at || '').slice(0, 10)) + ')</span></div>')
           : '<div class="dash-alert"><strong>' + esc(myChurch) + '</strong>의 ' + year +
             '년 보고서를 아직 내지 않으셨습니다.</div>';
       } else {
@@ -1416,10 +1424,12 @@ var SHSBoard = (function () {
         var bySic = {};
         rows.forEach(function (r) { bySic[r.sichal] = (bySic[r.sichal] || 0) + 1; });
         var keys = Object.keys(bySic).sort();
+        var nApproved = rows.filter(function (r) { return r.status === '반영완료'; }).length;
         h += '<p class="dash-sub">' + year + '년 제출 현황 — 모두 <strong>' + rows.length + '곳</strong>' +
           (keys.length ? ' (' + keys.map(function (k) {
             return esc(k) + ' ' + bySic[k];
-          }).join(' · ') + ')' : '') + '</p>';
+          }).join(' · ') + ')' : '') +
+          ' · 노회 반영완료 <strong>' + nApproved + '건</strong></p>';
 
         /* 시찰이 노회 서기에게 낸 것 */
         var subMap = {};

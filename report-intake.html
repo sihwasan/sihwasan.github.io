@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>교회상황 보고서 접수 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20260902b">
+<style>
+/* 시찰 묶음 */
+.ri-sichal { border: 1px solid var(--gray-2); border-radius: 12px; background: var(--white);
+             padding: 16px 18px; margin-bottom: 18px; }
+.ri-sichal > h3 { margin: 0 0 4px; color: var(--navy); }
+.ri-sichal .ri-sub { font-size: 0.86rem; color: var(--gray-6); margin: 0 0 12px; }
+.ri-nums { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; }
+.ri-nums div { background: var(--gray-1, #f4f5f8); border-radius: 8px; padding: 8px 12px;
+               font-size: 0.84rem; color: var(--gray-7); }
+.ri-nums div strong { display: block; font-size: 1.05rem; color: var(--navy); }
+.ri-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+          margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--gray-2);
+          border-radius: 10px; background: var(--white); position: sticky; top: 0; z-index: 30; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>교회상황 보고서 접수</h1>
+    <div class="crumb">홈 &gt; 관리자 &gt; 교회상황 보고서 접수</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="ri-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20260903a"></script>
+<script src="js/church-report.js?v=20260903a"></script>
+<script>
+/* =====================================================================
+ *  교회상황 보고서 접수 · 반영 (노회 서기)
+ *
+ *  결재 흐름 : 교회 작성 → 시찰 서기 취합 → 노회 서기 제출 → 노회 서기 반영
+ *  ※ 노회 서기의 승인이 곧 노회장의 승인입니다. 따로 노회장 결재 단계를 두지 않습니다.
+ *
+ *  열람 범위는 데이터베이스(RLS)가 정합니다 — 임원 · 그 시찰 임원 · 그 교회.
+ *  여기서는 돌아온 것을 그대로 보여 줄 뿐, 그 범위를 넓히지 않습니다.
+ *
+ *  보고서 내용 보기와 인쇄는 <교회상황 보고서> 화면(report.html)의 것을
+ *  그대로 씁니다. 여기서 다시 만들지 않습니다.
+ *    · 한 건 열람 · 인쇄     report.html?id=번호
+ *    · 여러 건 한 번에 인쇄  report.html?ids=1,2,3&print=1
+ * ===================================================================== */
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('ri-area');
+  var e = SHS.esc;
+
+  if (!user || !SHSAuth.canManageMembers(user)) {
+    area.innerHTML =
+      '<div class="notice-banner">교회상황 보고서 접수는 <strong>노회 서기·노회장·간사</strong>가 ' +
+      '이용하는 화면입니다.' +
+      (user ? ' 현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 이용할 수 없습니다.'
+            : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') +
+      '</div>';
+    return;
+  }
+  if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+    area.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var reports = [], sichals = [], churches = [];
+  var year = new Date().getFullYear();
+  /* 기본은 노회로 올라온 것(노회제출)만 본다 */
+  var FILTERS = ['노회제출', '전체', '시찰접수', '반영완료', '보완요청'];
+  var filter = '노회제출';
+  var picked = {};   /* 고른 보고서 id */
+
+  function db() { return SHSCloud.init(); }
+  function nf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
+
+  /* ---------- 불러오기 ---------- */
+  function load() {
+    db().then(function (c) {
+      return Promise.all([
+        c.from('church_reports').select('*')
+          .order('year', { ascending: false }).order('sichal').order('church'),
+        c.from('sichals').select('name,head,clerk,sort').order('sort'),
+        c.from('sichal_churches').select('sichal,name,pastor,sort').order('sichal').order('sort')
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) {
+        area.innerHTML = '<div class="notice-banner">보고서를 불러오지 못했습니다: ' +
+          e(rs[0].error.message) +
+          '<br><span style="font-size:0.85rem;color:var(--gray-5)">Supabase에서 ' +
+          '<strong>71_church_report_flow.sql</strong>을 아직 실행하지 않으셨다면 먼저 실행해 주세요.</span></div>';
+        return;
+      }
+      reports  = rs[0].data || [];
+      sichals  = (rs[1] && rs[1].data) || [];
+      churches = (rs[2] && rs[2].data) || [];
+      draw();
+    }).catch(function (x) {
+      area.innerHTML = '<div class="notice-banner">불러오지 못했습니다: ' +
+        e((x && x.message) || String(x)) + '</div>';
+    });
+  }
+
+  /* ---------- 화면 ---------- */
+  function yearsOf() {
+    var y = {};
+    reports.forEach(function (r) { y[r.year] = 1; });
+    y[year] = 1;
+    return Object.keys(y).map(Number).sort(function (a, b) { return b - a; });
+  }
+
+  /* 그 해 시찰별로 (관내 교회 · 낸 보고서)를 짝지어 둔다 */
+  function groups() {
+    var thisYear = reports.filter(function (r) { return r.year === year; });
+    var byCh = {};
+    thisYear.forEach(function (r) { byCh[r.sichal + '/' + r.church] = r; });
+
+    /* 시찰 이름은 시찰 명부를 따르고, 명부에 없는 시찰도 보고서가 있으면 함께 보여 준다 */
+    var names = sichals.map(function (s) { return s.name; });
+    thisYear.forEach(function (r) {
+      if (r.sichal && names.indexOf(r.sichal) === -1) names.push(r.sichal);
+    });
+
+    return names.map(function (name) {
+      var chs = churches.filter(function (c) { return c.sichal === name; });
+      /* 관내 교회 명부가 없으면 보고서에 있는 교회라도 늘어놓는다 */
+      if (!chs.length) {
+        chs = thisYear.filter(function (r) { return r.sichal === name; })
+          .map(function (r) { return { sichal: name, name: r.church, pastor: r.pastor }; });
+      }
+      var rows = chs.map(function (c) {
+        return { church: c.name, pastor: c.pastor, r: byCh[name + '/' + c.name] || null };
+      });
+      var got = rows.filter(function (x) { return x.r; });
+      var s = sichals.filter(function (x) { return x.name === name; })[0] || {};
+      return {
+        name: name, clerk: s.clerk || '', head: s.head || '',
+        rows: rows, all: rows.length, made: got.length,
+        sent:     got.filter(function (x) { return x.r.status === '노회제출'; }).length,
+        approved: got.filter(function (x) { return x.r.status === '반영완료'; }).length,
+        redo:     got.filter(function (x) { return x.r.status === '보완요청'; }).length,
+        held:     got.filter(function (x) { return x.r.status === '시찰접수' || x.r.status === '작성'; }).length,
+        sum: SHSReport.sum(got.map(function (x) { return x.r; }))
+      };
+    });
+  }
+
+  function show(rec) {
+    if (!rec) return false;                     /* 미제출 교회는 늘 보여 준다 (진행 상황) */
+    if (filter === '전체') return true;
+    return rec.status === filter;
+  }
+
+  function draw() {
+    var gs = groups();
+    var yearList = yearsOf();
+
+    var tAll = 0, tMade = 0, tSent = 0, tApproved = 0, tRedo = 0;
+    gs.forEach(function (g) {
+      tAll += g.all; tMade += g.made; tSent += g.sent; tApproved += g.approved; tRedo += g.redo;
+    });
+
+    var h = '<div class="notice-banner">시찰 서기가 노회로 올린 <strong>교회상황 보고서</strong>를 ' +
+      '받아 <strong>반영</strong>하는 자리입니다. 반영하시면 노회 기록으로 확정되어 ' +
+      '교회·시찰 화면에서는 더 고칠 수 없게 잠깁니다. ' +
+      '고칠 것이 있으면 <strong>보완요청</strong>으로 사유와 함께 돌려보내 주세요.<br>' +
+      '<span style="font-size:0.86rem;color:var(--gray-6)">' +
+      '보고서를 볼 수 있는 범위는 <strong>본인 교회와 임원</strong>입니다. ' +
+      '반영이 끝나도 그 범위는 넓어지지 않습니다.</span></div>';
+
+    h += '<div class="inline-form" style="margin-bottom:6px">' +
+      '<div class="field" style="flex:0 0 160px"><label for="ri-year">연도</label>' +
+      '<select id="ri-year">' + yearList.map(function (y) {
+        return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + y + '년</option>';
+      }).join('') + '</select></div></div>';
+
+    h += '<div class="dues-stats" style="margin-bottom:14px">' +
+      '<div class="ds"><div class="n">' + tMade + '/' + tAll + '곳</div><div class="l">보고서 작성</div></div>' +
+      '<div class="ds"><div class="n">' + tSent + '건</div><div class="l">노회 제출 (접수 대기)</div></div>' +
+      '<div class="ds"><div class="n">' + tApproved + '건</div><div class="l">반영 완료</div></div>' +
+      '<div class="ds"><div class="n">' + tRedo + '건</div><div class="l">보완 요청</div></div>' +
+      '</div>';
+
+    h += '<div class="tabs" style="margin-bottom:12px" id="ri-filter">' +
+      FILTERS.map(function (f) {
+        return '<button class="' + (filter === f ? 'active' : '') + '" data-rif="' + e(f) + '">' +
+          e(f) + '</button>';
+      }).join('') + '</div>';
+
+    /* 고른 보고서에 한꺼번에 하는 일 */
+    h += '<div class="ri-bar">' +
+      '<strong id="ri-count">0건 선택</strong>' +
+      '<button class="btn sm" id="ri-print" disabled>선택한 보고서 인쇄하기</button>' +
+      '<button class="btn sm" id="ri-approve" disabled>선택한 보고서 반영하기</button>' +
+      '<button class="btn danger sm" id="ri-redo" disabled>선택한 보고서 보완요청</button>' +
+      '<span class="form-msg" id="ri-msg" style="margin:0"></span></div>';
+
+    if (!gs.length) {
+      h += '<p style="color:var(--gray-5)">등록된 시찰이 없습니다.</p>';
+      area.innerHTML = h;
+      bindTop();
+      return;
+    }
+
+    gs.forEach(function (g) {
+      var rows = g.rows.filter(function (x) { return !x.r || show(x.r); });
+      /* 아직 노회에 올라오지 않은 시찰도 진행 상황을 알 수 있게 남겨 둔다 */
+      h += '<div class="ri-sichal">' +
+        '<h3>' + e(g.name) +
+        (g.sent ? ' <span class="role-badge" style="vertical-align:middle">접수 대기 ' + g.sent + '건</span>' : '') +
+        '</h3>' +
+        '<p class="ri-sub">시찰장 ' + e(g.head || '-') + ' · 서기 ' + e(g.clerk || '-') +
+        ' · 관내 ' + g.all + '곳 가운데 <strong>' + g.made + '곳</strong>이 보고서를 작성했습니다.' +
+        (g.sent === 0 && g.approved === 0
+          ? ' <span style="color:#b0731f;font-weight:700">아직 노회에 제출되지 않았습니다' +
+            (g.held ? ' (시찰이 ' + g.held + '건 들고 있습니다)' : '') + '.</span>'
+          : '') + '</p>';
+
+      h += '<div class="ri-nums">' +
+        '<div>전체 교인<strong>' + nf(g.sum.total) + '명</strong></div>' +
+        '<div>세례교인<strong>' + nf(g.sum.baptized) + '명</strong></div>' +
+        '<div>주일 평균 출석<strong>' + nf(g.sum.wavg) + '명</strong></div>' +
+        '<div>교회학교<strong>' + nf(g.sum.school) + '명</strong></div>' +
+        '<div>목사<strong>' + nf(g.sum.pastors) + '명</strong></div>' +
+        '<div>시무장로<strong>' + nf(g.sum.elders) + '명</strong></div>' +
+        '<div>권사<strong>' + nf(g.sum.kwonsa) + '명</strong></div>' +
+        '<div>집사<strong>' + nf(g.sum.deacons) + '명</strong></div>' +
+        '</div>';
+
+      if (!rows.length) {
+        h += '<p style="color:var(--gray-5);margin:0">「' + e(filter) + '」에 드는 보고서가 없습니다.</p></div>';
+        return;
+      }
+
+      h += '<div style="overflow-x:auto"><table class="tbl" style="margin:0"><thead><tr>' +
+        '<th style="width:36px"><input type="checkbox" class="ri-all" data-sic="' + e(g.name) +
+        '" title="이 시찰 전체선택" style="width:auto"></th>' +
+        '<th style="width:170px">교회</th><th style="width:100px">담임</th>' +
+        '<th style="width:90px">전체 교인</th><th style="width:90px">세례교인</th>' +
+        '<th style="width:100px">평균 출석</th><th style="width:110px">단계</th>' +
+        '<th style="width:160px">보기</th></tr></thead><tbody>';
+      rows.forEach(function (x) {
+        var r = x.r;
+        h += '<tr' + (r ? '' : ' style="opacity:.55"') + '>' +
+          '<td>' + (r
+            ? '<input type="checkbox" class="ri-sel" data-sic="' + e(g.name) + '" value="' + r.id + '"' +
+              (picked[r.id] ? ' checked' : '') + ' style="width:auto">'
+            : '') + '</td>' +
+          '<td class="left">' + e(x.church) +
+          (r && r.status === '보완요청' && r.review_note
+            ? '<br><small style="color:#b03a3a">보완요청 : ' + e(r.review_note) + '</small>' : '') +
+          '</td>' +
+          '<td>' + e((r && r.pastor) || x.pastor || '-') + '</td>' +
+          '<td>' + (r && r.members_total != null ? nf(r.members_total) : '-') + '</td>' +
+          '<td>' + (r && r.members_baptized != null ? nf(r.members_baptized) : '-') + '</td>' +
+          '<td>' + (r && r.worship_avg != null ? nf(r.worship_avg) : '-') + '</td>' +
+          '<td>' + (r ? SHSReport.stage(r.status) : '<span style="color:var(--gray-5)">미작성</span>') + '</td>' +
+          '<td>' + (r
+            ? '<a class="btn sm" href="report.html?id=' + r.id + '" target="_blank" rel="noopener">열람 · 인쇄</a>'
+            : '<span style="color:var(--gray-5)">-</span>') + '</td></tr>';
+      });
+      h += '</tbody></table></div></div>';
+    });
+
+    area.innerHTML = h;
+    bindTop();
+    bindRows();
+    updateBar();
+  }
+
+  function bindTop() {
+    document.getElementById('ri-year').addEventListener('change', function () {
+      year = parseInt(this.value, 10);
+      picked = {};
+      draw();
+    });
+    area.querySelectorAll('#ri-filter button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        filter = b.dataset.rif;
+        draw();
+      });
+    });
+  }
+
+  function selected() {
+    return Object.keys(picked).filter(function (k) { return picked[k]; });
+  }
+
+  function updateBar() {
+    var ids = selected();
+    var cnt = document.getElementById('ri-count');
+    if (cnt) cnt.textContent = ids.length + '건 선택';
+    ['ri-print', 'ri-approve', 'ri-redo'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.disabled = !ids.length;
+    });
+    /* 시찰별 전체선택 칸의 상태를 맞춘다 */
+    area.querySelectorAll('.ri-all').forEach(function (all) {
+      var boxes = area.querySelectorAll('.ri-sel[data-sic="' + CSS.escape(all.dataset.sic) + '"]');
+      var on = 0;
+      boxes.forEach(function (cb) { if (cb.checked) on += 1; });
+      all.checked = boxes.length > 0 && on === boxes.length;
+    });
+  }
+
+  function bindRows() {
+    area.querySelectorAll('.ri-sel').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        picked[cb.value] = cb.checked;
+        updateBar();
+      });
+    });
+    area.querySelectorAll('.ri-all').forEach(function (all) {
+      all.addEventListener('change', function () {
+        area.querySelectorAll('.ri-sel[data-sic="' + CSS.escape(all.dataset.sic) + '"]')
+          .forEach(function (cb) {
+            cb.checked = all.checked;
+            picked[cb.value] = all.checked;
+          });
+        updateBar();
+      });
+    });
+
+    document.getElementById('ri-print').addEventListener('click', function () {
+      var ids = selected();
+      if (!ids.length) return;
+      window.open('report.html?ids=' + ids.join(',') + '&print=1', '_blank', 'noopener');
+    });
+    document.getElementById('ri-approve').addEventListener('click', function () { decide('반영완료'); });
+    document.getElementById('ri-redo').addEventListener('click', function () { decide('보완요청'); });
+  }
+
+  /* ---------- 반영 · 보완요청 ---------- */
+  function decide(status) {
+    var ids = selected();
+    if (!ids.length) return;
+    var msg = document.getElementById('ri-msg');
+    var patch = { status: status, updated_at: new Date().toISOString() };
+    var note = null;
+
+    if (status === '보완요청') {
+      note = prompt('보완요청 사유를 적어 주세요.\n' +
+                    '해당 교회와 시찰 화면에 그대로 보이며, 고쳐서 다시 낼 수 있게 됩니다.', '');
+      if (note === null) return;
+      note = note.trim();
+      if (!note) {
+        msg.className = 'form-msg err';
+        msg.textContent = '보완요청 사유를 적어 주세요.';
+        return;
+      }
+      patch.review_note = note;
+      patch.approved_at = null;
+      patch.approved_by = null;
+    } else {
+      if (!confirm('고르신 보고서 ' + ids.length + '건을 노회 기록으로 <반영>합니다.\n\n' +
+                   '반영하면 교회·시찰 화면에서는 더 고칠 수 없게 잠깁니다.\n' +
+                   '(노회 서기의 승인이 곧 노회장의 승인입니다.)\n\n처리하시겠습니까?')) return;
+      patch.approved_at = new Date().toISOString();
+      patch.approved_by = user.id;
+      patch.review_note = null;
+    }
+
+    msg.className = 'form-msg';
+    msg.textContent = '처리 중입니다... (' + ids.length + '건)';
+    db().then(function (c) {
+      return c.from('church_reports').update(patch).in('id', ids).select('id,church,year');
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      var done = (r.data || []).length;
+      SHS.logAction('update',
+        status === '반영완료' ? '교회상황 보고서 반영' : '교회상황 보고서 보완요청',
+        year + '년 ' + done + '건' + (note ? ' — ' + note : ''));
+      /* 해당 교회에 알림 — 노회 관리자만 넣을 수 있으므로 여기서는 됩니다 */
+      notify(ids, status, note);
+      msg.className = 'form-msg ok';
+      msg.textContent = done + '건을 ' + status + ' 처리했습니다.';
+      picked = {};
+      load();
+    }).catch(function (err) {
+      msg.className = 'form-msg err';
+      msg.textContent = '처리하지 못했습니다: ' + ((err && err.message) || err);
+    });
+  }
+
+  /* 보고서를 낸 분에게 알린다 (알림을 넣지 못해도 처리 자체는 그대로 둔다) */
+  function notify(ids, status, note) {
+    var rows = reports.filter(function (r) { return ids.indexOf(String(r.id)) !== -1 && r.user_id; });
+    if (!rows.length) return;
+    db().then(function (c) {
+      return c.from('notifications').insert(rows.map(function (r) {
+        return {
+          user_id: r.user_id, kind: '보고서',
+          title: '[노회] ' + r.year + '년 교회상황 보고서 — ' + status,
+          body: r.church + ' 보고서를 노회 서기가 ' + status + ' 처리했습니다.' +
+                (note ? '\n' + note : '')
+        };
+      }));
+    }).catch(function () {});
+  }
+
+  load();
+ });
+});
+</script>
+</body>
+</html>

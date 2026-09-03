@@ -87,7 +87,8 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902j"></script>
+<script src="js/main.js?v=20260903a"></script>
+<script src="js/church-report.js?v=20260903a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -234,11 +235,19 @@ document.addEventListener('DOMContentLoaded', function () {
   function g(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
   function gn(id) { return num(g(id)); }
 
+  /* ---------- 결재 흐름 (71) ----------
+   * 작성 → 시찰접수 → 노회제출 → 반영완료 (보완요청은 되돌아온 것) */
+  function crStatusHtml(st) { return SHSReport.stage(st); }
+  function crStepTrail(r) { return SHSReport.trail(r); }
+  /* 반영이 끝난 보고서는 교회·시찰 화면에서 고칠 수 없다 (관리자만 되돌린다) */
+  function isLocked() { return SHSReport.locked(record, user); }
+
   function renderForm() {
     if (!CHURCH) {
       area.innerHTML = '<div class="notice-banner">소속 교회가 없습니다. <a href="mypage.html">내 정보</a>에서 소속 교회를 먼저 채워 주세요.</div>';
       return;
     }
+    var LOCKED = isLocked();
     var d = (record && record.data) || {};
     /* 그 해 보고서가 아직 없으면 지난해 내용을 그대로 이어받는다.
      * 대부분 그대로 두고 바뀐 몇 가지만 고치면 된다. */
@@ -275,7 +284,25 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<div class="notice-banner"><strong>' + YEAR + '년 ' + e(CHURCH) + '</strong> 교회상황 보고서' +
       (record ? ' — 제출된 내용을 고치고 있습니다.'
         : carried ? ' — <strong>' + prevRecord.year + '년 보고서 내용을 그대로 가져왔습니다.</strong> ' +
-          '바뀐 부분만 고친 뒤 저장·제출해 주세요.' : '') + '</div>';
+          '바뀐 부분만 고친 뒤 저장·제출해 주세요.' : '') +
+      (record ? '<div style="margin-top:8px;font-size:0.88rem">지금 단계 : ' +
+        crStatusHtml(record.status) + crStepTrail(record) + '</div>' : '') + '</div>';
+
+    /* 노회 서기가 반영을 마친 보고서는 더 고칠 수 없다 (되돌리기는 관리자만) */
+    if (LOCKED) {
+      h += '<div class="notice-banner" style="border-left:4px solid #2f6f4f">' +
+        '<strong>이 보고서는 노회 서기가 반영을 마쳤습니다.</strong> ' +
+        '노회 기록으로 확정되어 더 고치실 수 없습니다. 고쳐야 할 내용이 있으면 ' +
+        '노회 서기(사무실)에 말씀해 주세요. 되돌리는 일은 노회 관리자만 할 수 있습니다.</div>';
+    }
+    /* 노회 서기가 보완을 요청했으면 사유를 잘 보이게 적는다 */
+    if (record && record.status === '보완요청' && record.review_note) {
+      h += '<div class="notice-banner" style="border-left:4px solid #b03a3a">' +
+        '<strong>노회 서기 보완요청</strong><br>' +
+        '<span style="white-space:pre-wrap">' + e(record.review_note) + '</span><br>' +
+        '<span style="font-size:0.86rem;color:var(--gray-6)">고치신 뒤 아래 ' +
+        '<strong>시찰 서기에게 제출</strong>을 다시 눌러 주세요.</span></div>';
+    }
 
     /* 한글 파일(HWPX)로 자동 입력 */
     h += '<div class="admin-card rf-sec"><h3>&#128196; 한글 파일(HWPX)로 자동 입력</h3>' +
@@ -456,8 +483,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* 제출 줄 */
     h += '<div class="rf-bar">' +
-      '<button class="btn" id="rp-save">저장하기</button>' +
-      '<button class="btn" id="rp-send">시찰 서기에게 제출</button>' +
+      (LOCKED
+        ? '<span style="font-weight:700;color:#2f6f4f">반영이 끝나 잠긴 보고서입니다 — 열람·인쇄만 하실 수 있습니다.</span> '
+        : '<button class="btn" id="rp-save">저장하기</button>' +
+          '<button class="btn" id="rp-send">시찰 서기에게 제출</button>') +
       '<button class="btn ghost" id="rp-preview">미리보기 · 인쇄</button>' +
       '<button class="btn ghost" id="rp-pdf">PDF 저장</button>' +
       '<span class="rf-seal-tip">' +
@@ -508,8 +537,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('rp-preview').addEventListener('click', function () {
       openSheet(collect(), mySeal);
     });
-    document.getElementById('rp-send').addEventListener('click', function () { send(false); });
-    document.getElementById('rp-save').addEventListener('click', function () { send(true); });
+    if (!LOCKED) {
+      document.getElementById('rp-send').addEventListener('click', function () { send(false); });
+      document.getElementById('rp-save').addEventListener('click', function () { send(true); });
+    }
     document.getElementById('rp-pdf').addEventListener('click', savePdf);
     var so = document.getElementById('rp-sealon');
     if (so) so.addEventListener('change', function () { sealOn = this.checked; });
@@ -998,6 +1029,13 @@ document.addEventListener('DOMContentLoaded', function () {
       updated_at: new Date().toISOString()
     };
     if (!record) row.user_id = user.id;
+    /* 결재 흐름 (71) — 시찰 서기에게 제출하면 <시찰접수>가 된다.
+     * 중간 저장은 지금 단계를 그대로 둔다. */
+    if (!draft) {
+      row.status = '시찰접수';
+      row.sichal_sent_at = new Date().toISOString();
+      row.review_note = null;   /* 보완요청을 받아 고쳐 냈으면 사유를 지운다 */
+    }
 
     var btn = document.getElementById(draft ? 'rp-save' : 'rp-send');
     btn.disabled = true;
@@ -1034,12 +1072,24 @@ document.addEventListener('DOMContentLoaded', function () {
    * ================================================================ */
   function renderDoc(rec) {
     var d = rec.data;
+    var locked = SHSReport.locked(rec, user);
     var h = '<div class="notice-banner"><strong>' + rec.year + '년 ' + e(rec.church) + '</strong> 교회상황 보고서' +
       ' <span style="color:var(--gray-5)">(제출: ' + e(rec.submitted_by || '-') + ' · ' +
-      e(String(rec.updated_at || rec.created_at || '').slice(0, 10)) + ')</span></div>' +
+      e(String(rec.updated_at || rec.created_at || '').slice(0, 10)) + ')</span>' +
+      '<div style="margin-top:8px;font-size:0.88rem">지금 단계 : ' +
+      crStatusHtml(rec.status) + crStepTrail(rec) + '</div>' +
+      (rec.status === '보완요청' && rec.review_note
+        ? '<div style="margin-top:8px;font-size:0.88rem;color:#7a2b2b">' +
+          '<strong>노회 서기 보완요청</strong> — <span style="white-space:pre-wrap">' +
+          e(rec.review_note) + '</span></div>'
+        : '') + '</div>' +
       '<div style="margin:12px 0 18px">' +
       '<button class="btn" id="doc-print">인쇄</button> ' +
-      '<a class="btn ghost" href="report.html?church=' + encodeURIComponent(rec.church) + '&year=' + rec.year + '">수정하기</a> ' +
+      (locked
+        ? '<span style="margin-left:8px;font-size:0.88rem;color:#2f6f4f;font-weight:700">' +
+          '반영이 끝나 잠긴 보고서입니다 (되돌리기는 노회 관리자만)</span> '
+        : '<a class="btn ghost" href="report.html?church=' + encodeURIComponent(rec.church) +
+          '&year=' + rec.year + '">수정하기</a> ') +
       '<a class="btn ghost" href="sichal.html?s=' + encodeURIComponent(rec.sichal || '') + '#report">시찰 페이지로</a>' +
       '</div>';
     if (!d) {

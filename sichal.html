@@ -24,7 +24,8 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260902j"></script>
+<script src="js/main.js?v=20260903a"></script>
+<script src="js/church-report.js?v=20260903a"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js"></script>
 <script src="js/minutes-box.js"></script>
@@ -1268,7 +1269,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  /* ================= 교회상황 보고서 ================= */
+  /* ================= 교회상황 보고서 =================
+   * 결재 흐름 (71) : 작성 → 시찰접수 → 노회제출 → 반영완료
+   *                  (보완요청은 노회 서기가 돌려보낸 것) */
+  function crStage(st) { return SHSReport.stage(st); }
 
   /* 노회 서기에게 제출 — 시찰장·서기가 한 해치를 모아 올린다 */
   function submitOf(y) {
@@ -1349,7 +1353,11 @@ document.addEventListener('DOMContentLoaded', function () {
             p_note: document.getElementById('rp-note').value.trim() },
           function (n) {
             SHS.logAction('add', '교회상황 보고서 노회 제출', NAME + ' ' + year + '년 ' + n + '곳');
-            load();
+            /* 보고서 한 장 한 장에도 <노회제출>을 적어 둔다 (71).
+             * 노회 서기가 이미 반영한 것은 건드리지 않는다. */
+            setReportStage(
+              { status: '노회제출', presbytery_sent_at: new Date().toISOString(), review_note: null },
+              function () { load(); });
           });
     });
 
@@ -1358,31 +1366,27 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!confirm(year + '년 제출을 취소하시겠습니까?')) return;
       run('unsubmit_sichal_reports', { p_year: year, p_sichal: NAME }, function () {
         SHS.logAction('delete', '교회상황 보고서 제출 취소', NAME + ' ' + year + '년');
-        load();
+        /* 다시 시찰이 들고 있는 단계로 돌린다 (반영이 끝난 것은 그대로 둔다) */
+        setReportStage({ status: '시찰접수', presbytery_sent_at: null }, function () { load(); });
       });
     });
+  }
+
+  /* 그 해 우리 시찰 보고서의 결재 단계를 한꺼번에 바꾼다 (71).
+   * 노회 서기가 이미 <반영완료>로 마친 것은 건드리지 않는다.
+   * 71 을 아직 실행하지 않았어도 화면이 멈추지 않도록 조용히 넘어간다. */
+  function setReportStage(patch, done) {
+    patch.updated_at = new Date().toISOString();
+    db().then(function (c) {
+      return c.from('church_reports').update(patch)
+        .eq('sichal', NAME).eq('year', year).neq('status', '반영완료');
+    }).then(function () { done(); }, function () { done(); });
   }
 
   /* ---------- 시찰 전체 통계 ----------
    * 제출된 보고서(church_reports)를 합산해 표와 그래프로 보여 준다.
    * 교세 항목은 시찰보고서의 교세보고 칸과 같은 기준으로 센다. */
-  function reportStat(r) {
-    function n(v) { return Number(v || 0) || 0; }
-    function pick(o, ks) { var s = 0; ks.forEach(function (k) { s += n(o && o[k]); }); return s; }
-    var d = (r && r.data) || {};
-    var cg = d.clergy || {}, jj = d.jejik || {};
-    return {
-      pastors: pick(cg, ['damim', 'wonro', 'bumok', 'hyup', 'gita']),
-      gangdosa: n(cg.gangdosa),
-      jeondosa: pick(cg, ['jd_m', 'jd_f']),
-      elders: n(jj.jr_simu),
-      muim: pick(jj, ['jr_wonro', 'jr_euntoe', 'jr_hyup', 'jr_gita']),
-      kwonsa: pick(jj, ['ks_simu', 'ks_gita']),
-      deacons: pick(jj, ['as_simu', 'as_gita', 'ss_m', 'ss_f']),
-      total: n(r.members_total), baptized: n(r.members_baptized),
-      wavg: n(r.worship_avg), school: n(r.school_total), offer: n(r.offering_year)
-    };
-  }
+  function reportStat(r) { return SHSReport.stat(r); }
 
   function statsBox(rows) {
     var wonf = function (n) { return Number(n || 0).toLocaleString('ko-KR'); };
@@ -1521,23 +1525,30 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:36px"><input type="checkbox" id="rp-selall" title="전체선택" style="width:auto"></th>' +
         '<th style="width:170px">교회</th><th style="width:110px">담임</th>' +
         '<th style="width:100px">전체 교인</th><th style="width:100px">세례교인</th>' +
-        '<th style="width:110px">평균 출석</th><th style="width:110px">제출</th>' +
+        '<th style="width:110px">평균 출석</th><th style="width:110px">단계</th>' +
         '<th style="width:190px">관리</th></tr></thead><tbody>';
       churches.forEach(function (ch) {
         var r = rows.filter(function (x) { return x.church === ch.name; })[0];
+        /* 노회 서기가 반영을 마친 보고서는 시찰에서 고치거나 지울 수 없다 */
+        var locked = SHSReport.locked(r, user);
         h += '<tr' + (r ? '' : ' style="opacity:.6"') + '>' +
           '<td>' + (r ? '<input type="checkbox" class="rp-sel" value="' + r.id + '" style="width:auto">' : '') + '</td>' +
-          '<td>' + e(ch.name) + '</td><td>' + e(ch.pastor || '-') + '</td>' +
+          '<td>' + e(ch.name) +
+          (r && r.status === '보완요청' && r.review_note
+            ? '<br><small style="color:#b03a3a">노회 보완요청 : ' + e(r.review_note) + '</small>' : '') +
+          '</td><td>' + e(ch.pastor || '-') + '</td>' +
           '<td>' + (r && r.members_total != null ? r.members_total : '-') + '</td>' +
           '<td>' + (r && r.members_baptized != null ? r.members_baptized : '-') + '</td>' +
           '<td>' + (r && r.worship_avg != null ? r.worship_avg : '-') + '</td>' +
-          '<td>' + (r ? '<span class="role-badge">제출</span>' : '<span style="color:var(--gray-5)">미제출</span>') + '</td>' +
+          '<td>' + (r ? crStage(r.status) : '<span style="color:var(--gray-5)">미제출</span>') + '</td>' +
           '<td>' +
           (r ? '<a class="btn sm" href="report.html?id=' + r.id + '">보기·인쇄</a> ' : '') +
           (r && r.file_path ? '<button class="btn ghost sm" data-rpfile="' + r.id + '">첨부</button> ' : '') +
-          '<a class="btn ghost sm" href="report.html?church=' + encodeURIComponent(ch.name) +
-          '&year=' + year + '">' + (r ? '수정' : '작성') + '</a>' +
-          (r ? ' <button class="btn danger sm" data-rpdel="' + r.id + '">삭제</button>' : '') +
+          (locked
+            ? '<span style="font-size:0.8rem;color:#2f6f4f;font-weight:700">반영 완료 · 잠김</span>'
+            : '<a class="btn ghost sm" href="report.html?church=' + encodeURIComponent(ch.name) +
+              '&year=' + year + '">' + (r ? '수정' : '작성') + '</a>' +
+              (r ? ' <button class="btn danger sm" data-rpdel="' + r.id + '">삭제</button>' : '')) +
           '</td></tr>';
       });
       h += '</tbody></table>';
@@ -1550,18 +1561,33 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       h += submitBox();
       var mine = rows[0];
+      var mineLocked = SHSReport.locked(mine, user);
       h += '<div class="notice-banner"><strong>' + e(myChurch) + '</strong>의 ' + year + '년 보고서 ' +
         (mine ? '— 제출하셨습니다. 아래에서 보거나 고치실 수 있습니다.' : '— 아직 제출하지 않으셨습니다.') +
+        (mine ? '<div style="margin-top:8px;font-size:0.88rem">지금 단계 : ' + crStage(mine.status) + '</div>' : '') +
         '</div>';
+      if (mine && mine.status === '보완요청' && mine.review_note) {
+        h += '<div class="notice-banner" style="border-left:4px solid #b03a3a">' +
+          '<strong>노회 서기 보완요청</strong><br>' +
+          '<span style="white-space:pre-wrap">' + e(mine.review_note) + '</span><br>' +
+          '<span style="font-size:0.86rem;color:var(--gray-6)">고치신 뒤 다시 ' +
+          '<strong>시찰 서기에게 제출</strong>을 눌러 주세요.</span></div>';
+      }
+      if (mineLocked) {
+        h += '<div class="notice-banner" style="border-left:4px solid #2f6f4f">' +
+          '노회 서기가 반영을 마쳐 이 보고서는 잠겼습니다. 열람·인쇄만 하실 수 있으며, ' +
+          '되돌리는 일은 노회 관리자만 할 수 있습니다.</div>';
+      }
       h += '<div style="margin:14px 0">' +
-        '<a class="btn" href="report.html?church=' + encodeURIComponent(myChurch) + '&year=' + year + '">' +
-        (mine ? '보고서 수정하기' : '교회상황 보고서 작성하기') + '</a>' +
-        (mine ? ' <a class="btn ghost" href="report.html?id=' + mine.id + '">보기·인쇄</a>' : '') +
+        (mineLocked ? '' :
+          '<a class="btn" href="report.html?church=' + encodeURIComponent(myChurch) + '&year=' + year + '">' +
+          (mine ? '보고서 수정하기' : '교회상황 보고서 작성하기') + '</a> ') +
+        (mine ? '<a class="btn ghost" href="report.html?id=' + mine.id + '">보기·인쇄</a>' : '') +
         '</div>';
       if (mine) {
         h += '<div style="margin:10px 0">' +
           (mine.file_path ? '<button class="btn ghost sm" data-rpfile="' + mine.id + '">첨부 내려받기</button> ' : '') +
-          '<button class="btn danger sm" data-rpdel="' + mine.id + '">삭제</button></div>';
+          (mineLocked ? '' : '<button class="btn danger sm" data-rpdel="' + mine.id + '">삭제</button>') + '</div>';
       }
     }
 
