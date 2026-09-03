@@ -126,6 +126,8 @@
 #pt-paper table.roster { border-collapse: collapse; width: 100%; margin: 10px 0; }
 #pt-paper table.roster th, #pt-paper table.roster td { border: 1px solid #333; padding: 7px 4px; text-align: center; font-size: 13px; height: 26px; }
 #pt-paper .pre { white-space: pre-wrap; }
+/* 여러 청원서 일괄 열람(?subs=1,2,3): 화면에서는 사이를 띄우고, 인쇄에서는 한 장씩 나눠 찍는다 */
+#pt-paper .pt-page + .pt-page { margin-top: 44px; padding-top: 44px; border-top: 2px dashed #bbb; }
 
 /* ----- 끼워 넣기(embed) 모드: 구비서류 안내 박스 안에서 서식만 보여 준다 ----- */
 body.pt-embed > *:not(main) { display: none !important; }
@@ -160,6 +162,10 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
   #pt-paper {
     position: absolute; left: 0; top: 0; width: 100%;
     border: none; box-shadow: none; padding: 0; margin: 0; max-width: none;
+  }
+  #pt-paper .pt-page + .pt-page {
+    margin-top: 0; padding-top: 0; border-top: none;
+    page-break-before: always; break-before: page;
   }
   @page { size: A4 portrait; margin: 18mm 16mm; }
 }
@@ -813,6 +819,9 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
   var sealPos = { dx: 0, dy: 0 };   /* 미리보기에서 끌어 옮긴 도장 위치 */
   /* ?sub=번호 — 제출된 청원서를 원본 그대로 열람하는 모드 (시찰 서류 진단) */
   var viewSubId = (location.search.match(/[?&]sub=(\d+)/) || [])[1] || null;
+  /* ?subs=1,2,3 — 여러 청원서를 이어 붙여 한 번에 인쇄 (시찰 자료실 통과 청원서) */
+  var viewSubIds = ((location.search.match(/[?&]subs=([\d,]+)/) || [])[1] || '')
+    .split(',').map(function (x) { return parseInt(x, 10); }).filter(Boolean);
 
   function cloudOn() {
     return user && user.cloud && window.SHSCloud && SHSCloud.enabled();
@@ -1416,6 +1425,72 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
     });
   }
 
+  /* 종이가 찍을 준비가 되었는지 — 글꼴과 도장 그림이 모두 내려온 뒤에 푼다.
+   * 인쇄·PDF 저장을 그 전에 시작하면 도장이 빠지거나 빈 종이가 나온다. */
+  function paperReady() {
+    var paper = document.getElementById('pt-paper');
+    var waits = Array.prototype.map.call(paper.querySelectorAll('img'), function (im) {
+      if (im.complete && im.naturalWidth) return Promise.resolve();
+      return new Promise(function (resolve) {
+        var p = im.decode ? im.decode() : Promise.reject();
+        p.then(resolve, resolve);
+        im.addEventListener('load', resolve); im.addEventListener('error', resolve);
+        setTimeout(resolve, 4000);   /* 그림 하나가 영영 안 오더라도 멈추지 않는다 */
+      });
+    });
+    if (document.fonts && document.fonts.ready) {
+      waits.push(document.fonts.ready.then(function () {}, function () {}));
+    }
+    return Promise.all(waits);
+  }
+
+  /* ----- 여러 청원서 일괄 열람·인쇄 (?subs=1,2,3&print=1) -----
+   * 시찰 자료실의 <통과 청원서>에서 여러 건을 골라 한 번의 인쇄로 모두 찍는다.
+   * 한 건씩 서식대로 그려 이어 붙이고, 인쇄에서는 한 장씩 나뉜다. */
+  function openSubmissions(ids) {
+    document.body.classList.add('pt-view');
+    if (!cloudOn()) {
+      document.getElementById('pt-paper').innerHTML =
+        '<p style="color:#666">청원서를 보시려면 로그인이 필요합니다.</p>';
+      return;
+    }
+    SHSCloud.init().then(function (c) {
+      return c.from('petition_submissions').select('*').in('id', ids);
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      /* 고른 순서(접수 순)를 그대로 지킨다 */
+      var rows = (r.data || []).slice().sort(function (a, b) {
+        return ids.indexOf(Number(a.id)) - ids.indexOf(Number(b.id));
+      });
+      if (!rows.length) throw new Error('청원서를 찾지 못했습니다.');
+      var html = '';
+      rows.forEach(function (p) {
+        var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
+        if (!f) return;
+        cur = f; data = p.data || {}; editingId = null; viewSeal = p.seal || null;
+        /* 도장 사용 여부·위치는 청원서마다 따로 저장되어 있다 */
+        sealOn = !(data._seal && data._seal.on === false);
+        sealPos = data._seal
+          ? { dx: Number(data._seal.dx) || 0, dy: Number(data._seal.dy) || 0 }
+          : { dx: 0, dy: 0 };
+        html += '<div class="pt-page">' + cur.render(data) + '</div>';
+      });
+      document.getElementById('pt-paper').innerHTML = html;
+      document.title = '통과 청원서 ' + rows.length + '건 - 시화산노회';
+      var info = document.getElementById('pt-viewinfo');
+      if (info) {
+        info.innerHTML = '<strong>' + e(rows[0].sichal) + ' 통과 청원서 ' + rows.length + '건</strong><br>' +
+          rows.map(function (p) { return e(p.title); }).join(' · ');
+      }
+      if (/[?&]print=1/.test(location.search)) {
+        paperReady().then(function () { setTimeout(function () { window.print(); }, 300); });
+      }
+    }).catch(function (err) {
+      document.getElementById('pt-paper').innerHTML =
+        '<p style="color:#a33">' + e(err.message || err) + '</p>';
+    });
+  }
+
   /* 바깥 화면(서류 진단)에서 이 종이를 인쇄·PDF 저장하도록 열어 둔다 */
   window.SHSPetitionPrint = function () { window.focus(); window.print(); };
   window.SHSPetitionPdf = savePdf;
@@ -1624,7 +1699,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
   /* 구비서류 안내 박스 안에 끼워 넣어 보여 줄 때 */
   if (/[?&]embed=1/.test(location.search)) document.body.classList.add('pt-embed');
   /* 제출된 청원서 열람 모드는 입력칸 없이 종이만 보여 준다 */
-  if (viewSubId) document.body.classList.add('pt-view');
+  if (viewSubId || viewSubIds.length) document.body.classList.add('pt-view');
 
   /* 구비서류 안내에서 ?form=아이디 로 들어오면 그 서식을 바로 연다 */
   var fm = location.search.match(/[?&]form=([a-z]+)/);
@@ -1648,6 +1723,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
         return;
       }
       if (viewSubId) { openSubmission(viewSubId); return; }
+      if (viewSubIds.length) { openSubmissions(viewSubIds); return; }
       loadMine(); loadSeal(); loadInbox(); openFromUrl();
       /* 시찰보고서 연동(회기·시찰장·교세 자동 입력)은 로그인 확인 후에야
        * 돌 수 있으므로, 처음부터 시찰보고서로 들어왔다면 다시 그린다 */
