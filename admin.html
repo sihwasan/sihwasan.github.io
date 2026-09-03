@@ -2804,6 +2804,11 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('sichals').select('*').order('sort'),
         c.from('sichal_churches').select('sichal')
+          .then(function (x) { return x; }, function () { return { data: [] }; }),
+        /* 시찰 임원으로 직접 이어 둔 계정 (35_sichal.sql) */
+        c.from('sichal_officers').select('*').order('sichal').order('position')
+          .then(function (x) { return x; }, function () { return { data: [] }; }),
+        c.from('profiles').select('id,name,church,position,role')
           .then(function (x) { return x; }, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
@@ -2843,7 +2848,135 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '</tbody></table>';
       html += '<p style="margin-top:12px"><button class="btn ghost sm" id="si-new">시찰 추가</button> ' +
         '<span class="form-msg" id="si-newmsg" style="margin:0"></span></p>';
+
+      /* ---------- 시찰 임원 지정 (계정 연결) ----------
+       * 위 표의 시찰장·서기 칸은 <이름>만 적히므로, 동명이인이 있거나
+       * 표기가 다르면 시스템이 그 사람을 알아보지 못한다. 여기에서
+       * 회원 계정을 직접 이어 두면(sichal_officers) 이름과 상관없이
+       * 그 시찰의 자료·서류 진단 권한이 정확히 간다. */
+      var offRows = (rs[2] && rs[2].data) || [];
+      var profs = ((rs[3] && rs[3].data) || []).filter(function (p) {
+        return p.name && p.role !== 'pending';
+      }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ko'); });
+      var profById = {};
+      profs.forEach(function (p) { profById[p.id] = p; });
+      var POSITIONS = ['시찰장', '서기', '회계', '총무', '부시찰장'];
+
+      html += '<h3 style="margin:26px 0 8px;color:var(--navy)">시찰 임원 지정 (계정 연결)</h3>';
+      html += '<div class="notice-banner">위 표의 <strong>시찰장·서기</strong> 칸은 이름만 적히므로, ' +
+        '동명이인이 있거나 명부 표기가 다르면 시스템이 그분을 알아보지 못합니다. ' +
+        '여기에서 <strong>회원 계정을 직접 이어</strong> 두시면 이름과 상관없이 ' +
+        '그 시찰의 자료·회계·회의록과 <strong>서류 진단</strong> 권한이 정확히 갑니다. ' +
+        '임원이 바뀌면 예전 분을 해제하고 새 분을 지정해 주세요.</div>';
+
+      html += '<div class="inline-form" style="align-items:flex-end">' +
+        '<div class="field" style="flex:0 0 150px"><label for="so-sichal">시찰</label>' +
+        '<select id="so-sichal">' + rows.map(function (x) {
+          return '<option>' + e(x.name) + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 200px"><label for="so-q">회원 찾기 (이름·교회)</label>' +
+        '<input type="text" id="so-q" placeholder="예: 이동진 또는 동탄영광"></div>' +
+        '<div class="field"><label for="so-member">회원 (' + profs.length + '명)</label>' +
+        '<select id="so-member"></select></div>' +
+        '<div class="field" style="flex:0 0 130px"><label for="so-pos">직위</label>' +
+        '<select id="so-pos">' + POSITIONS.map(function (p) {
+          return '<option' + (p === '서기' ? ' selected' : '') + '>' + e(p) + '</option>';
+        }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 90px"><button class="btn" id="so-add">지정</button></div>' +
+        '</div><div class="form-msg" id="so-msg"></div>';
+
+      html += '<table class="tbl" style="margin-top:10px"><thead><tr>' +
+        '<th style="width:130px">시찰</th><th style="width:120px">이름</th>' +
+        '<th style="width:170px">소속 교회</th><th style="width:110px">직분</th>' +
+        '<th style="width:110px">시찰 직위</th><th style="width:120px">지정일</th>' +
+        '<th style="width:90px">관리</th></tr></thead><tbody>';
+      if (!offRows.length) {
+        html += '<tr><td colspan="7" style="color:var(--gray-5)">아직 계정을 이어 둔 시찰 임원이 없습니다. ' +
+          '적어도 시찰마다 <strong>서기</strong> 한 분은 지정해 주세요.</td></tr>';
+      }
+      offRows.forEach(function (o) {
+        var p = profById[o.user_id] || {};
+        html += '<tr><td><strong>' + e(o.sichal) + '</strong></td>' +
+          '<td>' + e(p.name || '(계정을 찾을 수 없음)') + '</td>' +
+          '<td>' + e(p.church || '-') + '</td>' +
+          '<td>' + e(p.position || '-') + '</td>' +
+          '<td><span class="role-badge">' + e(o.position) + '</span></td>' +
+          '<td style="font-size:0.84rem;color:var(--gray-6)">' +
+          e(String(o.created_at || '').slice(0, 10)) + '</td>' +
+          '<td><button class="btn danger sm" data-sodel="' + o.id + '">해제</button></td></tr>';
+      });
+      html += '</tbody></table>';
+      html += '<p style="font-size:0.82rem;color:var(--gray-5)">' +
+        '· 노회장·서기·간사·최고관리자는 지정하지 않아도 모든 시찰을 다룰 수 있습니다.<br>' +
+        '· 지정한 분은 시찰 화면에서 관내 교회·자료실·회의록·회계와 ' +
+        '<strong>서류 진단</strong>을 다루실 수 있습니다.</p>';
+
       box.innerHTML = html;
+
+      /* 회원 고르기 — 이름·교회로 걸러 준다 */
+      (function () {
+        var q = document.getElementById('so-q');
+        var sel = document.getElementById('so-member');
+        if (!q || !sel) return;
+        function fill() {
+          var k = q.value.replace(/\s/g, '');
+          var list = profs.filter(function (p) {
+            if (!k) return true;
+            return (String(p.name) + String(p.church || '')).replace(/\s/g, '').indexOf(k) !== -1;
+          }).slice(0, 300);
+          sel.innerHTML = list.length
+            ? list.map(function (p) {
+                return '<option value="' + e(p.id) + '">' + e(p.name) +
+                  (p.church ? ' (' + e(p.church) + ')' : '') +
+                  (p.position ? ' · ' + e(p.position) : '') + '</option>';
+              }).join('')
+            : '<option value="">찾으시는 회원이 없습니다</option>';
+        }
+        q.addEventListener('input', fill);
+        fill();
+      })();
+
+      document.getElementById('so-add').addEventListener('click', function () {
+        var msg = document.getElementById('so-msg');
+        var sichal = document.getElementById('so-sichal').value;
+        var uid = document.getElementById('so-member').value;
+        var pos = document.getElementById('so-pos').value;
+        if (!uid) { msg.className = 'form-msg err'; msg.textContent = '지정할 회원을 골라 주세요.'; return; }
+        var p = profById[uid] || {};
+        if (!confirm(sichal + ' ' + pos + '으로 ' + (p.name || '') +
+                     ' 님의 계정을 지정합니다.\n\n지정하시겠습니까?')) return;
+        msg.className = 'form-msg'; msg.textContent = '지정하는 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.from('sichal_officers').upsert({
+            sichal: sichal, user_id: uid, position: pos, created_by: user.name
+          }, { onConflict: 'sichal,user_id' }).select();
+        }).then(function (res) {
+          var w = SHS.wrote(res);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+          SHSCloud.log('update', '시찰 임원 지정', sichal + ' ' + pos + ' — ' + (p.name || uid));
+          renderSichals();
+        }).catch(function (err) {
+          msg.className = 'form-msg err';
+          msg.textContent = '지정하지 못했습니다: ' + ((err && err.message) || err);
+        });
+      });
+
+      box.querySelectorAll('button[data-sodel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var o = offRows.filter(function (x) { return String(x.id) === b.dataset.sodel; })[0];
+          if (!o) return;
+          var p = profById[o.user_id] || {};
+          if (!confirm((p.name || '이 회원') + ' 님의 ' + o.sichal + ' ' + o.position +
+                       ' 지정을 해제하시겠습니까?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('sichal_officers').delete().eq('id', o.id);
+          }).then(function (res) {
+            if (res.error) { alert('해제하지 못했습니다: ' + res.error.message); return; }
+            SHSCloud.log('delete', '시찰 임원 해제', o.sichal + ' ' + o.position + ' — ' + (p.name || o.user_id));
+            renderSichals();
+          });
+        });
+      });
 
       function openSichalEdit(x) {
         var isNew = !x;
