@@ -137,7 +137,9 @@ body.pt-embed > *:not(main) { display: none !important; }
 /* PDF 도구(html2pdf·html2canvas)가 종이를 베껴 그리려고 body 바로 아래에 붙이는
  * 작업 칸은 감추면 안 된다 — 감추면 빈(백지) PDF 가 나온다. */
 body.pt-embed > .html2pdf__overlay, body.pt-embed > .html2canvas-container { display: block !important; }
-/* PDF 로 뜨는 동안: 캔버스가 그리지 못하는 혼합 모드는 잠시 끈다 */
+/* PDF 로 뜨는 동안: 캔버스가 그리지 못하는 혼합 모드는 잠시 끄고,
+ * 화면용 그림자·테두리는 PDF 에 찍히지 않게 지운다 */
+#pt-paper.pt-capturing { box-shadow: none; border: none; }
 #pt-paper.pt-capturing .pt-seal { mix-blend-mode: normal; opacity: 1; }
 body.pt-embed .page-head { display: none !important; }
 /* 끼워 넣기(embed)에서는 서식 입력과 미리보기만 남긴다:
@@ -1154,6 +1156,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
     if (pdfLoading) return pdfLoading;
     pdfLoading = new Promise(function (resolve, reject) {
       var sc = document.createElement('script');
+      /* 이 묶음(bundle) 안에 html2canvas 와 jsPDF 가 함께 들어 있어 따로 부르지 않아도 된다 */
       sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
       sc.onload = function () { resolve(window.html2pdf); };
       sc.onerror = function () { pdfLoading = null; reject(new Error('PDF 도구를 불러오지 못했습니다.')); };
@@ -1215,7 +1218,37 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
     return document.getElementById('pt-pdf');
   }
 
-  /* PDF 저장 — 화면의 미리보기(#pt-paper)를 html2pdf(html2canvas)로 떠서 내려받는다.
+  /* 뜬 그림을 A4 종이에 여백 10mm 로 앉혀 내려받는다.
+   * 한 장에 다 안 들어가면 한 쪽 높이만큼씩 잘라 여러 장으로 나눈다. */
+  function canvasToPdf(canvas, filename) {
+    var jsPDF = window.jspdf && window.jspdf.jsPDF;
+    if (!jsPDF) throw new Error('PDF 도구(jsPDF)를 찾지 못했습니다.');
+    var pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    var margin = 10;                                   /* 종이 가장자리 여백(mm) */
+    var innerW = 210 - margin * 2, innerH = 297 - margin * 2;
+    var imgH = canvas.height * innerW / canvas.width;  /* 안쪽 폭에 맞췄을 때의 높이(mm) */
+    if (imgH <= innerH) {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.98), 'JPEG', margin, margin, innerW, imgH);
+      pdf.save(filename);
+      return;
+    }
+    var pageH = Math.max(1, Math.floor(innerH * canvas.width / innerW));  /* 한 쪽 = 몇 픽셀 */
+    var slice = document.createElement('canvas');
+    var sx = slice.getContext('2d');
+    for (var top = 0, page = 0; top < canvas.height; top += pageH, page++) {
+      var h = Math.min(pageH, canvas.height - top);
+      slice.width = canvas.width; slice.height = h;    /* 크기를 바꾸면 칠하기 설정이 초기화된다 */
+      sx.fillStyle = '#ffffff'; sx.fillRect(0, 0, canvas.width, h);
+      sx.drawImage(canvas, 0, top, canvas.width, h, 0, 0, canvas.width, h);
+      if (page) pdf.addPage();
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.98), 'JPEG',
+                   margin, margin, innerW, h * innerW / canvas.width);
+    }
+    pdf.save(filename);
+  }
+
+  /* PDF 저장 — 화면에 보이는 미리보기(#pt-paper)를 html2canvas 로 그대로 뜬 뒤
+   * jsPDF 로 A4 에 앉힌다.
    * 서류 진단의 iframe 안에서도 쓰이므로(window.SHSPetitionPdf) 약속(Promise)을 돌려준다. */
   function savePdf(btn) {
     btn = pdfButton(btn);
@@ -1235,38 +1268,31 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
       window.scrollTo(0, keepY);
       done();
     }
-    return loadPdfTool().then(function (html2pdf) {
+    return loadPdfTool().then(function () {
       /* 1) 글꼴·도장 그림이 다 내려온 뒤에 뜬다 (그 전에 뜨면 빈 결과가 나온다) */
-      return paperReady().then(function () {
-        /* 3) 바깥 주소 그림은 data URL 로 바꿔 캔버스 오염을 막는다 */
-        return inlineImages(paper, restore);
-      }).then(function () {
-        /* 4) 캔버스가 못 그리는 mix-blend-mode 는 뜨는 동안만 끈다 */
-        paper.classList.add('pt-capturing');
-        var w = paper.scrollWidth, h = paper.scrollHeight;
-        return html2pdf().set({
-          margin: 10,
-          filename: (cur && cur.title ? cur.title : '청원서') + '.pdf',
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: {
-            scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
-            scrollX: 0, scrollY: 0,
-            /* 2) iframe 의 화면 크기에 기대지 않고 종이 크기를 그대로 준다 */
-            width: w, height: h, windowWidth: w, windowHeight: h
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'] }
-        }).from(paper).toContainer().then(function () {
-          /* 베껴 붙인 종이는 A4 안쪽 폭에 맞춰지므로, 그 실제 크기로 뜬다 */
-          var c = this.prop.container;
-          if (c && c.scrollWidth && c.scrollHeight) {
-            this.opt.html2canvas.width = c.scrollWidth;
-            this.opt.html2canvas.height = c.scrollHeight;
-            this.opt.html2canvas.windowWidth = c.scrollWidth;
-            this.opt.html2canvas.windowHeight = c.scrollHeight;
-          }
-        }).toCanvas().get('canvas', checkCanvas).save();   /* 6) 빈 캔버스는 오류 */
+      return paperReady();
+    }).then(function () {
+      /* 2) 바깥 주소 그림은 data URL 로 바꿔 캔버스 오염을 막는다 */
+      return inlineImages(paper, restore);
+    }).then(function () {
+      /* 3) 캔버스가 못 그리는 mix-blend-mode 와 화면용 그림자·테두리는 뜨는 동안만 끈다 */
+      paper.classList.add('pt-capturing');
+      if (!window.html2canvas) throw new Error('PDF 도구(html2canvas)를 찾지 못했습니다.');
+      /* 4) 화면에 보이는 종이를 그 자리에서 그대로 뜬다.
+       * html2canvas 에 windowWidth/windowHeight 를 주면 베껴 그리는 문서의 화면 폭이
+       * 바뀌어, 가운데 정렬(margin:0 auto)된 종이가 그 안에서 옆으로 옮겨 간다.
+       * 잘라낼 자리는 원본 문서에서 잰 값이라 왼쪽이 잘려 나가므로 절대 주지 않는다. */
+      window.scrollTo(0, 0);
+      var r = paper.getBoundingClientRect();
+      return window.html2canvas(paper, {
+        scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false,
+        scrollX: 0, scrollY: 0,
+        x: r.left + window.scrollX, y: r.top + window.scrollY,
+        width: paper.offsetWidth, height: paper.offsetHeight
       });
+    }).then(function (canvas) {
+      checkCanvas(canvas);                              /* 5) 빈 캔버스는 오류 */
+      canvasToPdf(canvas, (cur && cur.title ? cur.title : '청원서') + '.pdf');
     }).then(function () { cleanup(); }, function (err) {
       cleanup();
       console.error('[청원서 PDF]', err);
