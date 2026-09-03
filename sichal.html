@@ -1898,8 +1898,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     dBtn.addEventListener('click', function () {
       var w = fr.contentWindow;
-      if (w && typeof w.SHSPetitionPdf === 'function') w.SHSPetitionPdf();
-      else window.open('petition.html?sub=' + p.id, '_blank', 'noopener');
+      if (!(w && typeof w.SHSPetitionPdf === 'function')) {
+        window.open('petition.html?sub=' + p.id, '_blank', 'noopener');
+        return;
+      }
+      /* 안쪽 화면이 PDF 를 만드는 동안 이 단추에 진행 상태를 보인다.
+       * 실패하면 안쪽 화면이 스스로 알리므로 여기서는 단추만 되돌린다. */
+      dBtn.disabled = true; dBtn.textContent = '만드는 중...';
+      function back() { dBtn.disabled = false; dBtn.textContent = 'PDF 저장'; }
+      var r;
+      try { r = w.SHSPetitionPdf(); } catch (x) { back(); return; }
+      if (r && typeof r.then === 'function') r.then(back, back); else back();
     });
   }
 

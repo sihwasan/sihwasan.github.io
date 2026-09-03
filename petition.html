@@ -134,6 +134,11 @@
 
 /* ----- 끼워 넣기(embed) 모드: 구비서류 안내 박스 안에서 서식만 보여 준다 ----- */
 body.pt-embed > *:not(main) { display: none !important; }
+/* PDF 도구(html2pdf·html2canvas)가 종이를 베껴 그리려고 body 바로 아래에 붙이는
+ * 작업 칸은 감추면 안 된다 — 감추면 빈(백지) PDF 가 나온다. */
+body.pt-embed > .html2pdf__overlay, body.pt-embed > .html2canvas-container { display: block !important; }
+/* PDF 로 뜨는 동안: 캔버스가 그리지 못하는 혼합 모드는 잠시 끈다 */
+#pt-paper.pt-capturing .pt-seal { mix-blend-mode: normal; opacity: 1; }
 body.pt-embed .page-head { display: none !important; }
 /* 끼워 넣기(embed)에서는 서식 입력과 미리보기만 남긴다:
  * 탭(청원서류·나의 서류), 도우미 버튼 줄, 종류 메뉴, 내 서류·받은 서류 목록은 감춘다 */
@@ -1156,26 +1161,119 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
     });
     return pdfLoading;
   }
-  function savePdf() {
-    var btn = document.getElementById('pt-pdf');
-    btn.disabled = true; btn.textContent = '만드는 중...';
-    function done() { btn.disabled = false; btn.textContent = 'PDF 저장'; }
-    /* 화면에 보이는 미리보기를 그대로 뜬다.
-     * (화면 밖 복사본으로 만들면 스타일이 빠져 빈 PDF가 나온다) */
+  /* 종이 안의 바깥 주소(http) 그림을 data URL 로 바꿔 넣는다.
+   * 바깥 그림이 그대로 있으면 캔버스가 오염되어 PDF 를 못 만든다.
+   * 되돌릴 수 있게 원래 주소를 restore 에 적어 둔다. */
+  function inlineImages(paper, restore) {
+    var imgs = Array.prototype.filter.call(paper.querySelectorAll('img'), function (im) {
+      return im.src && !/^data:/i.test(im.src);
+    });
+    return Promise.all(imgs.map(function (im) {
+      return fetch(im.src, { mode: 'cors' }).then(function (res) {
+        if (!res.ok) throw new Error(res.status);
+        return res.blob();
+      }).then(function (blob) {
+        return new Promise(function (resolve, reject) {
+          var fr = new FileReader();
+          fr.onload = function () { resolve(fr.result); };
+          fr.onerror = function () { reject(fr.error); };
+          fr.readAsDataURL(blob);
+        });
+      }).then(function (dataUrl) {
+        restore.push({ img: im, src: im.getAttribute('src') });
+        im.src = dataUrl;
+        return im.decode ? im.decode().catch(function () {}) : null;
+      }).catch(function () { /* 못 바꾸면 useCORS 에 맡긴다 */ });
+    }));
+  }
+
+  /* 뜬 캔버스가 쓸 만한지 — 크기가 0 이거나 온통 흰색이면 빈 종이다.
+   * 조용히 백지 PDF 를 내놓지 않고 오류로 알린다. */
+  function checkCanvas(cv) {
+    if (!cv || !cv.width || !cv.height) {
+      throw new Error('뜬 그림의 크기가 0 입니다.');
+    }
+    var W = 96, H = Math.max(1, Math.round(cv.height / cv.width * W));
+    var t = document.createElement('canvas');
+    t.width = W; t.height = H;
+    var cx = t.getContext('2d');
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H);
+    cx.drawImage(cv, 0, 0, W, H);
+    var d = cx.getImageData(0, 0, W, H).data;
+    for (var i = 0; i < d.length; i += 4) {
+      if (d[i] < 240 || d[i + 1] < 240 || d[i + 2] < 240) return;   /* 무엇인가 그려져 있다 */
+    }
+    throw new Error('뜬 그림이 온통 흰색(빈 종이)입니다.');
+  }
+
+  /* PDF 단추: 눌린 단추를 받거나, 지금 보이는 것(열람 모드는 #pt-vpdf)을 찾는다 */
+  function pdfButton(btn) {
+    if (btn && btn.currentTarget) btn = btn.currentTarget;
+    if (btn && btn.nodeType === 1) return btn;
+    var v = document.getElementById('pt-vpdf');
+    if (v && v.offsetParent) return v;
+    return document.getElementById('pt-pdf');
+  }
+
+  /* PDF 저장 — 화면의 미리보기(#pt-paper)를 html2pdf(html2canvas)로 떠서 내려받는다.
+   * 서류 진단의 iframe 안에서도 쓰이므로(window.SHSPetitionPdf) 약속(Promise)을 돌려준다. */
+  function savePdf(btn) {
+    btn = pdfButton(btn);
+    var label = btn ? btn.textContent : 'PDF 저장';
+    function busy(t) { if (btn) { btn.disabled = true; btn.textContent = t; } }
+    function done() { if (btn) { btn.disabled = false; btn.textContent = label; } }
+    busy('만드는 중...');
     var paper = document.getElementById('pt-paper');
     /* 스크롤 위치에 따라 위가 잘려 나오는 일이 있어,
      * 찍는 동안 맨 위로 올렸다가 끝나면 제자리로 돌려 놓는다 */
     var keepY = window.scrollY;
     window.scrollTo(0, 0);
-    loadPdfTool().then(function (html2pdf) {
-      return html2pdf().set({
-        margin: 10,
-        filename: cur.title + '.pdf',
-        html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(paper).save();
-    }).then(function () { done(); window.scrollTo(0, keepY); })
-      .catch(function (err) { done(); window.scrollTo(0, keepY); alert(err.message || err); });
+    var restore = [];
+    function cleanup() {
+      paper.classList.remove('pt-capturing');
+      restore.forEach(function (r) { r.img.src = r.src; });
+      window.scrollTo(0, keepY);
+      done();
+    }
+    return loadPdfTool().then(function (html2pdf) {
+      /* 1) 글꼴·도장 그림이 다 내려온 뒤에 뜬다 (그 전에 뜨면 빈 결과가 나온다) */
+      return paperReady().then(function () {
+        /* 3) 바깥 주소 그림은 data URL 로 바꿔 캔버스 오염을 막는다 */
+        return inlineImages(paper, restore);
+      }).then(function () {
+        /* 4) 캔버스가 못 그리는 mix-blend-mode 는 뜨는 동안만 끈다 */
+        paper.classList.add('pt-capturing');
+        var w = paper.scrollWidth, h = paper.scrollHeight;
+        return html2pdf().set({
+          margin: 10,
+          filename: (cur && cur.title ? cur.title : '청원서') + '.pdf',
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: {
+            scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+            scrollX: 0, scrollY: 0,
+            /* 2) iframe 의 화면 크기에 기대지 않고 종이 크기를 그대로 준다 */
+            width: w, height: h, windowWidth: w, windowHeight: h
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] }
+        }).from(paper).toContainer().then(function () {
+          /* 베껴 붙인 종이는 A4 안쪽 폭에 맞춰지므로, 그 실제 크기로 뜬다 */
+          var c = this.prop.container;
+          if (c && c.scrollWidth && c.scrollHeight) {
+            this.opt.html2canvas.width = c.scrollWidth;
+            this.opt.html2canvas.height = c.scrollHeight;
+            this.opt.html2canvas.windowWidth = c.scrollWidth;
+            this.opt.html2canvas.windowHeight = c.scrollHeight;
+          }
+        }).toCanvas().get('canvas', checkCanvas).save();   /* 6) 빈 캔버스는 오류 */
+      });
+    }).then(function () { cleanup(); }, function (err) {
+      cleanup();
+      console.error('[청원서 PDF]', err);
+      alert('PDF 를 만들지 못했습니다: ' + ((err && err.message) || err) +
+        '\n\n인쇄 단추를 눌러 인쇄 대화상자에서 "PDF로 저장"을 고르셔도 됩니다.');
+      throw err;
+    });
   }
 
   /* ----- 저장하기 / 내 청원서 ----- */
