@@ -12,11 +12,16 @@
  * 감사가 끝난 장부는 고치거나 지울 수 없다. (막는 일은 데이터베이스가 한다)
  *
  *   SHSLedger.mount(자리, {
- *     kind:   'sichal' | 'committee',
- *     owner:  '북부시찰' | '재정부',
+ *     kind:   'sichal' | 'committee' | 'presbytery',
+ *     owner:  '북부시찰' | '재정부' | '노회',
  *     user:   지금 로그인한 사람,
- *     isAuditor: 감사부인가
+ *     isAuditor: 감사부인가,
+ *     committees: 상비부 이름 목록 (노회 장부의 배정 상대)
  *   })
+ *
+ * 노회(presbytery) 장부는 노회 재정부가 쓴다. 과목을 고르고 적요를 따로 적으며,
+ * 상회비·세례의무금 납부가 수입으로 저절로 적히고, <상비부 배정> 지출은
+ * 그 상비부 장부에 수입으로 함께 적힌다. (74_presbytery_ledger.sql)
  *
  * 적을 수 있는 사람은 화면이 짐작하지 않고 데이터베이스에 물어본다.
  *   is_ledger_owner(종류, 이름)
@@ -31,10 +36,24 @@ var SHSLedger = (function () {
 
   function esc(s) { return SHS.esc(s); }
   function won(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
+  function kindOf(k) { return ['committee', 'sichal', 'presbytery'].indexOf(k) >= 0 ? k : 'sichal'; }
+
+  /* 다른 곳에서 저절로 적힌 항목인지 — 표시말과 어디서 관리하는지 */
+  function linkInfo(x) {
+    if (x.fee_id) return { tag: '회비 연동', where: '납부 현황에서 관리' };
+    if (x.link_kind === 'dues') return { tag: '상회비 연동', where: '상회비 관리에서 관리' };
+    if (x.link_kind === 'bapdues') return { tag: '세례의무금 연동', where: '세례의무금 관리에서 관리' };
+    if (x.link_kind === 'alloc') return { tag: '재정부 배정', where: '노회 재정부 장부에서 관리' };
+    return null;
+  }
 
   function mount(box, opts) {
     if (!box) return;
-    var ownerKind = opts.kind === 'committee' ? 'committee' : 'sichal';
+    var ownerKind = kindOf(opts.kind);
+    /* 노회 장부는 과목을 고르고 적요를 따로 적는다. 상비부 배정도 여기서 한다. */
+    var useCats = ownerKind === 'presbytery';
+    var cats = { '수입': [], '지출': [] };   /* 과목 목록 (ledger_categories) */
+    var catRows = [];
     var books = [], book = null, entries = [];
     /* 항목 목록 — 기본 항목에 더해, 직접 적어 저장한 항목이 저절로 등재된다 */
     var CAT_BASE = {
@@ -61,6 +80,7 @@ var SHSLedger = (function () {
 
     /* 이 장부를 누가 쓰는지 알려 주는 말 */
     function who() {
+      if (ownerKind === 'presbytery') return '노회 회계·부회계';
       return opts.kind === 'committee'
         ? SHS.headTitle(opts.owner) + '·서기·회계'
         : '시찰장·서기·회계';
@@ -87,14 +107,26 @@ var SHSLedger = (function () {
             book ? c.from('ledger_entries').select('*').eq('book_id', book.id)
                     .order('entry_date').order('id')
                  : Promise.resolve({ data: [] }),
-            /* 여태 적어 온 항목 이름 — 목록에 저절로 등재된다 (회비 자동 기록은 뺀다) */
+            /* 여태 적어 온 항목 이름 — 목록에 저절로 등재된다 (자동 연동 기록은 뺀다) */
             ids.length ? c.from('ledger_entries').select('kind,title').in('book_id', ids)
-                          .is('fee_id', null)
+                          .is('fee_id', null).is('link_kind', null)
                           .then(function (x) { return x; }, function () { return { data: [] }; })
-                       : Promise.resolve({ data: [] })
+                       : Promise.resolve({ data: [] }),
+            /* 노회 장부의 과목 목록 */
+            useCats ? c.from('ledger_categories').select('*')
+                        .eq('owner_kind', ownerKind).eq('owner', opts.owner)
+                        .order('sort').order('id')
+                        .then(function (x) { return x; }, function () { return { data: [] }; })
+                    : Promise.resolve({ data: [] })
           ]);
         }).then(function (rs) {
           entries = (rs[0] && rs[0].data) || [];
+          catRows = (rs[2] && rs[2].data) || [];
+          cats = { '수입': [], '지출': [] };
+          catRows.forEach(function (r) {
+            if (cats[r.kind] && cats[r.kind].indexOf(r.name) === -1) cats[r.kind].push(r.name);
+          });
+          KINDS.forEach(function (k) { if (!cats[k].length) cats[k] = CAT_BASE[k].slice(); });
           catUsed = { '수입': [], '지출': [] };
           ((rs[1] && rs[1].data) || []).forEach(function (x) {
             var k = x.kind === '수입' ? '수입' : '지출';
@@ -224,32 +256,40 @@ var SHSLedger = (function () {
           (canWrite ? ' 위 입력 칸에 기록하시면 이 자리에 장부가 만들어집니다.' : '') + '</p>';
       } else {
         h += '<table class="tbl"><thead><tr><th style="width:120px">일자</th>' +
+          (useCats ? '<th style="width:130px">과목</th>' : '') +
           '<th style="width:140px">교회</th>' +
-          '<th>항목</th><th style="width:140px">금액 (원)</th><th style="width:200px">비고</th>' +
+          '<th>' + (useCats ? '적요' : '항목') + '</th>' +
+          '<th style="width:140px">금액 (원)</th><th style="width:200px">비고</th>' +
           (canWrite ? '<th style="width:110px">관리</th>' : '') + '</tr></thead><tbody>';
         shown.forEach(function (x) {
           var amt = Number(x.amount) || 0;
+          var ln = linkInfo(x);   /* 다른 곳과 연동된 항목인가 */
           h += '<tr><td>' + esc(x.entry_date || '-') + '</td>' +
+            (useCats
+              ? '<td>' + (x.category ? esc(x.category) : '<span style="color:var(--gray-5)">-</span>') + '</td>'
+              : '') +
             '<td>' + (x.church ? esc(x.church) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             '<td class="left">' + esc(x.title) +
-            (x.category && !x.fee_id
+            (x.category && !useCats && !ln
               ? ' <span style="font-size:0.8rem;color:var(--gray-5)">(' + esc(x.category) + ')</span>' : '') +
-            (x.fee_id
-              ? ' <span style="font-size:0.74rem;color:#b03a3a">회비 연동</span>' : '') +
+            (x.alloc_to
+              ? ' <span style="font-size:0.78rem;color:var(--navy)">→ ' + esc(x.alloc_to) + '</span>' : '') +
+            (ln ? ' <span style="font-size:0.74rem;color:#b03a3a">' + ln.tag + '</span>' : '') +
             '</td>' +
             '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
             (viewKind === '수입' ? '+' : '−') + won(amt) + '</td>' +
             '<td class="left">' + (x.note ? esc(x.note) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             (canWrite
-              ? (x.fee_id
-                  /* 회비 연동 항목은 회비 납부 현황에서 취소하면 함께 지워진다 */
-                  ? '<td><span style="font-size:0.78rem;color:var(--gray-5)">납부 현황에서 관리</span></td>'
+              ? (ln
+                  /* 연동 항목은 원본(납부 현황·노회 장부)에서 고치면 함께 바뀐다 */
+                  ? '<td><span style="font-size:0.78rem;color:var(--gray-5)">' + ln.where + '</span></td>'
                   : '<td><button class="btn ghost sm" data-lgedit="' + x.id + '">수정</button> ' +
                     '<button class="btn danger sm" data-lgdel="' + x.id + '">삭제</button></td>')
               : '') +
             '</tr>';
         });
-        h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td>합계</td><td></td><td></td>' +
+        h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td>합계</td>' +
+          (useCats ? '<td></td>' : '') + '<td></td><td></td>' +
           '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
           (viewKind === '수입' ? '+' : '−') + won(shownSum) + '</td><td></td>' +
           (canWrite ? '<td></td>' : '') + '</tr>';
@@ -262,7 +302,7 @@ var SHSLedger = (function () {
       box.innerHTML = h;
       bindYear();
       bindTabs();
-      if (canWrite) { bindOpening(); bindEntryForm(); bindEntryList(); }
+      if (canWrite) { bindOpening(); bindEntryForm(); bindEntryList(); if (useCats) bindCats(); }
 
       /* 마감 취소 — 잘못 마감했을 때 임원이 되돌린다 */
       var ro = document.getElementById('lg-reopen');
@@ -375,25 +415,44 @@ var SHSLedger = (function () {
       });
     }
 
+    var ALLOC_CAT = '상비부 배정';   /* 이 과목의 지출은 상비부 장부에 수입으로 함께 적힌다 */
+
     function entryForm() {
       var today = new Date().toISOString().slice(0, 10);
+      /* 노회 장부: 과목을 고르고, 상비부 배정이면 어느 상비부인지 고른다 */
+      var catField = useCats
+        ? '<div class="field" style="flex:0 0 190px"><label>과목</label>' +
+          '<select id="lg-cat">' + cats[viewKind].map(function (x) {
+            return '<option value="' + esc(x) + '">' + esc(x) + '</option>';
+          }).join('') + '</select></div>' +
+          (viewKind === '지출'
+            ? '<div class="field hidden" id="lg-alloc-f" style="flex:0 0 200px"><label>배정 상비부</label>' +
+              '<select id="lg-alloc"><option value="">고르세요</option>' +
+              (opts.committees || []).map(function (x) {
+                return '<option value="' + esc(x) + '">' + esc(x) + '</option>';
+              }).join('') + '</select></div>'
+            : '')
+        : '';
       return '<div class="admin-card" style="margin-bottom:16px">' +
         '<h3 style="margin-top:0" id="lg-ftitle">' + viewKind + ' 적기</h3>' +
         '<input type="hidden" id="lg-id" value="">' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 160px"><label>일자</label>' +
         '<input type="date" id="lg-date" value="' + today + '"></div>' +
+        catField +
         '<div class="field" style="flex:0 0 170px"><label>교회명 (선택)</label>' +
         '<input type="text" id="lg-church" list="lg-churches" placeholder="예: 반석교회">' +
         '<datalist id="lg-churches">' +
         (opts.churches || []).map(function (x) {
           return '<option value="' + esc(x) + '"></option>';
         }).join('') + '</datalist></div>' +
-        '<div class="field"><label>항목 (고르거나 직접 입력)</label>' +
+        '<div class="field"><label>' + (useCats ? '적요' : '항목 (고르거나 직접 입력)') + '</label>' +
         '<input type="text" id="lg-title" list="lg-cats" placeholder="' +
-        (viewKind === '수입' ? '예: 회비, 찬조' : '예: 사업비, 식비') + '">' +
+        (useCats
+          ? (viewKind === '수입' ? '예: ○○교회 찬조금' : '예: 정기노회 식사비')
+          : (viewKind === '수입' ? '예: 회비, 찬조' : '예: 사업비, 식비')) + '">' +
         '<datalist id="lg-cats">' +
-        CAT_BASE[viewKind].concat(catUsed[viewKind]).map(function (x) {
+        (useCats ? [] : CAT_BASE[viewKind].concat(catUsed[viewKind])).map(function (x) {
           return '<option value="' + esc(x) + '"></option>';
         }).join('') +
         '</datalist></div>' +
@@ -403,19 +462,86 @@ var SHSLedger = (function () {
         '<div class="field"><label>비고 (선택)</label><input type="text" id="lg-note"></div>' +
         '<button class="btn" id="lg-save">저장</button> ' +
         '<button class="btn ghost hidden" id="lg-cancel">취소</button>' +
-        '<div class="form-msg" id="lg-msg"></div></div>';
+        '<div class="form-msg" id="lg-msg"></div>' +
+        (useCats ? catManager() : '') +
+        '</div>';
+    }
+
+    /* 과목 더하기·지우기 — 접어 두었다가 필요할 때 연다 */
+    function catManager() {
+      var mine = catRows.filter(function (r) { return r.kind === viewKind; });
+      return '<details style="margin-top:12px"><summary style="cursor:pointer;font-size:0.86rem;color:var(--navy)">' +
+        viewKind + ' 과목 설정</summary>' +
+        '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+        (mine.length
+          ? mine.map(function (r) {
+              return '<span class="role-badge">' + esc(r.name) +
+                ' <button type="button" data-lgcatdel="' + r.id + '" title="지우기" ' +
+                'style="border:none;background:none;color:#a33;cursor:pointer;padding:0 2px">×</button></span>';
+            }).join('')
+          : '<span style="font-size:0.82rem;color:var(--gray-5)">저장된 과목이 없어 기본 과목을 보여 드립니다.</span>') +
+        '<input type="text" id="lg-newcat" placeholder="새 과목" style="width:150px"> ' +
+        '<button type="button" class="btn ghost sm" id="lg-addcat">더하기</button>' +
+        '</div><div class="form-msg" id="lg-catmsg"></div></details>';
+    }
+
+    function bindCats() {
+      var add = document.getElementById('lg-addcat');
+      if (add) add.addEventListener('click', function () {
+        var msg = document.getElementById('lg-catmsg');
+        var name = document.getElementById('lg-newcat').value.trim();
+        if (!name) { msg.className = 'form-msg err'; msg.textContent = '과목 이름을 적어 주세요.'; return; }
+        var sort = catRows.filter(function (r) { return r.kind === viewKind; }).length + 1;
+        SHSCloud.init().then(function (c) {
+          return c.from('ledger_categories').insert({
+            owner_kind: ownerKind, owner: opts.owner, kind: viewKind, name: name, sort: sort
+          }).select();
+        }).then(function (r) {
+          var w = SHS.wrote(r);
+          if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+          SHSCloud.log('create', '회계 과목 추가', opts.owner + ' ' + viewKind + ' / ' + name);
+          load();
+        });
+      });
+      box.querySelectorAll('button[data-lgcatdel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var r = catRows.filter(function (x) { return String(x.id) === b.dataset.lgcatdel; })[0];
+          if (!r) return;
+          if (!confirm('"' + r.name + '" 과목을 목록에서 지우시겠습니까?\n이미 적어 둔 항목은 그대로 남습니다.')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('ledger_categories').delete().eq('id', r.id);
+          }).then(function (res) {
+            if (res.error) { alert(res.error.message); return; }
+            SHSCloud.log('delete', '회계 과목 삭제', opts.owner + ' ' + viewKind + ' / ' + r.name);
+            load();
+          });
+        });
+      });
+    }
+
+    /* 과목이 <상비부 배정>일 때만 상비부 고르는 칸을 보인다 */
+    function syncAllocField() {
+      var cat = document.getElementById('lg-cat');
+      var f = document.getElementById('lg-alloc-f');
+      if (!cat || !f) return;
+      f.classList.toggle('hidden', cat.value !== ALLOC_CAT);
     }
 
     function clearEntryForm() {
       ['lg-id', 'lg-church', 'lg-amt', 'lg-title', 'lg-note'].forEach(function (id) {
         document.getElementById(id).value = '';
       });
+      var al = document.getElementById('lg-alloc');
+      if (al) al.value = '';
+      syncAllocField();
       document.getElementById('lg-ftitle').textContent = viewKind + ' 적기';
       document.getElementById('lg-cancel').classList.add('hidden');
     }
 
     function bindEntryForm() {
       document.getElementById('lg-cancel').addEventListener('click', clearEntryForm);
+      var catSel = document.getElementById('lg-cat');
+      if (catSel) { catSel.addEventListener('change', syncAllocField); syncAllocField(); }
       document.getElementById('lg-save').addEventListener('click', function () {
         var msg = document.getElementById('lg-msg');
         var id = document.getElementById('lg-id').value;
@@ -429,6 +555,16 @@ var SHSLedger = (function () {
           note: document.getElementById('lg-note').value.trim() || null,
           updated_at: new Date().toISOString()
         };
+        if (useCats) {
+          d.category = catSel ? catSel.value : null;
+          /* 적요를 비우면 과목 이름을 적요로 쓴다 */
+          if (!d.title) d.title = d.category || '';
+          var al = document.getElementById('lg-alloc');
+          d.alloc_to = (viewKind === '지출' && d.category === ALLOC_CAT && al) ? (al.value || null) : null;
+          if (viewKind === '지출' && d.category === ALLOC_CAT && !d.alloc_to) {
+            msg.className = 'form-msg err'; msg.textContent = '배정할 상비부를 골라 주세요.'; return;
+          }
+        }
         if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '항목을 적어 주세요.'; return; }
         if (d.amount < 0) { msg.className = 'form-msg err'; msg.textContent = '금액은 0원 이상이어야 합니다.'; return; }
         if (!id) d.created_by = opts.user.name;
@@ -461,6 +597,11 @@ var SHSLedger = (function () {
           document.getElementById('lg-amt').value = x.amount;
           document.getElementById('lg-title').value = x.title;
           document.getElementById('lg-note').value = x.note || '';
+          var cs = document.getElementById('lg-cat');
+          if (cs && x.category) cs.value = x.category;
+          var al = document.getElementById('lg-alloc');
+          if (al) al.value = x.alloc_to || '';
+          syncAllocField();
           document.getElementById('lg-ftitle').textContent = viewKind + ' 수정';
           document.getElementById('lg-cancel').classList.remove('hidden');
           document.getElementById('lg-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -494,7 +635,7 @@ var SHSLedger = (function () {
    */
   function report(box, opts) {
     if (!box) return;
-    var ownerKind = opts.kind === 'committee' ? 'committee' : 'sichal';
+    var ownerKind = kindOf(opts.kind);
     var now0 = new Date();
     var year = now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1;
     function fyLabel(y) { return y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)'; }
@@ -548,9 +689,39 @@ var SHSLedger = (function () {
       }
       function cellRow(x) {
         if (!x) return '<td></td><td></td><td></td>';
-        return '<td class="left">' + esc(x.title) + '</td>' +
+        return '<td class="left">' + (x.category ? esc(x.category) + ' · ' : '') + esc(x.title) + '</td>' +
           '<td class="left" style="font-size:0.8rem;color:var(--gray-6)">' + brief(x) + '</td>' +
           '<td style="text-align:right">' + won(x.amount) + '</td>';
+      }
+
+      /* 과목별 집계 — 과목을 적는 장부(노회 장부)에서만 나온다 */
+      function byCat(list) {
+        var m = {}, order = [];
+        list.forEach(function (x) {
+          var k = x.category || '기타';
+          if (!(k in m)) { m[k] = 0; order.push(k); }
+          m[k] += Number(x.amount) || 0;
+        });
+        return order.map(function (k) { return { name: k, sum: m[k] }; });
+      }
+      var catTable = '';
+      if (entries.some(function (x) { return x.category; })) {
+        var ci = byCat(inc), co = byCat(out);
+        var cn = Math.max(ci.length, co.length);
+        catTable = '<h4 style="margin:10px 0 4px;font-size:0.92rem">과목별 집계</h4>' +
+          '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.86rem;margin-bottom:14px"><thead><tr>' +
+          '<th style="width:38%">수입 과목</th><th style="width:12%">금액</th>' +
+          '<th style="width:38%">지출 과목</th><th style="width:12%">금액</th></tr></thead><tbody>';
+        for (var ci2 = 0; ci2 < cn; ci2++) {
+          catTable += '<tr>' +
+            (ci[ci2] ? '<td class="left">' + esc(ci[ci2].name) + '</td><td style="text-align:right">' + won(ci[ci2].sum) + '</td>' : '<td></td><td></td>') +
+            (co[ci2] ? '<td class="left">' + esc(co[ci2].name) + '</td><td style="text-align:right">' + won(co[ci2].sum) + '</td>' : '<td></td><td></td>') +
+            '</tr>';
+        }
+        catTable += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)">' +
+          '<td>수입합계</td><td style="text-align:right">' + won(sumIn) + '</td>' +
+          '<td>지출합계</td><td style="text-align:right">' + won(sumOut) + '</td></tr>' +
+          '</tbody></table></div>';
       }
 
       var h = '<div class="inline-form" style="margin-bottom:10px;align-items:flex-end">' +
@@ -575,6 +746,7 @@ var SHSLedger = (function () {
         esc(opts.owner) + ' · ' + fyLabel(year) +
         (book.closed_yn ? ' · 마감' : '') +
         (book.audited_yn ? ' · 감사필' : '') + '</p>' +
+        catTable +
         '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.86rem"><thead><tr>' +
         '<th style="width:16%">수입항목</th><th style="width:22%">적요</th><th style="width:12%">금액</th>' +
         '<th style="width:16%">지출항목</th><th style="width:22%">적요</th><th style="width:12%">금액</th>' +

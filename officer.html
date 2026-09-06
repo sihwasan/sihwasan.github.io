@@ -25,10 +25,28 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20260906b"></script>
+<script src="js/audit-mark.js"></script>
+<script src="js/ledger.js?v=20260907a"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+ /* 노회 재정부 장부를 볼 수 있는가 — 회계·부회계·관리자는 바로 알 수 있고,
+  * 감사 기간의 감사부장·서기는 데이터베이스(can_read_ledger)에 물어본다. */
+ function financeAccess(user) {
+   if (!user || !SHSAuth.isOfficer(user)) return Promise.resolve(false);
+   var local = SHSAuth.canManageMembers(user) ||
+     (user.role === 'officer' && !!user.title && user.title.indexOf('회계') !== -1);
+   if (local) return Promise.resolve(true);
+   if (!(window.SHSCloud && SHSCloud.enabled())) return Promise.resolve(false);
+   return SHSCloud.init().then(function (c) {
+     return c.rpc('can_read_ledger', { p_kind: 'presbytery', p_owner: '노회' });
+   }).then(function (r) { return !!(r && r.data === true); }, function () { return false; });
+ }
+
  SHS.getUser().then(function (user) {
+  return financeAccess(user).then(function (ok) { return { user: user, canFinance: ok }; });
+ }).then(function (st) {
+  var user = st.user, canFinance = st.canFinance;
   var area = document.getElementById('officer-area');
   var e = SHS.esc;
 
@@ -108,6 +126,18 @@ document.addEventListener('DOMContentLoaded', function () {
   html += '<p>해마다 한 번 총회에 내는 세례교인헌금입니다. 총회 공문으로 교회별 목표액이 배정 됩니다.</p>';
   html += '<div id="bap-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
 
+  /* 노회 재정부 회계 — 회계·부회계가 적고, 관리자와 감사 기간의 감사부장·서기가 본다 */
+  if (canFinance) {
+    html += '<h2>재정부 회계</h2>';
+    html += '<p>노회 재정부(일반회계) 장부입니다. 상회비·세례의무금 납부를 기록하면 수입으로 저절로 적히고, ' +
+      '<strong>상비부 배정</strong> 과목으로 지출을 적으면 그 상비부 장부에 수입으로 함께 적힙니다. ' +
+      '장부는 노회 회계·부회계가 적으며, 노회장·서기·간사와 감사 기간의 감사부장·서기가 열람합니다.</p>';
+    html += '<div class="tabs" id="fin-tabs">' +
+      '<button class="active" data-ft="ledger">장부</button>' +
+      '<button data-ft="report">재정보고서</button></div>' +
+      '<div id="fin-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+  }
+
   /* 교회상황 보고서 (연도별) — 각 교회가 시찰 화면에서 올린 것을 임원이 모아 본다 */
   html += '<h2>교회상황 보고서</h2>';
   html += '<p>각 교회가 시찰회 화면에서 올린 해마다의 교회상황 보고서입니다. ' +
@@ -124,6 +154,51 @@ document.addEventListener('DOMContentLoaded', function () {
   area.innerHTML = html;
   SHS.sectionize(area);
   loadChurchReports();
+  if (canFinance) loadFinance();
+
+  /* ================= 노회 재정부 회계 =================
+   * 장부 자체는 상비부·시찰과 같은 js/ledger.js 를 쓴다(kind: presbytery).
+   * 상비부 이름 목록은 배정 상대를 고르는 데 쓰고, 감사부원인지는 감사 칸에 쓴다. */
+  var finTab = 'ledger', finCommittees = [], finAuditor = false, finChurches = [];
+  function loadFinance() {
+    SHSCloud.init().then(function (c) {
+      return Promise.all([
+        c.from('committees').select('name,sort').order('sort'),
+        c.rpc('my_committees'),
+        c.from('dues_rates').select('church').eq('year', fiscalYearNow())
+      ]);
+    }).then(function (rs) {
+      finCommittees = ((rs[0] && rs[0].data) || []).map(function (x) { return x.name; });
+      var mine = (rs[1] && rs[1].data) || [];
+      finAuditor = SHSAuth.canManageMembers(user) ||
+        mine.some(function (m) { return m.committee === '감사헌의부' && m.is_officer; });
+      finChurches = ((rs[2] && rs[2].data) || []).map(function (x) { return x.church; });
+    }, function () {}).then(function () {
+      var tabs = document.getElementById('fin-tabs');
+      if (tabs) tabs.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          finTab = b.dataset.ft;
+          tabs.querySelectorAll('button').forEach(function (x) { x.classList.toggle('active', x === b); });
+          drawFinance();
+        });
+      });
+      drawFinance();
+    });
+  }
+  function drawFinance() {
+    var box = document.getElementById('fin-area');
+    if (!box) return;
+    if (finTab === 'report') {
+      SHSLedger.report(box, { kind: 'presbytery', owner: '노회' });
+    } else {
+      SHSLedger.mount(box, {
+        kind: 'presbytery', owner: '노회', user: user,
+        canEdit: user.role === 'superadmin' ||
+          (user.role === 'officer' && !!user.title && user.title.indexOf('회계') !== -1),
+        isAuditor: finAuditor, committees: finCommittees, churches: finChurches
+      });
+    }
+  }
 
   /* ================= 교회상황 보고서 (연도별) =================
    * 각 교회는 시찰회 화면에서 올리고, 임원은 여기서 모아 봅니다.
