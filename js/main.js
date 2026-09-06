@@ -596,8 +596,10 @@
    * 문의는 그 글로, 서류는 그 신청·증명서로 곧장 데려간다.
    * 서류는 보는 사람에 따라 갈 곳이 다르다 —
    * 관리자는 처리 화면(서류 발급), 신청자는 내 신청 내역. */
-  function notiLinkOf(n, u) {
+  /* 알림에서 곧바로 갈 곳. 갈 곳이 마땅치 않으면 null 을 돌려 준다. */
+  function notiTargetOf(n, u) {
     var key = String((n && n.dedupe_key) || '');
+    var title = String((n && n.title) || '');
     if (n.kind === '문의') {
       return 'board.html#' + (key.indexOf('inquiry-') === 0 ? key : 'inquiry');
     }
@@ -614,7 +616,27 @@
       }
       return canDo ? 'documents.html#requests' : 'request.html';
     }
-    return 'notifications.html';
+    /* 청원서 — 시찰 서기에게는 그 청원서의 <서류 진단>,
+     * 낸 분에게는 <나의 서류>의 시찰로 보낸 청원서 */
+    if (n.kind === '시찰') {
+      var m = key.match(/^petition-(\d+)-(.+)$/);          /* 73 이후의 새 알림 */
+      if (m) {
+        return 'sichal.html?s=' + encodeURIComponent(m[2]) + '&p=' + m[1] + '#review';
+      }
+      if (key.indexOf('petsub-') === 0) return 'mydocs.html';
+      /* 예전 알림 — 제목의 [시찰명]과 문구를 읽어 알맞은 화면으로 */
+      if (title.indexOf('진단 결과') !== -1) return 'mydocs.html';
+      var sc = (title.match(/^\[([^\]]+)\]/) || [])[1] || '';
+      if (sc && title.indexOf('청원서') !== -1) {
+        return 'sichal.html?s=' + encodeURIComponent(sc) + '#review';
+      }
+      return null;
+    }
+    return null;
+  }
+  /* 알림 쪽지(토스트)처럼 어디로든 보내야 할 때 쓰는 것 — 갈 곳이 없으면 알림함으로 */
+  function notiLinkOf(n, u) {
+    return notiTargetOf(n, u) || 'notifications.html';
   }
   function toastLink(n) {
     return notiLinkOf(n, window.__shsUser || null);
@@ -1367,6 +1389,7 @@
 
   window.SHS = {
     notiLinkOf: notiLinkOf,
+    notiTargetOf: notiTargetOf,
     user: user,
     getUser: getUser,
     sectionize: sectionize,

@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260906"></script>
+<script src="js/main.js?v=20260906b"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -147,6 +147,8 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '<p style="color:var(--gray-5)">받은 알림이 없습니다.</p>';
       } else {
         rows.forEach(function (n) {
+          /* 알림마다 갈 곳이 있으면 <바로 가기>(문의는 <답장하기>)를 붙인다 */
+          var goTo = SHS.notiTargetOf ? SHS.notiTargetOf(n, user) : null;
           html += '<div class="noti-item' + (n.read_at ? '' : ' unread') + '">' +
             '<div class="n-head"><span class="n-kind">' + e(n.kind) + '</span>' +
             '<span class="n-title">' + e(n.title) + '</span>' +
@@ -155,8 +157,8 @@ document.addEventListener('DOMContentLoaded', function () {
               ? '<div class="n-from">보낸이 ' + e(n.sent_by_name) + '</div>' : '') +
             '<div class="n-body">' + e(n.body || '') + '</div>' +
             '<p style="margin:10px 0 0">' +
-            (SHS.notiLinkOf && (n.kind === '문의' || n.kind === '서류')
-              ? '<a class="btn sm" href="' + e(SHS.notiLinkOf(n, user)) + '" style="margin-right:6px">' +
+            (goTo
+              ? '<a class="btn sm" href="' + e(goTo) + '" style="margin-right:6px">' +
                 (n.kind === '문의' ? '답장하기' : '바로 가기') + '</a>' : '') +
             (n.read_at ? '' : '<button class="btn ghost sm" data-ntread="' + n.id + '" style="margin-right:6px">읽음</button>') +
             '<button class="btn danger sm" data-ntdel="' + n.id + '">삭제</button>' +

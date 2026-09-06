@@ -24,7 +24,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260906"></script>
+<script src="js/main.js?v=20260906b"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js"></script>
@@ -62,7 +62,10 @@ document.addEventListener('DOMContentLoaded', function () {
   var churchStaff = [], bapAll = [], sicFin = [], subs = [];
   /* 서류 진단 — 상태 거르개와 지금 열람 중인 청원서 */
   var REV_STATUS = ['전체', '제출됨', '적합', '보완요청', '반려'];
-  var revFilter = '전체', revOpenId = null;
+  /* 알림함의 <바로 가기>(sichal.html?s=시찰&p=번호#review)로 들어오면
+   * 그 청원서를 서류 진단에서 곧바로 펼쳐 준다. */
+  var revFilter = '전체';
+  var revOpenId = (location.search.match(/[?&]p=(\d+)/) || [])[1] || null;
   /* 회기 설정(site_settings.sessions) — 시찰 자료실의 <통과 청원서>가 회기별로 나뉜다 */
   var sessions = { current: null, list: [] };
   var passSes = null;       /* 자료실 통과 청원서에서 고른 회기 번호 (없으면 현재 회기) */
@@ -70,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var docNotice = '';       /* 서류 진단에서 <적합> 처리 뒤 자료실로 넘어올 때 보여 줄 안내 */
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
+  if (revOpenId) tab = 'review';
   var year = new Date().getFullYear();
   /* 상회비 회기: 4월에 시작해 다음 해 3월에 끝난다 */
   var FY_MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
@@ -2090,7 +2094,8 @@ document.addEventListener('DOMContentLoaded', function () {
             return c.from('notifications').insert({
               user_id: open.user_id, kind: '시찰',
               title: '[' + NAME + '] 청원서 진단 결과 : ' + status,
-              body: '「' + open.title + '」' + (note ? '\n' + note : '')
+              body: '「' + open.title + '」' + (note ? '\n' + note : ''),
+              dedupe_key: 'petsub-' + open.id
             });
           }).catch(function () {});
           Object.keys(r.data).forEach(function (k) { open[k] = r.data[k]; });
