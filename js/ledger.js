@@ -42,6 +42,36 @@ var SHSLedger = (function () {
   function won(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
   function kindOf(k) { return ['committee', 'sichal', 'presbytery'].indexOf(k) >= 0 ? k : 'sichal'; }
 
+  /* PDF 도구(html2pdf)는 처음 쓸 때 한 번만 내려받는다 */
+  var pdfLoading = null;
+  function loadPdfTool() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (pdfLoading) return pdfLoading;
+    pdfLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+      sc.onload = function () { resolve(window.html2pdf); };
+      sc.onerror = function () { pdfLoading = null; reject(new Error('PDF 도구를 불러오지 못했습니다.')); };
+      document.head.appendChild(sc);
+    });
+    return pdfLoading;
+  }
+
+  /* 보관함의 영수증 사진을 문서 안에 넣을 수 있는 글자(data URL)로 바꾼다 */
+  function fetchDataUrl(url) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    }).then(function (blob) {
+      return new Promise(function (resolve) {
+        var fr = new FileReader();
+        fr.onload = function () { resolve(fr.result); };
+        fr.onerror = function () { resolve(null); };
+        fr.readAsDataURL(blob);
+      });
+    }).catch(function () { return null; });
+  }
+
   /* 영수증 사진을 긴 변 1600px 이하 jpg로 줄인다 (글자가 읽히는 크기, 파일은 작게) */
   function shrinkImage(f) {
     return new Promise(function (resolve, reject) {
@@ -1377,6 +1407,7 @@ var SHSLedger = (function () {
     var ownerKind = kindOf(opts.kind);
     var now0 = new Date();
     var year = now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1;
+    var receipts = {}, payouts = {};   /* 항목 번호 → 영수증 / 지급 확인 */
     function fyLabel(y) { return y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)'; }
 
     function load() {
@@ -1397,6 +1428,24 @@ var SHSLedger = (function () {
         });
       }).then(function (r2) {
         entries = (r2 && r2.data) || [];
+        if (!book) return [{ data: [] }, { data: [] }];
+        /* 증빙: 영수증 사진과 지급 확인 명단 (표가 없으면 빈 목록) */
+        return SHSCloud.init().then(function (c) {
+          return Promise.all([
+            c.from('ledger_receipts').select('*').eq('book_id', book.id).order('id')
+              .then(function (x) { return x.error ? { data: [] } : x; }, function () { return { data: [] }; }),
+            c.from('ledger_payouts').select('*').eq('book_id', book.id).order('id')
+              .then(function (x) { return x.error ? { data: [] } : x; }, function () { return { data: [] }; })
+          ]);
+        });
+      }).then(function (rs) {
+        receipts = {}; payouts = {};
+        ((rs[0] && rs[0].data) || []).forEach(function (r) {
+          (receipts[r.entry_id] = receipts[r.entry_id] || []).push(r);
+        });
+        ((rs[1] && rs[1].data) || []).forEach(function (r) {
+          (payouts[r.entry_id] = payouts[r.entry_id] || []).push(r);
+        });
         draw(books, book, entries);
       }).catch(function (x) {
         box.innerHTML = '<p style="color:var(--gray-5)">재정보고서를 불러오지 못했습니다: ' +
@@ -1419,12 +1468,28 @@ var SHSLedger = (function () {
       var yearOpts = Object.keys(ys).map(Number).sort(function (a, b) { return b - a; });
 
       /* 적요: 날짜 · 교회 · 비고를 한 줄로 */
+      /* 항목마다 증빙 번호를 매긴다 (영수증이나 지급 확인이 있는 것만, 날짜 순) */
+      var attNo = {};
+      entries.slice().sort(function (a, b) {
+        return String(a.entry_date || '').localeCompare(String(b.entry_date || '')) || (a.id - b.id);
+      }).forEach(function (x) {
+        if ((receipts[x.id] || []).length || (payouts[x.id] || []).length) {
+          attNo[x.id] = Object.keys(attNo).length + 1;
+        }
+      });
       function brief(x) {
         var parts = [];
         if (x.entry_date) parts.push(String(x.entry_date).slice(5).replace('-', '.'));
         if (x.church) parts.push(x.church);
         if (x.note) parts.push(x.note);
-        return parts.length ? esc(parts.join(' · ')) : '';
+        var s = parts.length ? esc(parts.join(' · ')) : '';
+        var rc = (receipts[x.id] || []).length, po = payouts[x.id] || [];
+        if (rc || po.length) {
+          var ok = po.filter(function (p) { return p.status === '확인'; }).length;
+          s += (s ? ' ' : '') + '<span style="white-space:nowrap;color:#b03a3a">[증빙 ' + attNo[x.id] +
+            (rc ? ' · 영수증 ' + rc + '장' : '') + (po.length ? ' · 수령 ' + ok + '/' + po.length : '') + ']</span>';
+        }
+        return s;
       }
       function cellRow(x) {
         if (!x) return '<td></td><td></td><td></td>';
@@ -1469,6 +1534,7 @@ var SHSLedger = (function () {
           return '<option value="' + y + '"' + (y === year ? ' selected' : '') + '>' + fyLabel(y) + '</option>';
         }).join('') + '</select></div>' +
         '<button class="btn ghost" id="fr-print">인쇄</button>' +
+        '<button class="btn ghost" id="fr-pdf">PDF 저장</button>' +
         '</div>';
 
       if (!book) {
@@ -1520,23 +1586,138 @@ var SHSLedger = (function () {
           year = parseInt(this.value, 10);
           load();
         });
+        /* 증빙(영수증 사진·지급 확인 명단)이 있으면 함께 출력할지 묻는다 */
+        function askAttachments() {
+          var rc = 0, po = 0;
+          entries.forEach(function (x) {
+            rc += (receipts[x.id] || []).length;
+            if ((payouts[x.id] || []).length) po++;
+          });
+          if (!rc && !po) return Promise.resolve(false);
+          var what = [];
+          if (rc) what.push('영수증 사진 ' + rc + '장');
+          if (po) what.push('지급 확인 명단 ' + po + '건');
+          return Promise.resolve(confirm(what.join('과 ') + '도 함께 출력할까요?\n\n' +
+            '확인 = 보고서 뒤에 증빙을 붙여 출력\n취소 = 보고서만 출력'));
+        }
+
+        /* 증빙 쪽 — 항목마다 영수증 사진과 지급 확인 명단 */
+        function attachmentsHtml() {
+          var ids = Object.keys(attNo).sort(function (a, b) { return attNo[a] - attNo[b]; });
+          if (!ids.length) return Promise.resolve('');
+          var jobs = ids.map(function (id) {
+            var x = entries.filter(function (e2) { return String(e2.id) === String(id); })[0];
+            var rcs = receipts[id] || [], pos = payouts[id] || [];
+            return Promise.all(rcs.map(function (r) {
+              return SHSCloud.init().then(function (c) {
+                return c.storage.from('receipts').createSignedUrl(r.file_path, 600);
+              }).then(function (res) {
+                return res && res.data ? fetchDataUrl(res.data.signedUrl) : null;
+              }, function () { return null; });
+            })).then(function (urls) {
+              var h2 = '<div class="att">' +
+                '<h4>증빙 ' + attNo[id] + ' · ' + esc(x.entry_date || '') +
+                (x.category ? ' · ' + esc(x.category) : '') + ' · ' + esc(x.title) +
+                ' · ' + won(x.amount) + '원' + (x.church ? ' (' + esc(x.church) + ')' : '') + '</h4>';
+              urls.forEach(function (u, i) {
+                h2 += '<div class="att-img">' +
+                  (u ? '<img src="' + u + '" alt="영수증">'
+                     : '<p class="att-miss">영수증 사진을 불러오지 못했습니다 (' + esc(rcs[i].file_name || '') + ')</p>') +
+                  '</div>';
+              });
+              if (pos.length) {
+                var sum = 0, ok = 0;
+                pos.forEach(function (p) { sum += Number(p.amount) || 0; if (p.status === '확인') ok++; });
+                h2 += '<p class="att-sub">지급 확인 명단 — ' + pos.length + '명 · 지급 합계 ' + won(sum) +
+                  '원 · 수령 확인 ' + ok + '명' + (ok < pos.length ? ' · 미확인 ' + (pos.length - ok) + '명' : '') + '</p>' +
+                  '<table><thead><tr><th style="width:8%">번호</th><th class="left">받는 사람</th><th>교회</th>' +
+                  '<th style="width:14%">금액 (원)</th><th style="width:34%">수령 확인</th></tr></thead><tbody>';
+                pos.forEach(function (p, i) {
+                  h2 += '<tr><td>' + (i + 1) + '</td><td class="left">' + esc(p.recipient) + '</td>' +
+                    '<td>' + esc(p.recipient_church || '') + '</td>' +
+                    '<td style="text-align:right">' + won(p.amount) + '</td>' +
+                    '<td class="left">' + (p.status === '확인'
+                      ? '확인 ' + esc(String(p.confirmed_at || '').replace('T', ' ').slice(0, 16)) +
+                        (p.confirmed_by ? ' · ' + esc(p.confirmed_by) : '') +
+                        (p.confirm_note ? ' · ' + esc(p.confirm_note) : '')
+                      : '미확인') + '</td></tr>';
+                });
+                h2 += '</tbody></table>';
+              }
+              return h2 + '</div>';
+            });
+          });
+          return Promise.all(jobs).then(function (parts) {
+            return '<div class="att-head"><h3>증빙 서류</h3>' +
+              '<p>' + esc(opts.owner) + ' · ' + fyLabel(year) + ' · 증빙 ' + ids.length + '건 — ' +
+              '보고서의 [증빙 번호]와 같은 번호입니다. 회의비·거마비는 받는 분의 수령 확인이 영수증을 대신합니다.</p></div>' +
+              parts.join('');
+          });
+        }
+
+        var ATT_CSS = '.att-head{page-break-before:always;margin-top:8px}' +
+          '.att{page-break-inside:avoid;margin:14px 0 18px;border-top:1px solid #999;padding-top:8px}' +
+          '.att h4{margin:0 0 6px;font-size:13px}' +
+          '.att-img{page-break-inside:avoid;text-align:center;margin:6px 0}' +
+          '.att-img img{max-width:100%;max-height:120mm}' +
+          '.att-miss{color:#a33;font-size:12px}' +
+          '.att-sub{font-size:12px;margin:8px 0 4px}';
+        var SHEET_CSS = 'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;padding:24px;color:#111}' +
+          'table{width:100%;border-collapse:collapse;font-size:12px}' +
+          'th,td{border:1px solid #333;padding:4px 6px}' +
+          'th{background:#f2f2f2}h3{text-align:center}' +
+          'td.left,th.left{text-align:left}td{text-align:center}' + ATT_CSS;
+
         var pr = document.getElementById('fr-print');
         if (pr) pr.addEventListener('click', function () {
           var sheet = document.getElementById('fr-sheet');
           if (!sheet) return;
-          var w = window.open('', '_blank', 'noopener,width=900,height=700');
-          if (!w) return;
-          w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">' +
-            '<title>재정보고서 - ' + esc(opts.owner) + '</title>' +
-            '<style>body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;padding:24px;color:#111}' +
-            'table{width:100%;border-collapse:collapse;font-size:12px}' +
-            'th,td{border:1px solid #333;padding:4px 6px}' +
-            'th{background:#f2f2f2}h3{text-align:center}' +
-            'td.left{text-align:left}td{text-align:center}</style></head><body>' +
-            sheet.innerHTML + '</body></html>');
-          w.document.close();
-          w.focus();
-          setTimeout(function () { w.print(); }, 300);
+          askAttachments().then(function (withAtt) {
+            pr.disabled = true; pr.textContent = '준비 중…';
+            return (withAtt ? attachmentsHtml() : Promise.resolve('')).then(function (att) {
+              pr.disabled = false; pr.textContent = '인쇄';
+              var w = window.open('', '_blank', 'width=900,height=700');
+              if (!w) { alert('인쇄 창이 막혔습니다. 팝업을 허용해 주세요.'); return; }
+              w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">' +
+                '<title>재정보고서 - ' + esc(opts.owner) + '</title>' +
+                '<style>' + SHEET_CSS + '</style></head><body>' +
+                sheet.innerHTML + att + '</body></html>');
+              w.document.close();
+              w.focus();
+              setTimeout(function () { w.print(); }, att ? 900 : 300);
+              if (window.SHSCloud) SHSCloud.log('view', '재정보고서 인쇄', opts.owner + ' ' + year + '년' + (att ? ' (증빙 포함)' : ''));
+            });
+          });
+        });
+
+        var pf = document.getElementById('fr-pdf');
+        if (pf) pf.addEventListener('click', function () {
+          var sheet = document.getElementById('fr-sheet');
+          if (!sheet) return;
+          askAttachments().then(function (withAtt) {
+            pf.disabled = true; pf.textContent = '만드는 중…';
+            var stage = document.createElement('div');
+            stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
+            return (withAtt ? attachmentsHtml() : Promise.resolve('')).then(function (att) {
+              stage.innerHTML = '<style>' + ATT_CSS + '</style><div>' + sheet.innerHTML + att + '</div>';
+              document.body.appendChild(stage);
+              return loadPdfTool();
+            }).then(function (html2pdf) {
+              return html2pdf().set({
+                margin: 8,
+                filename: opts.owner + ' ' + year + ' 회계연도 재정보고서' + (withAtt ? ' (증빙 포함)' : '') + '.pdf',
+                pagebreak: { mode: ['css', 'legacy'] },
+                html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              }).from(stage.firstElementChild.nextElementSibling || stage).save();
+            }).then(function () {
+              stage.remove(); pf.disabled = false; pf.textContent = 'PDF 저장';
+              if (window.SHSCloud) SHSCloud.log('view', '재정보고서 PDF 저장', opts.owner + ' ' + year + '년' + (withAtt ? ' (증빙 포함)' : ''));
+            }).catch(function (err) {
+              stage.remove(); pf.disabled = false; pf.textContent = 'PDF 저장';
+              alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
+            });
+          });
         });
       }
     }
