@@ -1797,7 +1797,9 @@ input.dp-bad { border-color: var(--red); }
   position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px;
   background: var(--navy); border-radius: 1px;
 }
-.dues-sc-chart .dsc-sub { font-size: 0.72rem; color: var(--gray-5); margin-top: 3px; }
+.dues-sc-chart .dsc-sub {
+  font-size: 0.74rem; font-weight: 600; color: var(--red, #b03a3a); margin-top: 3px;
+}
 
 /* 완납/미납 필터와 검색 */
 .dues-filter { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 16px 0 4px; }
