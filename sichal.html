@@ -215,50 +215,78 @@ document.addEventListener('DOMContentLoaded', function () {
       (sic.area ? '<p class="cm-duty">관할 지역 : ' + e(sic.area) + '</p>' : '') +
       '</div>';
 
-    /* 상회비 · 세례의무금 진행률 — 노회 전체와 이 시찰 (49 sichal_finance) */
+    /* 상회비 · 세례의무금 진행률 — 노회 전체와 이 시찰 (49 sichal_finance, 72 에서 이번 달까지 부과분 추가)
+     * 상회비 막대 = 연간 목표 대비 납부액, 세로 눈금 = 이번 달까지 부과액. 임원방 상회비 화면과 같은 기준이다.
+     * 다음 달 이후분을 미리 낸 돈(선납)은 따로 적어, 경과분 비율이 부풀어 보이지 않게 한다. */
     (function () {
       if (!sicFin.length) return;
       var mo = fyElapsed;   /* 회기(4월 시작)에서 몇 달째인지 */
+      var upto = FY_MONTHS[mo - 1] + '월까지';
+      var hasDue = sicFin.every(function (x) { return x.out_dues_due != null; });
       function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
-      function bar(pct, color) {
-        return '<div style="background:var(--gray-2,#e8eaef);border-radius:4px;height:10px;overflow:hidden">' +
-          '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + '"></div></div>';
+      function bar(pct, color, pos) {
+        return '<div style="position:relative;background:var(--gray-2,#e8eaef);border-radius:4px;height:10px">' +
+          '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + ';border-radius:4px"></div>' +
+          (pos != null && pos < 100
+            ? '<div style="position:absolute;top:-3px;bottom:-3px;left:' + pos + '%;width:2px;margin-left:-1px;' +
+              'background:var(--navy,#1f2a44)" title="' + upto + ' 부과액"></div>'
+            : '') + '</div>';
       }
-      function rowHtml(label, duesPlan, duesPaid, bapTarget, bapPaid, bapJoin, bapN) {
-        var duesDue = Number(duesPlan || 0) / 12 * mo;
-        var duesPct = duesDue ? Math.round(Number(duesPaid || 0) / duesDue * 100) : 0;
-        var bapPct = Number(bapTarget || 0) ? Math.round(Number(bapPaid || 0) / Number(bapTarget) * 100) : 0;
+      function duesInfo(plan, paid, due, paidDue) {
+        plan = Number(plan || 0); paid = Number(paid || 0);
+        due = due != null ? Number(due) : plan / 12 * mo;
+        var pct = plan ? Math.min(100, Math.round(paid / plan * 100)) : 0;
+        var pctDue = (paidDue != null && due) ? Math.min(100, Math.round(Number(paidDue) / due * 100)) : null;
+        var prepaid = paidDue != null ? paid - Number(paidDue) : 0;
+        return {
+          plan: plan, paid: paid, pct: pct,
+          pos: plan ? Math.min(100, Math.round(due / plan * 1000) / 10) : 0,
+          sub: upto + ' 부과 ' + wonf(due) + '만원' +
+            (pctDue != null ? ' 중 ' + wonf(paidDue) + '만원 납부 (' + pctDue + '%)' : '') +
+            (prepaid > 0 ? ' · 다음 달 이후분 선납 ' + wonf(prepaid) + '만원' : '')
+        };
+      }
+      function rowHtml(label, f) {
+        var di = duesInfo(f.plan, f.paid, f.due, f.paidDue);
+        var bapPct = Number(f.bapTarget || 0) ? Math.round(Number(f.bapPaid || 0) / Number(f.bapTarget) * 100) : 0;
         return '<div style="margin-bottom:12px">' +
           '<div style="font-size:0.88rem;font-weight:700;color:var(--navy);margin-bottom:4px">' + e(label) + '</div>' +
           '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1 1 220px;min-width:200px">' +
-          '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--gray-6)">' +
-          '<span>상회비</span><span><strong>' + duesPct + '%</strong> <span style="color:var(--gray-5)">(' +
-          wonf(duesPaid) + '만원)</span></span></div>' + bar(duesPct, '#b03a3a') + '</div>' +
+          '<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.78rem;color:var(--gray-6)">' +
+          '<span>상회비 <strong>' + di.pct + '%</strong> <span style="color:var(--gray-5)">(납부 ' + wonf(di.paid) + '만원)</span></span>' +
+          '<span style="color:var(--gray-5)">연간 목표 ' + wonf(di.plan) + '만원</span></div>' +
+          bar(di.pct, '#b03a3a', mo < 12 ? di.pos : null) +
+          '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:3px">' + di.sub +
+          (f.full != null ? ' · 완납 ' + f.full + '/' + f.n + '곳' : '') + '</div></div>' +
           '<div style="flex:1 1 220px;min-width:200px">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--gray-6)">' +
           '<span>세례의무금</span><span><strong>' + bapPct + '%</strong> <span style="color:var(--gray-5)">(' +
-          wonf(bapPaid) + ' / ' + wonf(bapTarget) + '원 · ' + bapJoin + '/' + bapN + '곳)</span></span></div>' +
+          wonf(f.bapPaid) + ' / ' + wonf(f.bapTarget) + '원 · ' + f.bapJoin + '/' + f.bapN + '곳)</span></span></div>' +
           bar(bapPct, '#d97b6c') + '</div>' +
           '</div></div>';
       }
-      var tDP = 0, tDA = 0, tBT = 0, tBP = 0, tBJ = 0, tBN = 0;
+      function fin(x) {
+        return { plan: x.out_dues_plan, paid: x.out_dues_paid,
+                 due: hasDue ? x.out_dues_due : null, paidDue: hasDue ? x.out_dues_paid_due : null,
+                 full: hasDue ? x.out_dues_full : null, n: x.out_dues_churches,
+                 bapTarget: x.out_bap_target, bapPaid: x.out_bap_paid,
+                 bapJoin: x.out_bap_join, bapN: x.out_bap_churches };
+      }
+      var t = { plan: 0, paid: 0, due: 0, paidDue: 0, full: 0, n: 0, bapTarget: 0, bapPaid: 0, bapJoin: 0, bapN: 0 };
       sicFin.forEach(function (x) {
-        tDP += Number(x.out_dues_plan || 0); tDA += Number(x.out_dues_paid || 0);
-        tBT += Number(x.out_bap_target || 0); tBP += Number(x.out_bap_paid || 0);
-        tBJ += Number(x.out_bap_join || 0); tBN += Number(x.out_bap_churches || 0);
+        var f = fin(x);
+        Object.keys(t).forEach(function (k) { t[k] += Number(f[k] || 0); });
       });
+      if (!hasDue) { t.due = null; t.paidDue = null; t.full = null; }
       var mineFin = sicFin.filter(function (x) { return x.out_sichal === NAME; })[0];
       h += '<div class="side-box" style="max-width:860px;margin-bottom:16px"><div class="box-head">' +
         fyYear + '년 회기(4월~다음 해 3월) 상회비 · 세례의무금 진행률</div>' +
         '<div class="box-body">' +
-        rowHtml('노회 전체', tDP, tDA, tBT, tBP, tBJ, tBN) +
-        (mineFin
-          ? rowHtml(NAME, mineFin.out_dues_plan, mineFin.out_dues_paid,
-              mineFin.out_bap_target, mineFin.out_bap_paid,
-              mineFin.out_bap_join, mineFin.out_bap_churches)
-          : '') +
-        '<p style="font-size:0.78rem;color:var(--gray-5);margin:0 0 8px">상회비는 이번 달까지 부과된 금액 대비, ' +
+        rowHtml('노회 전체', t) +
+        (mineFin ? rowHtml(NAME, fin(mineFin)) : '') +
+        '<p style="font-size:0.78rem;color:var(--gray-5);margin:0 0 8px">상회비 막대는 연간 목표액(월 부과액 × 12) 대비 납부액이고, ' +
+        '세로 눈금이 ' + upto + ' 부과액입니다(임원방 상회비 화면과 같은 기준). ' +
         '세례의무금은 올해 목표금액 대비 납부율입니다.</p>' +
         (mineFin && (isOfficer || churches.some(function (x) { return x.name === myChurch; }))
           ? '<button class="btn ghost sm" id="si-findetail">상회비·세례의무금 상세보기</button>' +
@@ -319,12 +347,15 @@ document.addEventListener('DOMContentLoaded', function () {
           '<th style="width:130px">상회비 납부</th><th style="width:110px">상회비 상태</th>' +
           '<th style="width:150px">세례의무금</th><th style="width:110px">세례의무금 상태</th></tr></thead><tbody>';
         list.forEach(function (d) {
-          var late = Math.max(0, fyElapsed - Number(d.out_months || 0));
+          var mDue = d.out_months_due != null ? Number(d.out_months_due) : Math.min(Number(d.out_months || 0), fyElapsed);
+          var pre = Number(d.out_months || 0) - mDue;   /* 다음 달 이후분 선납 개월 */
+          var late = Math.max(0, fyElapsed - mDue);
           var bapT = Number(d.out_bap_target || 0), bapP = Number(d.out_bap_paid || 0);
           var bapDone = bapT > 0 && bapP >= bapT;
           t += '<tr><td class="left">' + e(d.out_church) + '</td>' +
             '<td>' + wonf(d.out_monthly) + '만</td>' +
-            '<td>' + d.out_months + '/' + fyElapsed + '개월 · ' + wonf(d.out_dues_paid) + '만원</td>' +
+            '<td>' + mDue + '/' + fyElapsed + '개월' + (pre > 0 ? ' (+선납 ' + pre + '개월)' : '') +
+            ' · ' + wonf(d.out_dues_paid) + '만원</td>' +
             '<td>' + (late > 0
               ? '<span class="fail">' + late + '개월 미납</span>'
               : '<span class="pass">완납</span>') + '</td>' +

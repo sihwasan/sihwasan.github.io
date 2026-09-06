@@ -644,9 +644,13 @@ var SHSBoard = (function () {
       var ORDER = ['북부시찰', '상록시찰', '남부시찰', '기타'];
 
       function wonf(n) { return Number(n || 0).toLocaleString('ko-KR'); }
-      function bar(pct, color) {
-        return '<div style="background:var(--gray-2,#e8eaef);border-radius:3px;height:7px;overflow:hidden">' +
-          '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + '"></div></div>';
+      function bar(pct, color, pos) {
+        return '<div style="position:relative;background:var(--gray-2,#e8eaef);border-radius:3px;height:7px">' +
+          '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + ';border-radius:3px"></div>' +
+          (pos != null && pos < 100
+            ? '<div style="position:absolute;top:-2px;bottom:-2px;left:' + pos + '%;width:2px;margin-left:-1px;' +
+              'background:var(--navy,#1f2a44)" title="이번 달까지 부과액"></div>'
+            : '') + '</div>';
       }
 
       SHSCloud.init().then(function (c) {
@@ -666,23 +670,49 @@ var SHSBoard = (function () {
           yr + '년 납부 현황 <span style="font-weight:400;color:var(--gray-5);font-size:0.76rem">' +
           '시찰 이름을 누르면 교회별 상세가 열립니다</span></div>';
 
+        /* 상회비 막대 = 연간 목표 대비 납부액, 세로 눈금 = 이번 달까지 부과액 (임원방 상회비 화면과 같은 기준).
+         * out_dues_due·out_dues_paid_due·out_dues_full 은 72_sichal_finance_due 부터 온다. */
+        var upto = FY_MONTHS[mo - 1] + '월까지';
+        var hasDue = rows.every(function (x) { return x.out_dues_due != null; });
+        function duesInfo(plan, paid, due, paidDue) {
+          plan = Number(plan || 0); paid = Number(paid || 0);
+          due = due != null ? Number(due) : plan / 12 * mo;
+          var pct = plan ? Math.min(100, Math.round(paid / plan * 100)) : 0;
+          var pctDue = (paidDue != null && due) ? Math.min(100, Math.round(Number(paidDue) / due * 100)) : null;
+          var prepaid = paidDue != null ? paid - Number(paidDue) : 0;
+          return {
+            plan: plan, paid: paid, pct: pct,
+            pos: plan ? Math.min(100, Math.round(due / plan * 1000) / 10) : 0,
+            sub: upto + ' 부과 ' + wonf(due) + '만원' +
+              (pctDue != null ? ' 중 ' + wonf(paidDue) + '만원 (' + pctDue + '%)' : '') +
+              (prepaid > 0 ? ' · 선납 ' + wonf(prepaid) + '만원' : '')
+          };
+        }
+        function duesBlock(plan, paid, due, paidDue, strong) {
+          var di = duesInfo(plan, paid, due, paidDue);
+          var pctHtml = strong ? '<strong>' + di.pct + '%</strong>' : di.pct + '%';
+          return '<div style="flex:1 1 130px;min-width:120px">' +
+            '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
+            '<span>상회비</span><span>' + pctHtml + ' <span style="color:var(--gray-5)">(' +
+            wonf(di.paid) + '/' + wonf(di.plan) + '만원)</span></span></div>' +
+            bar(di.pct, '#b03a3a', mo < 12 ? di.pos : null) +
+            '<div style="font-size:0.68rem;color:var(--gray-5);margin-top:2px">' + di.sub + '</div></div>';
+        }
+
         /* 노회 전체 진행률 */
-        var tDuesPlan = 0, tDuesPaid = 0, tBapTarget = 0, tBapPaid = 0, tBapJoin = 0, tBapN = 0;
+        var tDuesPlan = 0, tDuesPaid = 0, tDuesDue = 0, tDuesPaidDue = 0;
+        var tBapTarget = 0, tBapPaid = 0, tBapJoin = 0, tBapN = 0;
         rows.forEach(function (x) {
           tDuesPlan += Number(x.out_dues_plan || 0); tDuesPaid += Number(x.out_dues_paid || 0);
+          tDuesDue += Number(x.out_dues_due || 0); tDuesPaidDue += Number(x.out_dues_paid_due || 0);
           tBapTarget += Number(x.out_bap_target || 0); tBapPaid += Number(x.out_bap_paid || 0);
           tBapJoin += Number(x.out_bap_join || 0); tBapN += Number(x.out_bap_churches || 0);
         });
-        var tDuesDue = tDuesPlan / 12 * mo;
-        var tDuesPct = tDuesDue ? Math.round(tDuesPaid / tDuesDue * 100) : 0;
         var tBapPct = tBapTarget ? Math.round(tBapPaid / tBapTarget * 100) : 0;
         h += '<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--gray-2,#e8eaef)">' +
           '<span style="font-size:0.85rem;font-weight:700;color:var(--navy)">노회 전체</span>' +
           '<div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">' +
-          '<div style="flex:1 1 130px;min-width:120px">' +
-          '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
-          '<span>상회비</span><span><strong>' + tDuesPct + '%</strong> <span style="color:var(--gray-5)">(' +
-          wonf(tDuesPaid) + '만원)</span></span></div>' + bar(tDuesPct, '#b03a3a') + '</div>' +
+          duesBlock(tDuesPlan, tDuesPaid, hasDue ? tDuesDue : null, hasDue ? tDuesPaidDue : null, true) +
           '<div style="flex:1 1 130px;min-width:120px">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
           '<span>세례의무금</span><span><strong>' + tBapPct + '%</strong> <span style="color:var(--gray-5)">(' +
@@ -690,9 +720,6 @@ var SHSBoard = (function () {
           '</div></div>';
         /* 시찰별 막대는 내가 속한 시찰만 보여 준다 */
         rows.filter(function (x) { return x.out_sichal === mySic; }).forEach(function (x) {
-          /* 상회비: 이번 달까지 부과된 금액 대비 납부율 */
-          var duesDue = Number(x.out_dues_plan || 0) / 12 * mo;
-          var duesPct = duesDue ? Math.round(Number(x.out_dues_paid || 0) / duesDue * 100) : 0;
           var bapPct = Number(x.out_bap_target || 0)
             ? Math.round(Number(x.out_bap_paid || 0) / Number(x.out_bap_target) * 100) : 0;
           var isMine = x.out_sichal === mySic;
@@ -701,11 +728,11 @@ var SHSBoard = (function () {
             'style="font-size:0.85rem;font-weight:700;color:var(--navy);text-decoration:underline">' +
             esc(x.out_sichal) + '</a>' +
             (isMine ? ' <span style="font-size:0.72rem;color:var(--gold,#b9974e)">나의 시찰</span>' : '') +
+            (hasDue && x.out_dues_full != null
+              ? ' <span style="font-size:0.72rem;color:var(--gray-5)">완납 ' + x.out_dues_full + '/' + x.out_dues_churches + '곳</span>'
+              : '') +
             '<div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap">' +
-            '<div style="flex:1 1 130px;min-width:120px">' +
-            '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
-            '<span>상회비</span><span>' + duesPct + '% <span style="color:var(--gray-5)">(' +
-            wonf(x.out_dues_paid) + '만원)</span></span></div>' + bar(duesPct, '#b03a3a') + '</div>' +
+            duesBlock(x.out_dues_plan, x.out_dues_paid, hasDue ? x.out_dues_due : null, hasDue ? x.out_dues_paid_due : null, false) +
             '<div style="flex:1 1 130px;min-width:120px">' +
             '<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--gray-6)">' +
             '<span>세례의무금</span><span>' + bapPct + '% <span style="color:var(--gray-5)">(' +
@@ -714,8 +741,8 @@ var SHSBoard = (function () {
             '<div class="hidden" data-sicdetail="' + esc(x.out_sichal) + '" style="margin-top:6px"></div>' +
             '</div>';
         });
-        h += '<p style="font-size:0.7rem;color:var(--gray-5);margin:2px 0 0">상회비는 회기(4월~다음 해 3월)에서 ' +
-          '이번 달까지 부과된 금액 대비, 세례의무금은 올해 목표금액 대비 납부율입니다.</p></div>';
+        h += '<p style="font-size:0.7rem;color:var(--gray-5);margin:2px 0 0">상회비는 연간 목표액 대비 납부액이며 ' +
+          '세로 눈금이 ' + upto + ' 부과액입니다. 세례의무금은 올해 목표금액 대비 납부율입니다.</p></div>';
         box.innerHTML = h;
 
         box.querySelectorAll('a[data-sicfin]').forEach(function (a) {
@@ -740,9 +767,11 @@ var SHSBoard = (function () {
               list.forEach(function (d) {
                 var bapDone = Number(d.out_bap_target) > 0 && Number(d.out_bap_paid) >= Number(d.out_bap_target);
                 var bapPart = Number(d.out_bap_paid) > 0 && !bapDone;
-                var late = Math.max(0, mo - Number(d.out_months || 0));
+                var mDue = d.out_months_due != null ? Number(d.out_months_due) : Math.min(Number(d.out_months || 0), mo);
+                var pre = Number(d.out_months || 0) - mDue;   /* 다음 달 이후분 선납 개월 */
+                var late = Math.max(0, mo - mDue);
                 t += '<tr><td class="left">' + esc(d.out_church) + '</td>' +
-                  '<td>' + d.out_months + '/' + mo + '개월' +
+                  '<td>' + mDue + '/' + mo + '개월' + (pre > 0 ? ' (+선납 ' + pre + ')' : '') +
                   (Number(d.out_monthly) ? ' · ' + wonf(d.out_dues_paid) + '만원' : '') + '</td>' +
                   '<td>' + wonf(d.out_bap_paid) + ' / ' + wonf(d.out_bap_target) + '원</td>' +
                   '<td>' +
