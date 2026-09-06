@@ -1810,6 +1810,19 @@ input.dp-bad { border-color: var(--red); }
 }
 .dues-sc-chart .dsc-legend em { font-style: normal; color: var(--gray-5); }
 
+/* 회계 장부 — 영수증 사진 끌어다 놓기 */
+.lg-drop {
+  border: 2px dashed var(--gray-3); border-radius: 8px; padding: 14px 16px; text-align: center;
+  background: #fff; cursor: pointer; font-size: 0.88rem;
+  transition: background .15s, border-color .15s;
+}
+.lg-drop:hover, .lg-drop:focus, .lg-drop.over { border-color: var(--navy); background: #f4f1ea; outline: none; }
+.lg-drop-list { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.lg-drop-list:empty { display: none; }
+.lg-drop-list span { font-size: 0.8rem; background: var(--gray-1); border-radius: 999px; padding: 3px 10px; }
+.lg-drop-list button { border: none; background: none; color: #a33; cursor: pointer; padding: 0 2px; font-size: 1rem; line-height: 1; }
+td.lg-dropcell.over { outline: 2px dashed var(--navy); outline-offset: -2px; background: #f4f1ea; }
+
 /* 완납/미납 필터와 검색 */
 .dues-filter { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 16px 0 4px; }
 .dues-filter .dues-ftabs { margin-bottom: 0; }

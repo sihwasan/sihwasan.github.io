@@ -84,6 +84,7 @@ var SHSLedger = (function () {
     var books = [], book = null, entries = [];
     var receipts = {};        /* 항목 번호 → 영수증 목록 */
     var upTarget = null;      /* 줄의 <올리기>를 눌렀을 때 어느 항목에 붙일지 */
+    var pendingFiles = [];    /* 입력 칸에 끌어다 놓거나 고른 사진들 — 저장할 때 함께 올라간다 */
     /* 항목 목록 — 기본 항목에 더해, 직접 적어 저장한 항목이 저절로 등재된다 */
     var CAT_BASE = {
       '수입': ['회비', '찬조', '노회 지원금', '이자', '기타'],
@@ -137,7 +138,7 @@ var SHSLedger = (function () {
                     .order('entry_date').order('id')
                  : Promise.resolve({ data: [] }),
             /* 여태 적어 온 항목 이름 — 목록에 저절로 등재된다 (자동 연동 기록은 뺀다) */
-            ids.length ? c.from('ledger_entries').select('kind,title').in('book_id', ids)
+            ids.length ? c.from('ledger_entries').select('kind,title,category').in('book_id', ids)
                           .is('fee_id', null).is('link_kind', null)
                           .then(function (x) { return x; }, function () { return { data: [] }; })
                        : Promise.resolve({ data: [] }),
@@ -167,6 +168,8 @@ var SHSLedger = (function () {
           catUsed = { '수입': [], '지출': [] };
           ((rs[1] && rs[1].data) || []).forEach(function (x) {
             var k = x.kind === '수입' ? '수입' : '지출';
+            var cg = String(x.category || '').trim();
+            if (useCats && cg && cats[k].indexOf(cg) === -1) cats[k].push(cg);
             var t = String(x.title || '').trim();
             if (t && catUsed[k].indexOf(t) === -1 && CAT_BASE[k].indexOf(t) === -1) {
               catUsed[k].push(t);
@@ -317,7 +320,8 @@ var SHSLedger = (function () {
             '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
             (viewKind === '수입' ? '+' : '−') + won(amt) + '</td>' +
             '<td class="left">' + (x.note ? esc(x.note) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
-            '<td>' + receiptCell(x, ln, canWrite) + '</td>' +
+            '<td' + (canWrite && !ln ? ' class="lg-dropcell" data-lgdrop="' + x.id + '" title="영수증 사진을 여기에 끌어다 놓아도 됩니다"' : '') +
+            '>' + receiptCell(x, ln, canWrite) + '</td>' +
             (canWrite
               ? (ln
                   /* 연동 항목은 원본(납부 현황·노회 장부)에서 고치면 함께 바뀐다 */
@@ -338,7 +342,7 @@ var SHSLedger = (function () {
       h += '<div id="lg-audit" style="margin-top:16px">' +
         SHSAuditMark.panel(book, { isAuditor: opts.isAuditor }) + '</div>';
       /* 줄의 <올리기>가 쓰는 숨은 파일 입력 (카메라나 사진첩이 열린다) */
-      if (canWrite) h += '<input type="file" id="lg-upfile" accept="image/*" class="hidden">';
+      if (canWrite) h += '<input type="file" id="lg-upfile" accept="image/*" multiple class="hidden">';
 
       box.innerHTML = h;
       bindYear();
@@ -463,10 +467,12 @@ var SHSLedger = (function () {
       var today = new Date().toISOString().slice(0, 10);
       /* 노회 장부: 과목을 고르고, 상비부 배정이면 어느 상비부인지 고른다 */
       var catField = useCats
-        ? '<div class="field" style="flex:0 0 190px"><label>과목</label>' +
-          '<select id="lg-cat">' + cats[viewKind].map(function (x) {
-            return '<option value="' + esc(x) + '">' + esc(x) + '</option>';
-          }).join('') + '</select></div>' +
+        ? '<div class="field" style="flex:0 0 200px"><label>과목 (고르거나 직접 입력)</label>' +
+          '<input type="text" id="lg-cat" list="lg-catlist" placeholder="' +
+          (viewKind === '수입' ? '예: 상회비, 찬조금' : '예: 상비부 배정, 사무비') + '">' +
+          '<datalist id="lg-catlist">' + cats[viewKind].map(function (x) {
+            return '<option value="' + esc(x) + '"></option>';
+          }).join('') + '</datalist></div>' +
           (viewKind === '지출'
             ? '<div class="field hidden" id="lg-alloc-f" style="flex:0 0 200px"><label>배정 상비부</label>' +
               '<select id="lg-alloc"><option value="">고르세요</option>' +
@@ -502,10 +508,15 @@ var SHSLedger = (function () {
         '<input type="number" id="lg-amt" min="0" step="1"></div>' +
         '</div>' +
         '<div class="field"><label>비고 (선택)</label><input type="text" id="lg-note"></div>' +
-        '<div class="field"><label>영수증 사진 (선택 · 휴대전화에서는 바로 찍을 수 있습니다)</label>' +
-        '<input type="file" id="lg-file" accept="image/*">' +
+        '<div class="field"><label>영수증 사진 (선택)</label>' +
+        '<div class="lg-drop" id="lg-drop" tabindex="0" role="button">' +
+        '<input type="file" id="lg-file" accept="image/*" multiple class="hidden">' +
+        '<div id="lg-drop-text">여기에 영수증 사진을 <strong>끌어다 놓거나</strong> 눌러서 고르세요 ' +
+        '<span style="color:var(--gray-5)">(휴대전화에서는 바로 찍을 수 있습니다 · 여러 장 가능)</span></div>' +
+        '<div class="lg-drop-list" id="lg-drop-list"></div></div>' +
         '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:3px">저장하면 사진이 함께 올라가고, ' +
-        '줄의 <strong>영수증</strong> 단추로 언제든 다시 볼 수 있습니다. 한 항목에 여러 장을 붙일 수 있습니다.</div></div>' +
+        '줄의 <strong>영수증</strong> 단추로 언제든 다시 볼 수 있습니다. ' +
+        '이미 적은 줄에는 영수증 칸에 사진을 바로 끌어다 놓아도 됩니다.</div></div>' +
         '<button class="btn" id="lg-save">저장</button> ' +
         '<button class="btn ghost hidden" id="lg-cancel">취소</button>' +
         '<div class="form-msg" id="lg-msg"></div>' +
@@ -551,6 +562,68 @@ var SHSLedger = (function () {
         if (!w.ok) throw new Error(w.why);
         SHSCloud.log('create', '영수증 등록', opts.owner + ' ' + year + '년 / 항목 ' + entryId);
       });
+    }
+
+    /* 여러 장을 차례로 올린다 */
+    function uploadReceipts(entryId, files) {
+      var list = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type); });
+      var p = Promise.resolve();
+      list.forEach(function (f) { p = p.then(function () { return uploadReceipt(entryId, f); }); });
+      return p;
+    }
+
+    /* 끌어다 놓은 파일 중 사진만 */
+    function droppedImages(ev) {
+      var dt = ev.dataTransfer;
+      if (!dt || !dt.files) return [];
+      return Array.prototype.slice.call(dt.files).filter(function (f) { return /^image\//.test(f.type); });
+    }
+
+    /* 입력 칸의 놓는 자리 — 고르거나 끌어다 놓은 사진을 모아 두고 이름을 보여 준다 */
+    function renderPending() {
+      var list = document.getElementById('lg-drop-list');
+      if (!list) return;
+      list.innerHTML = pendingFiles.map(function (f, i) {
+        return '<span>' + esc(f.name || '사진') + ' <button type="button" data-lgpf="' + i + '" title="빼기">&times;</button></span>';
+      }).join('');
+      list.querySelectorAll('button[data-lgpf]').forEach(function (b) {
+        b.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          pendingFiles.splice(parseInt(b.dataset.lgpf, 10), 1);
+          renderPending();
+        });
+      });
+    }
+    function addPending(files) {
+      Array.prototype.slice.call(files || []).forEach(function (f) {
+        if (/^image\//.test(f.type)) pendingFiles.push(f);
+      });
+      renderPending();
+    }
+    function bindDrop() {
+      var zone = document.getElementById('lg-drop');
+      var input = document.getElementById('lg-file');
+      if (!zone || !input) return;
+      zone.addEventListener('click', function (ev) {
+        if (ev.target.closest && ev.target.closest('button')) return;
+        input.value = ''; input.click();
+      });
+      zone.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); input.value = ''; input.click(); }
+      });
+      input.addEventListener('change', function () { addPending(input.files); });
+      zone.addEventListener('dragover', function (ev) { ev.preventDefault(); zone.classList.add('over'); });
+      zone.addEventListener('dragleave', function () { zone.classList.remove('over'); });
+      zone.addEventListener('drop', function (ev) {
+        ev.preventDefault(); zone.classList.remove('over');
+        addPending(droppedImages(ev));
+      });
+      /* 놓는 자리 밖에 떨어뜨려도 브라우저가 사진 페이지로 넘어가지 않게 한다 */
+      if (!window.__lgDropGuard) {
+        window.__lgDropGuard = true;
+        document.addEventListener('dragover', function (ev) { ev.preventDefault(); });
+        document.addEventListener('drop', function (ev) { ev.preventDefault(); });
+      }
     }
 
     /* 항목에 붙은 영수증 파일을 보관함에서 지운다 (항목 삭제 전에 부른다) */
@@ -645,14 +718,27 @@ var SHSLedger = (function () {
         b.addEventListener('click', function () { upTarget = b.dataset.lgup; up.value = ''; up.click(); });
       });
       up.addEventListener('change', function () {
-        var f = up.files && up.files[0];
-        if (!f || !upTarget) return;
-        var b2 = box.querySelector('button[data-lgup="' + upTarget + '"]');
-        if (b2) { b2.disabled = true; b2.textContent = '올리는 중…'; }
-        uploadReceipt(upTarget, f).then(load, function (err) {
-          alert((err && err.message) || '영수증을 올리지 못했습니다.');
-          load();
+        if (!up.files || !up.files.length || !upTarget) return;
+        uploadToRow(upTarget, up.files);
+      });
+      box.querySelectorAll('td.lg-dropcell').forEach(function (td) {
+        td.addEventListener('dragover', function (ev) { ev.preventDefault(); td.classList.add('over'); });
+        td.addEventListener('dragleave', function () { td.classList.remove('over'); });
+        td.addEventListener('drop', function (ev) {
+          ev.preventDefault(); td.classList.remove('over');
+          var files = droppedImages(ev);
+          if (files.length) uploadToRow(td.dataset.lgdrop, files);
         });
+      });
+    }
+
+    /* 줄 하나에 사진을 올린다 (단추로 골랐든 끌어다 놓았든) */
+    function uploadToRow(entryId, files) {
+      var b2 = box.querySelector('button[data-lgup="' + entryId + '"]');
+      if (b2) { b2.disabled = true; b2.textContent = '올리는 중…'; }
+      uploadReceipts(entryId, files).then(load, function (err) {
+        alert((err && err.message) || '영수증을 올리지 못했습니다.');
+        load();
       });
     }
 
@@ -723,14 +809,21 @@ var SHSLedger = (function () {
       var al = document.getElementById('lg-alloc');
       if (al) al.value = '';
       syncAllocField();
+      pendingFiles = [];
+      renderPending();
       document.getElementById('lg-ftitle').textContent = viewKind + ' 적기';
       document.getElementById('lg-cancel').classList.add('hidden');
     }
 
     function bindEntryForm() {
       document.getElementById('lg-cancel').addEventListener('click', clearEntryForm);
+      bindDrop();
       var catSel = document.getElementById('lg-cat');
-      if (catSel) { catSel.addEventListener('change', syncAllocField); syncAllocField(); }
+      if (catSel) {
+        catSel.addEventListener('change', syncAllocField);
+        catSel.addEventListener('input', syncAllocField);
+        syncAllocField();
+      }
       document.getElementById('lg-save').addEventListener('click', function () {
         var msg = document.getElementById('lg-msg');
         var id = document.getElementById('lg-id').value;
@@ -745,7 +838,8 @@ var SHSLedger = (function () {
           updated_at: new Date().toISOString()
         };
         if (useCats) {
-          d.category = catSel ? catSel.value : null;
+          d.category = catSel ? catSel.value.trim() : null;
+          if (!d.category) { msg.className = 'form-msg err'; msg.textContent = '과목을 고르거나 적어 주세요.'; return; }
           /* 적요를 비우면 과목 이름을 적요로 쓴다 */
           if (!d.title) d.title = d.category || '';
           var al = document.getElementById('lg-alloc');
@@ -757,8 +851,7 @@ var SHSLedger = (function () {
         if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '항목을 적어 주세요.'; return; }
         if (d.amount < 0) { msg.className = 'form-msg err'; msg.textContent = '금액은 0원 이상이어야 합니다.'; return; }
         if (!id) d.created_by = opts.user.name;
-        var fileEl = document.getElementById('lg-file');
-        var file = fileEl && fileEl.files && fileEl.files[0];
+        var files = pendingFiles.slice();
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
         SHSCloud.init().then(function (c) {
           return id ? c.from('ledger_entries').update(d).eq('id', id).select()
@@ -769,15 +862,29 @@ var SHSLedger = (function () {
           SHSCloud.log(id ? 'update' : 'create', '회계 ' + d.kind + ' ' + (id ? '수정' : '등록'),
             opts.owner + ' ' + year + '년 / ' + d.title + ' ' + won(d.amount) + '원');
           var savedId = id || (r.data && r.data[0] && r.data[0].id);
-          if (!file || !savedId) { load(); return; }
-          /* 항목은 저장되었고, 이어서 영수증 사진을 올린다 */
-          msg.textContent = '항목은 저장되었습니다. 영수증 사진을 올리는 중입니다...';
-          uploadReceipt(savedId, file).then(load, function (err) {
-            alert('항목은 저장되었지만 영수증을 올리지 못했습니다: ' + ((err && err.message) || ''));
-            load();
+          rememberCat(d.category).then(function () {
+            if (!files.length || !savedId) { load(); return; }
+            /* 항목은 저장되었고, 이어서 영수증 사진을 올린다 */
+            msg.textContent = '항목은 저장되었습니다. 영수증 사진 ' + files.length + '장을 올리는 중입니다...';
+            pendingFiles = [];
+            uploadReceipts(savedId, files).then(load, function (err) {
+              alert('항목은 저장되었지만 영수증을 올리지 못했습니다: ' + ((err && err.message) || ''));
+              load();
+            });
           });
         });
       });
+    }
+
+    /* 손으로 적은 새 과목은 목록에 저장해 두어 다음에 고를 수 있게 한다 */
+    function rememberCat(name) {
+      if (!useCats || !name || cats[viewKind].indexOf(name) !== -1) return Promise.resolve();
+      var sort = catRows.filter(function (r) { return r.kind === viewKind; }).length + 1;
+      return SHSCloud.init().then(function (c) {
+        return c.from('ledger_categories').insert({
+          owner_kind: ownerKind, owner: opts.owner, kind: viewKind, name: name, sort: sort
+        });
+      }).then(function () {}, function () {});
     }
 
     function findEntry(id) {
