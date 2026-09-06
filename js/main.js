@@ -631,6 +631,16 @@
     if (n.kind === '회계' && key.indexOf('payout-') === 0) {
       return 'mypage.html#payouts';
     }
+    /* 회기 마감 요청·승인·반려 — 그 장부 화면으로 (열쇠말: lclose-번호-종류-이름) */
+    if (n.kind === '회계' && key.indexOf('lclose-') === 0) {
+      var lc = key.match(/^lclose-\d+-(committee|sichal|presbytery)-(.+?)(-ok|-no)?$/);
+      if (lc) {
+        if (lc[1] === 'presbytery') return 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84';
+        if (lc[1] === 'committee') return 'committee.html?c=' + encodeURIComponent(lc[2]);
+        return 'sichal.html?s=' + encodeURIComponent(lc[2]);
+      }
+      return null;
+    }
     /* 청원서 — 시찰 서기에게는 그 청원서의 <서류 진단>,
      * 낸 분에게는 <나의 서류>의 시찰로 보낸 청원서 */
     if (n.kind === '시찰') {

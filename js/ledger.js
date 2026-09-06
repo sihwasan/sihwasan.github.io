@@ -134,13 +134,23 @@ var SHSLedger = (function () {
     /* 적을 수 있는가. 데이터베이스에 물어본 답으로 채운다. */
     var canEdit = !!opts.canEdit;
 
+    var isReviewer = false;   /* 감사부장·감사부 서기 — 회기 마감을 승인한다 */
+    function isAdmin() {
+      return !!(window.SHSAuth && SHSAuth.canManageMembers && SHSAuth.canManageMembers(opts.user));
+    }
     function askCanEdit() {
       return SHSCloud.init().then(function (c) {
-        return c.rpc('is_ledger_owner', { p_kind: ownerKind, p_owner: opts.owner });
-      }).then(function (r) {
+        return Promise.all([
+          c.rpc('is_ledger_owner', { p_kind: ownerKind, p_owner: opts.owner }),
+          c.rpc('is_audit_reviewer').then(function (x) { return x; }, function () { return { data: false }; })
+        ]);
+      }).then(function (rs) {
+        var r = rs[0];
         if (r && !r.error && typeof r.data === 'boolean') canEdit = r.data;
+        isReviewer = !!(rs[1] && !rs[1].error && rs[1].data === true);
       }, function () { /* 못 물어보면 부르는 쪽이 준 값을 그대로 쓴다 */ });
     }
+    function dt(s) { return String(s || '').replace('T', ' ').slice(0, 16); }
 
     /* 이 장부를 누가 쓰는지 알려 주는 말 */
     function who() {
@@ -299,10 +309,39 @@ var SHSLedger = (function () {
       } else if (closed) {
         h += '<div class="notice-banner">이 장부는 <strong>' + fyLabel(year) + ' 마감</strong>되었습니다. ' +
           '남은 돈 ' + won(s.left) + '원이 ' + (year + 1) + ' 회계연도 이월금으로 넘어갔습니다.' +
-          (canEdit
+          (book.close_approved_at
+            ? '<div style="font-size:0.84rem;margin-top:4px">감사부 승인: ' + esc(dt(book.close_approved_at)) +
+              ' ' + esc(book.close_approved_by || '') +
+              (book.close_opinion ? ' · 의견: ' + esc(book.close_opinion) : '') +
+              (book.close_requested_by ? ' <span style="color:var(--gray-5)">(요청 ' + esc(dt(book.close_requested_at)) +
+                ' ' + esc(book.close_requested_by) + ')</span>' : '') + '</div>'
+            : '') +
+          (isReviewer || isAdmin()
             ? ' <button class="btn ghost sm" id="lg-reopen" style="margin-left:8px">마감 취소</button>'
             : '') +
           '</div>';
+      } else if (book.close_requested_at) {
+        /* 마감 승인을 기다리는 중 — 감사부장·서기에게는 승인·반려 단추가 보인다 */
+        h += '<div class="notice-banner" style="border-left:4px solid #d9a33b">' +
+          '<strong>마감 승인 요청 중</strong> — ' + esc(dt(book.close_requested_at)) + ' ' +
+          esc(book.close_requested_by || '') + ' 님이 ' + fyLabel(year) + ' 마감 승인을 요청했습니다.' +
+          (book.close_request_note ? ' <span style="color:var(--gray-6)">요청 말씀: ' + esc(book.close_request_note) + '</span>' : '') +
+          ' 감사부장·감사부 서기가 승인하면 남은 돈 ' + won(s.left) + '원이 ' + (year + 1) +
+          ' 회계연도 이월금으로 넘어가고 장부가 잠깁니다.' +
+          (isReviewer || isAdmin()
+            ? '<div class="inline-form" style="margin-top:10px;align-items:flex-end">' +
+              '<div class="field"><label>감사 의견 (선택)</label><input type="text" id="lg-opinion" placeholder="예: 증빙 확인, 이상 없음"></div>' +
+              '<button class="btn sm" id="lg-approve">회기 마감 승인</button>' +
+              '<button class="btn ghost sm" id="lg-reject">반려</button></div>'
+            : '') +
+          (canEdit
+            ? '<div style="margin-top:8px"><button class="btn ghost sm" id="lg-reqcancel">요청 취소</button></div>'
+            : '') +
+          '<div class="form-msg" id="lg-cmsg"></div></div>';
+      } else if (book.close_opinion && !book.close_approved_at) {
+        /* 반려된 적이 있으면 그 사유를 보여 준다 */
+        h += '<div class="notice-banner" style="border-left:4px solid #a33">지난 마감 요청이 <strong>반려</strong>되었습니다. ' +
+          '사유: ' + esc(book.close_opinion) + ' — 장부를 고친 뒤 다시 마감 승인을 요청해 주세요.</div>';
       }
 
       if (canWrite) {
@@ -312,7 +351,7 @@ var SHSLedger = (function () {
           '<button class="btn ghost" id="lg-opensave">이월금 저장</button>' +
           (books.filter(function (b) { return b.year === year - 1; }).length
             ? '<button class="btn ghost" id="lg-carry">지난해 잔액 가져오기</button>' : '') +
-          '<button class="btn ghost" id="lg-close">회계연도 마감</button>' +
+          (book.close_requested_at ? '' : '<button class="btn ghost" id="lg-close">마감 승인 요청</button>') +
           '</div><div class="form-msg" id="lg-omsg"></div>';
       }
 
@@ -396,7 +435,7 @@ var SHSLedger = (function () {
       var ro = document.getElementById('lg-reopen');
       if (ro) ro.addEventListener('click', function () {
         if (!confirm(fyLabel(year) + ' 마감을 취소하시겠습니까?\n' +
-                     '다음 회계연도 이월금은 그대로 두므로, 장부를 고친 뒤 다시 마감해 주세요.')) return;
+                     '다음 회계연도 이월금은 그대로 두므로, 장부를 고친 뒤 다시 마감 승인을 요청해 주세요.')) return;
         SHSCloud.init().then(function (c) {
           return c.rpc('reopen_ledger_year', { p_book: book.id });
         }).then(function (r) {
@@ -407,6 +446,49 @@ var SHSLedger = (function () {
       });
       SHSAuditMark.bind(document.getElementById('lg-audit'), {
         kind: 'ledger_books', label: opts.owner + ' ' + year + '년 회계 장부', after: load
+      });
+
+      /* 회기 마감 승인 — 감사부장·서기가 누르면 그 자리에서 이월·잠금까지 된다 */
+      var ap = document.getElementById('lg-approve');
+      if (ap) ap.addEventListener('click', function () {
+        var s3 = sums();
+        if (!confirm(fyLabel(year) + ' 마감을 승인합니다.\n\n남은 돈 ' + won(s3.left) + '원이 ' + (year + 1) +
+              ' 회계연도 이월금으로 넘어가고, 이 장부에는 더 적을 수 없습니다.\n\n계속하시겠습니까?')) return;
+        var op = document.getElementById('lg-opinion');
+        var cm = document.getElementById('lg-cmsg');
+        cm.className = 'form-msg'; cm.textContent = '승인 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.rpc('approve_ledger_close', { p_book: book.id, p_opinion: op ? op.value.trim() : '' });
+        }).then(function (r) {
+          if (r.error) { cm.className = 'form-msg err'; cm.textContent = r.error.message; return; }
+          SHSCloud.log('update', '회기 마감 승인', opts.owner + ' ' + year + ' 회계연도 → 이월금 ' + won(r.data) + '원');
+          load();
+        });
+      });
+      var rj = document.getElementById('lg-reject');
+      if (rj) rj.addEventListener('click', function () {
+        var reason = prompt('반려 사유를 적어 주세요 (요청한 회계에게 알림으로 갑니다)', '');
+        if (reason === null) return;
+        var cm = document.getElementById('lg-cmsg');
+        cm.className = 'form-msg'; cm.textContent = '반려 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.rpc('reject_ledger_close', { p_book: book.id, p_reason: reason.trim() });
+        }).then(function (r) {
+          if (r.error) { cm.className = 'form-msg err'; cm.textContent = r.error.message; return; }
+          SHSCloud.log('update', '회기 마감 반려', opts.owner + ' ' + year + ' 회계연도');
+          load();
+        });
+      });
+      var rc = document.getElementById('lg-reqcancel');
+      if (rc) rc.addEventListener('click', function () {
+        if (!confirm('마감 승인 요청을 취소하시겠습니까?')) return;
+        SHSCloud.init().then(function (c) {
+          return c.rpc('cancel_ledger_close_request', { p_book: book.id });
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('update', '회기 마감 요청 취소', opts.owner + ' ' + year + ' 회계연도');
+          load();
+        });
       });
     }
 
@@ -477,27 +559,25 @@ var SHSLedger = (function () {
         });
       });
 
-      /* 회계연도 마감 — 남은 돈이 다음 회계연도 이월금으로 넘어간다 */
+      /* 마감 승인 요청 — 감사부장·서기가 승인하면 남은 돈이 다음 회계연도 이월금으로 넘어간다 */
       var cl = document.getElementById('lg-close');
       if (cl) cl.addEventListener('click', function () {
         var s2 = sums();
-        if (!confirm(fyLabel(year) + '를 마감합니다.\n\n남은 돈 ' + won(s2.left) + '원이 ' +
-              (year + 1) + ' 회계연도 이월금으로 저절로 넘어가고,\n마감된 장부에는 더 적을 수 없습니다.\n\n' +
-              '계속하시겠습니까?')) return;
+        var note = prompt(fyLabel(year) + ' 마감 승인을 감사부장·감사부 서기에게 요청합니다.\n\n' +
+          '남은 돈 ' + won(s2.left) + '원이 승인과 함께 ' + (year + 1) + ' 회계연도 이월금으로 넘어가고, ' +
+          '마감된 장부에는 더 적을 수 없습니다.\n\n감사부에 전할 말씀이 있으면 적어 주세요 (없으면 비워 두고 확인)', '');
+        if (note === null) return;
         var msg = document.getElementById('lg-omsg');
-        msg.className = 'form-msg'; msg.textContent = '마감 중입니다...';
+        msg.className = 'form-msg'; msg.textContent = '요청을 보내는 중입니다...';
         SHSCloud.init().then(function (c) {
-          return c.rpc('close_ledger_year', { p_book: book.id });
+          return c.rpc('request_ledger_close', { p_book: book.id, p_note: note.trim() });
         }).then(function (r) {
           if (r.error) {
             msg.className = 'form-msg err';
-            msg.textContent = r.error.message +
-              ' (60_sichal_fee_ledger.sql 실행이 필요할 수 있습니다)';
+            msg.textContent = r.error.message + ' (78_ledger_close_approval.sql 실행이 필요할 수 있습니다)';
             return;
           }
-          SHSCloud.log('update', '회계연도 마감',
-            opts.owner + ' ' + year + ' 회계연도 → 이월금 ' + won(r.data) + '원');
-          year = year + 1;
+          SHSCloud.log('update', '회기 마감 승인 요청', opts.owner + ' ' + year + ' 회계연도');
           load();
         });
       });
