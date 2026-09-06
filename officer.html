@@ -829,37 +829,59 @@ document.addEventListener('DOMContentLoaded', function () {
     for (var i = 0; i < el; i++) if (!payOf(r.church, DUES_MONTHS[i])) return false;
     return true;
   }
-  /* 시찰별 진행 통계 */
+  /* 시찰별 진행 통계
+   * yearPlan: 연간 목표(월 부과액 × 12) / dueSoFar: 이번 달까지 부과액
+   * paid: 올해 납부액(다음 달 이후분 선납 포함) / paidDue: 이번 달까지 부과분만 센 납부액
+   * pct: 연간 목표 대비 납부율(대시보드의 연간 납부율과 같은 기준) / pctDue: 이번 달까지 부과액 대비 */
   function sichalStats() {
     var el = duesElapsed();
     return DUES_SICHALS.map(function (sc) {
       var rows = duesRates.filter(function (r) { return (r.sichal || '기타') === sc; });
       if (!rows.length) return null;
-      var expected = 0, paid = 0, full = 0;
+      var yearPlan = 0, dueSoFar = 0, paid = 0, paidDue = 0, full = 0;
       rows.forEach(function (r) {
-        expected += Number(r.monthly_amount || 0) * el;
+        var mo = Number(r.monthly_amount || 0);
+        yearPlan += mo * 12;
+        dueSoFar += mo * el;
         for (var m = 1; m <= 12; m++) {
           var p2 = payOf(r.church, m);
-          if (p2) paid += paidAmount(r, p2);
+          if (!p2) continue;
+          paid += paidAmount(r, p2);
+          if (DUES_MONTHS.indexOf(m) < el) paidDue += paidAmount(r, p2);
         }
         if (isFullPaid(r)) full++;
       });
-      var pct = expected ? Math.min(100, Math.round(paid / expected * 100)) : 0;
-      return { sc: sc, churches: rows.length, full: full, expected: expected, paid: paid, pct: pct };
+      var pct = yearPlan ? Math.min(100, Math.round(paid / yearPlan * 100)) : 0;
+      var pctDue = dueSoFar ? Math.min(100, Math.round(paidDue / dueSoFar * 100)) : 0;
+      return { sc: sc, churches: rows.length, full: full,
+               yearPlan: yearPlan, dueSoFar: dueSoFar, paid: paid, paidDue: paidDue,
+               prepaid: paid - paidDue, pct: pct, pctDue: pctDue,
+               duePos: yearPlan ? Math.min(100, Math.round(dueSoFar / yearPlan * 1000) / 10) : 0 };
     }).filter(Boolean);
   }
-  /* 시찰별 진행 그래프 (화면용) */
+  /* 시찰별 목표 대비 납부 그래프 (화면용)
+   * 막대 전체 = 연간 목표액, 붉게 채운 부분 = 올해 납부액, 세로 눈금 = 이번 달까지 부과액 */
   function sichalChartHtml() {
     var el = duesElapsed();
+    var upto = DUES_MONTHS[el - 1] + '월까지';
     var h = '<div class="dues-sc-chart">' +
-      '<div class="dsc-title">시찰별 진행 상황 <span>(' + duesYear + '년 회기 4월 시작 · ' +
-      el + '개월 경과 기준)</span></div>';
+      '<div class="dsc-title">시찰별 목표 대비 납부 <span>(연간 목표 = 월 부과액 × 12개월' +
+      (el < 12 ? ' · 세로 눈금은 ' + upto + ' 부과액' : '') + ')</span></div>';
     sichalStats().forEach(function (s) {
-      h += '<div class="dsc-row" title="' + e(s.sc) + ': 예정 ' + manwon(s.expected) + '원 중 ' + manwon(s.paid) + '원 납부">' +
-        '<div class="dsc-name">' + e(s.sc) + '</div>' +
-        '<div class="dsc-track"><div class="dsc-bar" style="width:' + s.pct + '%"></div></div>' +
-        '<div class="dsc-val">' + s.pct + '% · 완납 ' + s.full + '/' + s.churches + '곳</div>' +
-        '</div>';
+      h += '<div class="dsc-row">' +
+        '<div class="dsc-name">' + e(s.sc) + '<small>완납 ' + s.full + '/' + s.churches + '곳</small></div>' +
+        '<div class="dsc-body">' +
+        '<div class="dsc-labels"><span><strong>납부 ' + manwon(s.paid) + '원</strong> · ' + s.pct + '%</span>' +
+        '<span>연간 목표 ' + manwon(s.yearPlan) + '원</span></div>' +
+        '<div class="dsc-track" title="' + e(s.sc) + ': 연간 목표 ' + manwon(s.yearPlan) + '원 중 ' + manwon(s.paid) + '원 납부">' +
+        '<div class="dsc-bar" style="width:' + s.pct + '%"></div>' +
+        (el < 12 ? '<div class="dsc-due" style="left:' + s.duePos + '%" title="' + upto + ' 부과액 ' + manwon(s.dueSoFar) + '원"></div>' : '') +
+        '</div>' +
+        (el < 12
+          ? '<div class="dsc-sub">' + upto + ' 부과 ' + manwon(s.dueSoFar) + '원 중 ' + manwon(s.paidDue) + '원 납부 (' + s.pctDue + '%)' +
+            (s.prepaid ? ' · 다음 달 이후분 선납 ' + manwon(s.prepaid) + '원' : '') + '</div>'
+          : '') +
+        '</div></div>';
     });
     return h + '</div>';
   }
@@ -1362,17 +1384,24 @@ document.addEventListener('DOMContentLoaded', function () {
           '교회 ' + duesRates.length + '곳 · 월 부과액 ' + manwon(totalMonthly) + '원 · ' +
           '연간 납부액 ' + manwon(paidSum) + '원 · ' + (dateLabel || '출력일') + ' ' +
           new Date().toISOString().slice(0, 10) + '</p>';
-        /* 시찰별 진행 그래프 */
+        /* 시찰별 목표 대비 납부 그래프 */
         var elP = duesElapsed();
+        var uptoP = DUES_MONTHS[elP - 1] + '월까지';
         pg += '<div style="border:1px solid #ccc;border-radius:6px;padding:8px 10px;margin:0 0 10px">' +
-          '<p style="font-size:11px;font-weight:700;margin:0 0 6px">시찰별 진행 상황 (회기 4월 시작 · ' + elP + '개월 경과 기준)</p>';
+          '<p style="font-size:11px;font-weight:700;margin:0 0 6px">시찰별 목표 대비 납부 ' +
+          '<span style="font-weight:400;color:#666">(연간 목표 = 월 부과액 × 12개월' +
+          (elP < 12 ? ' · 세로 눈금은 ' + uptoP + ' 부과액' : '') + ')</span></p>';
         sichalStats().forEach(function (s) {
-          pg += '<div style="display:flex;align-items:center;gap:8px;margin:3px 0">' +
+          pg += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0">' +
             '<span style="font-size:10px;width:60px;flex:none">' + e(s.sc) + '</span>' +
-            '<span style="flex:1;height:10px;background:#eee;border-radius:5px;overflow:hidden;display:block">' +
-            '<span style="display:block;height:100%;width:' + s.pct + '%;background:#c0392b"></span></span>' +
-            '<span style="font-size:10px;width:180px;flex:none;text-align:right">' +
-            s.pct + '% · 완납 ' + s.full + '/' + s.churches + '곳 · ' + manwon(s.paid) + '/' + manwon(s.expected) + '원</span>' +
+            '<span style="flex:1;height:10px;background:#eee;border-radius:5px;display:block;position:relative">' +
+            '<span style="display:block;height:100%;width:' + s.pct + '%;background:#c0392b;border-radius:5px"></span>' +
+            (elP < 12 ? '<span style="position:absolute;top:-2px;bottom:-2px;left:' + s.duePos + '%;width:2px;margin-left:-1px;background:#1f2a44"></span>' : '') +
+            '</span>' +
+            '<span style="font-size:10px;width:280px;flex:none;text-align:right">' +
+            '납부 ' + manwon(s.paid) + ' / 목표 ' + manwon(s.yearPlan) + '원 · ' + s.pct + '%' +
+            (elP < 12 ? ' · ' + uptoP + ' 부과분 ' + s.pctDue + '%' : '') +
+            ' · 완납 ' + s.full + '/' + s.churches + '곳</span>' +
             '</div>';
         });
         pg += '</div>';

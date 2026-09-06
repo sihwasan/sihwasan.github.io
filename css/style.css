@@ -1767,16 +1767,27 @@ input.dp-bad { border-color: var(--red); }
 }
 .dues-sc-chart .dsc-title { font-weight: 700; margin-bottom: 10px; }
 .dues-sc-chart .dsc-title span { font-weight: 400; font-size: 0.8rem; color: var(--gray-5); }
-.dues-sc-chart .dsc-row { display: flex; align-items: center; gap: 12px; margin: 7px 0; }
+.dues-sc-chart .dsc-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
 .dues-sc-chart .dsc-name { width: 70px; flex: none; font-size: 0.85rem; color: var(--gray-7); }
+.dues-sc-chart .dsc-name small { display: block; font-size: 0.72rem; color: var(--gray-5); }
+.dues-sc-chart .dsc-body { flex: 1; min-width: 0; }
+.dues-sc-chart .dsc-labels {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 0.76rem; color: var(--gray-5); margin-bottom: 3px;
+}
+.dues-sc-chart .dsc-labels strong { color: var(--ink); }
 .dues-sc-chart .dsc-track {
-  flex: 1; height: 14px; background: var(--gray-1); border-radius: 7px; overflow: hidden;
+  position: relative; height: 14px; background: var(--gray-1); border-radius: 7px; overflow: visible;
 }
 .dues-sc-chart .dsc-bar {
   height: 100%; border-radius: 7px; transition: width .3s;
   background: linear-gradient(90deg, #c0392b, #e74c3c);
 }
-.dues-sc-chart .dsc-val { width: 150px; flex: none; font-size: 0.8rem; color: var(--gray-7); text-align: right; }
+.dues-sc-chart .dsc-due {
+  position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px;
+  background: var(--navy); border-radius: 1px;
+}
+.dues-sc-chart .dsc-sub { font-size: 0.72rem; color: var(--gray-5); margin-top: 3px; }
 
 /* 완납/미납 필터와 검색 */
 .dues-filter { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 16px 0 4px; }
