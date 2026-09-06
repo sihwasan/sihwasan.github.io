@@ -23,6 +23,10 @@
  * 상회비·세례의무금 납부가 수입으로 저절로 적히고, <상비부 배정> 지출은
  * 그 상비부 장부에 수입으로 함께 적힌다. (74_presbytery_ledger.sql)
  *
+ * 항목마다 영수증 사진을 붙일 수 있다. 휴대전화로 찍어 올리면 긴 변 1600px
+ * jpg로 줄여 비공개 보관함(receipts)에 담고, 항목의 <영수증> 단추를 누르면
+ * 크게 본다. 그 장부를 볼 수 있는 사람만 꺼내 볼 수 있다. (75_ledger_receipts.sql)
+ *
  * 적을 수 있는 사람은 화면이 짐작하지 않고 데이터베이스에 물어본다.
  *   is_ledger_owner(종류, 이름)
  *     상비부 : 부장·서기·회계
@@ -37,6 +41,29 @@ var SHSLedger = (function () {
   function esc(s) { return SHS.esc(s); }
   function won(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
   function kindOf(k) { return ['committee', 'sichal', 'presbytery'].indexOf(k) >= 0 ? k : 'sichal'; }
+
+  /* 영수증 사진을 긴 변 1600px 이하 jpg로 줄인다 (글자가 읽히는 크기, 파일은 작게) */
+  function shrinkImage(f) {
+    return new Promise(function (resolve, reject) {
+      if (!/^image\//.test(f.type)) { reject(new Error('이미지 파일만 올릴 수 있습니다.')); return; }
+      var img = new Image();
+      var url = URL.createObjectURL(f);
+      img.onload = function () {
+        var MAX = 1600;
+        var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        var cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.naturalWidth * sc));
+        cv.height = Math.max(1, Math.round(img.naturalHeight * sc));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        cv.toBlob(function (b) {
+          if (b) resolve(b); else reject(new Error('사진을 변환하지 못했습니다.'));
+        }, 'image/jpeg', 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진 파일을 읽지 못했습니다.')); };
+      img.src = url;
+    });
+  }
 
   /* 다른 곳에서 저절로 적힌 항목인지 — 표시말과 어디서 관리하는지 */
   function linkInfo(x) {
@@ -55,6 +82,8 @@ var SHSLedger = (function () {
     var cats = { '수입': [], '지출': [] };   /* 과목 목록 (ledger_categories) */
     var catRows = [];
     var books = [], book = null, entries = [];
+    var receipts = {};        /* 항목 번호 → 영수증 목록 */
+    var upTarget = null;      /* 줄의 <올리기>를 눌렀을 때 어느 항목에 붙일지 */
     /* 항목 목록 — 기본 항목에 더해, 직접 적어 저장한 항목이 저절로 등재된다 */
     var CAT_BASE = {
       '수입': ['회비', '찬조', '노회 지원금', '이자', '기타'],
@@ -117,7 +146,11 @@ var SHSLedger = (function () {
                         .eq('owner_kind', ownerKind).eq('owner', opts.owner)
                         .order('sort').order('id')
                         .then(function (x) { return x; }, function () { return { data: [] }; })
-                    : Promise.resolve({ data: [] })
+                    : Promise.resolve({ data: [] }),
+            /* 이 장부의 영수증 (표가 아직 없으면 빈 목록) */
+            book ? c.from('ledger_receipts').select('*').eq('book_id', book.id).order('id')
+                    .then(function (x) { return x.error ? { data: [] } : x; }, function () { return { data: [] }; })
+                 : Promise.resolve({ data: [] })
           ]);
         }).then(function (rs) {
           entries = (rs[0] && rs[0].data) || [];
@@ -127,6 +160,10 @@ var SHSLedger = (function () {
             if (cats[r.kind] && cats[r.kind].indexOf(r.name) === -1) cats[r.kind].push(r.name);
           });
           KINDS.forEach(function (k) { if (!cats[k].length) cats[k] = CAT_BASE[k].slice(); });
+          receipts = {};
+          ((rs[3] && rs[3].data) || []).forEach(function (r) {
+            (receipts[r.entry_id] = receipts[r.entry_id] || []).push(r);
+          });
           catUsed = { '수입': [], '지출': [] };
           ((rs[1] && rs[1].data) || []).forEach(function (x) {
             var k = x.kind === '수입' ? '수입' : '지출';
@@ -260,6 +297,7 @@ var SHSLedger = (function () {
           '<th style="width:140px">교회</th>' +
           '<th>' + (useCats ? '적요' : '항목') + '</th>' +
           '<th style="width:140px">금액 (원)</th><th style="width:200px">비고</th>' +
+          '<th style="width:92px">영수증</th>' +
           (canWrite ? '<th style="width:110px">관리</th>' : '') + '</tr></thead><tbody>';
         shown.forEach(function (x) {
           var amt = Number(x.amount) || 0;
@@ -279,6 +317,7 @@ var SHSLedger = (function () {
             '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
             (viewKind === '수입' ? '+' : '−') + won(amt) + '</td>' +
             '<td class="left">' + (x.note ? esc(x.note) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td>' + receiptCell(x, ln, canWrite) + '</td>' +
             (canWrite
               ? (ln
                   /* 연동 항목은 원본(납부 현황·노회 장부)에서 고치면 함께 바뀐다 */
@@ -291,17 +330,20 @@ var SHSLedger = (function () {
         h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td>합계</td>' +
           (useCats ? '<td></td>' : '') + '<td></td><td></td>' +
           '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
-          (viewKind === '수입' ? '+' : '−') + won(shownSum) + '</td><td></td>' +
+          (viewKind === '수입' ? '+' : '−') + won(shownSum) + '</td><td></td><td></td>' +
           (canWrite ? '<td></td>' : '') + '</tr>';
         h += '</tbody></table>';
       }
 
       h += '<div id="lg-audit" style="margin-top:16px">' +
         SHSAuditMark.panel(book, { isAuditor: opts.isAuditor }) + '</div>';
+      /* 줄의 <올리기>가 쓰는 숨은 파일 입력 (카메라나 사진첩이 열린다) */
+      if (canWrite) h += '<input type="file" id="lg-upfile" accept="image/*" class="hidden">';
 
       box.innerHTML = h;
       bindYear();
       bindTabs();
+      bindReceipts(canWrite);
       if (canWrite) { bindOpening(); bindEntryForm(); bindEntryList(); if (useCats) bindCats(); }
 
       /* 마감 취소 — 잘못 마감했을 때 임원이 되돌린다 */
@@ -460,11 +502,158 @@ var SHSLedger = (function () {
         '<input type="number" id="lg-amt" min="0" step="1"></div>' +
         '</div>' +
         '<div class="field"><label>비고 (선택)</label><input type="text" id="lg-note"></div>' +
+        '<div class="field"><label>영수증 사진 (선택 · 휴대전화에서는 바로 찍을 수 있습니다)</label>' +
+        '<input type="file" id="lg-file" accept="image/*">' +
+        '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:3px">저장하면 사진이 함께 올라가고, ' +
+        '줄의 <strong>영수증</strong> 단추로 언제든 다시 볼 수 있습니다. 한 항목에 여러 장을 붙일 수 있습니다.</div></div>' +
         '<button class="btn" id="lg-save">저장</button> ' +
         '<button class="btn ghost hidden" id="lg-cancel">취소</button>' +
         '<div class="form-msg" id="lg-msg"></div>' +
         (useCats ? catManager() : '') +
         '</div>';
+    }
+
+    /* ================= 영수증 ================= */
+    function receiptCell(x, ln, canWrite) {
+      var list = receipts[x.id] || [];
+      var h = '';
+      if (list.length) {
+        h += '<button type="button" class="btn ghost sm" data-lgrc="' + x.id + '" title="영수증 보기">' +
+          '&#128206; ' + list.length + '장</button>';
+      }
+      if (canWrite && !ln) {
+        h += (h ? ' ' : '') + '<button type="button" class="btn ghost sm" data-lgup="' + x.id + '" ' +
+          'title="영수증 사진 올리기" style="padding-left:6px;padding-right:6px">+</button>';
+      }
+      return h || '<span style="color:var(--gray-5)">-</span>';
+    }
+
+    /* 사진 한 장을 줄여서 보관함에 올리고 영수증 표에 적는다 */
+    function uploadReceipt(entryId, f) {
+      var path = book.id + '/' + entryId + '/' + Date.now() + '-' +
+        Math.random().toString(36).slice(2, 8) + '.jpg';
+      var size = 0;
+      return shrinkImage(f).then(function (blob) {
+        size = blob.size;
+        return SHSCloud.init().then(function (c) {
+          return c.storage.from('receipts')
+            .upload(path, blob, { upsert: false, contentType: 'image/jpeg' })
+            .then(function (r) {
+              if (r.error) throw r.error;
+              return c.from('ledger_receipts').insert({
+                entry_id: entryId, book_id: book.id, file_path: path,
+                file_name: f.name || null, file_size: size, created_by: opts.user.name
+              }).select();
+            });
+        });
+      }).then(function (r) {
+        var w = SHS.wrote(r);
+        if (!w.ok) throw new Error(w.why);
+        SHSCloud.log('create', '영수증 등록', opts.owner + ' ' + year + '년 / 항목 ' + entryId);
+      });
+    }
+
+    /* 항목에 붙은 영수증 파일을 보관함에서 지운다 (항목 삭제 전에 부른다) */
+    function removeReceiptFiles(entryId) {
+      var list = receipts[entryId] || [];
+      if (!list.length) return Promise.resolve();
+      return SHSCloud.init().then(function (c) {
+        return c.storage.from('receipts').remove(list.map(function (r) { return r.file_path; }));
+      }).then(function () {}, function () {});
+    }
+
+    /* 크게 보기 — 한 항목의 영수증을 차례로 넘겨 본다 */
+    var lb = null, lbList = [], lbAt = 0, lbEntry = null, lbCanWrite = false;
+    function lightbox() {
+      if (lb) return lb;
+      lb = document.createElement('div');
+      lb.className = 'lightbox';
+      lb.id = 'lg-lb';
+      lb.innerHTML =
+        '<button class="lb-close" id="lg-lb-close" aria-label="닫기">&times;</button>' +
+        '<button class="lb-nav prev" id="lg-lb-prev" aria-label="이전">&#8249;</button>' +
+        '<img id="lg-lb-img" src="" alt="영수증">' +
+        '<button class="lb-nav next" id="lg-lb-next" aria-label="다음">&#8250;</button>' +
+        '<div class="lb-cap" id="lg-lb-cap"></div>' +
+        '<div class="lb-tools" id="lg-lb-tools"><button id="lg-lb-del" class="danger">이 영수증 지우기</button></div>';
+      document.body.appendChild(lb);
+      lb.querySelector('#lg-lb-close').addEventListener('click', closeLb);
+      lb.addEventListener('click', function (ev) { if (ev.target === lb) closeLb(); });
+      lb.querySelector('#lg-lb-prev').addEventListener('click', function () { showLb(lbAt - 1); });
+      lb.querySelector('#lg-lb-next').addEventListener('click', function () { showLb(lbAt + 1); });
+      lb.querySelector('#lg-lb-del').addEventListener('click', function () {
+        var r = lbList[lbAt];
+        if (!r) return;
+        if (!confirm('이 영수증 사진을 지우시겠습니까?')) return;
+        SHSCloud.init().then(function (c) {
+          return c.storage.from('receipts').remove([r.file_path]).then(function () {
+            return c.from('ledger_receipts').delete().eq('id', r.id);
+          });
+        }).then(function (res) {
+          if (res.error) { alert(res.error.message); return; }
+          SHSCloud.log('delete', '영수증 삭제', opts.owner + ' ' + year + '년 / 항목 ' + lbEntry);
+          closeLb();
+          load();
+        });
+      });
+      document.addEventListener('keydown', function (ev) {
+        if (!lb.classList.contains('open')) return;
+        if (ev.key === 'Escape') closeLb();
+        if (ev.key === 'ArrowLeft') showLb(lbAt - 1);
+        if (ev.key === 'ArrowRight') showLb(lbAt + 1);
+      });
+      return lb;
+    }
+    function closeLb() { if (lb) { lb.classList.remove('open'); lb.querySelector('#lg-lb-img').src = ''; } }
+    function showLb(i) {
+      if (!lbList.length) return;
+      lbAt = (i + lbList.length) % lbList.length;
+      var r = lbList[lbAt];
+      var img = lb.querySelector('#lg-lb-img');
+      var cap = lb.querySelector('#lg-lb-cap');
+      var x = findEntry(lbEntry) || {};
+      cap.textContent = (x.title || '') + (x.amount != null ? ' · ' + won(x.amount) + '원' : '') +
+        ' — 영수증 ' + (lbAt + 1) + '/' + lbList.length +
+        (r.file_name ? ' · ' + r.file_name : '') +
+        (r.created_by ? ' · ' + r.created_by : '');
+      lb.querySelector('#lg-lb-prev').classList.toggle('hidden', lbList.length < 2);
+      lb.querySelector('#lg-lb-next').classList.toggle('hidden', lbList.length < 2);
+      lb.querySelector('#lg-lb-tools').classList.toggle('hidden', !lbCanWrite);
+      img.src = '';
+      SHSCloud.init().then(function (c) {
+        return c.storage.from('receipts').createSignedUrl(r.file_path, 600);
+      }).then(function (res) {
+        if (res.error || !res.data) { cap.textContent += ' (사진을 불러오지 못했습니다)'; return; }
+        img.src = res.data.signedUrl;
+      });
+    }
+    function openReceipts(entryId, canWrite) {
+      lbList = receipts[entryId] || [];
+      if (!lbList.length) return;
+      lbEntry = entryId; lbCanWrite = canWrite;
+      lightbox().classList.add('open');
+      showLb(0);
+    }
+
+    function bindReceipts(canWrite) {
+      box.querySelectorAll('button[data-lgrc]').forEach(function (b) {
+        b.addEventListener('click', function () { openReceipts(b.dataset.lgrc, canWrite); });
+      });
+      var up = document.getElementById('lg-upfile');
+      if (!up) return;
+      box.querySelectorAll('button[data-lgup]').forEach(function (b) {
+        b.addEventListener('click', function () { upTarget = b.dataset.lgup; up.value = ''; up.click(); });
+      });
+      up.addEventListener('change', function () {
+        var f = up.files && up.files[0];
+        if (!f || !upTarget) return;
+        var b2 = box.querySelector('button[data-lgup="' + upTarget + '"]');
+        if (b2) { b2.disabled = true; b2.textContent = '올리는 중…'; }
+        uploadReceipt(upTarget, f).then(load, function (err) {
+          alert((err && err.message) || '영수증을 올리지 못했습니다.');
+          load();
+        });
+      });
     }
 
     /* 과목 더하기·지우기 — 접어 두었다가 필요할 때 연다 */
@@ -568,6 +757,8 @@ var SHSLedger = (function () {
         if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '항목을 적어 주세요.'; return; }
         if (d.amount < 0) { msg.className = 'form-msg err'; msg.textContent = '금액은 0원 이상이어야 합니다.'; return; }
         if (!id) d.created_by = opts.user.name;
+        var fileEl = document.getElementById('lg-file');
+        var file = fileEl && fileEl.files && fileEl.files[0];
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
         SHSCloud.init().then(function (c) {
           return id ? c.from('ledger_entries').update(d).eq('id', id).select()
@@ -577,7 +768,14 @@ var SHSLedger = (function () {
           if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
           SHSCloud.log(id ? 'update' : 'create', '회계 ' + d.kind + ' ' + (id ? '수정' : '등록'),
             opts.owner + ' ' + year + '년 / ' + d.title + ' ' + won(d.amount) + '원');
-          load();
+          var savedId = id || (r.data && r.data[0] && r.data[0].id);
+          if (!file || !savedId) { load(); return; }
+          /* 항목은 저장되었고, 이어서 영수증 사진을 올린다 */
+          msg.textContent = '항목은 저장되었습니다. 영수증 사진을 올리는 중입니다...';
+          uploadReceipt(savedId, file).then(load, function (err) {
+            alert('항목은 저장되었지만 영수증을 올리지 못했습니다: ' + ((err && err.message) || ''));
+            load();
+          });
         });
       });
     }
@@ -611,8 +809,12 @@ var SHSLedger = (function () {
         b.addEventListener('click', function () {
           var x = findEntry(b.dataset.lgdel);
           if (!x) return;
-          if (!confirm('"' + x.title + '" (' + won(x.amount) + '원) 항목을 지우시겠습니까?')) return;
-          SHSCloud.init().then(function (c) {
+          var nrc = (receipts[x.id] || []).length;
+          if (!confirm('"' + x.title + '" (' + won(x.amount) + '원) 항목을 지우시겠습니까?' +
+                       (nrc ? '\n붙어 있는 영수증 ' + nrc + '장도 함께 지워집니다.' : ''))) return;
+          removeReceiptFiles(x.id).then(function () {
+            return SHSCloud.init();
+          }).then(function (c) {
             return c.from('ledger_entries').delete().eq('id', x.id);
           }).then(function (r) {
             if (r.error) { alert(r.error.message); return; }
