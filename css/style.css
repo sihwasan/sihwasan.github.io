@@ -1824,6 +1824,10 @@ input.dp-bad { border-color: var(--red); }
 td.lg-dropcell.over { outline: 2px dashed var(--navy); outline-offset: -2px; background: #f4f1ea; }
 
 /* 회계 장부 — 받는 사람 칩, 회원 일괄 선택 창 */
+.lg-ocr { font-size: 0.84rem; margin-top: 6px; }
+.lg-ocr:empty { display: none; }
+.lg-ocr.ok { color: var(--navy); }
+.lg-ocr.err { color: #a33; }
 .lg-chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .lg-chips:empty { display: none; }
 .lg-chips span { font-size: 0.8rem; background: var(--gray-1); border-radius: 999px; padding: 3px 10px; }

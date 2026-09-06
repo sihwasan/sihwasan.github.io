@@ -57,6 +57,53 @@ var SHSLedger = (function () {
     return pdfLoading;
   }
 
+  /* ---------- 영수증 자동 읽기 (cloudflare/receipts → Claude) ----------
+   * 창구 주소가 없으면 조용히 건너뛴다. 읽은 값은 입력칸에 미리 채우고,
+   * 저장은 언제나 회계가 확인한 뒤에 한다. */
+  function ocrBase() { return (window.SHS_RECEIPTS && SHS_RECEIPTS.base) || ''; }
+  function ocrEnabled() { return !!ocrBase(); }
+  function blobToBase64(blob) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(String(fr.result).split(',')[1] || ''); };
+      fr.onerror = function () { reject(new Error('사진을 읽지 못했습니다.')); };
+      fr.readAsDataURL(blob);
+    });
+  }
+  function ocrToken() {
+    return SHSCloud.init().then(function (c) {
+      return c.auth.getSession().then(function (r) {
+        return (r && r.data && r.data.session && r.data.session.access_token) || null;
+      });
+    }).catch(function () { return null; });
+  }
+  /* 줄인 사진(jpg)을 창구에 보내 {taken_on, vendor, amount, items, payment, confidence, note} 를 받는다 */
+  function readReceipt(blob, bookId) {
+    if (!ocrEnabled() || !bookId) return Promise.resolve(null);
+    return Promise.all([blobToBase64(blob), ocrToken()]).then(function (xs) {
+      if (!xs[1]) throw new Error('로그인이 확인되지 않았습니다.');
+      return fetch(ocrBase() + '/read', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + xs[1], 'Content-Type': 'application/json' },
+        body: JSON.stringify({ book_id: bookId, media_type: 'image/jpeg', image: xs[0] })
+      });
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok || !d.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+        return d.result || null;
+      });
+    });
+  }
+  function ocrSummary(o) {
+    if (!o) return '';
+    var parts = [];
+    if (o.taken_on) parts.push(o.taken_on);
+    if (o.vendor) parts.push(o.vendor);
+    if (o.amount != null) parts.push(won(o.amount) + '원');
+    if (o.payment) parts.push(o.payment);
+    return parts.join(' · ');
+  }
+
   /* 보관함의 영수증 사진을 문서 안에 넣을 수 있는 글자(data URL)로 바꾼다 */
   function fetchDataUrl(url) {
     return fetch(url).then(function (r) {
@@ -636,7 +683,10 @@ var SHSLedger = (function () {
         '<div id="lg-drop-text">여기에 영수증 사진을 <strong>끌어다 놓거나</strong> 눌러서 고르세요 ' +
         '<span style="color:var(--gray-5)">(휴대전화에서는 바로 찍을 수 있습니다 · 여러 장 가능)</span></div>' +
         '<div class="lg-drop-list" id="lg-drop-list"></div></div>' +
-        '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:3px">저장하면 사진이 함께 올라가고, ' +
+        '<div id="lg-ocr" class="lg-ocr"></div>' +
+        '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:3px">' +
+        (ocrEnabled() ? '사진을 놓으면 일자·사용처·금액을 자동으로 읽어 미리 채웁니다(확인 후 저장). ' : '') +
+        '저장하면 사진이 함께 올라가고, ' +
         '줄의 <strong>영수증</strong> 단추로 언제든 다시 볼 수 있습니다. ' +
         '이미 적은 줄에는 영수증 칸에 사진을 바로 끌어다 놓아도 됩니다.</div></div>' +
         (viewKind === '지출' ? payeeForm() : '') +
@@ -1065,23 +1115,37 @@ var SHSLedger = (function () {
       return h || '<span style="color:var(--gray-5)">-</span>';
     }
 
-    /* 사진 한 장을 줄여서 보관함에 올리고 영수증 표에 적는다 */
+    /* 사진 한 장을 줄여서 보관함에 올리고 영수증 표에 적는다.
+     * 자동 읽기가 켜져 있으면 읽은 일자·사용처·금액도 함께 적어 둔다. */
     function uploadReceipt(entryId, f) {
       var path = book.id + '/' + entryId + '/' + Date.now() + '-' +
         Math.random().toString(36).slice(2, 8) + '.jpg';
-      var size = 0;
+      var size = 0, ocr = f.__ocr || null;
       return shrinkImage(f).then(function (blob) {
         size = blob.size;
-        return SHSCloud.init().then(function (c) {
-          return c.storage.from('receipts')
-            .upload(path, blob, { upsert: false, contentType: 'image/jpeg' })
-            .then(function (r) {
-              if (r.error) throw r.error;
-              return c.from('ledger_receipts').insert({
-                entry_id: entryId, book_id: book.id, file_path: path,
-                file_name: f.name || null, file_size: size, created_by: opts.user.name
-              }).select();
-            });
+        /* 입력칸에서 미리 읽어 둔 것이 없으면 여기서 읽는다 (실패해도 올리기는 계속) */
+        var p = (ocr || f.__ocrTried) ? Promise.resolve(ocr)
+              : readReceipt(blob, book.id).then(function (o) { return o; }, function () { return null; });
+        return p.then(function (o) {
+          ocr = o;
+          return SHSCloud.init().then(function (c) {
+            return c.storage.from('receipts')
+              .upload(path, blob, { upsert: false, contentType: 'image/jpeg' })
+              .then(function (r) {
+                if (r.error) throw r.error;
+                var row = {
+                  entry_id: entryId, book_id: book.id, file_path: path,
+                  file_name: f.name || null, file_size: size, created_by: opts.user.name
+                };
+                if (ocr) {
+                  row.taken_on = /^\d{4}-\d{2}-\d{2}$/.test(String(ocr.taken_on || '')) ? ocr.taken_on : null;
+                  row.vendor = ocr.vendor || null;
+                  row.amount = ocr.amount != null ? Math.round(Number(ocr.amount)) : null;
+                  row.ocr = ocr;
+                }
+                return c.from('ledger_receipts').insert(row).select();
+              });
+          });
         });
       }).then(function (r) {
         var w = SHS.wrote(r);
@@ -1121,10 +1185,49 @@ var SHSLedger = (function () {
       });
     }
     function addPending(files) {
+      var added = [];
       Array.prototype.slice.call(files || []).forEach(function (f) {
-        if (/^image\//.test(f.type)) pendingFiles.push(f);
+        if (/^image\//.test(f.type)) { pendingFiles.push(f); added.push(f); }
       });
       renderPending();
+      if (ocrEnabled() && book && added.length) prefillFromReceipt(added[0]);
+    }
+
+    /* 자동 읽기 — 첫 사진을 읽어 비어 있는 일자·적요(사용처)·금액을 채운다.
+     * 이미 적은 값은 건드리지 않고, 읽은 내용을 보여 주어 회계가 확인하게 한다. */
+    function prefillFromReceipt(f) {
+      var info = document.getElementById('lg-ocr');
+      if (!info) return;
+      info.className = 'lg-ocr';
+      info.innerHTML = '영수증을 읽는 중입니다… <small>(몇 초 걸립니다)</small>';
+      shrinkImage(f).then(function (blob) {
+        return readReceipt(blob, book.id);
+      }).then(function (o) {
+        f.__ocrTried = true;
+        if (!o) { info.innerHTML = ''; return; }
+        f.__ocr = o;
+        var filled = [];
+        var dEl = document.getElementById('lg-date');
+        var tEl = document.getElementById('lg-title');
+        var aEl = document.getElementById('lg-amt');
+        var today = new Date().toISOString().slice(0, 10);
+        if (dEl && /^\d{4}-\d{2}-\d{2}$/.test(String(o.taken_on || '')) &&
+            (!dEl.value || dEl.value === today)) { dEl.value = o.taken_on; filled.push('일자'); }
+        if (tEl && o.vendor && !tEl.value.trim()) { tEl.value = o.vendor; filled.push(useCats ? '적요' : '항목'); }
+        if (aEl && o.amount != null && !aEl.value) { aEl.value = Math.round(Number(o.amount)); filled.push('금액'); }
+        info.className = 'lg-ocr ok';
+        info.innerHTML = '<strong>영수증에서 읽음</strong> ' + esc(ocrSummary(o)) +
+          (o.items && o.items.length
+            ? ' <small style="color:var(--gray-5)">· 품목 ' + o.items.slice(0, 4).map(function (it) { return esc(it.name); }).join(', ') +
+              (o.items.length > 4 ? ' 외 ' + (o.items.length - 4) : '') + '</small>' : '') +
+          (filled.length ? '<br><small>' + filled.join('·') + ' 칸을 채웠습니다. 맞는지 확인한 뒤 저장해 주세요.</small>' : '') +
+          (o.confidence === 'low' || o.note
+            ? '<br><small style="color:#b0731f">' + (o.confidence === 'low' ? '확신이 낮습니다. ' : '') + esc(o.note || '') + '</small>' : '');
+      }).catch(function (err) {
+        f.__ocrTried = true;
+        info.className = 'lg-ocr err';
+        info.innerHTML = '자동 읽기를 하지 못했습니다: ' + esc((err && err.message) || '') + ' <small>(사진은 그대로 올라갑니다)</small>';
+      });
     }
     function bindDrop() {
       var zone = document.getElementById('lg-drop');
@@ -1214,7 +1317,9 @@ var SHSLedger = (function () {
       cap.textContent = (x.title || '') + (x.amount != null ? ' · ' + won(x.amount) + '원' : '') +
         ' — 영수증 ' + (lbAt + 1) + '/' + lbList.length +
         (r.file_name ? ' · ' + r.file_name : '') +
-        (r.created_by ? ' · ' + r.created_by : '');
+        (r.created_by ? ' · ' + r.created_by : '') +
+        ((r.taken_on || r.vendor || r.amount != null)
+          ? ' | 읽은 내용: ' + ocrSummary({ taken_on: r.taken_on, vendor: r.vendor, amount: r.amount }) : '');
       lb.querySelector('#lg-lb-prev').classList.toggle('hidden', lbList.length < 2);
       lb.querySelector('#lg-lb-next').classList.toggle('hidden', lbList.length < 2);
       lb.querySelector('#lg-lb-tools').classList.toggle('hidden', !lbCanWrite);
