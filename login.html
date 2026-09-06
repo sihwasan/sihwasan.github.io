@@ -200,10 +200,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         c.auth.signInWithPassword({ email: id, password: pw }).then(function (r) {
           if (r.error) {
+            var em = String(r.error.message || '');
             msg.className = 'form-msg err';
-            msg.textContent = (r.error.message || '').indexOf('Invalid') !== -1
-              ? '이메일 또는 비밀번호가 올바르지 않습니다.'
-              : r.error.message;
+            if (em.indexOf('Invalid') !== -1) {
+              msg.textContent = '이메일 또는 비밀번호가 올바르지 않습니다.';
+            } else if (em.toLowerCase().indexOf('not confirmed') !== -1) {
+              /* 예전에 메일 확인을 켜 두었던 때 가입한 계정 */
+              msg.textContent = '메일 확인이 끝나지 않은 계정입니다. ' +
+                '노회 사무실(031-486-9993)로 알려 주시면 바로 열어 드립니다.';
+            } else {
+              msg.textContent = em;
+            }
             return;
           }
           msg.className = 'form-msg ok';
