@@ -859,15 +859,51 @@ document.addEventListener('DOMContentLoaded', function () {
                duePos: yearPlan ? Math.min(100, Math.round(dueSoFar / yearPlan * 1000) / 10) : 0 };
     }).filter(Boolean);
   }
+  /* 도넛: 연간 목표액(월 부과액 × 12) 기준 시찰별 비중 — 세례의무금 화면과 같은 모양 */
+  var DUES_DCOLORS = ['#2e6db4', '#c2503a', '#3f8f5a', '#8a8175', '#d9a33b', '#6b5fa8'];
+  function duesDonutHtml(stats) {
+    var total = 0;
+    stats.forEach(function (s) { total += s.yearPlan; });
+    if (!total) return '';
+    var R = 15.9155, CIRC = 100, acc = 0, segs = '';
+    stats.forEach(function (s, i) {
+      var share = s.yearPlan / total * 100;
+      if (share <= 0) return;
+      segs += '<circle r="' + R + '" cx="21" cy="21" fill="transparent" ' +
+        'stroke="' + DUES_DCOLORS[i % DUES_DCOLORS.length] + '" stroke-width="7" ' +
+        'stroke-dasharray="' + share.toFixed(2) + ' ' + (CIRC - share).toFixed(2) + '" ' +
+        'stroke-dashoffset="' + (25 - acc).toFixed(2) + '" style="cursor:help">' +
+        /* 마우스를 올리면 시찰 이름과 금액이 뜬다 */
+        '<title>' + e(s.sc) + ' — 연간 목표 ' + manwon(s.yearPlan) + '원 · 납부 ' +
+        manwon(s.paid) + '원 (비중 ' + (Math.round(share * 10) / 10) + '%)</title></circle>';
+      acc += share;
+    });
+    return '<div class="dsc-donut">' +
+      '<svg width="170" height="170" viewBox="0 0 42 42" role="img" aria-label="시찰별 연간 목표액 비중">' +
+      segs +
+      '<text x="21" y="20" text-anchor="middle" style="font-size:4.6px;font-weight:700;fill:var(--navy)">연간 목표</text>' +
+      '<text x="21" y="25.5" text-anchor="middle" style="font-size:3.4px;fill:#6b7382">시찰별 비중</text>' +
+      '</svg>' +
+      '<div class="dsc-legend">' +
+      stats.map(function (s, i) {
+        var share = Math.round(s.yearPlan / total * 1000) / 10;
+        return '<div><i style="background:' + DUES_DCOLORS[i % DUES_DCOLORS.length] + '"></i>' +
+          e(s.sc) + ' <strong>' + share + '%</strong> <em>(' + manwon(s.yearPlan) + '원)</em></div>';
+      }).join('') +
+      '</div></div>';
+  }
+
   /* 시찰별 목표 대비 납부 그래프 (화면용)
    * 막대 전체 = 연간 목표액, 붉게 채운 부분 = 올해 납부액, 세로 눈금 = 이번 달까지 부과액 */
   function sichalChartHtml() {
     var el = duesElapsed();
     var upto = DUES_MONTHS[el - 1] + '월까지';
+    var stats = sichalStats();
     var h = '<div class="dues-sc-chart">' +
       '<div class="dsc-title">시찰별 목표 대비 납부 <span>(연간 목표 = 월 부과액 × 12개월' +
-      (el < 12 ? ' · 세로 눈금은 ' + upto + ' 부과액' : '') + ')</span></div>';
-    sichalStats().forEach(function (s) {
+      (el < 12 ? ' · 세로 눈금은 ' + upto + ' 부과액' : '') + ')</span></div>' +
+      '<div class="dsc-wrap"><div class="dsc-bars">';
+    stats.forEach(function (s) {
       h += '<div class="dsc-row">' +
         '<div class="dsc-name">' + e(s.sc) + '<small>완납 ' + s.full + '/' + s.churches + '곳</small></div>' +
         '<div class="dsc-body">' +
@@ -883,7 +919,7 @@ document.addEventListener('DOMContentLoaded', function () {
           : '') +
         '</div></div>';
     });
-    return h + '</div>';
+    return h + '</div>' + duesDonutHtml(stats) + '</div></div>';
   }
 
   function renderDues() {

@@ -696,7 +696,8 @@ var SHSBoard = (function () {
             '<span>상회비</span><span>' + pctHtml + ' <span style="color:var(--gray-5)">(' +
             wonf(di.paid) + '/' + wonf(di.plan) + '만원)</span></span></div>' +
             bar(di.pct, '#b03a3a', mo < 12 ? di.pos : null) +
-            '<div style="font-size:0.68rem;color:var(--gray-5);margin-top:2px">' + di.sub + '</div></div>';
+            '<div style="font-size:0.7rem;font-weight:600;color:var(--red,#b03a3a);margin-top:2px">' +
+            di.sub + '</div></div>';
         }
 
         /* 노회 전체 진행률 */

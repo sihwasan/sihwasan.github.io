@@ -261,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<span>상회비 <strong>' + di.pct + '%</strong> <span style="color:var(--gray-5)">(납부 ' + wonf(di.paid) + '만원)</span></span>' +
           '<span style="color:var(--gray-5)">연간 목표 ' + wonf(di.plan) + '만원</span></div>' +
           bar(di.pct, '#b03a3a', mo < 12 ? di.pos : null) +
-          '<div style="font-size:0.72rem;color:var(--gray-5);margin-top:3px">' + di.sub +
+          '<div style="font-size:0.74rem;font-weight:600;color:var(--red,#b03a3a);margin-top:3px">' + di.sub +
           (f.full != null ? ' · 완납 ' + f.full + '/' + f.n + '곳' : '') + '</div></div>' +
           '<div style="flex:1 1 220px;min-width:200px">' +
           '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--gray-6)">' +
