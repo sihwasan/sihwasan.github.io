@@ -286,8 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
         rowHtml('노회 전체', t) +
         (mineFin ? rowHtml(NAME, fin(mineFin)) : '') +
         '<p style="font-size:0.78rem;color:var(--gray-5);margin:0 0 8px">상회비 막대는 연간 목표액(월 부과액 × 12) 대비 납부액이고, ' +
-        '세로 눈금이 ' + upto + ' 부과액입니다(임원방 상회비 화면과 같은 기준). ' +
-        '세례의무금은 올해 목표금액 대비 납부율입니다.</p>' +
+        '세로 눈금이 ' + upto + ' 부과액입니다.</p>' +
         (mineFin && (isOfficer || churches.some(function (x) { return x.name === myChurch; }))
           ? '<button class="btn ghost sm" id="si-findetail">상회비·세례의무금 상세보기</button>' +
             '<div id="si-findetail-body" class="hidden" style="margin-top:10px"></div>'
