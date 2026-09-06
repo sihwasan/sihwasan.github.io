@@ -1842,7 +1842,7 @@ input.dp-bad { border-color: var(--red); }
   text-align: left; padding-left: 12px;
 }
 .dues-cell { color: var(--gray-3); }
-.dues-cell.paid { color: var(--navy); font-weight: 700; }
+.dues-cell.paid { color: #c0392b; font-weight: 700; }
 td[data-duch] { cursor: pointer; }
 td[data-duch]:hover { background: #eef2f8; }
 .dues-closed-chip {
