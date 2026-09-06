@@ -24,9 +24,9 @@
 <script src="private/resolutions.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260906b"></script>
+<script src="js/main.js?v=20260907a"></script>
 <script src="js/audit-mark.js"></script>
-<script src="js/ledger.js?v=20260907b"></script>
+<script src="js/ledger.js?v=20260907c"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 회의록 작성 안내 — 회록서기(부회록서기)에게만 보인다 (최고관리자 포함) */
   var isMinutesClerk = user.role === 'superadmin' ||
-    (user.role === 'officer' && !!user.title && user.title.indexOf('회록서기') !== -1);
+    (user.role === 'officer' && !!user.title && user.title.trim() === '회록서기');
   if (isMinutesClerk) {
     html += '<h2>회의록 작성</h2>';
     html += '<div class="dash-box"><div class="box-head">회의록 작성 안내</div>' +
@@ -193,8 +193,9 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       SHSLedger.mount(box, {
         kind: 'presbytery', owner: '노회', user: user,
+        /* 기록은 회계만, 부회계는 열람만 (데이터베이스도 같은 규칙) */
         canEdit: user.role === 'superadmin' ||
-          (user.role === 'officer' && !!user.title && user.title.indexOf('회계') !== -1),
+          (user.role === 'officer' && !!user.title && user.title.trim() === '회계'),
         isAuditor: finAuditor, committees: finCommittees, churches: finChurches
       });
     }
@@ -839,8 +840,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var duesFilter = 'all';    /* all | full | unpaid — 완납/미납 필터 */
   var duesQuery = '';        /* 교회·교역자 검색어 */
   var duesClosed = null;      /* 마감 기록. 있으면 그 해는 잠겨 있다 */
+  /* 상회비·세례의무금 기록은 관리자와 회계. 부회계는 열람만 한다. */
   var canDues = SHSAuth.canManageMembers(user) ||
-    (user.role === 'officer' && user.title && user.title.indexOf('회계') !== -1);
+    (user.role === 'officer' && !!user.title && user.title.trim() === '회계');
 
   function duesBox() { return document.getElementById('dues-area'); }
   function manwon(n) { return Number(n || 0).toLocaleString('ko-KR') + '만'; }

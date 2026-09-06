@@ -19,20 +19,30 @@
       { t: '노회 연혁', h: 'about.html#history' },
       { t: '관할지역 안내', h: 'about.html#area' },
       { t: '오시는 길', h: 'about.html#location' },
-      { t: '홈페이지 이용 안내', h: 'guide.html' }
-    ]},
-    { title: '조직', href: 'organization.html', sub: [
+      /* 조직 — 예전 <조직> 메뉴를 이 아래로 옮겼다 */
       { t: '노회 임원', h: 'organization.html#officers' },
       { t: '회원명단', h: 'organization.html#members' },
       { t: '회원교회', h: 'organization.html#churches' },
-      { t: '시찰회', h: 'organization.html#sichal' },
-      { t: '상비부', h: 'organization.html#committees' },
-      { t: '상비부 대시보드', h: 'dashboard.html' }
+      { t: '시찰회 조직', h: 'organization.html#sichal' },
+      { t: '상비부 조직', h: 'organization.html#committees' },
+      { t: '홈페이지 이용 안내', h: 'guide.html' }
     ]},
     { title: '시찰회', href: 'sichal.html?s=%EB%B6%81%EB%B6%80%EC%8B%9C%EC%B0%B0', sub: [
       { t: '북부시찰', h: 'sichal.html?s=%EB%B6%81%EB%B6%80%EC%8B%9C%EC%B0%B0' },
       { t: '남부시찰', h: 'sichal.html?s=%EB%82%A8%EB%B6%80%EC%8B%9C%EC%B0%B0' },
       { t: '상록시찰', h: 'sichal.html?s=%EC%83%81%EB%A1%9D%EC%8B%9C%EC%B0%B0' }
+    ]},
+    /* 상비부 — 부서마다 회의록·회계 장부·자료가 있는 상비부 화면으로 */
+    { title: '상비부', href: 'committee.html?c=%EA%B0%90%EC%82%AC%ED%97%8C%EC%9D%98%EB%B6%80', sub: [
+      { t: '감사헌의부', h: 'committee.html?c=%EA%B0%90%EC%82%AC%ED%97%8C%EC%9D%98%EB%B6%80' },
+      { t: '정치부', h: 'committee.html?c=%EC%A0%95%EC%B9%98%EB%B6%80' },
+      { t: '고시규칙부', h: 'committee.html?c=%EA%B3%A0%EC%8B%9C%EA%B7%9C%EC%B9%99%EB%B6%80' },
+      { t: '재정부', h: 'committee.html?c=%EC%9E%AC%EC%A0%95%EB%B6%80' },
+      { t: '교육친교부', h: 'committee.html?c=%EA%B5%90%EC%9C%A1%EC%B9%9C%EA%B5%90%EB%B6%80' },
+      { t: '전도선교부', h: 'committee.html?c=%EC%A0%84%EB%8F%84%EC%84%A0%EA%B5%90%EB%B6%80' },
+      { t: '사회복지부', h: 'committee.html?c=%EC%82%AC%ED%9A%8C%EB%B3%B5%EC%A7%80%EB%B6%80' },
+      { t: '미래교회자립위원회', h: 'committee.html?c=%EB%AF%B8%EB%9E%98%EA%B5%90%ED%9A%8C%EC%9E%90%EB%A6%BD%EC%9C%84%EC%9B%90%ED%9A%8C' },
+      { t: '상비부 대시보드', h: 'dashboard.html' }
     ]},
     { title: '회칙', href: 'rules-presbytery.html', sub: [
       { t: '노회 회칙', h: 'rules-presbytery.html' },
@@ -71,6 +81,7 @@
       { t: '임원 자료실', h: 'officer.html' },
       { t: '상회비 관리', h: 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC' },
       { t: '세례의무금 관리', h: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC' },
+      { t: '재정부 회계', h: 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84' },
       { t: '노회 회의록', h: 'minutes.html' }
     ]}
   ];
@@ -508,9 +519,9 @@
           addProceedMenu();
         }
 
-        /* 회의록 작성 매니저 — 회록서기(부회록서기)만 (최고관리자 포함) */
+        /* 회의록 작성 매니저 — 회록서기만 (부회록서기는 열람만, 최고관리자 포함) */
         if (p.role === 'superadmin' ||
-            (p.role === 'officer' && p.title && p.title.indexOf('회록서기') !== -1)) {
+            (p.role === 'officer' && p.title && p.title.trim() === '회록서기')) {
           addMinutesWriteMenu();
         }
 
@@ -615,6 +626,10 @@
         return canDo ? 'documents.html#' + key : 'request.html#' + key;
       }
       return canDo ? 'documents.html#requests' : 'request.html';
+    }
+    /* 회의비·거마비 지급 — 내 정보의 <지급 수령 확인> */
+    if (n.kind === '회계' && key.indexOf('payout-') === 0) {
+      return 'mypage.html#payouts';
     }
     /* 청원서 — 시찰 서기에게는 그 청원서의 <서류 진단>,
      * 낸 분에게는 <나의 서류>의 시찰로 보낸 청원서 */

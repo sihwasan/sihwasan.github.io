@@ -85,6 +85,10 @@ var SHSLedger = (function () {
     var receipts = {};        /* 항목 번호 → 영수증 목록 */
     var upTarget = null;      /* 줄의 <올리기>를 눌렀을 때 어느 항목에 붙일지 */
     var pendingFiles = [];    /* 입력 칸에 끌어다 놓거나 고른 사진들 — 저장할 때 함께 올라간다 */
+    var payouts = {};         /* 항목 번호 → 지급 확인(받는 사람) 목록 */
+    var members = null;       /* 노회 명단 — 받는 사람을 고를 때 처음 한 번 읽는다 */
+    var accKnown = false;     /* 계정 유무를 알 수 있었는가 (명단과 계정을 견줄 수 있을 때만) */
+    var pendingPayees = [];   /* 입력 칸에서 고른 받는 사람들 — 저장할 때 함께 적는다 */
     /* 항목 목록 — 기본 항목에 더해, 직접 적어 저장한 항목이 저절로 등재된다 */
     var CAT_BASE = {
       '수입': ['회비', '찬조', '노회 지원금', '이자', '기타'],
@@ -118,7 +122,7 @@ var SHSLedger = (function () {
 
     function load() {
       box.innerHTML = '<p style="color:var(--gray-5)">회계 장부를 불러오는 중...</p>';
-      SHSCloud.init().then(function (c) {
+      return SHSCloud.init().then(function (c) {
         return c.from('ledger_books').select('*')
                 .eq('owner_kind', ownerKind).eq('owner', opts.owner)
                 .order('year', { ascending: false });
@@ -151,6 +155,10 @@ var SHSLedger = (function () {
             /* 이 장부의 영수증 (표가 아직 없으면 빈 목록) */
             book ? c.from('ledger_receipts').select('*').eq('book_id', book.id).order('id')
                     .then(function (x) { return x.error ? { data: [] } : x; }, function () { return { data: [] }; })
+                 : Promise.resolve({ data: [] }),
+            /* 이 장부의 지급 확인 (표가 아직 없으면 빈 목록) */
+            book ? c.from('ledger_payouts').select('*').eq('book_id', book.id).order('id')
+                    .then(function (x) { return x.error ? { data: [] } : x; }, function () { return { data: [] }; })
                  : Promise.resolve({ data: [] })
           ]);
         }).then(function (rs) {
@@ -164,6 +172,10 @@ var SHSLedger = (function () {
           receipts = {};
           ((rs[3] && rs[3].data) || []).forEach(function (r) {
             (receipts[r.entry_id] = receipts[r.entry_id] || []).push(r);
+          });
+          payouts = {};
+          ((rs[4] && rs[4].data) || []).forEach(function (r) {
+            (payouts[r.entry_id] = payouts[r.entry_id] || []).push(r);
           });
           catUsed = { '수입': [], '지출': [] };
           ((rs[1] && rs[1].data) || []).forEach(function (x) {
@@ -517,11 +529,405 @@ var SHSLedger = (function () {
         '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:3px">저장하면 사진이 함께 올라가고, ' +
         '줄의 <strong>영수증</strong> 단추로 언제든 다시 볼 수 있습니다. ' +
         '이미 적은 줄에는 영수증 칸에 사진을 바로 끌어다 놓아도 됩니다.</div></div>' +
+        (viewKind === '지출' ? payeeForm() : '') +
         '<button class="btn" id="lg-save">저장</button> ' +
         '<button class="btn ghost hidden" id="lg-cancel">취소</button>' +
         '<div class="form-msg" id="lg-msg"></div>' +
         (useCats ? catManager() : '') +
         '</div>';
+    }
+
+    /* ================= 지급 확인 =================
+     * 회의비·거마비처럼 영수증이 없는 지출은 받는 사람을 적어 둔다.
+     * 계정이 있으면 알림이 가고 본인이 수령 확인을 누른다. (76_ledger_payouts.sql) */
+    function payeeForm() {
+      return '<details id="lg-payout" style="margin:4px 0 12px"' + (pendingPayees.length ? ' open' : '') + '>' +
+        '<summary style="cursor:pointer;font-size:0.9rem;color:var(--navy)">지급 확인 받기 — ' +
+        '회의비·거마비처럼 영수증이 없는 지출</summary>' +
+        '<div style="margin-top:8px">' +
+        '<div class="inline-form">' +
+        '<div class="field"><label>받는 사람 (이름을 적어 고르세요)</label>' +
+        '<input type="text" id="lg-payee" list="lg-members" placeholder="예: 김동석" autocomplete="off">' +
+        '<datalist id="lg-members"></datalist></div>' +
+        '<div class="field" style="flex:0 0 150px"><label>1인 금액 (원)</label>' +
+        '<input type="number" id="lg-payamt" min="0" step="1000"></div>' +
+        '<div class="field" style="flex:0 0 auto"><label>&nbsp;</label>' +
+        '<button type="button" class="btn ghost sm" id="lg-payadd">더하기</button> ' +
+        '<button type="button" class="btn ghost sm" id="lg-paybulk">회원 일괄 선택</button></div>' +
+        '</div>' +
+        '<div class="lg-chips" id="lg-paylist"></div>' +
+        '<p style="font-size:0.78rem;color:var(--gray-5);margin:6px 0 0">저장하면 받는 분마다 알림이 가고, 본인이 ' +
+        '<strong>수령 확인</strong>을 누르면 영수증을 대신합니다. 계정이 없는 회원은 회계가 수기로 확인 처리합니다.</p>' +
+        '</div></details>';
+    }
+
+    function memberLabel(m) { return m.name + ' (' + (m.church || '') + ')'; }
+
+    /* 노회 명단과 계정 유무 — 처음 한 번만 읽는다 */
+    function loadMembers() {
+      if (members) return Promise.resolve(members);
+      return SHSCloud.init().then(function (c) {
+        return Promise.all([
+          c.from('roster').select('id,name,church,position,category,sichal,sort')
+            .eq('active', true).order('sort').order('id'),
+          c.from('profiles').select('roster_id,name')
+            .then(function (x) { return x; }, function () { return { data: null }; })
+        ]);
+      }).then(function (rs) {
+        var acc = {}, accName = {};
+        var profs = rs[1] && !rs[1].error ? rs[1].data : null;
+        accKnown = !!profs;
+        (profs || []).forEach(function (p) {
+          if (p.roster_id) acc[p.roster_id] = 1;
+          if (p.name) accName[p.name] = 1;
+        });
+        members = ((rs[0] && rs[0].data) || []).map(function (m) {
+          return { roster_id: m.id, name: m.name, church: m.church || '', position: m.position || '',
+                   category: m.category || '', sichal: m.sichal || '',
+                   has_account: !!(acc[m.id] || accName[m.name]) };
+        });
+        return members;
+      }, function () { members = []; return members; });
+    }
+
+    /* 적은 글이 명단의 누구인지 — "이름 (교회)" 또는 이름만(한 사람일 때) */
+    function matchMember(text) {
+      var t = String(text || '').trim();
+      if (!t || !members) return null;
+      var hit = members.filter(function (m) { return memberLabel(m) === t; })[0];
+      if (hit) return hit;
+      var name = t.replace(/\s*\(.*$/, '').trim();
+      var same = members.filter(function (m) { return m.name === name; });
+      return same.length === 1 ? same[0] : null;
+    }
+
+    function fillMemberList(id) {
+      var dl = document.getElementById(id || 'lg-members');
+      if (!dl || !members) return;
+      dl.innerHTML = members.map(function (m) {
+        return '<option value="' + esc(memberLabel(m)) + '"></option>';
+      }).join('');
+    }
+
+    function addPayee(m) {
+      if (!m) return;
+      if (pendingPayees.some(function (x) { return x.roster_id === m.roster_id; })) return;
+      pendingPayees.push(m);
+      renderPayees();
+    }
+
+    function renderPayees() {
+      var list = document.getElementById('lg-paylist');
+      if (!list) return;
+      list.innerHTML = pendingPayees.map(function (m, i) {
+        return '<span>' + esc(m.name) + ' <small style="color:var(--gray-5)">' + esc(m.church) + '</small>' +
+          (accKnown && !m.has_account ? ' <small style="color:#b0731f">계정 없음</small>' : '') +
+          ' <button type="button" data-lgpd="' + i + '" title="빼기">&times;</button></span>';
+      }).join('') +
+      (pendingPayees.length
+        ? '<span style="background:none;font-weight:700">' + pendingPayees.length + '명</span>' : '');
+      list.querySelectorAll('button[data-lgpd]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          pendingPayees.splice(parseInt(b.dataset.lgpd, 10), 1);
+          renderPayees();
+        });
+      });
+    }
+
+    function bindPayees() {
+      var inp = document.getElementById('lg-payee');
+      if (!inp) return;
+      loadMembers().then(function () { fillMemberList('lg-members'); });
+      function addFromInput() {
+        var m = matchMember(inp.value);
+        if (!m) { alert('명단에서 찾지 못했습니다. 목록에서 "이름 (교회)"를 골라 주세요.'); return; }
+        addPayee(m); inp.value = ''; inp.focus();
+      }
+      document.getElementById('lg-payadd').addEventListener('click', addFromInput);
+      inp.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); addFromInput(); }
+      });
+      document.getElementById('lg-paybulk').addEventListener('click', function () {
+        openMemberPicker(function (list) { list.forEach(addPayee); });
+      });
+      renderPayees();
+    }
+
+    /* 항목을 저장한 뒤 받는 사람들을 적는다 (알림은 데이터베이스가 보낸다) */
+    function savePayees(entryId) {
+      if (!pendingPayees.length) return Promise.resolve();
+      var amtEl = document.getElementById('lg-payamt');
+      var amt = parseInt(amtEl ? amtEl.value : '0', 10) || 0;
+      var rows = pendingPayees.map(function (m) {
+        return { entry_id: entryId, book_id: book.id, roster_id: m.roster_id || null,
+                 recipient: m.name, recipient_church: m.church || null, amount: amt,
+                 created_by: opts.user.name };
+      });
+      var n = rows.length;
+      pendingPayees = [];
+      return SHSCloud.init().then(function (c) {
+        return c.from('ledger_payouts').insert(rows);
+      }).then(function (r) {
+        if (r.error) { alert('항목은 저장되었지만 지급 확인을 적지 못했습니다: ' + r.error.message); return; }
+        SHSCloud.log('create', '지급 확인 등록', opts.owner + ' ' + year + '년 / 항목 ' + entryId + ' ' + n + '명');
+      });
+    }
+
+    /* ----- 회원 일괄 선택 창 ----- */
+    var memMdl = null, memSel = {}, memDone = null;
+    function memberPicker() {
+      if (memMdl) return memMdl;
+      memMdl = document.createElement('div');
+      memMdl.className = 'mdl';
+      memMdl.id = 'lg-mem-mdl';
+      memMdl.innerHTML =
+        '<div class="mdl-box wide">' +
+        '<button class="mdl-close" id="lg-mem-close">&times;</button>' +
+        '<h2>회원 일괄 선택</h2>' +
+        '<div class="inline-form" style="margin-bottom:8px">' +
+        '<div class="field" style="flex:0 0 150px"><label>시찰</label><select id="lg-mem-sichal"><option value="">전체</option></select></div>' +
+        '<div class="field" style="flex:0 0 150px"><label>구분</label><select id="lg-mem-cat"><option value="">전체</option></select></div>' +
+        '<div class="field"><label>찾기</label><input type="text" id="lg-mem-q" placeholder="이름·교회"></div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">' +
+        '<button type="button" class="btn ghost sm" id="lg-mem-all">보이는 회원 모두 선택</button>' +
+        '<button type="button" class="btn ghost sm" id="lg-mem-none">모두 해제</button>' +
+        '<span id="lg-mem-cnt" style="font-size:0.86rem;color:var(--gray-6)"></span></div>' +
+        '<div class="lg-mem-list" id="lg-mem-list"></div>' +
+        '<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">' +
+        '<button type="button" class="btn ghost" id="lg-mem-cancel">닫기</button>' +
+        '<button type="button" class="btn" id="lg-mem-ok">선택 확정</button></div>' +
+        '</div>';
+      document.body.appendChild(memMdl);
+      function close() { memMdl.classList.remove('open'); }
+      memMdl.querySelector('#lg-mem-close').addEventListener('click', close);
+      memMdl.querySelector('#lg-mem-cancel').addEventListener('click', close);
+      memMdl.addEventListener('click', function (ev) { if (ev.target === memMdl) close(); });
+      ['lg-mem-sichal', 'lg-mem-cat'].forEach(function (id) {
+        memMdl.querySelector('#' + id).addEventListener('change', renderMemberList);
+      });
+      memMdl.querySelector('#lg-mem-q').addEventListener('input', renderMemberList);
+      memMdl.querySelector('#lg-mem-all').addEventListener('click', function () {
+        visibleMembers().forEach(function (m) { memSel[m.roster_id] = 1; });
+        renderMemberList();
+      });
+      memMdl.querySelector('#lg-mem-none').addEventListener('click', function () {
+        memSel = {}; renderMemberList();
+      });
+      memMdl.querySelector('#lg-mem-ok').addEventListener('click', function () {
+        var picked = (members || []).filter(function (m) { return memSel[m.roster_id]; });
+        close();
+        if (memDone) memDone(picked);
+      });
+      return memMdl;
+    }
+    function visibleMembers() {
+      var sc = memMdl.querySelector('#lg-mem-sichal').value;
+      var ct = memMdl.querySelector('#lg-mem-cat').value;
+      var q = memMdl.querySelector('#lg-mem-q').value.trim();
+      return (members || []).filter(function (m) {
+        if (sc && m.sichal !== sc) return false;
+        if (ct && m.category !== ct) return false;
+        if (q && (m.name + ' ' + m.church).indexOf(q) === -1) return false;
+        return true;
+      });
+    }
+    function renderMemberList() {
+      var list = memMdl.querySelector('#lg-mem-list');
+      var vis = visibleMembers();
+      var groups = {}, order = [];
+      vis.forEach(function (m) {
+        var g = m.sichal || '시찰 없음';
+        if (!groups[g]) { groups[g] = []; order.push(g); }
+        groups[g].push(m);
+      });
+      list.innerHTML = order.map(function (g) {
+        return '<div class="lg-mem-group">' + esc(g) + ' <small>' + groups[g].length + '명</small></div>' +
+          groups[g].map(function (m) {
+            return '<label><input type="checkbox" data-lgmem="' + m.roster_id + '"' +
+              (memSel[m.roster_id] ? ' checked' : '') + '> ' + esc(m.name) +
+              ' <small>' + esc(m.church) + (m.category ? ' · ' + esc(m.category) : '') + '</small>' +
+              (accKnown && !m.has_account ? ' <small style="color:#b0731f">계정 없음</small>' : '') +
+              '</label>';
+          }).join('');
+      }).join('') || '<p style="color:var(--gray-5)">조건에 맞는 회원이 없습니다.</p>';
+      list.querySelectorAll('input[data-lgmem]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          if (cb.checked) memSel[cb.dataset.lgmem] = 1; else delete memSel[cb.dataset.lgmem];
+          updateMemCount();
+        });
+      });
+      updateMemCount();
+    }
+    function updateMemCount() {
+      var n = Object.keys(memSel).length;
+      memMdl.querySelector('#lg-mem-cnt').textContent = n ? n + '명 선택' : '';
+    }
+    function openMemberPicker(onDone, preselectedIds) {
+      memDone = onDone;
+      memSel = {};
+      (preselectedIds || []).forEach(function (id) { memSel[id] = 1; });
+      loadMembers().then(function () {
+        var m = memberPicker();
+        var scs = {}, cts = {};
+        members.forEach(function (x) { if (x.sichal) scs[x.sichal] = 1; if (x.category) cts[x.category] = 1; });
+        m.querySelector('#lg-mem-sichal').innerHTML = '<option value="">전체</option>' +
+          Object.keys(scs).map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
+        m.querySelector('#lg-mem-cat').innerHTML = '<option value="">전체</option>' +
+          Object.keys(cts).map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
+        m.querySelector('#lg-mem-q').value = '';
+        renderMemberList();
+        m.classList.add('open');
+      });
+    }
+
+    /* ----- 한 항목의 지급 확인 창 (받는 사람 목록 · 수기 확인 · 더하기) ----- */
+    var poMdl = null, poEntry = null, poCanWrite = false;
+    function payoutModal() {
+      if (poMdl) return poMdl;
+      poMdl = document.createElement('div');
+      poMdl.className = 'mdl';
+      poMdl.id = 'lg-po-mdl';
+      poMdl.innerHTML = '<div class="mdl-box wide"><button class="mdl-close" id="lg-po-close">&times;</button>' +
+        '<div id="lg-po-body"></div></div>';
+      document.body.appendChild(poMdl);
+      poMdl.querySelector('#lg-po-close').addEventListener('click', function () { poMdl.classList.remove('open'); });
+      poMdl.addEventListener('click', function (ev) { if (ev.target === poMdl) poMdl.classList.remove('open'); });
+      return poMdl;
+    }
+    function openPayouts(entryId, canWrite) {
+      poEntry = entryId; poCanWrite = canWrite;
+      payoutModal().classList.add('open');
+      renderPayoutModal();
+      if (canWrite) loadMembers().then(function () { fillMemberList('lg-members2'); });
+    }
+    function renderPayoutModal() {
+      var x = findEntry(poEntry);
+      var list = payouts[poEntry] || [];
+      var body = poMdl.querySelector('#lg-po-body');
+      if (!x) { body.innerHTML = '<p>항목을 찾을 수 없습니다.</p>'; return; }
+      var sum = 0, ok = 0;
+      list.forEach(function (p) { sum += Number(p.amount) || 0; if (p.status === '확인') ok++; });
+      var h = '<h2 style="font-size:1.15rem">지급 확인 — ' + esc(x.title) + '</h2>' +
+        '<p style="font-size:0.86rem;color:var(--gray-6);margin:-8px 0 12px">' +
+        esc(x.entry_date || '') + (x.category ? ' · ' + esc(x.category) : '') +
+        ' · 항목 금액 <strong>' + won(x.amount) + '원</strong>' +
+        (list.length ? ' · 지급 합계 ' + won(sum) + '원 · 수령 확인 ' + ok + '/' + list.length + '명' : '') +
+        (list.length && sum !== Number(x.amount)
+          ? ' <span style="color:#b03a3a">(항목 금액과 다릅니다)</span>' : '') + '</p>';
+      if (list.length) {
+        h += '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.88rem"><thead><tr>' +
+          '<th class="left">받는 사람</th><th style="width:110px">금액 (원)</th><th style="width:170px">수령 확인</th>' +
+          (poCanWrite ? '<th style="width:150px">관리</th>' : '') + '</tr></thead><tbody>';
+        list.forEach(function (p) {
+          h += '<tr><td class="left">' + esc(p.recipient) +
+            (p.recipient_church ? ' <small style="color:var(--gray-5)">' + esc(p.recipient_church) + '</small>' : '') +
+            (!p.recipient_user ? ' <small style="color:#b0731f">계정 없음</small>' : '') + '</td>' +
+            '<td style="text-align:right">' + won(p.amount) + '</td>' +
+            '<td>' + (p.status === '확인'
+              ? '<span class="role-badge" style="color:#2a7a2a;border-color:#2a7a2a">확인</span> ' +
+                '<small style="color:var(--gray-5)">' + esc(String(p.confirmed_at || '').replace('T', ' ').slice(0, 16)) +
+                (p.confirmed_by ? ' · ' + esc(p.confirmed_by) : '') +
+                (p.confirm_note ? '<br>' + esc(p.confirm_note) : '') + '</small>'
+              : '<span class="role-badge" style="color:var(--gray-5)">대기</span>' +
+                (p.recipient_user ? ' <small style="color:var(--gray-5)">알림 보냄</small>' : '')) + '</td>' +
+            (poCanWrite
+              ? '<td>' + (p.status === '확인'
+                  ? '<button type="button" class="btn ghost sm" data-lgpoundo="' + p.id + '">대기로</button> '
+                  : '<button type="button" class="btn ghost sm" data-lgpook="' + p.id + '">수기 확인</button> ') +
+                '<button type="button" class="btn danger sm" data-lgpodel="' + p.id + '">지우기</button></td>'
+              : '') + '</tr>';
+        });
+        h += '</tbody></table></div>';
+      } else {
+        h += '<p style="color:var(--gray-5)">아직 받는 사람을 적지 않았습니다.</p>';
+      }
+      if (poCanWrite) {
+        h += '<div class="inline-form" style="margin-top:12px;align-items:flex-end">' +
+          '<div class="field"><label>받는 사람 더하기</label>' +
+          '<input type="text" id="lg-payee2" list="lg-members2" placeholder="이름을 적어 고르세요" autocomplete="off">' +
+          '<datalist id="lg-members2"></datalist></div>' +
+          '<div class="field" style="flex:0 0 140px"><label>1인 금액 (원)</label>' +
+          '<input type="number" id="lg-payamt2" min="0" step="1000" value="' +
+          (list.length ? Number(list[list.length - 1].amount) || '' : '') + '"></div>' +
+          '<button type="button" class="btn ghost sm" id="lg-payadd2">더하기</button>' +
+          '<button type="button" class="btn ghost sm" id="lg-paybulk2">회원 일괄 선택</button>' +
+          '</div><div class="form-msg" id="lg-po-msg"></div>' +
+          '<p style="font-size:0.78rem;color:var(--gray-5)">계정이 있는 회원에게는 바로 알림이 갑니다. ' +
+          '계정이 없거나 직접 확인한 경우 <strong>수기 확인</strong>으로 처리하세요.</p>';
+      }
+      body.innerHTML = h;
+      if (!poCanWrite) return;
+
+      function insertPayees(list2, amt) {
+        if (!list2.length) return;
+        if (!(amt > 0)) { var mm = document.getElementById('lg-po-msg'); mm.className = 'form-msg err'; mm.textContent = '1인 금액을 적어 주세요.'; return; }
+        var have = {};
+        (payouts[poEntry] || []).forEach(function (p) { if (p.roster_id) have[p.roster_id] = 1; });
+        var rows = list2.filter(function (m) { return !have[m.roster_id]; }).map(function (m) {
+          return { entry_id: poEntry, book_id: book.id, roster_id: m.roster_id || null,
+                   recipient: m.name, recipient_church: m.church || null, amount: amt, created_by: opts.user.name };
+        });
+        if (!rows.length) return;
+        SHSCloud.init().then(function (c) {
+          return c.from('ledger_payouts').insert(rows);
+        }).then(function (r) {
+          if (r.error) { alert(r.error.message); return; }
+          SHSCloud.log('create', '지급 확인 등록', opts.owner + ' ' + year + '년 / 항목 ' + poEntry + ' ' + rows.length + '명');
+          load().then(renderPayoutModal);
+        });
+      }
+      document.getElementById('lg-payadd2').addEventListener('click', function () {
+        var m = matchMember(document.getElementById('lg-payee2').value);
+        if (!m) { alert('명단에서 찾지 못했습니다. 목록에서 "이름 (교회)"를 골라 주세요.'); return; }
+        insertPayees([m], parseInt(document.getElementById('lg-payamt2').value, 10) || 0);
+      });
+      document.getElementById('lg-paybulk2').addEventListener('click', function () {
+        var amt = parseInt(document.getElementById('lg-payamt2').value, 10) || 0;
+        openMemberPicker(function (picked) { insertPayees(picked, amt); },
+          (payouts[poEntry] || []).map(function (p) { return p.roster_id; }).filter(Boolean));
+      });
+      body.querySelectorAll('button[data-lgpook]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var note = prompt('수기 확인 사유를 적어 주세요 (예: 현금 지급, 본인 확인)', '현금 지급 · 본인 확인');
+          if (note === null) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('ledger_payouts').update({
+              status: '확인', confirmed_at: new Date().toISOString(),
+              confirmed_by: opts.user.name + ' (수기)', confirm_note: note.trim() || null
+            }).eq('id', b.dataset.lgpook);
+          }).then(function (r) {
+            if (r.error) { alert(r.error.message); return; }
+            SHSCloud.log('update', '지급 수기 확인', opts.owner + ' ' + year + '년 / 지급 ' + b.dataset.lgpook);
+            load().then(renderPayoutModal);
+          });
+        });
+      });
+      body.querySelectorAll('button[data-lgpoundo]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('수령 확인을 대기로 되돌리시겠습니까?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('ledger_payouts').update({
+              status: '대기', confirmed_at: null, confirmed_by: null, confirm_note: null
+            }).eq('id', b.dataset.lgpoundo);
+          }).then(function (r) {
+            if (r.error) { alert(r.error.message); return; }
+            load().then(renderPayoutModal);
+          });
+        });
+      });
+      body.querySelectorAll('button[data-lgpodel]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (!confirm('이 받는 사람을 지우시겠습니까?')) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('ledger_payouts').delete().eq('id', b.dataset.lgpodel);
+          }).then(function (r) {
+            if (r.error) { alert(r.error.message); return; }
+            SHSCloud.log('delete', '지급 확인 삭제', opts.owner + ' ' + year + '년 / 지급 ' + b.dataset.lgpodel);
+            load().then(renderPayoutModal);
+          });
+        });
+      });
     }
 
     /* ================= 영수증 ================= */
@@ -531,6 +937,16 @@ var SHSLedger = (function () {
       if (list.length) {
         h += '<button type="button" class="btn ghost sm" data-lgrc="' + x.id + '" title="영수증 보기">' +
           '&#128206; ' + list.length + '장</button>';
+      }
+      var po = payouts[x.id] || [];
+      if (po.length) {
+        var ok = po.filter(function (p) { return p.status === '확인'; }).length;
+        h += (h ? ' ' : '') + '<button type="button" class="btn ghost sm" data-lgpo="' + x.id + '" title="지급 확인 보기"' +
+          (ok === po.length ? ' style="color:#2a7a2a;border-color:#2a7a2a"' : '') +
+          '>수령 ' + ok + '/' + po.length + '</button>';
+      } else if (canWrite && !ln && x.kind === '지출') {
+        h += (h ? ' ' : '') + '<button type="button" class="btn ghost sm" data-lgpo="' + x.id + '" ' +
+          'title="받는 사람을 적어 수령 확인을 받는다" style="color:var(--gray-5)">수령확인</button>';
       }
       if (canWrite && !ln) {
         h += (h ? ' ' : '') + '<button type="button" class="btn ghost sm" data-lgup="' + x.id + '" ' +
@@ -712,6 +1128,9 @@ var SHSLedger = (function () {
       box.querySelectorAll('button[data-lgrc]').forEach(function (b) {
         b.addEventListener('click', function () { openReceipts(b.dataset.lgrc, canWrite); });
       });
+      box.querySelectorAll('button[data-lgpo]').forEach(function (b) {
+        b.addEventListener('click', function () { openPayouts(b.dataset.lgpo, canWrite); });
+      });
       var up = document.getElementById('lg-upfile');
       if (!up) return;
       box.querySelectorAll('button[data-lgup]').forEach(function (b) {
@@ -811,6 +1230,8 @@ var SHSLedger = (function () {
       syncAllocField();
       pendingFiles = [];
       renderPending();
+      pendingPayees = [];
+      renderPayees();
       document.getElementById('lg-ftitle').textContent = viewKind + ' 적기';
       document.getElementById('lg-cancel').classList.add('hidden');
     }
@@ -818,6 +1239,7 @@ var SHSLedger = (function () {
     function bindEntryForm() {
       document.getElementById('lg-cancel').addEventListener('click', clearEntryForm);
       bindDrop();
+      bindPayees();
       var catSel = document.getElementById('lg-cat');
       if (catSel) {
         catSel.addEventListener('change', syncAllocField);
@@ -849,6 +1271,12 @@ var SHSLedger = (function () {
           }
         }
         if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '항목을 적어 주세요.'; return; }
+        if (viewKind === '지출' && pendingPayees.length) {
+          var pa = document.getElementById('lg-payamt');
+          if (!(parseInt(pa ? pa.value : '0', 10) > 0)) {
+            msg.className = 'form-msg err'; msg.textContent = '받는 사람의 1인 금액을 적어 주세요.'; return;
+          }
+        }
         if (d.amount < 0) { msg.className = 'form-msg err'; msg.textContent = '금액은 0원 이상이어야 합니다.'; return; }
         if (!id) d.created_by = opts.user.name;
         var files = pendingFiles.slice();
@@ -863,6 +1291,8 @@ var SHSLedger = (function () {
             opts.owner + ' ' + year + '년 / ' + d.title + ' ' + won(d.amount) + '원');
           var savedId = id || (r.data && r.data[0] && r.data[0].id);
           rememberCat(d.category).then(function () {
+            return savedId ? savePayees(savedId) : null;
+          }).then(function () {
             if (!files.length || !savedId) { load(); return; }
             /* 항목은 저장되었고, 이어서 영수증 사진을 올린다 */
             msg.textContent = '항목은 저장되었습니다. 영수증 사진 ' + files.length + '장을 올리는 중입니다...';

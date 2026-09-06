@@ -1823,6 +1823,18 @@ input.dp-bad { border-color: var(--red); }
 .lg-drop-list button { border: none; background: none; color: #a33; cursor: pointer; padding: 0 2px; font-size: 1rem; line-height: 1; }
 td.lg-dropcell.over { outline: 2px dashed var(--navy); outline-offset: -2px; background: #f4f1ea; }
 
+/* 회계 장부 — 받는 사람 칩, 회원 일괄 선택 창 */
+.lg-chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.lg-chips:empty { display: none; }
+.lg-chips span { font-size: 0.8rem; background: var(--gray-1); border-radius: 999px; padding: 3px 10px; }
+.lg-chips button { border: none; background: none; color: #a33; cursor: pointer; padding: 0 2px; font-size: 1rem; line-height: 1; }
+.lg-mem-list { max-height: 52vh; overflow-y: auto; border: 1px solid var(--gray-2); border-radius: 8px; padding: 8px 12px; }
+.lg-mem-list .lg-mem-group { font-weight: 700; color: var(--navy); margin: 10px 0 4px; font-size: 0.9rem; }
+.lg-mem-list .lg-mem-group:first-child { margin-top: 0; }
+.lg-mem-list label { display: inline-flex; align-items: center; gap: 4px; width: 33%; min-width: 180px; padding: 3px 0; font-size: 0.88rem; cursor: pointer; }
+.lg-mem-list label small { color: var(--gray-5); }
+@media (max-width: 640px) { .lg-mem-list label { width: 100%; } }
+
 /* 완납/미납 필터와 검색 */
 .dues-filter { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 16px 0 4px; }
 .dues-filter .dues-ftabs { margin-bottom: 0; }
