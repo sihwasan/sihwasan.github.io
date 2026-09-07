@@ -81,7 +81,7 @@
       { t: '임원 자료실', h: 'officer.html' },
       { t: '상회비 관리', h: 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC' },
       { t: '세례의무금 관리', h: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC' },
-      { t: '재정부 회계', h: 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84' },
+      { t: '재정부 회계', h: 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84', fin: true },
       { t: '감사 결과 보고서', h: 'audit-report.html' },
       { t: '노회 회의록', h: 'minutes.html' }
     ]}
@@ -185,6 +185,20 @@
     }
   }
 
+  /* 재정부 회계 메뉴 — 노회 회계·부회계(와 총관리자)에게만 보인다.
+   * 감사 기간의 감사부장·서기는 데이터베이스(can_read_ledger)에 물어 켠다.
+   * 노회장·서기·간사·부서기 등 다른 임원에게는 보이지 않는다. */
+  function showFinanceMenu(p) {
+    var links = document.querySelectorAll('a[data-fin]');
+    if (!links.length || !p) return;
+    function show() { links.forEach(function (a) { a.style.display = ''; }); }
+    if (p.role === 'superadmin' || (p.role === 'officer' && !!p.title && p.title.indexOf('회계') !== -1)) { show(); return; }
+    if (!(window.SHSCloud && SHSCloud.enabled && SHSCloud.enabled())) return;
+    SHSCloud.init().then(function (c) {
+      return c.rpc('can_read_ledger', { p_kind: 'presbytery', p_owner: '노회' });
+    }).then(function (r) { if (r && r.data === true) show(); }, function () {});
+  }
+
   function addAdminMenu() {
     var list = document.querySelector('.gnb-list');
     if (!list || document.getElementById('gnb-admin')) return;
@@ -278,7 +292,8 @@
       m.sub.forEach(function (s) {
         /* '미래교회자립위원회'처럼 긴 이름은 '위원회'를 다음 줄로 내려 칸 밖으로 나가지 않게 한다 */
         var label = s.t.replace(/^(.{4,})(위원회)$/, '$1<br>$2');
-        html += '<a href="' + s.h + '">' + label + '</a>';
+        /* 재정부 회계는 회계·부회계에게만 — 로그인 확인 뒤 showFinanceMenu 가 켠다 */
+        html += '<a href="' + s.h + '"' + (s.fin ? ' data-fin="1" style="display:none"' : '') + '>' + label + '</a>';
       });
       html += '</div></li>';
     });
@@ -505,6 +520,7 @@
           var lo = document.getElementById('btn-logout2');
           if (lo) lo.addEventListener('click', window.SHSLogout);
           window.__shsUser = p;
+          showFinanceMenu(p);
           loadUnread();
           /* 1분마다 새 알림을 확인해 팝업으로 띄운다 */
           setInterval(loadUnread, 60000);

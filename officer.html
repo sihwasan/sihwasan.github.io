@@ -24,18 +24,19 @@
 <script src="private/resolutions.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907g"></script>
+<script src="js/main.js?v=20260907h"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
 <script src="js/ledger.js?v=20260907r"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
- /* 노회 재정부 장부를 볼 수 있는가 — 회계·부회계·관리자는 바로 알 수 있고,
-  * 감사 기간의 감사부장·서기는 데이터베이스(can_read_ledger)에 물어본다. */
+ /* 노회 재정부 장부를 볼 수 있는가 — 회계·부회계(와 총관리자)는 바로 알 수 있고,
+  * 감사 기간의 감사부장·서기는 데이터베이스(can_read_ledger)에 물어본다.
+  * 노회장·서기·간사·부서기 등 다른 임원은 보지 못한다(데이터베이스 규칙도 같다, 86). */
  function financeAccess(user) {
    if (!user || !SHSAuth.isOfficer(user)) return Promise.resolve(false);
-   var local = SHSAuth.canManageMembers(user) ||
+   var local = user.role === 'superadmin' ||
      (user.role === 'officer' && !!user.title && user.title.indexOf('회계') !== -1);
    if (local) return Promise.resolve(true);
    if (!(window.SHSCloud && SHSCloud.enabled())) return Promise.resolve(false);
