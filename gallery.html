@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://sihwasan.org/images/og-cover.png">
 <meta property="og:site_name" content="시화산노회">
 <meta property="og:locale" content="ko_KR">
-<link rel="stylesheet" href="css/style.css?v=20260907c">
+<link rel="stylesheet" href="css/style.css?v=20260907d">
 </head>
 <body>
 
@@ -83,6 +83,15 @@
 </div>
 
 <!-- 사진 올리기 -->
+<!-- 영상 칸에서 고른 영상을 그 자리에서 재생한다 -->
+<div class="mdl" id="vp-mdl">
+  <div class="mdl-box wide">
+    <button class="mdl-close" id="vp-close">&times;</button>
+    <div class="feed-vid" id="vp-box"></div>
+    <div id="vp-cap" style="margin-top:10px;font-size:0.92rem;color:var(--gray-7)"></div>
+  </div>
+</div>
+
 <div class="mdl" id="up-mdl">
   <div class="mdl-box">
     <button class="mdl-close" id="up-close">&times;</button>
@@ -111,12 +120,12 @@
     <div id="up-vidbox" style="display:none">
       <div class="field">
         <label>유튜브 주소</label>
-        <input type="url" id="up-link" placeholder="https://youtu.be/… 또는 https://www.youtube.com/watch?v=…">
+        <input type="url" id="up-link" placeholder="유튜브 영상 주소를 붙여 넣으세요">
         <div class="field-hint">영상은 사진 앨범과 따로 <strong>영상</strong> 칸에 모입니다.</div>
       </div>
       <div class="field">
         <label>영상 제목</label>
-        <input type="text" id="up-vtitle" placeholder="예: 제19회 정기노회 개회예배">
+        <input type="text" id="up-vtitle" placeholder="영상 제목을 적으세요">
       </div>
       <div class="field">
         <label>날짜</label>
@@ -137,7 +146,7 @@
     <div id="up-new">
       <div class="field">
         <label>새 앨범 이름</label>
-        <input type="text" id="up-title" placeholder="예: 제20회 정기노회">
+        <input type="text" id="up-title" placeholder="앨범 이름을 적으세요">
       </div>
       <div class="inline-form" style="margin-bottom:16px">
         <div class="field"><label>날짜</label><input type="date" id="up-date"></div>
@@ -149,7 +158,7 @@
     </div>
     <div class="field">
       <label>한 줄 소식 (선택)</label>
-      <textarea id="up-caption" rows="2" placeholder="어떤 순간인가요?"></textarea>
+      <textarea id="up-caption" rows="2" placeholder="사진에 담긴 소식을 한 줄로 적으세요"></textarea>
     </div>
     <button class="btn-round solid" id="up-send" style="width:100%">올리기</button>
     <div class="form-msg" id="up-msg"></div>
@@ -175,7 +184,7 @@
 <script src="js/supabase-auth.js"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
-<script src="js/main.js?v=20260907e"></script>
+<script src="js/main.js?v=20260907f"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -239,6 +248,65 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function isVideo(it) { return !!ytId(it && it.link_url); }
   function ytThumb(id) { return 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg'; }
+  /* 글에 딸린 영상 — 영상 칸에 올린 것이든, 한 줄 소식에 유튜브 주소를 적은 것이든 */
+  function videoOf(it) { return it ? (ytId(it.link_url) || ytId(it.caption) || ytId(it.title)) : ''; }
+  function embedHtml(id, autoplay) {
+    return '<div class="feed-vid"><iframe data-yt="' + id + '" src="https://www.youtube.com/embed/' + id +
+      '?enablejsapi=1&playsinline=1&rel=0&modestbranding=1' + (autoplay ? '&autoplay=1' : '') +
+      '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="유튜브 영상"></iframe></div>';
+  }
+  /* 피드의 영상은 화면에 보이는 것만 재생하고 나머지는 멈춘다 */
+  var feedObs = null, feedAutoplayOnce = false;
+  function ytCmd(f, func) {
+    try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: [] }), '*'); } catch (e) {}
+  }
+  function pauseAllVideos() {
+    document.querySelectorAll('#feed-list iframe[data-yt]').forEach(function (f) { ytCmd(f, 'pauseVideo'); });
+  }
+  function mostlyVisible(f) {
+    var r = f.getBoundingClientRect(), h = window.innerHeight || 0;
+    if (!r.height) return false;
+    var seen = Math.min(r.bottom, h) - Math.max(r.top, 0);
+    return seen / r.height >= 0.6;
+  }
+  function watchFeedVideos() {
+    if (feedObs) { feedObs.disconnect(); feedObs = null; }
+    var frames = document.querySelectorAll('#feed-list iframe[data-yt]');
+    if (!frames.length) return;
+    frames.forEach(function (f) {
+      /* 막 불러온 영상이 화면 한가운데 있으면 바로 재생한다 (재생기가 준비될 때까지 두 번 시도) */
+      f.addEventListener('load', function () {
+        [400, 1500].forEach(function (ms) {
+          setTimeout(function () {
+            if (!mostlyVisible(f)) return;
+            frames.forEach(function (g) { if (g !== f) ytCmd(g, 'pauseVideo'); });   /* 한 번에 하나만 */
+            ytCmd(f, 'playVideo');
+          }, ms);
+        });
+      });
+    });
+    if (!('IntersectionObserver' in window)) return;
+    feedObs = new IntersectionObserver(function (ents) {
+      ents.forEach(function (en) {
+        if (en.intersectionRatio >= 0.6) {
+          frames.forEach(function (f) { if (f !== en.target) ytCmd(f, 'pauseVideo'); });
+          ytCmd(en.target, 'playVideo');
+        } else if (en.intersectionRatio < 0.3) {
+          ytCmd(en.target, 'pauseVideo');
+        }
+      });
+    }, { threshold: [0, 0.3, 0.6, 1] });
+    frames.forEach(function (f) { feedObs.observe(f); });
+  }
+  /* 영상 칸에서 누른 영상을 창에 띄워 바로 재생한다 */
+  function openPlayer(v) {
+    var id = ytId(v.link_url);
+    if (!id) return;
+    document.getElementById('vp-box').innerHTML = embedHtml(id, true);
+    document.getElementById('vp-cap').textContent = (v.title || '노회 영상') + (dateText(v.taken) ? ' · ' + dateText(v.taken) : '');
+    openM('vp-mdl');
+  }
+  function closePlayer() { document.getElementById('vp-box').innerHTML = ''; closeM('vp-mdl'); }
 
   function renderVideos() {
     var sec = document.getElementById('videos');
@@ -255,6 +323,13 @@ document.addEventListener('DOMContentLoaded', function () {
         '<span class="vid-cap"><span class="t">' + e(v.title || '노회 영상') + '</span>' +
         '<span class="d">' + e(dateText(v.taken)) + '</span></span></a>';
     }).join('');
+    box.querySelectorAll('a[data-vid]').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        if (ev.target.closest('button')) return;   /* 지우기 단추는 그대로 */
+        ev.preventDefault();
+        openPlayer(videos[+a.dataset.vid]);
+      });
+    });
     /* 관리자·올린 이는 목록에서 바로 지울 수 있다 */
     box.querySelectorAll('a[data-vid]').forEach(function (a) {
       var v = videos[+a.dataset.vid];
@@ -454,8 +529,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 피드 ---------- */
-  function feedCard(it) {
+  function feedCard(it, autoplay) {
     var initial = (it.author_name || '노회').charAt(0);
+    var vid = videoOf(it);
     var mine = user && it.author_id === user.id;
     var liked = !!likeSet[it.id];
     var cs = comments[it.id] || [];
@@ -466,7 +542,10 @@ document.addEventListener('DOMContentLoaded', function () {
       (it.category ? ' · ' + e(it.category) : '') + '</div></div>' +
       ((mine || canManage) ? '<button class="feed-del" data-fdel="' + it.id + '" data-ffull="' + e(it.image_url || '') + '" data-fthumb="' + e(it.thumb_url || '') + '">삭제</button>' : '') +
       '</div>' +
-      '<img class="feed-img" src="' + e(it.image_url) + '" alt="">' +
+      /* 영상이 있으면 그 자리에 끼워 넣어 바로 재생한다. 사진 글에 주소만 적었으면 사진도 아래에 둔다 */
+      (vid
+        ? embedHtml(vid, !!autoplay) + ((isVideo(it) || !it.image_url) ? '' : '<img class="feed-img" src="' + e(it.image_url) + '" alt="">')
+        : '<img class="feed-img" src="' + e(it.image_url) + '" alt="">') +
       '<div class="feed-bar">' +
       '<button data-flike="' + it.id + '" class="' + (liked ? 'liked' : '') + '">' + (liked ? '좋아요 취소' : '좋아요') + '</button>' +
       '<button data-fcmt="' + it.id + '">댓글</button>' +
@@ -474,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="feed-meta"><span class="likes">좋아요 ' + (likeCount[it.id] || 0) + '개</span>' +
       (it.title ? '<div style="margin-top:4px">' + e(it.title) + '</div>' : '') +
       (it.caption ? '<div style="color:var(--gray-7)">' + e(it.caption) + '</div>' : '') +
-      (it.link_url ? '<div style="margin-top:4px"><a href="' + e(it.link_url) + '" target="_blank" rel="noopener" style="color:var(--navy);text-decoration:underline">링크 보기</a></div>' : '') +
+      (it.link_url && !ytId(it.link_url) ? '<div style="margin-top:4px"><a href="' + e(it.link_url) + '" target="_blank" rel="noopener" style="color:var(--navy);text-decoration:underline">링크 보기</a></div>' : '') +
       '</div>' +
       (cs.length ? '<div class="feed-cmt">' + cs.map(function (c) {
         return '<div class="row"><span class="n">' + e(c.author_name || '회원') + '</span>' +
@@ -487,16 +566,30 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>';
   }
 
+  /* 피드에는 사진과 영상을 함께, 올린 순서대로 보여 준다 */
+  function feedItems() {
+    var all = items.concat(videos);
+    all.sort(function (a, b) {
+      var x = String(a.created_at || a.taken || ''), y = String(b.created_at || b.taken || '');
+      return x < y ? 1 : x > y ? -1 : 0;
+    });
+    return all;
+  }
   function renderFeed() {
     var box = document.getElementById('feed-list');
-    if (!items.length) { box.innerHTML = '<p style="color:var(--gray-5)">등록된 소식이 없습니다.</p>'; return; }
-    var shown = items.slice(0, feedShown);
-    box.innerHTML = shown.map(feedCard).join('') +
-      (items.length > shown.length
+    var all = feedItems();
+    if (!all.length) { box.innerHTML = '<p style="color:var(--gray-5)">등록된 소식이 없습니다.</p>'; return; }
+    var shown = all.slice(0, feedShown);
+    var auto = feedAutoplayOnce; feedAutoplayOnce = false;
+    var firstVid = -1;
+    shown.forEach(function (it, i) { if (firstVid < 0 && videoOf(it)) firstVid = i; });
+    box.innerHTML = shown.map(function (it, i) { return feedCard(it, auto && i === firstVid); }).join('') +
+      (all.length > shown.length
         ? '<div style="text-align:center;margin:6px 0 10px">' +
           '<button class="btn-round" id="feed-more">더 보기 (' +
-          (items.length - shown.length) + '장 남음)</button></div>'
+          (all.length - shown.length) + '장 남음)</button></div>'
         : '');
+    watchFeedVideos();
     var more = document.getElementById('feed-more');
     if (more) more.addEventListener('click', function () { feedShown += 30; renderFeed(); });
     bindFeed();
@@ -572,12 +665,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- 모달 ---------- */
   function openM(id) { document.getElementById(id).classList.add('open'); }
-  function closeM(id) { document.getElementById(id).classList.remove('open'); }
-  document.getElementById('nw-more').addEventListener('click', function () { feedShown = 30; renderFeed(); openM('feed-mdl'); });
+  function closeM(id) {
+    document.getElementById(id).classList.remove('open');
+    if (id === 'feed-mdl') pauseAllVideos();
+    if (id === 'vp-mdl') document.getElementById('vp-box').innerHTML = '';
+  }
+  document.getElementById('nw-more').addEventListener('click', function () {
+    feedShown = 30; feedAutoplayOnce = true; renderFeed(); openM('feed-mdl');
+  });
   document.getElementById('feed-close').addEventListener('click', function () { closeM('feed-mdl'); });
+  document.getElementById('vp-close').addEventListener('click', closePlayer);
   document.getElementById('up-close').addEventListener('click', function () { closeM('up-mdl'); });
   document.getElementById('alb-close').addEventListener('click', function () { closeM('alb-mdl'); });
-  ['feed-mdl', 'up-mdl', 'alb-mdl'].forEach(function (id) {
+  ['feed-mdl', 'up-mdl', 'alb-mdl', 'vp-mdl'].forEach(function (id) {
     document.getElementById(id).addEventListener('click', function (ev) {
       if (ev.target.id === id) closeM(id);
     });
@@ -767,7 +867,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var vid = ytId(vurl);
       if (!vid) {
         msg.className = 'form-msg err';
-        msg.textContent = '유튜브 주소를 확인해 주세요. (예: https://youtu.be/영상번호)';
+        msg.textContent = '유튜브 주소를 확인해 주세요.';
         return;
       }
       var vtitle = document.getElementById('up-vtitle').value.trim() || '노회 영상';

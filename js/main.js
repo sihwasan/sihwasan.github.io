@@ -425,6 +425,23 @@
     });
   }
 
+  /* ---------- 창(모달) 밖으로 끌어도 닫히지 않게 ----------
+   * 입력 칸의 글을 끌어 고르다가 마우스를 창 밖(어두운 배경)에서 놓으면 브라우저는
+   * 배경에 '클릭'이 난 것으로 쳐서, 배경 클릭 = 닫기 규칙 때문에 창이 사라진다.
+   * 배경 위에서 눌렀다가 배경 위에서 뗀 진짜 클릭만 지나가게 하고, 안에서 시작된
+   * 끌기는 어느 창이든 여기서 걸러 낸다. (x 단추와 진짜 배경 클릭은 그대로) */
+  var pressedOn = null;
+  document.addEventListener('mousedown', function (ev) { pressedOn = ev.target; }, true);
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!pressedOn || pressedOn === t || !(t instanceof Element) || !t.contains(pressedOn)) return;
+    if (window.getComputedStyle(t).position !== 'fixed') return;
+    var r = t.getBoundingClientRect();
+    if (r.width < window.innerWidth * 0.9 || r.height < window.innerHeight * 0.9) return;
+    ev.stopImmediatePropagation();
+    ev.preventDefault();
+  }, true);
+
   document.addEventListener('DOMContentLoaded', function () {
     /* 비밀번호 재설정 메일의 링크로 들어온 경우 재설정 화면으로 보낸다.
      * (메일 링크는 홈으로 돌아오므로 여기서 안내해야 한다.) */
