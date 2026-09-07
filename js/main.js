@@ -993,8 +993,8 @@
 
   /* 상단 배너: 표시 기간에 든 시스템 알림
    * 규칙의 대상(명부 연동)과 관리자에게 보인다 (서버 my_ops_notices 가 고른다).
-   * 규칙에 <확인 완료 단추>가 켜져 있으면 눌러서 이번 회기에는 끌 수 있고(서버에 남아
-   * 어느 기기에서든 같다), 꺼져 있으면 <나중에 보기>로 이 창에서만 잠시 숨긴다. */
+   * 알림마다 <완료> 단추가 있어 누르면 이번 회기에는 다시 보이지 않고(서버에 남아
+   * 어느 기기에서든 같다), <나중에 보기>는 이 창에서만 잠시 숨긴다. */
   function meetingReminder(u) {
     if (!u) return;
     var esc = SHS_esc;
@@ -1013,16 +1013,16 @@
       bar.style.marginTop = '16px';
       bar.innerHTML =
         '<div class="notice-banner" style="border-left:4px solid var(--accent)">' +
-        '<strong>[시스템 알림]</strong> 확인이 필요한 알림이 ' + rows.length + '건 있습니다.' +
+        '<strong>[시스템 알림]</strong> 확인이 필요한 알림이 ' + rows.length + '건 있습니다. ' +
+        '<small style="color:var(--gray-5)">처리한 뒤 완료를 누르면 이번 회기에는 다시 보이지 않습니다.</small>' +
         '<ul style="margin:8px 0 4px;padding-left:18px">' +
         rows.map(function (n) {
           return '<li style="margin:4px 0"><strong>' + esc(n.title) + '</strong> ' +
             '<small style="color:var(--gray-5)">(' + md(n.start_on) + ' ~ ' + md(n.end_on) +
             (n.audience ? ' · 대상 ' + esc(n.audience) : '') + ')</small>' +
             (n.message ? '<div style="font-size:0.88rem;color:var(--gray-7);margin-top:2px;white-space:pre-wrap">' + esc(n.message) + '</div>' : '') +
-            (n.ack_enabled
-              ? '<button class="btn sm" data-opsack="' + n.id + '" data-pk="' + esc(n.period_key) + '" style="margin-top:4px">확인 완료</button>'
-              : '') +
+            '<button class="btn sm" data-opsack="' + n.id + '" data-pk="' + esc(n.period_key) + '"' +
+              (n.doneKey ? ' data-donekey="' + esc(n.doneKey) + '"' : '') + ' style="margin-top:4px">완료</button>' +
             '</li>';
         }).join('') + '</ul>' +
         (isAdmin ? '<a class="btn ghost sm" href="manage.html#mg-ops">알림 규칙 관리</a> ' : '') +
@@ -1033,15 +1033,24 @@
 
       bar.querySelectorAll('button[data-opsack]').forEach(function (b) {
         b.addEventListener('click', function () {
+          function hide() {
+            var li = b.closest('li');
+            if (li) li.remove();
+            if (!bar.querySelector('li')) bar.remove();
+          }
+          /* 서버가 없을 때(예전 방식): 이 브라우저에만 남긴다 */
+          if (b.dataset.donekey) {
+            try { localStorage.setItem(b.dataset.donekey, '1'); } catch (x) {}
+            hide();
+            return;
+          }
           b.disabled = true; b.textContent = '처리 중…';
           SHSCloud.init().then(function (c) {
             return c.rpc('ack_ops_notice', { p_id: parseInt(b.dataset.opsack, 10), p_period_key: b.dataset.pk });
           }).then(function (r) {
-            if (r && r.error) { alert(r.error.message); b.disabled = false; b.textContent = '확인 완료'; return; }
-            var li = b.closest('li');
-            if (li) li.remove();
-            if (!bar.querySelector('li')) bar.remove();
-          });
+            if (r && r.error) { alert(r.error.message); b.disabled = false; b.textContent = '완료'; return; }
+            hide();
+          }).catch(function (x) { alert((x && x.message) || x); b.disabled = false; b.textContent = '완료'; });
         });
       });
       var later = bar.querySelector('#ops-later-btn');
@@ -1066,7 +1075,7 @@
     /* 서버가 없을 때(예전 방식): 관리자에게 기본 규칙만 */
     if (SHSAuth.canManageMembers(u)) {
       var act = opsActive(DEFAULT_OPS_NOTICES, DEFAULT_OPS_DATES);
-      show(act.map(function (n) { return { id: n.id, title: n.title, message: n.message, audience: n.audience, period_key: 'local', ack_enabled: false }; }));
+      show(act.map(function (n) { return { id: n.id, title: n.title, message: n.message, audience: n.audience, period_key: 'local', doneKey: n.doneKey }; }));
     }
   }
 

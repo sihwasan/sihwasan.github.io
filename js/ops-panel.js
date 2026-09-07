@@ -424,7 +424,7 @@ var SHSOps = (function () {
         ? srv.map(function (n) {
             return { id: n.id, title: n.title, message: n.message, audience: n.audience,
                      period: md(n.start_on) + ' ~ ' + md(n.end_on), period_key: n.period_key,
-                     acked: n.acked, ack_enabled: n.ack_enabled, server: true };
+                     acked: n.acked, server: true };
           })
         : SHS.opsActive(rows, dates);
 
@@ -440,7 +440,7 @@ var SHSOps = (function () {
             (n.server
               ? (n.acked
                   ? '<button class="btn ghost sm" data-opsunack="' + n.id + '" data-pk="' + e(n.period_key) + '">다시 표시</button> '
-                  : '<button class="btn ghost sm" data-opsack="' + n.id + '" data-pk="' + e(n.period_key) + '">이번 회기 확인 완료 (내 화면에서 끄기)</button> ')
+                  : '<button class="btn ghost sm" data-opsack="' + n.id + '" data-pk="' + e(n.period_key) + '">완료 (이번 회기에는 내 화면에서 끄기)</button> ')
               : '<button class="btn ghost sm" data-opsdone="' + n.doneKey + '">이번 회기 처리 완료 (알림 끄기)</button> ') +
             (OPS_GROUPS.indexOf(n.audience) !== -1
               ? '<button class="btn sm" data-opssend="' + e(n.audience) + '" data-st="' + e(n.title) +
@@ -468,10 +468,10 @@ var SHSOps = (function () {
 
       html += '<h2>등록된 알림 규칙</h2>' +
         '<p style="font-size:0.86rem;color:var(--gray-6)">제목을 누르면 세부 내용이 열립니다. 표시 기간이 되면 규칙의 대상(명부 연동)과 관리자에게 홈페이지 상단 배너로 보이고, ' +
-        '<strong>확인 완료 단추</strong>가 켜진 규칙은 받는 사람이 눌러 이번 회기에는 끌 수 있습니다.</p>';
-      html += '<table class="tbl"><thead><tr><th>제목</th><th>대상</th><th>표시 기준</th><th style="width:80px">확인 완료</th><th style="width:60px">사용</th>' +
+        '받는 사람이 <strong>완료</strong>를 누르면 이번 회기에는 다시 보이지 않습니다.</p>';
+      html += '<table class="tbl"><thead><tr><th>제목</th><th>대상</th><th>표시 기준</th><th style="width:60px">사용</th>' +
         (isSuper ? '<th style="width:80px">관리</th>' : '') + '</tr></thead><tbody>';
-      var COLS = isSuper ? 6 : 5;
+      var COLS = isSuper ? 5 : 4;
       rows.forEach(function (n) {
         var w = SHS.opsWindow(n, dates);
         var open = String(opsOpen) === String(n.id);
@@ -480,7 +480,6 @@ var SHSOps = (function () {
           (w && w.open ? ' <span class="role-badge" style="color:#b0731f;border-color:#b0731f">표시 중</span>' : '') + '</td>' +
           '<td>' + e(n.audience) + '</td>' +
           '<td class="left">' + e(SHS.opsRuleLabel(n)) + '</td>' +
-          '<td>' + (n.ack_enabled ? '<span style="color:#2a7a2a">켜짐</span>' : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td>' + (n.active ? '사용' : '<span style="color:#a33">중지</span>') + '</td>' +
           (isSuper ? '<td><button class="btn danger sm" data-opsdel="' + n.id + '" data-opst="' + e(n.title) + '">삭제</button></td>' : '') +
           '</tr>';
@@ -503,8 +502,6 @@ var SHSOps = (function () {
           '<div class="field" style="flex:0 0 160px"><label>특정 날짜(해당 시)</label><input type="date" id="op-fixed"></div>' +
           '</div>' +
           '<div class="field"><label>알림 내용</label><textarea id="op-msg" rows="3"></textarea></div>' +
-          '<div class="field"><label><input type="checkbox" id="op-ack"> ' +
-          '<strong>확인 완료 단추</strong> — 받는 사람이 눌러 이번 회기에는 알림을 끌 수 있게 (끄면 표시 기간 내내 보입니다)</label></div>' +
           '<button class="btn" id="op-add">추가</button><div class="form-msg" id="op-addmsg"></div></div>';
       }
       box.innerHTML = html;
@@ -601,7 +598,6 @@ var SHSOps = (function () {
             window_days: parseInt(document.getElementById('op-win').value, 10) || 21,
             fixed_date: document.getElementById('op-fixed').value || null,
             message: document.getElementById('op-msg').value.trim(),
-            ack_enabled: !!(document.getElementById('op-ack') && document.getElementById('op-ack').checked),
             sort: rows.length + 1
           };
           if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
@@ -626,7 +622,6 @@ var SHSOps = (function () {
       '<div style="color:var(--gray-5)">올해 표시 기간</div><div>' +
       (w ? md(w.start) + ' ~ ' + md(w.end) + (w.open ? ' <span class="role-badge" style="color:#b0731f;border-color:#b0731f">지금 표시 중</span>' : ' <small style="color:var(--gray-5)">(기간 아님)</small>')
          : '<span style="color:var(--gray-5)">기준일이 없어 표시되지 않습니다</span>') + '</div>' +
-      '<div style="color:var(--gray-5)">확인 완료 단추</div><div>' + (n.ack_enabled ? '켜짐 — 받는 사람이 눌러 이번 회기에는 끌 수 있습니다' : '꺼짐 — 표시 기간 내내 보입니다') + '</div>' +
       '<div style="color:var(--gray-5)">사용</div><div>' + (n.active ? '사용' : '<span style="color:#a33">중지</span>') + '</div>' +
       '<div style="color:var(--gray-5)">확인 완료한 사람</div><div id="ops-acks-' + n.id + '"><small style="color:var(--gray-5)">불러오는 중…</small></div>' +
       '</div>';
@@ -643,7 +638,6 @@ var SHSOps = (function () {
         '<div class="field" style="flex:0 0 160px"><label>특정 날짜(해당 시)</label><input type="date" id="oe-fixed" value="' + e(n.fixed_date || '') + '"></div>' +
         '</div>' +
         '<div class="field"><label>알림 내용</label><textarea id="oe-msg" rows="3">' + e(n.message || '') + '</textarea></div>' +
-        '<div class="field"><label><input type="checkbox" id="oe-ack"' + (n.ack_enabled ? ' checked' : '') + '> 확인 완료 단추 (받는 사람이 눌러 이번 회기에는 끌 수 있게)</label></div>' +
         '<div class="field"><label><input type="checkbox" id="oe-active"' + (n.active ? ' checked' : '') + '> 사용 (끄면 표시되지 않습니다)</label></div>' +
         '<button class="btn" id="oe-save">저장</button> <button class="btn ghost" id="oe-close">닫기</button>' +
         '<div class="form-msg" id="oe-msg2"></div></div>';
@@ -672,7 +666,6 @@ var SHSOps = (function () {
         window_days: parseInt(document.getElementById('oe-win').value, 10) || 21,
         fixed_date: document.getElementById('oe-fixed').value || null,
         message: document.getElementById('oe-msg').value.trim(),
-        ack_enabled: document.getElementById('oe-ack').checked,
         active: document.getElementById('oe-active').checked,
         updated_at: new Date().toISOString(), updated_by: user.name
       };
