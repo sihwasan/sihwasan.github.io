@@ -1385,19 +1385,22 @@ document.addEventListener('DOMContentLoaded', function () {
     if (btn) { btn.disabled = true; btn.textContent = '만드는 중...'; }
     function done() { if (btn) { btn.disabled = false; btn.textContent = 'PDF 저장'; } }
     var stage = document.createElement('div');
-    stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:800px;background:#fff';
-    stage.innerHTML = duesReportHtml();
+    stage.style.cssText = 'position:absolute;left:-11000px;top:0;width:800px;background:#fff';
+    stage.innerHTML = '<style>tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}</style>' + duesReportHtml();
     document.body.appendChild(stage);
+    /* 화면을 내린 채 만들면 첫 쪽 위가 그만큼 비므로, 만드는 동안만 맨 위로 올린다 */
+    var keepX = window.scrollX || 0, keepY = window.scrollY || 0;
     loadPdfTool().then(function (html2pdf) {
+      window.scrollTo(0, 0);
       return html2pdf().set({
         margin: 6,
         filename: duesYear + '년 상회비 납입현황.pdf',
-        pagebreak: { mode: ['css', 'legacy'] },
-        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['tr'] },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(stage.firstChild).save();
+      }).from(stage.lastChild).save();
     }).then(function () {
-      stage.remove(); done();
+      stage.remove(); done(); window.scrollTo(keepX, keepY);
       SHSCloud.log('view', '상회비 납입현황 PDF 저장', duesYear + '년');
     }).catch(function (err) {
       stage.remove(); done();
@@ -1535,19 +1538,21 @@ document.addEventListener('DOMContentLoaded', function () {
       '· 마감 해제는 관리자(노회장·서기·간사)만 할 수 있습니다.')) return;
 
     var stage = document.createElement('div');
-    stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:800px;background:#fff';
-    stage.innerHTML = duesReportHtml('마감일');
+    stage.style.cssText = 'position:absolute;left:-11000px;top:0;width:800px;background:#fff';
+    stage.innerHTML = '<style>tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}</style>' + duesReportHtml('마감일');
     document.body.appendChild(stage);
+    var keepX2 = window.scrollX || 0, keepY2 = window.scrollY || 0;
 
     loadPdfTool().then(function (html2pdf) {
+      window.scrollTo(0, 0);
       return html2pdf().set({
         margin: 6,
-        pagebreak: { mode: ['css', 'legacy'] },
-        html2canvas: { scale: 2, backgroundColor: '#ffffff' },
+        pagebreak: { mode: ['css', 'legacy'], avoid: ['tr'] },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      }).from(stage.firstChild).outputPdf('blob');
+      }).from(stage.lastChild).outputPdf('blob');
     }).then(function (blob) {
-      stage.remove();
+      stage.remove(); window.scrollTo(keepX2, keepY2);
       var file = new File([blob], duesYear + '년 상회비 납입현황(마감).pdf', { type: 'application/pdf' });
       /* 자료 보관소의 회계 칸에 올린다 */
       return odPut(file, 'officer', '회계').then(function (url) {

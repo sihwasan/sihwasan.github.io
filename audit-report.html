@@ -340,21 +340,26 @@ document.addEventListener('DOMContentLoaded', function () {
       var btn = this;
       btn.disabled = true; btn.textContent = '만드는 중…';
       var stage = document.createElement('div');
-      stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
-      stage.innerHTML = '<style>' + PRINT_CSS + '</style><div>' + document.getElementById('ar-sheet').innerHTML + '</div>';
+      stage.style.cssText = 'position:absolute;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
+      stage.innerHTML = '<style>' + PRINT_CSS + 'tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}</style>' +
+        '<div>' + document.getElementById('ar-sheet').innerHTML + '</div>';
       document.body.appendChild(stage);
+      /* 화면을 내린 채 만들면 첫 쪽 위가 그만큼 비므로, 만드는 동안만 맨 위로 올린다 */
+      var keepX = window.scrollX || 0, keepY = window.scrollY || 0;
+      function done() { stage.remove(); btn.disabled = false; btn.textContent = 'PDF 저장'; window.scrollTo(keepX, keepY); }
       loadPdfTool().then(function (html2pdf) {
+        window.scrollTo(0, 0);
         return html2pdf().set({
           margin: 8, filename: '시화산노회 감사 보고서 ' + year + '년 ' + period + '.pdf',
-          pagebreak: { mode: ['css', 'legacy'] },
-          html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'h4'] },
+          html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true, scrollX: 0, scrollY: 0 },
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         }).from(stage.lastElementChild).save();
       }).then(function () {
-        stage.remove(); btn.disabled = false; btn.textContent = 'PDF 저장';
+        done();
         SHSCloud.log('view', '감사 보고서 PDF 저장', year + '년 ' + period);
       }).catch(function (err) {
-        stage.remove(); btn.disabled = false; btn.textContent = 'PDF 저장';
+        done();
         alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
       });
     });
