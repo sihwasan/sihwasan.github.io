@@ -133,10 +133,8 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '<p>노회 재정부(일반회계) 장부입니다. 상회비·세례의무금 납부를 기록하면 수입으로 저절로 적히고, ' +
       '<strong>상비부 배정</strong> 과목으로 지출을 적으면 그 상비부 장부에 수입으로 함께 적힙니다. ' +
       '장부는 노회 회계·부회계가 적으며, 노회장·서기·간사와 감사 기간의 감사부장·서기가 열람합니다.</p>';
-    html += '<div class="tabs" id="fin-tabs">' +
-      '<button class="active" data-ft="ledger">장부</button>' +
-      '<button data-ft="report">재정보고서</button></div>' +
-      '<div id="fin-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+    /* 재정보고서는 장부 안의 탭(수입·지출 곁)에서 본다 */
+    html += '<div id="fin-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
   }
 
   /* 교회상황 보고서 (연도별) — 각 교회가 시찰 화면에서 올린 것을 임원이 모아 본다 */
@@ -160,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ================= 노회 재정부 회계 =================
    * 장부 자체는 상비부·시찰과 같은 js/ledger.js 를 쓴다(kind: presbytery).
    * 상비부 이름 목록은 배정 상대를 고르는 데 쓰고, 감사부원인지는 감사 칸에 쓴다. */
-  var finTab = 'ledger', finCommittees = [], finAuditor = false, finChurches = [];
+  var finCommittees = [], finAuditor = false, finChurches = [];
   function loadFinance() {
     SHSCloud.init().then(function (c) {
       return Promise.all([
@@ -174,24 +172,12 @@ document.addEventListener('DOMContentLoaded', function () {
       finAuditor = SHSAuth.canManageMembers(user) ||
         mine.some(function (m) { return m.committee === '감사헌의부' && m.is_officer; });
       finChurches = ((rs[2] && rs[2].data) || []).map(function (x) { return x.church; });
-    }, function () {}).then(function () {
-      var tabs = document.getElementById('fin-tabs');
-      if (tabs) tabs.querySelectorAll('button').forEach(function (b) {
-        b.addEventListener('click', function () {
-          finTab = b.dataset.ft;
-          tabs.querySelectorAll('button').forEach(function (x) { x.classList.toggle('active', x === b); });
-          drawFinance();
-        });
-      });
-      drawFinance();
-    });
+    }, function () {}).then(drawFinance);
   }
   function drawFinance() {
     var box = document.getElementById('fin-area');
     if (!box) return;
-    if (finTab === 'report') {
-      SHSLedger.report(box, { kind: 'presbytery', owner: '노회' });
-    } else {
+    {
       SHSLedger.mount(box, {
         kind: 'presbytery', owner: '노회', user: user,
         /* 기록은 회계만, 부회계는 열람만 (데이터베이스도 같은 규칙) */

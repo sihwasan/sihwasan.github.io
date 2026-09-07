@@ -1214,13 +1214,15 @@ document.addEventListener('DOMContentLoaded', function () {
      * 재정보고서는 시찰 회원 누구나 상시로 열람한다. */
     var canBook = isOfficer || isTreasurer() || isAuditor;
     if (accTab === 'ledger' && !canBook) accTab = 'fee';
+    /* 장부를 여는 사람에게는 장부 안의 <재정보고서> 탭이 있으므로 여기 따로 두지 않는다.
+     * 장부를 못 여는 일반 회원만 이 자리에서 보고서를 본다. */
+    if (accTab === 'report' && canBook) accTab = 'ledger';
     body.innerHTML =
       '<div class="tabs" id="acc-tabs" style="margin-bottom:14px">' +
       '<button class="' + (accTab === 'fee' ? 'active' : '') + '" data-a="fee">회비 납부 현황</button>' +
       (canBook
         ? '<button class="' + (accTab === 'ledger' ? 'active' : '') + '" data-a="ledger">회계 장부</button>'
-        : '') +
-      '<button class="' + (accTab === 'report' ? 'active' : '') + '" data-a="report">재정보고서</button>' +
+        : '<button class="' + (accTab === 'report' ? 'active' : '') + '" data-a="report">재정보고서</button>') +
       '</div><div id="acc-body"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
     body.querySelectorAll('#acc-tabs button').forEach(function (b) {
       b.addEventListener('click', function () {
