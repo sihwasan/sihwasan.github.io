@@ -874,6 +874,8 @@
    * 봄 정기노회: 4월 둘째 주 월요일(통상 부활절 다음 주) / 가을 정기노회: 10월 둘째 주 월요일 (기준일은 운영 일정에서 변경 가능)
    * 알림 규칙은 서버(ops_notices)에서 관리하며, 간사·서기·노회장이 받는다. */
 
+  var SHS_esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+
   function nthMonday(y, month, week) {
     var first = new Date(y, month - 1, 1).getDay();      /* 0=일 */
     var firstMonday = 1 + ((8 - first) % 7);
@@ -892,6 +894,21 @@
     { id: 'd4', title: '고시부 공문 발송 안내 (가을)', audience: '간사', rule: 'before_fall', offset_days: 45, window_days: 45, active: true,
       message: '가을 정기노회 한 달 반 전입니다. 고시규칙부에 공문 발송을 안내해 주세요.' }
   ];
+
+  /* 규칙의 올해 표시 기간 (관리자 화면의 세부 보기에 쓴다) */
+  function opsWindow(n, dates) {
+    dates = dates || DEFAULT_OPS_DATES;
+    var y = new Date().getFullYear();
+    var base;
+    if (n.rule === 'spring' || n.rule === 'before_spring') base = nthMonday(y, dates.springMonth, dates.springWeek);
+    else if (n.rule === 'fall' || n.rule === 'before_fall') base = nthMonday(y, dates.fallMonth, dates.fallWeek);
+    else if (n.rule === 'fixed' && n.fixed_date) base = new Date(n.fixed_date + 'T00:00:00');
+    else return null;
+    var start = new Date(base.getTime() - (n.offset_days || 0) * 86400000);
+    var end = new Date(start.getTime() + (n.window_days || 21) * 86400000);
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    return { start: start, end: end, open: today >= start && today <= end };
+  }
 
   function opsRuleLabel(n) {
     var base = { spring: '봄 정기노회', fall: '가을 정기노회', before_spring: '봄 정기노회', before_fall: '가을 정기노회', fixed: (n.fixed_date || '') }[n.rule] || n.rule;
@@ -930,47 +947,83 @@
     return out;
   }
 
-  /* 관리자 화면 상단 배너: 확인이 필요한 시스템 알림 안내 */
+  /* 상단 배너: 표시 기간에 든 시스템 알림
+   * 규칙의 대상(명부 연동)과 관리자에게 보인다 (서버 my_ops_notices 가 고른다).
+   * 규칙에 <확인 완료 단추>가 켜져 있으면 눌러서 이번 회기에는 끌 수 있고(서버에 남아
+   * 어느 기기에서든 같다), 꺼져 있으면 <나중에 보기>로 이 창에서만 잠시 숨긴다. */
   function meetingReminder(u) {
-    if (!u || !SHSAuth.canManageMembers(u)) return;
+    if (!u) return;
+    var esc = SHS_esc;
 
-    function show(active) {
-      if (!active.length) return;
+    function show(rows) {
+      rows = (rows || []).filter(function (n) {
+        if (n.acked) return false;
+        try { if (sessionStorage.getItem('shs_ops_later_' + n.id + '_' + n.period_key)) return false; } catch (x) {}
+        return true;
+      });
+      if (!rows.length) return;
+      var isAdmin = SHSAuth.canManageMembers(u);
+      function md(d) { var m = String(d || '').match(/^\d{4}-(\d{2})-(\d{2})$/); return m ? parseInt(m[1], 10) + '.' + parseInt(m[2], 10) : ''; }
       var bar = document.createElement('div');
       bar.className = 'container';
       bar.style.marginTop = '16px';
       bar.innerHTML =
         '<div class="notice-banner" style="border-left:4px solid var(--accent)">' +
-        '<strong>[시스템 알림]</strong> 확인이 필요한 운영 알림이 ' + active.length + '건 있습니다: ' +
-        active.map(function (n) { return n.title; }).join(', ') + ' ' +
-        '<a class="btn sm" style="margin-left:8px" href="manage.html#mg-ops">알림 확인하기</a> ' +
-        '<button class="btn ghost sm" id="ops-done-btn">읽음으로 표시</button>' +
+        '<strong>[시스템 알림]</strong> 확인이 필요한 알림이 ' + rows.length + '건 있습니다.' +
+        '<ul style="margin:8px 0 4px;padding-left:18px">' +
+        rows.map(function (n) {
+          return '<li style="margin:4px 0"><strong>' + esc(n.title) + '</strong> ' +
+            '<small style="color:var(--gray-5)">(' + md(n.start_on) + ' ~ ' + md(n.end_on) +
+            (n.audience ? ' · 대상 ' + esc(n.audience) : '') + ')</small>' +
+            (n.message ? '<div style="font-size:0.88rem;color:var(--gray-7);margin-top:2px;white-space:pre-wrap">' + esc(n.message) + '</div>' : '') +
+            (n.ack_enabled
+              ? '<button class="btn sm" data-opsack="' + n.id + '" data-pk="' + esc(n.period_key) + '" style="margin-top:4px">확인 완료</button>'
+              : '') +
+            '</li>';
+        }).join('') + '</ul>' +
+        (isAdmin ? '<a class="btn ghost sm" href="manage.html#mg-ops">알림 규칙 관리</a> ' : '') +
+        '<button class="btn ghost sm" id="ops-later-btn">나중에 보기</button>' +
         '</div>';
       var gnb = document.querySelector('.gnb');
       if (gnb) gnb.insertAdjacentElement('afterend', bar);
-      var doneBtn = bar.querySelector('#ops-done-btn');
-      if (doneBtn) doneBtn.addEventListener('click', function () {
-        /* 이 알림들을 올해는 다시 띄우지 않는다 */
-        active.forEach(function (n) { localStorage.setItem(n.doneKey, '1'); });
+
+      bar.querySelectorAll('button[data-opsack]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          b.disabled = true; b.textContent = '처리 중…';
+          SHSCloud.init().then(function (c) {
+            return c.rpc('ack_ops_notice', { p_id: parseInt(b.dataset.opsack, 10), p_period_key: b.dataset.pk });
+          }).then(function (r) {
+            if (r && r.error) { alert(r.error.message); b.disabled = false; b.textContent = '확인 완료'; return; }
+            var li = b.closest('li');
+            if (li) li.remove();
+            if (!bar.querySelector('li')) bar.remove();
+          });
+        });
+      });
+      var later = bar.querySelector('#ops-later-btn');
+      if (later) later.addEventListener('click', function () {
+        rows.forEach(function (n) {
+          try { sessionStorage.setItem('shs_ops_later_' + n.id + '_' + n.period_key, '1'); } catch (x) {}
+        });
         bar.remove();
       });
     }
 
     if (u.cloud && window.SHSCloud && SHSCloud.enabled()) {
       SHSCloud.init().then(function (c) {
-        if (!c) return;
-        return Promise.all([
-          c.from('ops_notices').select('*'),
-          c.from('site_settings').select('*').eq('key', 'ops_dates').single()
-        ]);
-      }).then(function (rs) {
-        if (!rs || rs[0].error) { show(opsActive(DEFAULT_OPS_NOTICES, DEFAULT_OPS_DATES)); return; }
-        var dates = (rs[1] && rs[1].data && rs[1].data.value) || DEFAULT_OPS_DATES;
-        show(opsActive(rs[0].data || [], dates));
-      });
+        if (!c) return null;
+        return c.rpc('my_ops_notices');
+      }).then(function (r) {
+        if (!r || r.error) return;   /* 82 sql 전이면 조용히 건너뛴다 */
+        show(r.data || []);
+      }).catch(function () {});
       return;
     }
-    show(opsActive(DEFAULT_OPS_NOTICES, DEFAULT_OPS_DATES));
+    /* 서버가 없을 때(예전 방식): 관리자에게 기본 규칙만 */
+    if (SHSAuth.canManageMembers(u)) {
+      var act = opsActive(DEFAULT_OPS_NOTICES, DEFAULT_OPS_DATES);
+      show(act.map(function (n) { return { id: n.id, title: n.title, message: n.message, audience: n.audience, period_key: 'local', ack_enabled: false }; }));
+    }
   }
 
   /* 통합 감사 로그: 서버가 연결되어 있으면 서버에, 아니면 브라우저에 기록 */
@@ -1442,6 +1495,7 @@
     daysToRetire: daysToRetire,
     nthMonday: nthMonday,
     opsActive: opsActive,
+    opsWindow: opsWindow,
     opsRuleLabel: opsRuleLabel,
     isOrganizedChurch: isOrganizedChurch,
     adjustPosition: adjustPosition,

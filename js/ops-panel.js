@@ -406,26 +406,42 @@ var SHSOps = (function () {
     });
   }
 
+  var opsOpen = null;   /* 세부 내용을 펼쳐 둔 규칙 번호 */
   function loadAlerts() {
     Promise.all([
       db.from('ops_notices').select('*').order('sort'),
-      db.from('site_settings').select('*').eq('key', 'ops_dates').single()
+      db.from('site_settings').select('*').eq('key', 'ops_dates').single(),
+      db.rpc('my_ops_notices').then(function (x) { return x; }, function () { return { data: null }; })
     ]).then(function (rs) {
       var box = document.getElementById('ops-alert');
       if (rs[0].error) { box.innerHTML = '<div class="notice-banner">불러오기 실패: ' + e(rs[0].error.message) + ' (06_system.sql 실행이 필요할 수 있습니다)</div>'; return; }
       var rows = rs[0].data || [];
       var dates = (rs[1].data && rs[1].data.value) || { springMonth: 4, springWeek: 2, fallMonth: 10, fallWeek: 2 };
-      var active = SHS.opsActive(rows, dates);
+      /* 서버가 골라 준 "지금 표시 중" (82 sql). 없으면 예전처럼 화면에서 셈한다. */
+      var srv = rs[2] && !rs[2].error && Array.isArray(rs[2].data) ? rs[2].data : null;
+      function md(d) { var m = String(d || '').match(/^\d{4}-(\d{2})-(\d{2})$/); return m ? parseInt(m[1], 10) + '.' + parseInt(m[2], 10) : ''; }
+      var active = srv
+        ? srv.map(function (n) {
+            return { id: n.id, title: n.title, message: n.message, audience: n.audience,
+                     period: md(n.start_on) + ' ~ ' + md(n.end_on), period_key: n.period_key,
+                     acked: n.acked, ack_enabled: n.ack_enabled, server: true };
+          })
+        : SHS.opsActive(rows, dates);
 
       var html = '<h2>지금 확인이 필요한 알림</h2>';
       if (!active.length) {
         html += '<p style="color:var(--gray-5)">현재 기간에 해당하는 알림이 없습니다.</p>';
       } else {
         active.forEach(function (n) {
-          html += '<div class="side-box" style="margin-bottom:14px;border-left:4px solid var(--accent)">' +
-            '<div class="box-head">' + e(n.title) + ' <span style="font-weight:400;font-size:0.8rem;color:var(--gray-5)">(대상: ' + e(n.audience) + ' / ' + e(n.period) + ')</span></div>' +
-            '<div class="box-body"><p>' + e(n.message || '') + '</p>' +
-            '<button class="btn ghost sm" data-opsdone="' + n.doneKey + '">이번 회기 처리 완료 (알림 끄기)</button> ' +
+          html += '<div class="side-box" style="margin-bottom:14px;border-left:4px solid var(--accent)' + (n.acked ? ';opacity:.6' : '') + '">' +
+            '<div class="box-head">' + e(n.title) + ' <span style="font-weight:400;font-size:0.8rem;color:var(--gray-5)">(대상: ' + e(n.audience) + ' / ' + e(n.period) + ')</span>' +
+            (n.acked ? ' <span class="role-badge" style="color:#2a7a2a;border-color:#2a7a2a">확인 완료</span>' : '') + '</div>' +
+            '<div class="box-body"><p style="white-space:pre-wrap">' + e(n.message || '') + '</p>' +
+            (n.server
+              ? (n.acked
+                  ? '<button class="btn ghost sm" data-opsunack="' + n.id + '" data-pk="' + e(n.period_key) + '">다시 표시</button> '
+                  : '<button class="btn ghost sm" data-opsack="' + n.id + '" data-pk="' + e(n.period_key) + '">이번 회기 확인 완료 (내 화면에서 끄기)</button> ')
+              : '<button class="btn ghost sm" data-opsdone="' + n.doneKey + '">이번 회기 처리 완료 (알림 끄기)</button> ') +
             (OPS_GROUPS.indexOf(n.audience) !== -1
               ? '<button class="btn sm" data-opssend="' + e(n.audience) + '" data-st="' + e(n.title) +
                 '" data-sb="' + e(n.message || '') + '">' + e(n.audience) + '에게 알림함으로 보내기</button>'
@@ -450,15 +466,25 @@ var SHSOps = (function () {
         '<button class="btn" id="gs-send">알림함으로 보내기</button>' +
         '<div class="form-msg" id="gs-msg"></div></div>';
 
-      html += '<h2>등록된 알림 규칙</h2>';
-      html += '<table class="tbl"><thead><tr><th>제목</th><th>대상</th><th>표시 기준</th><th>사용</th>' +
+      html += '<h2>등록된 알림 규칙</h2>' +
+        '<p style="font-size:0.86rem;color:var(--gray-6)">제목을 누르면 세부 내용이 열립니다. 표시 기간이 되면 규칙의 대상(명부 연동)과 관리자에게 홈페이지 상단 배너로 보이고, ' +
+        '<strong>확인 완료 단추</strong>가 켜진 규칙은 받는 사람이 눌러 이번 회기에는 끌 수 있습니다.</p>';
+      html += '<table class="tbl"><thead><tr><th>제목</th><th>대상</th><th>표시 기준</th><th style="width:80px">확인 완료</th><th style="width:60px">사용</th>' +
         (isSuper ? '<th style="width:80px">관리</th>' : '') + '</tr></thead><tbody>';
+      var COLS = isSuper ? 6 : 5;
       rows.forEach(function (n) {
-        html += '<tr><td class="left">' + e(n.title) + '</td><td>' + e(n.audience) + '</td>' +
+        var w = SHS.opsWindow(n, dates);
+        var open = String(opsOpen) === String(n.id);
+        html += '<tr' + (open ? ' style="background:var(--gray-1,#f4efe7)"' : '') + '>' +
+          '<td class="left"><a href="#" data-opsdet="' + n.id + '" style="text-decoration:underline;color:var(--navy);font-weight:600">' + e(n.title) + '</a>' +
+          (w && w.open ? ' <span class="role-badge" style="color:#b0731f;border-color:#b0731f">표시 중</span>' : '') + '</td>' +
+          '<td>' + e(n.audience) + '</td>' +
           '<td class="left">' + e(SHS.opsRuleLabel(n)) + '</td>' +
-          '<td>' + (n.active ? '사용' : '중지') + '</td>' +
+          '<td>' + (n.ack_enabled ? '<span style="color:#2a7a2a">켜짐</span>' : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+          '<td>' + (n.active ? '사용' : '<span style="color:#a33">중지</span>') + '</td>' +
           (isSuper ? '<td><button class="btn danger sm" data-opsdel="' + n.id + '" data-opst="' + e(n.title) + '">삭제</button></td>' : '') +
           '</tr>';
+        if (open) html += '<tr><td colspan="' + COLS + '" class="left" style="background:#fcfbf8"><div id="ops-det-' + n.id + '">' + ruleDetailHtml(n, w) + '</div></td></tr>';
       });
       html += '</tbody></table>';
 
@@ -477,9 +503,40 @@ var SHSOps = (function () {
           '<div class="field" style="flex:0 0 160px"><label>특정 날짜(해당 시)</label><input type="date" id="op-fixed"></div>' +
           '</div>' +
           '<div class="field"><label>알림 내용</label><textarea id="op-msg" rows="3"></textarea></div>' +
+          '<div class="field"><label><input type="checkbox" id="op-ack"> ' +
+          '<strong>확인 완료 단추</strong> — 받는 사람이 눌러 이번 회기에는 알림을 끌 수 있게 (끄면 표시 기간 내내 보입니다)</label></div>' +
           '<button class="btn" id="op-add">추가</button><div class="form-msg" id="op-addmsg"></div></div>';
       }
       box.innerHTML = html;
+
+      /* 제목을 누르면 세부 내용 (관리자는 수정까지) */
+      box.querySelectorAll('a[data-opsdet]').forEach(function (a) {
+        a.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          opsOpen = String(opsOpen) === String(a.dataset.opsdet) ? null : a.dataset.opsdet;
+          loadAlerts();
+        });
+      });
+      if (opsOpen) bindRuleDetail(rows.filter(function (n) { return String(n.id) === String(opsOpen); })[0], rows);
+
+      /* 서버에 남는 확인 완료 / 다시 표시 */
+      box.querySelectorAll('button[data-opsack]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          db.rpc('ack_ops_notice', { p_id: parseInt(b.dataset.opsack, 10), p_period_key: b.dataset.pk }).then(function (r) {
+            if (r.error) { alert(r.error.message); return; }
+            SHSCloud.log('update', '시스템 알림 확인 완료', b.dataset.opsack + ' / ' + b.dataset.pk);
+            loadAlerts();
+          });
+        });
+      });
+      box.querySelectorAll('button[data-opsunack]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          db.rpc('unack_ops_notice', { p_id: parseInt(b.dataset.opsunack, 10), p_period_key: b.dataset.pk }).then(function (r) {
+            if (r.error) { alert(r.error.message); return; }
+            loadAlerts();
+          });
+        });
+      });
 
       /* 표시 중인 알림을 그 대상 그룹에게 알림함으로 보내기 */
       box.querySelectorAll('button[data-opssend]').forEach(function (b) {
@@ -544,6 +601,7 @@ var SHSOps = (function () {
             window_days: parseInt(document.getElementById('op-win').value, 10) || 21,
             fixed_date: document.getElementById('op-fixed').value || null,
             message: document.getElementById('op-msg').value.trim(),
+            ack_enabled: !!(document.getElementById('op-ack') && document.getElementById('op-ack').checked),
             sort: rows.length + 1
           };
           if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
@@ -555,6 +613,79 @@ var SHSOps = (function () {
         });
       }
     });
+  }
+
+  /* ----- 알림 규칙 세부 내용 (제목을 누르면 열린다) ----- */
+  var RULES = { spring: '봄 정기노회', fall: '가을 정기노회', before_spring: '봄 노회 전', before_fall: '가을 노회 전', fixed: '특정 날짜' };
+  function ruleDetailHtml(n, w) {
+    function md(d) { return d ? (d.getMonth() + 1) + '.' + d.getDate() : ''; }
+    var h = '<div style="display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:0.9rem;max-width:820px">' +
+      '<div style="color:var(--gray-5)">알림 내용</div><div style="white-space:pre-wrap">' + (n.message ? e(n.message) : '<span style="color:var(--gray-5)">(없음)</span>') + '</div>' +
+      '<div style="color:var(--gray-5)">대상</div><div>' + e(n.audience) + ' <small style="color:var(--gray-5)">(명부 연동)</small></div>' +
+      '<div style="color:var(--gray-5)">표시 기준</div><div>' + e(SHS.opsRuleLabel(n)) + '</div>' +
+      '<div style="color:var(--gray-5)">올해 표시 기간</div><div>' +
+      (w ? md(w.start) + ' ~ ' + md(w.end) + (w.open ? ' <span class="role-badge" style="color:#b0731f;border-color:#b0731f">지금 표시 중</span>' : ' <small style="color:var(--gray-5)">(기간 아님)</small>')
+         : '<span style="color:var(--gray-5)">기준일이 없어 표시되지 않습니다</span>') + '</div>' +
+      '<div style="color:var(--gray-5)">확인 완료 단추</div><div>' + (n.ack_enabled ? '켜짐 — 받는 사람이 눌러 이번 회기에는 끌 수 있습니다' : '꺼짐 — 표시 기간 내내 보입니다') + '</div>' +
+      '<div style="color:var(--gray-5)">사용</div><div>' + (n.active ? '사용' : '<span style="color:#a33">중지</span>') + '</div>' +
+      '<div style="color:var(--gray-5)">확인 완료한 사람</div><div id="ops-acks-' + n.id + '"><small style="color:var(--gray-5)">불러오는 중…</small></div>' +
+      '</div>';
+    if (isSuper) {
+      h += '<div class="admin-card" style="max-width:820px;margin-top:12px"><h3 style="margin-top:0;font-size:1rem">규칙 수정</h3>' +
+        '<div class="inline-form" style="margin-bottom:8px">' +
+        '<div class="field"><label>제목</label><input type="text" id="oe-title" value="' + e(n.title) + '"></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>대상</label><select id="oe-aud">' +
+        OPS_GROUPS.map(function (g) { return '<option' + (g === n.audience ? ' selected' : '') + '>' + g + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 150px"><label>기준</label><select id="oe-rule">' +
+        Object.keys(RULES).map(function (k) { return '<option value="' + k + '"' + (k === n.rule ? ' selected' : '') + '>' + RULES[k] + '</option>'; }).join('') + '</select></div>' +
+        '<div class="field" style="flex:0 0 110px"><label>며칠 전부터</label><input type="number" id="oe-off" value="' + (n.offset_days || 0) + '"></div>' +
+        '<div class="field" style="flex:0 0 110px"><label>표시 일수</label><input type="number" id="oe-win" value="' + (n.window_days || 21) + '"></div>' +
+        '<div class="field" style="flex:0 0 160px"><label>특정 날짜(해당 시)</label><input type="date" id="oe-fixed" value="' + e(n.fixed_date || '') + '"></div>' +
+        '</div>' +
+        '<div class="field"><label>알림 내용</label><textarea id="oe-msg" rows="3">' + e(n.message || '') + '</textarea></div>' +
+        '<div class="field"><label><input type="checkbox" id="oe-ack"' + (n.ack_enabled ? ' checked' : '') + '> 확인 완료 단추 (받는 사람이 눌러 이번 회기에는 끌 수 있게)</label></div>' +
+        '<div class="field"><label><input type="checkbox" id="oe-active"' + (n.active ? ' checked' : '') + '> 사용 (끄면 표시되지 않습니다)</label></div>' +
+        '<button class="btn" id="oe-save">저장</button> <button class="btn ghost" id="oe-close">닫기</button>' +
+        '<div class="form-msg" id="oe-msg2"></div></div>';
+    }
+    return h;
+  }
+  function bindRuleDetail(n, rows) {
+    if (!n) return;
+    /* 누가 확인했나 */
+    db.rpc('ops_notice_acks_of', { p_id: n.id }).then(function (r) {
+      var el = document.getElementById('ops-acks-' + n.id);
+      if (!el) return;
+      var list = (r && !r.error && r.data) || [];
+      el.innerHTML = list.length
+        ? list.map(function (a) { return e(a.user_name || '') + ' <small style="color:var(--gray-5)">(' + e(a.period_key) + ' · ' + e(String(a.done_at || '').replace('T', ' ').slice(0, 16)) + ')</small>'; }).join('<br>')
+        : '<small style="color:var(--gray-5)">아직 없음</small>';
+    }, function () {});
+    var sv = document.getElementById('oe-save');
+    if (sv) sv.addEventListener('click', function () {
+      var msg = document.getElementById('oe-msg2');
+      var d = {
+        title: document.getElementById('oe-title').value.trim(),
+        audience: document.getElementById('oe-aud').value,
+        rule: document.getElementById('oe-rule').value,
+        offset_days: parseInt(document.getElementById('oe-off').value, 10) || 0,
+        window_days: parseInt(document.getElementById('oe-win').value, 10) || 21,
+        fixed_date: document.getElementById('oe-fixed').value || null,
+        message: document.getElementById('oe-msg').value.trim(),
+        ack_enabled: document.getElementById('oe-ack').checked,
+        active: document.getElementById('oe-active').checked,
+        updated_at: new Date().toISOString(), updated_by: user.name
+      };
+      if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
+      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      db.from('ops_notices').update(d).eq('id', n.id).then(function (res) {
+        if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
+        SHSCloud.log('update', '시스템 알림 규칙 수정', d.title);
+        loadAlerts();
+      });
+    });
+    var cl = document.getElementById('oe-close');
+    if (cl) cl.addEventListener('click', function () { opsOpen = null; loadAlerts(); });
   }
 
   /* ---------- 운영 매뉴얼 ---------- */
