@@ -705,17 +705,20 @@ var SHSLedger = (function () {
         '<summary style="cursor:pointer;font-size:0.9rem;color:var(--navy)">지급 확인 받기 — ' +
         '회의비·거마비처럼 영수증이 없는 지출</summary>' +
         '<div style="margin-top:8px">' +
+        '<p style="font-size:0.82rem;color:var(--gray-5);margin:0 0 8px">받는 사람은 <strong>한 명씩</strong> 이름을 적고 「적은 사람 추가」를 누르거나, ' +
+        '<strong>여럿을 한 번에</strong> 「회원 일괄 선택」으로 고릅니다. 고른 사람은 아래 <strong>추가된 명단</strong>에 모입니다.</p>' +
         '<div class="inline-form">' +
-        '<div class="field"><label>받는 사람 (이름을 적어 고르세요)</label>' +
+        '<div class="field"><label>받는 사람 한 명씩 적기 (이름을 적어 목록에서 고르세요)</label>' +
         '<input type="text" id="lg-payee" list="lg-members" placeholder="예: 김동석" autocomplete="off">' +
         '<datalist id="lg-members"></datalist></div>' +
         '<div class="field" style="flex:0 0 150px"><label>1인 금액 (원)</label>' +
         '<input type="number" id="lg-payamt" min="0" step="1000"></div>' +
         '<div class="field" style="flex:0 0 auto"><label>&nbsp;</label>' +
-        '<button type="button" class="btn ghost sm" id="lg-payadd">더하기</button> ' +
+        '<button type="button" class="btn ghost sm" id="lg-payadd">적은 사람 추가</button> ' +
         '<button type="button" class="btn ghost sm" id="lg-paybulk">회원 일괄 선택</button></div>' +
         '</div>' +
-        '<div class="lg-chips" id="lg-paylist"></div>' +
+        '<div id="lg-paylist-head" style="margin-top:12px;font-size:0.88rem;font-weight:700;color:var(--navy)"></div>' +
+        '<div class="lg-chips" id="lg-paylist" style="margin-top:6px"></div>' +
         '<div class="form-msg" id="lg-paymsg"></div>' +
         '<p style="font-size:0.78rem;color:var(--gray-5);margin:6px 0 0">저장하면 받는 분마다 알림이 가고, 본인이 ' +
         '<strong>수령 확인</strong>을 누르면 영수증을 대신합니다. 계정이 없는 회원은 회계가 수기로 확인 처리합니다.</p>' +
@@ -793,13 +796,18 @@ var SHSLedger = (function () {
     function renderPayees() {
       var list = document.getElementById('lg-paylist');
       if (!list) return;
+      var head = document.getElementById('lg-paylist-head');
+      if (head) {
+        head.innerHTML = pendingPayees.length
+          ? '추가된 명단 <span style="color:var(--accent)">' + pendingPayees.length + '명</span> ' +
+            '<small style="font-weight:400;color:var(--gray-5)">— 저장을 누르면 이 분들께 지급 확인이 갑니다. ×로 뺄 수 있습니다.</small>'
+          : '추가된 명단 <small style="font-weight:400;color:var(--gray-5)">— 아직 없습니다.</small>';
+      }
       list.innerHTML = pendingPayees.map(function (m, i) {
         return '<span>' + esc(m.name) + ' <small style="color:var(--gray-5)">' + esc(m.church) + '</small>' +
           (accKnown && !m.has_account ? ' <small style="color:#b0731f">계정 없음</small>' : '') +
           ' <button type="button" data-lgpd="' + i + '" title="빼기">&times;</button></span>';
-      }).join('') +
-      (pendingPayees.length
-        ? '<span style="background:none;font-weight:700">' + pendingPayees.length + '명</span>' : '');
+      }).join('');
       list.querySelectorAll('button[data-lgpd]').forEach(function (b) {
         b.addEventListener('click', function () {
           pendingPayees.splice(parseInt(b.dataset.lgpd, 10), 1);
@@ -822,14 +830,14 @@ var SHSLedger = (function () {
         var t = inp.value.trim();
         if (!t) {
           say('', pendingPayees.length
-            ? '이미 고른 ' + pendingPayees.length + '명은 아래 저장을 누르면 함께 적힙니다. 더 넣으려면 이름을 적거나 회원 일괄 선택을 누르세요.'
-            : '받는 사람 이름을 적어 목록에서 고르거나, 회원 일괄 선택을 누르세요.');
+            ? '추가된 명단 ' + pendingPayees.length + '명은 아래 저장을 누르면 함께 적힙니다. 한 명 더 넣으려면 이름을 적은 뒤 이 단추를 누르세요.'
+            : '이름을 적은 뒤 이 단추를 누르면 추가된 명단에 들어갑니다. 여럿은 회원 일괄 선택으로 고르세요.');
           inp.focus(); return;
         }
         var m = matchMember(t);
         if (!m) { say('err', '"' + t + '"을(를) 명단에서 찾지 못했습니다. 목록에서 "이름 (교회)"를 골라 주세요.'); inp.focus(); return; }
         if (pendingPayees.some(function (x) { return x.roster_id === m.roster_id; })) {
-          say('', m.name + ' 님은 이미 목록에 있습니다.'); inp.value = ''; inp.focus(); return;
+          say('', m.name + ' 님은 이미 추가된 명단에 있습니다.'); inp.value = ''; inp.focus(); return;
         }
         addPayee(m); inp.value = ''; inp.focus(); say('', '');
       }
@@ -840,7 +848,7 @@ var SHSLedger = (function () {
       document.getElementById('lg-paybulk').addEventListener('click', function () {
         openMemberPicker(function (list) {
           list.forEach(addPayee);
-          say('', list.length ? list.length + '명을 골랐습니다. 아래 저장을 누르면 함께 적힙니다.' : '');
+          say('', list.length ? list.length + '명을 추가된 명단에 넣었습니다. 아래 저장을 누르면 함께 적힙니다.' : '');
         });
       });
       renderPayees();
@@ -1152,7 +1160,7 @@ var SHSLedger = (function () {
           '<div class="field" style="flex:0 0 140px"><label>1인 금액 (원)</label>' +
           '<input type="number" id="lg-payamt2" min="0" step="1000" value="' +
           (list.length ? Number(list[list.length - 1].amount) || '' : '') + '"></div>' +
-          '<button type="button" class="btn ghost sm" id="lg-payadd2">더하기</button>' +
+          '<button type="button" class="btn ghost sm" id="lg-payadd2">적은 사람 추가</button>' +
           '<button type="button" class="btn ghost sm" id="lg-paybulk2">회원 일괄 선택</button>' +
           '</div><div class="form-msg" id="lg-po-msg"></div>' +
           '<p style="font-size:0.78rem;color:var(--gray-5)">계정이 있는 회원에게는 바로 알림이 갑니다. ' +
@@ -1184,7 +1192,7 @@ var SHSLedger = (function () {
         var mm = document.getElementById('lg-po-msg');
         var t = inp2.value.trim();
         if (!t) {
-          mm.className = 'form-msg'; mm.textContent = '받는 사람 이름을 적어 목록에서 고르거나, 회원 일괄 선택을 누르세요.';
+          mm.className = 'form-msg'; mm.textContent = '이름을 적은 뒤 이 단추를 누르세요. 여럿은 회원 일괄 선택으로 고르세요.';
           inp2.focus(); return;
         }
         var m = matchMember(t);
