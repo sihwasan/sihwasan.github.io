@@ -27,6 +27,7 @@
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/my-payouts.js"></script>
+<script src="js/seal-maker.js?v=20260907a"></script>
 <script src="js/date-pick.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -183,7 +184,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<small>흰 바탕은 자동으로 투명하게 지워져, 문서 위에 자연스럽게 찍힙니다</small></div>' +
       '</div>' +
       '<input type="file" id="sl-file" accept="image/*" class="hidden">' +
-      '<button class="btn ghost hidden" id="sl-del" style="width:100%;margin-top:12px">직인 지우기</button>' +
+      '<button class="btn" id="sl-make" style="width:100%;margin-top:12px">도장 파일 생성하기 — 교회 직인 만들기</button>' +
+      '<button class="btn ghost hidden" id="sl-del" style="width:100%;margin-top:8px">직인 지우기</button>' +
       '<div class="form-msg" id="sl-msg"></div>' +
       '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:8px">본인만 보고 쓸 수 있으며, ' +
       '<strong>교회상황 보고서</strong>를 제출하거나 인쇄할 때 문서 하단 (직인) 자리에 찍힙니다.</p>' +
@@ -200,10 +202,13 @@ document.addEventListener('DOMContentLoaded', function () {
       '<small>흰 바탕은 자동으로 투명하게 지워져, 문서 위에 자연스럽게 찍힙니다</small></div>' +
       '</div>' +
       '<input type="file" id="ps-file" accept="image/*" class="hidden">' +
-      '<button class="btn ghost hidden" id="ps-del" style="width:100%;margin-top:12px">도장 지우기</button>' +
+      '<button class="btn" id="ps-make" style="width:100%;margin-top:12px">도장 파일 생성하기 — 이름·직책으로 전자 도장 만들기</button>' +
+      '<button class="btn ghost hidden" id="ps-del" style="width:100%;margin-top:8px">도장 지우기</button>' +
       '<div class="form-msg" id="ps-msg"></div>' +
       '<p style="font-size:0.82rem;color:var(--gray-5);margin-top:8px">본인만 보고 쓸 수 있으며, ' +
-      '<strong>청원서</strong>를 작성해 인쇄·PDF 저장하거나 시찰로 전달할 때 (인) 자리에 찍힙니다.</p>' +
+      '<strong>청원서</strong>를 작성해 인쇄·PDF 저장하거나 시찰로 전달할 때 (인) 자리에 찍힙니다. ' +
+      '사진을 올리는 대신 <strong>도장 파일 생성하기</strong>로 이름과 직책만 넣어 투명 바탕 PNG 도장을 만들 수도 있습니다.</p>' +
+      '<div id="ps-audit"></div>' +
       '</div>';
 
     /* 노회장 전용: 차기 노회장에게 권한 이양 */
@@ -289,6 +294,49 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     SHSMyDuties.mount(document.getElementById('duty-area'), p);
     SHSMyPayouts.mount(document.getElementById('payout-area'), p);
+    setupAuditSeal();
+
+    /* ---------- 감사부장·감사부 서기: 내 도장을 감사필 도장으로 등록 ----------
+     * 감사 기간에 감사필을 찍으면 이 도장이 회의록·회계 장부에 담긴다. */
+    function setupAuditSeal() {
+      var box = document.getElementById('ps-audit');
+      if (!box || !(window.SHSCloud && SHSCloud.enabled())) return;
+      SHSCloud.init().then(function (c) {
+        return Promise.all([
+          c.rpc('my_audit_seal_key'),
+          c.rpc('audit_seal_status').then(function (x) { return x; }, function () { return { data: [] }; }),
+          c.from('member_seals').select('image').eq('user_id', p.id).eq('kind', 'pastor')
+        ]);
+      }).then(function (rs) {
+        var key = rs[0] && !rs[0].error ? rs[0].data : null;
+        if (!key) { box.innerHTML = ''; return; }
+        var st = ((rs[1] && rs[1].data) || []).filter(function (x) { return x.key === key; })[0] || {};
+        var mine = rs[2] && rs[2].data && rs[2].data[0] ? rs[2].data[0].image : null;
+        var who = key === '감사부장' ? '감사부장' : '감사부 서기';
+        box.innerHTML = '<div class="notice-banner" style="margin-top:14px;border-left:4px solid ' + (st.has_seal ? '#2a7a2a' : '#d9a33b') + '">' +
+          '<strong>' + who + ' 감사필 도장</strong> — 감사 기간에 회계 장부·회의록에 감사필을 찍을 때 이 도장이 담깁니다.<br>' +
+          (st.has_seal
+            ? '<span style="color:#2a7a2a">등록되어 있습니다' + (st.holder ? ' (' + e(st.holder) + ')' : '') + '.</span> 도장을 새로 만들었거나 올렸으면 아래 단추로 다시 등록하세요.'
+            : '<span style="color:#b0731f">아직 등록되지 않았습니다.</span> 위에서 도장을 만들거나 올린 뒤, 아래 단추로 감사필 도장으로 등록해 주세요.') +
+          '<div style="margin-top:8px"><button class="btn sm" id="ps-audit-reg"' + (mine ? '' : ' disabled') + '>내 도장을 ' + who + ' 도장으로 등록</button>' +
+          (mine ? '' : ' <small style="color:var(--gray-5)">먼저 도장을 만들거나 올려 주세요</small>') +
+          '</div><div class="form-msg" id="ps-audit-msg"></div></div>';
+        var btn = document.getElementById('ps-audit-reg');
+        if (btn && mine) btn.addEventListener('click', function () {
+          if (!confirm('지금 저장된 내 도장을 ' + who + ' 감사필 도장으로 등록합니다.\n감사필을 찍을 때 이 도장이 문서에 담깁니다. 계속하시겠습니까?')) return;
+          var msg = document.getElementById('ps-audit-msg');
+          btn.disabled = true; msg.className = 'form-msg'; msg.textContent = '등록 중입니다...';
+          SHSCloud.init().then(function (c) {
+            return c.rpc('register_my_audit_seal', { p_image: mine });
+          }).then(function (r) {
+            if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; btn.disabled = false; return; }
+            SHSCloud.log('update', '감사필 도장 등록', r.data);
+            if (window.SHSAuditMark && SHSAuditMark.forgetSeals) SHSAuditMark.forgetSeals();
+            setupAuditSeal();
+          });
+        });
+      }).catch(function () { box.innerHTML = ''; });
+    }
 
     /* ---------- 교회 직인·도장 올리기 ----------
      * 흰 바탕을 투명하게 지우고 420px 이하 PNG로 줄여
@@ -377,6 +425,36 @@ document.addEventListener('DOMContentLoaded', function () {
           setMsg((err && err.message) || label + '을(를) 올리지 못했습니다.', true);
         });
       }
+
+      /* 도장 만들기 — 동의를 거쳐 만든 PNG 를 내 도장으로 저장한다 */
+      function saveGenerated(dataUrl, meta) {
+        if (dataUrl.length > 900000) return Promise.reject(new Error('그림이 너무 큽니다.'));
+        return SHSCloud.init().then(function (c) {
+          return c.from('member_seals').upsert({
+            user_id: p.id, kind: kind, image: dataUrl, updated_at: new Date().toISOString(),
+            generated: true, consent_at: new Date().toISOString(),
+            consent_ver: (meta && meta.consent_ver) || (window.SHSSealMaker && SHSSealMaker.CONSENT_VER) || '',
+            gen_meta: meta || null
+          }, { onConflict: 'user_id,kind' });
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          SHSCloud.log('update', logLabel + ' 생성·등록 (동의)', p.email);
+          setMsg(label + '을(를) 만들어 저장했습니다. 이제 문서에 찍을 수 있습니다.');
+          show(dataUrl);
+          if (kind === 'pastor') setupAuditSeal();
+        });
+      }
+      var makeBtn = document.getElementById(pre + '-make');
+      if (makeBtn) makeBtn.addEventListener('click', function () {
+        if (!window.SHSSealMaker) { setMsg('도장 만들기 도구를 불러오지 못했습니다. 새로 고침해 주세요.', true); return; }
+        var titleEl = document.getElementById('ps-title');
+        SHSSealMaker.open({
+          kind: kind === 'church' ? 'church' : 'pastor',
+          name: p.name || '', church: p.church || '',
+          title: kind === 'church' ? '' : (p.position || (titleEl ? titleEl.textContent.replace(' 도장', '') : '')),
+          onSave: saveGenerated
+        });
+      });
 
       drop.addEventListener('click', function () { fileIn.click(); });
       fileIn.addEventListener('change', function () {

@@ -376,6 +376,19 @@ var SHSBoard = (function () {
         }
         auditRows = r.data || [];
         drawAudit();
+        /* 감사필에 찍힐 도장이 갖추어졌는지 — 없으면 내 정보로 안내 */
+        return SHSCloud.init().then(function (c) { return c.rpc('audit_seal_status'); }).then(function (r2) {
+          var st = (r2 && !r2.error && r2.data) || [];
+          var missing = st.filter(function (x) { return !x.has_seal; });
+          var slot = document.getElementById('dash-audit-seal');
+          if (!slot || !missing.length) return;
+          var mineMissing = missing.some(function (x) { return x.mine; });
+          slot.innerHTML = '<div class="notice-banner" style="border-left:4px solid #d9a33b;margin-bottom:10px">' +
+            '<strong>감사필 도장</strong> — ' + missing.map(function (x) { return x.key === '감사부장' ? '감사부장' : '감사부 서기'; }).join('·') +
+            ' 도장이 아직 등록되지 않았습니다. 감사필을 찍으면 도장 자리가 비어 나옵니다.' +
+            (mineMissing ? ' <a class="btn sm" href="mypage.html#ps-title" style="margin-left:8px">내 정보에서 도장 만들기·등록</a>' : '') +
+            '</div>';
+        }, function () {});
       });
     }
     function drawAudit() {
@@ -388,7 +401,8 @@ var SHSBoard = (function () {
       var years = Object.keys(ys).map(Number).sort(function (a, b) { return b - a; });
 
       var sd = SHSAuditMark.shortDate;
-      var h = '<div class="notice-banner" style="border-left:4px solid var(--navy)">' +
+      var h = '<div id="dash-audit-seal"></div>' +
+        '<div class="notice-banner" style="border-left:4px solid var(--navy)">' +
         '<strong>' + esc(String(w.year || auditYear)) + '년 ' + esc(w.period || '') + ' 감사 기간</strong>' +
         ' <span style="font-size:0.84rem;color:var(--gray-6)">' + sd(w.from) + ' ~ ' + sd(w.until) +
         (w.daysLeft > 0 ? ' · ' + w.daysLeft + '일 남음' : ' · 오늘까지') +

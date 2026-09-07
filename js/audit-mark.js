@@ -84,6 +84,7 @@ var SHSAuditMark = (function () {
 
   /* 설정을 고친 뒤 다시 읽게 한다 */
   function forget() { override = null; overLoading = null; }
+  function forgetSeals() { seals = null; loading = null; }
 
   /* ---------- 감사부 도장 ----------
    * 비공개 보관함에서 꺼내 그림 자체로 바꾼다.
@@ -118,6 +119,8 @@ var SHSAuditMark = (function () {
       var rows = (r && r.data) || [];
       return Promise.all(rows.map(function (s) {
         out[s.key] = { label: s.label, holder: s.holder || '', data: null };
+        /* 감사부장·서기가 내 정보에서 직접 등록한 도장 그림이 있으면 그것을 쓴다 */
+        if (s.image && /^data:image\//.test(s.image)) { out[s.key].data = s.image; return null; }
         if (!s.file_path) return null;
         return SHSCloud.init().then(function (c) {
           return c.storage.from('seals').createSignedUrl(s.file_path, 600);
@@ -272,6 +275,7 @@ var SHSAuditMark = (function () {
     forget: forget,
     windowNow: windowNow,
     shortDate: shortDate,
+    forgetSeals: forgetSeals,
     loadSeals: loadSeals,
     panel: panel,
     bind: bind,

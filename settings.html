@@ -184,7 +184,9 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '<div class="doc-item">' +
           '<div class="d-name">' + e(s.label) + '</div>' +
           '<div class="d-desc">' + (s.holder ? h.label + ': ' + e(s.holder) + '<br>' : '') +
-          (s.file_path ? '등록됨 (' + e(String(s.updated_at || '').slice(0, 10)) + ')' : '아직 등록되지 않았습니다.') + '</div>' +
+          ((s.file_path || s.image)
+            ? '등록됨 (' + e(String(s.updated_at || '').slice(0, 10)) + ')' + (s.image ? ' · 본인이 내 정보에서 등록한 도장' : '')
+            : '아직 등록되지 않았습니다.') + '</div>' +
           '<div id="seal-prev-' + e(s.key) + '" style="min-height:70px;margin-bottom:10px"></div>' +
           '<div class="field"><label>' + e(h.label) + '</label>' +
           '<input type="text" data-sholder="' + e(s.key) + '" value="' + e(val) + '"' +
@@ -201,6 +203,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
       /* 등록된 도장 미리보기 */
       rows.forEach(function (s) {
+        if (s.image) {
+          var el0 = document.getElementById('seal-prev-' + s.key);
+          if (el0) el0.innerHTML = '<img src="' + s.image + '" alt="' + e(s.label) + '" ' +
+            'style="width:80px;height:80px;object-fit:contain;border:1px solid var(--gray-2);padding:4px">';
+          return;
+        }
         if (!s.file_path) return;
         SHSCloud.init().then(function (c) {
           return c.storage.from('seals').createSignedUrl(s.file_path, 300);
