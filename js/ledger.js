@@ -1274,7 +1274,8 @@ var SHSLedger = (function () {
         h += (h ? ' ' : '') + '<button type="button" class="btn ghost sm" data-lgpo="' + x.id + '" title="지급 확인 보기"' +
           (ok === po.length ? ' style="color:#2a7a2a;border-color:#2a7a2a"' : '') +
           '>수령 ' + ok + '/' + po.length + '</button>';
-      } else if (canWrite && !ln && x.kind === '지출') {
+      } else if (canWrite && !ln && x.kind === '지출' && !list.length) {
+        /* 수령 확인은 영수증 없이 지급한 경우에만 — 영수증이 붙어 있으면 단추를 내지 않는다 */
         h += (h ? ' ' : '') + '<button type="button" class="btn ghost sm" data-lgpo="' + x.id + '" ' +
           'title="받는 사람을 적어 수령 확인을 받는다" style="color:var(--gray-5)">수령확인</button>';
       }
