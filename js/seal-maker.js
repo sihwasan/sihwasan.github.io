@@ -2,7 +2,15 @@
  *
  * 이름·직책·소속을 넣으면 인주색 도장 그림(PNG, 투명 바탕)을 그려 준다.
  * 모양은 여섯 가지 — 원형(테두리 글+가운데 / 바둑판 이름 / 세로 이름),
- * 사각(3×3 바둑판·전통 / 직책+이름 / 3줄). 글꼴은 궁서·바탕·고딕.
+ * 사각(3×3 바둑판·전통 / 직책+이름 / 3줄).
+ *
+ * 서체는 도장집의 서체 견본(고인체·예서체·훈민정음체·도안체·붓글씨·전서체…)을
+ * 본떠 열네 가지를 둔다. 상용 도장 서체는 쓸 수 없으므로 무료 웹 글꼴(구글 폰트)
+ * 가운데 느낌이 가까운 것을 고르고, 도장 특유의 처리를 더한다:
+ *   · 글자를 칸에 꽉 차게 늘인다(전서·고인체처럼 획이 칸을 가득 메운다)
+ *   · 획을 굵힌다 / 테두리만 남긴다(환붓예서) / 음각(붉은 바탕에 흰 글자, 국화전서)
+ *   · 인주 자국처럼 살짝 벗겨진 질감
+ * 웹 글꼴은 처음 쓸 때 한 번 내려받는다. 내려받지 못하면 컴퓨터 글꼴로 대신 그린다.
  *
  * 만들기 전에 반드시 동의를 받는다:
  *   · 본인 확인 — 내 이름의 도장이며 남의 도장을 흉내 낸 것이 아니다
@@ -29,27 +37,124 @@ var SHSSealMaker = (function () {
     { id: 'square-title', shape: 'square', name: '사각 · 직책 + 이름',         hint: '위에 직책 작게, 아래에 이름 크게' },
     { id: 'square-lines', shape: 'square', name: '사각 · 3줄',                 hint: '소속 · 직책 · 이름을 세 줄로' }
   ];
+
+  /* 서체 — id 는 저장된 도장 정보(gen_meta.font)에 남으므로 바꾸지 않는다.
+   *   family : 캔버스에 줄 글꼴 이름(뒤에 대체 글꼴)
+   *   gf     : 구글 폰트 이름(없으면 컴퓨터 글꼴)
+   *   fill   : 'stretch' 칸에 꽉 차게 늘임 / 'fit' 모양 그대로 칸에 맞춤
+   *   bold   : 획 굵히기(글자 크기 대비) / outline: 테두리만 / neg: 음각
+   *   border : 테두리 굵기 배율 */
   var FONTS = [
-    { id: 'gungsuh', name: '궁서체 (붓글씨)', css: '"Gungsuh","궁서","GungsuhChe",serif' },
-    { id: 'batang',  name: '바탕체 (또렷)',   css: '"Batang","바탕","Noto Serif KR",serif' },
-    { id: 'gothic',  name: '고딕 (굵게)',     css: '"Malgun Gothic","맑은 고딕","Noto Sans KR",sans-serif' }
+    { id: 'goin1',    name: '고인체풍',        group: '인장', family: '"Black Han Sans","Do Hyeon","Malgun Gothic",sans-serif', gf: 'Black Han Sans', weight: 400, fill: 'stretch', bold: 0.015, border: 1.25 },
+    { id: 'goin2',    name: '신고인체풍',      group: '인장', family: '"Do Hyeon","Black Han Sans","Malgun Gothic",sans-serif', gf: 'Do Hyeon',      weight: 400, fill: 'stretch', bold: 0.02,  border: 1.15 },
+    { id: 'jeonseo',  name: '전서체풍',        group: '인장', family: '"Gugi","Black Han Sans",sans-serif',                     gf: 'Gugi',          weight: 400, fill: 'stretch', bold: 0.05,  border: 1.3 },
+    { id: 'jeonseo2', name: '국화전서풍 (음각)', group: '인장', family: '"Gugi","Black Han Sans",sans-serif',                   gf: 'Gugi',          weight: 400, fill: 'stretch', bold: 0.04,  neg: true },
+    { id: 'yeseo',    name: '예서체풍',        group: '고전', family: '"Song Myung","Nanum Myeongjo","Batang",serif',           gf: 'Song Myung',    weight: 400, fill: 'stretch', bold: 0.035, border: 1.1 },
+    { id: 'hunmin',   name: '훈민정음체풍',    group: '고전', family: '"Hahmlet","Gowun Batang","Batang",serif',                gf: 'Hahmlet:wght@700', weight: 700, fill: 'stretch', bold: 0.02, border: 1.1 },
+    { id: 'songjuk',  name: '송죽체풍',        group: '고전', family: '"Nanum Myeongjo","Batang",serif',                        gf: 'Nanum Myeongjo:wght@800', weight: 800, fill: 'stretch', bold: 0.025 },
+    { id: 'hwanbut',  name: '환붓예서풍 (외곽선)', group: '고전', family: '"Song Myung","Nanum Myeongjo","Batang",serif',       gf: 'Song Myung',    weight: 400, fill: 'stretch', outline: 0.03, border: 0.9 },
+    { id: 'doan',     name: '도안체풍',        group: '도안', family: '"Jua","Do Hyeon","Malgun Gothic",sans-serif',            gf: 'Jua',           weight: 400, fill: 'stretch', bold: 0.025, border: 1.15 },
+    { id: 'doan2',    name: '도안체2풍 (둥근)', group: '도안', family: '"Bagel Fat One","Jua","Malgun Gothic",sans-serif',      gf: 'Bagel Fat One', weight: 400, fill: 'fit',     bold: 0.0,   border: 1.15 },
+    { id: 'brush',    name: '흑룡체풍 (붓)',   group: '붓',   family: '"Nanum Brush Script","Gungsuh","궁서",serif',            gf: 'Nanum Brush Script', weight: 400, fill: 'fit', bold: 0.05 },
+    { id: 'brush2',   name: '석천필흔체풍 (거친 붓)', group: '붓', family: '"East Sea Dokdo","Nanum Brush Script","Gungsuh",serif', gf: 'East Sea Dokdo', weight: 400, fill: 'fit', bold: 0.035 },
+    { id: 'pen',      name: '자마노체풍 (손글씨)', group: '붓', family: '"Nanum Pen Script","Gungsuh","궁서",serif',            gf: 'Nanum Pen Script', weight: 400, fill: 'fit', bold: 0.055 },
+    { id: 'gungsuh',  name: '궁서체 (내 컴퓨터)', group: '붓', family: '"Gungsuh","궁서","GungsuhChe","Nanum Brush Script",serif', gf: null,        weight: 700, fill: 'fit',     bold: 0.02 }
   ];
+  var DEFAULT_FONT = 'goin1';
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function chars(s) { return Array.from(String(s || '').replace(/\s+/g, '')); }
-  function fontCss(id) { return (FONTS.filter(function (f) { return f.id === id; })[0] || FONTS[0]).css; }
-
-  /* 글자 크기를 칸에 맞춘다 */
-  function fitFont(ctx, text, family, maxW, maxH) {
-    var size = maxH;
-    ctx.font = 'bold ' + size + 'px ' + family;
-    while (size > 8 && ctx.measureText(text).width > maxW) { size -= 2; ctx.font = 'bold ' + size + 'px ' + family; }
-    return size;
+  function styleOf(id) {
+    /* 예전 저장값(batang·gothic)도 비슷한 서체로 받는다 */
+    if (id === 'batang') id = 'yeseo';
+    if (id === 'gothic') id = 'goin2';
+    return FONTS.filter(function (f) { return f.id === id; })[0] || FONTS.filter(function (f) { return f.id === DEFAULT_FONT; })[0];
   }
-  function drawChar(ctx, ch, x, y, size, family) {
-    ctx.font = 'bold ' + size + 'px ' + family;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(ch, x, y + size * 0.04);
+
+  /* ---------- 웹 글꼴 내려받기 ----------
+   * 구글 폰트는 글자 범위별로 나뉘어 오므로, 실제로 그릴 글자를 함께 주어 필요한 조각만 받는다. */
+  var linkReady = null;
+  function addLink() {
+    if (linkReady) return linkReady;
+    if (!document.head) return Promise.resolve();
+    var fams = FONTS.filter(function (f) { return f.gf; }).map(function (f) { return 'family=' + f.gf.replace(/ /g, '+'); });
+    linkReady = new Promise(function (resolve) {
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = 'https://fonts.googleapis.com/css2?' + fams.join('&') + '&display=swap';
+      /* 스타일시트가 도착해야 글꼴 이름을 알 수 있으므로, 그때까지 기다린다 */
+      l.onload = function () { resolve(true); };
+      l.onerror = function () { resolve(false); };
+      setTimeout(function () { resolve(false); }, 6000);
+      document.head.appendChild(l);
+    });
+    return linkReady;
+  }
+  var SAMPLE = '홍길동인印시화산노회감사부장서기회계목사장로교회직';
+  function ready(styleIds, text) {
+    if (!document.fonts || !document.fonts.load) return Promise.resolve();
+    var ids = styleIds && styleIds.length ? styleIds : FONTS.map(function (f) { return f.id; });
+    var t = (text || '') + SAMPLE;
+    return addLink().then(function () {
+      var jobs = ids.map(function (id) {
+        var f = styleOf(id);
+        if (!f.gf) return Promise.resolve();
+        var fam = f.gf.split(':')[0];
+        return document.fonts.load((f.weight || 400) + ' 40px "' + fam + '"', t).then(function () {}, function () {});
+      });
+      /* 오래 걸리면 기다리지 않고 대체 글꼴로 그린다 */
+      var timeout = new Promise(function (resolve) { setTimeout(resolve, 8000); });
+      return Promise.race([Promise.all(jobs), timeout]);
+    });
+  }
+
+  /* ---------- 글자 한 자를 칸에 맞춰 그린다 ----------
+   * 칸(x,y 가운데, 너비 w, 높이 h)에 글자의 실제 잉크 범위를 재어 맞춘다.
+   * stretch 서체는 가로세로를 따로 늘여 칸을 가득 채우고(도장 느낌),
+   * fit 서체는 모양을 지키며 칸 안에 들어가게만 한다. */
+  function drawGlyph(ctx, ch, x, y, w, h, st, ink) {
+    var px = 200;
+    ctx.save();
+    ctx.font = (st.weight || 400) + ' ' + px + 'px ' + st.family;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    var m = ctx.measureText(ch);
+    var L = m.actualBoundingBoxLeft, Rr = m.actualBoundingBoxRight, A = m.actualBoundingBoxAscent, D = m.actualBoundingBoxDescent;
+    if (!(L >= 0 || L < 0) || !(A >= 0 || A < 0)) { L = Rr = m.width / 2; A = px * 0.8; D = px * 0.1; }   /* 옛 브라우저 */
+    var bw = Math.max(L + Rr, px * 0.15), bh = Math.max(A + D, px * 0.15);
+    var pad = st.bold ? px * st.bold : (st.outline ? px * st.outline : 0);
+    bw += pad; bh += pad;
+    var sx, sy;
+    if (st.fill === 'stretch') {
+      sx = w / bw; sy = h / bh;
+      /* 너무 찌그러지지 않게 — 가로세로 비율은 0.6~1.7 사이로 */
+      if (sx / sy > 1.7) sx = sy * 1.7;
+      if (sx / sy < 0.6) sy = sx / 0.6;
+    } else {
+      sx = sy = Math.min(w / bw, h / bh);
+    }
+    ctx.translate(x, y);
+    ctx.scale(sx, sy);
+    /* 잉크 범위의 가운데가 (0,0)에 오도록 */
+    var ox = (L - Rr) / 2, oy = (A - D) / 2;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.fillStyle = ink; ctx.strokeStyle = ink;
+    if (st.outline) {
+      ctx.lineWidth = px * st.outline;
+      ctx.strokeText(ch, ox, oy);
+    } else {
+      if (st.bold) { ctx.lineWidth = px * st.bold; ctx.strokeText(ch, ox, oy); }
+      ctx.fillText(ch, ox, oy);
+    }
+    ctx.restore();
+  }
+  /* 글자 여러 개를 한 줄(가로)에 고르게 나눠 그린다 — 도장은 글자 폭을 고르게 둔다 */
+  function drawLine(ctx, list, cx, cy, width, height, st, ink) {
+    var n = list.length; if (!n) return;
+    var cellW = width / n, box = Math.min(cellW * 0.94, height);
+    var bw = st.fill === 'stretch' ? cellW * 0.92 : box, bh = height;
+    list.forEach(function (ch, i) {
+      drawGlyph(ctx, ch, cx + (i - (n - 1) / 2) * cellW, cy, bw, bh, st, ink);
+    });
   }
 
   /* 바둑판 배열 — 전통(오른쪽 위부터 세로) / 현대(왼쪽 위부터 가로) */
@@ -83,74 +188,105 @@ var SHSSealMaker = (function () {
     ctx.restore();
   }
 
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+
   /* ---------- 그리기 ---------- */
   function render(o) {
     var S = o.size || 600, cv = document.createElement('canvas');
     cv.width = S; cv.height = S;
     var ctx = cv.getContext('2d');
-    var fam = fontCss(o.font);
+    var st = styleOf(o.font);
+    var ink = st.neg ? '#ffffff' : RED;      /* 음각은 붉은 바탕에 흰 글자 */
+    var bm = st.border || 1;
     var cx = S / 2, cy = S / 2;
-    ctx.fillStyle = RED; ctx.strokeStyle = RED; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     var main = chars(o.main), ring = chars(o.ring), sub = chars(o.sub), line3 = chars(o.line3);
     var p = o.preset;
+    var round = (p === 'round-ring' || p === 'round-name' || p === 'round-vert');
 
-    if (p === 'round-ring' || p === 'round-name' || p === 'round-vert') {
+    /* 바탕(음각) 또는 테두리 */
+    if (round) {
       var R = S * 0.46;
-      ctx.lineWidth = S * 0.028;
-      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+      if (st.neg) {
+        ctx.fillStyle = RED; ctx.beginPath(); ctx.arc(cx, cy, R + S * 0.014, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.strokeStyle = RED; ctx.lineWidth = S * 0.028 * bm;
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
+      }
+    } else {
+      var m = S * 0.05, w = S - m * 2, rad = S * 0.03;
+      if (st.neg) {
+        ctx.fillStyle = RED; roundRect(ctx, m - S * 0.013, m - S * 0.013, w + S * 0.026, w + S * 0.026, rad); ctx.fill();
+      } else {
+        ctx.strokeStyle = RED; ctx.lineWidth = S * 0.026 * bm;
+        roundRect(ctx, m, m, w, w, rad); ctx.stroke();
+      }
+    }
 
+    if (round) {
+      var R2 = S * 0.46;
       if (p === 'round-ring') {
         var Rin = S * 0.30;
-        ctx.lineWidth = S * 0.014;
+        ctx.strokeStyle = ink; ctx.lineWidth = S * 0.014 * bm;
         ctx.beginPath(); ctx.arc(cx, cy, Rin, 0, Math.PI * 2); ctx.stroke();
         /* 테두리 글: 위 가운데(★)에서 시계 방향으로 고르게 */
         var items = ['★'].concat(ring);
-        var rr = (R + Rin) / 2, n = items.length;
-        var fs = Math.min(S * 0.11, (2 * Math.PI * rr / Math.max(n, 8)) * 0.9);
+        var rr = (R2 + Rin) / 2, n = items.length;
+        var fs = Math.min(S * 0.105, (2 * Math.PI * rr / Math.max(n, 8)) * 0.86);
+        var ringSt = st.fill === 'stretch' ? Object.assign({}, st, { fill: 'fit' }) : st;
         items.forEach(function (ch, i) {
           var ang = -Math.PI / 2 + (2 * Math.PI * i) / n;
           ctx.save();
           ctx.translate(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr);
           ctx.rotate(ang + Math.PI / 2);
-          drawChar(ctx, ch, 0, 0, ch === '★' ? fs * 0.8 : fs, fam);
+          var f = ch === '★' ? fs * 0.75 : fs;
+          drawGlyph(ctx, ch, 0, 0, f, f, ringSt, ink);
           ctx.restore();
         });
         /* 가운데: 1~2자는 세로, 3~4자는 2×2 */
         var inner = main.length ? main : ['印'];
         if (inner.length <= 2) {
-          var fs2 = Rin * (inner.length === 1 ? 1.25 : 0.82);
+          var fs2 = Rin * (inner.length === 1 ? 1.2 : 0.8);
           inner.forEach(function (ch, i) {
-            drawChar(ctx, ch, cx, cy + (i - (inner.length - 1) / 2) * fs2 * 1.02, fs2, fam);
+            drawGlyph(ctx, ch, cx, cy + (i - (inner.length - 1) / 2) * fs2 * 1.04, fs2, fs2, st, ink);
           });
         } else {
-          var cell = Rin * 0.72, fs3 = cell * 0.9;
+          var cell = Rin * 0.74, g3 = cell * 0.9;
           gridCells(inner.slice(0, 4), 2, 2, o.dir || 'trad').forEach(function (g) {
-            drawChar(ctx, g.ch, cx + (g.c - 0.5) * cell, cy + (g.r - 0.5) * cell, fs3, fam);
+            drawGlyph(ctx, g.ch, cx + (g.c - 0.5) * cell, cy + (g.r - 0.5) * cell, g3, g3, st, ink);
           });
         }
       } else if (p === 'round-name') {
         var list = main.slice();
         if (list.length === 3) list.push('印');
         if (list.length <= 2) {
-          var f1 = R * (list.length === 1 ? 1.1 : 0.72);
-          list.forEach(function (ch, i) { drawChar(ctx, ch, cx, cy + (i - (list.length - 1) / 2) * f1 * 1.02, f1, fam); });
+          var f1 = R2 * (list.length === 1 ? 1.1 : 0.72);
+          list.forEach(function (ch, i) { drawGlyph(ctx, ch, cx, cy + (i - (list.length - 1) / 2) * f1 * 1.04, f1 * 1.15, f1, st, ink); });
         } else {
-          var cell2 = R * 0.62, f2 = cell2 * 0.92;
+          var cell2 = R2 * 0.64, f2 = cell2 * 0.9;
           gridCells(list.slice(0, 4), 2, 2, o.dir || 'trad').forEach(function (g) {
-            drawChar(ctx, g.ch, cx + (g.c - 0.5) * cell2, cy + (g.r - 0.5) * cell2, f2, fam);
+            drawGlyph(ctx, g.ch, cx + (g.c - 0.5) * cell2, cy + (g.r - 0.5) * cell2, f2, f2, st, ink);
           });
         }
       } else {
         var lv = main.length ? main : ['印'];
-        var fv = Math.min(R * 0.9, (R * 1.7) / lv.length * 0.98);
-        lv.forEach(function (ch, i) { drawChar(ctx, ch, cx, cy + (i - (lv.length - 1) / 2) * fv * 1.0, fv, fam); });
+        var fv = Math.min(R2 * 0.9, (R2 * 1.72) / lv.length);
+        lv.forEach(function (ch, i) {
+          var yy = cy + (i - (lv.length - 1) / 2) * fv;
+          /* 원 안이라 위아래 칸은 조금 좁다 */
+          var half = Math.sqrt(Math.max(R2 * R2 - (yy - cy) * (yy - cy), 0)) * 2 * 0.8;
+          drawGlyph(ctx, ch, cx, yy, Math.min(fv * 1.05, half), fv * 0.94, st, ink);
+        });
       }
     } else {
-      /* 사각: 바깥 굵은 테두리(살짝 둥근 모서리) */
-      var m = S * 0.05, w = S - m * 2, rad = S * 0.03;
-      ctx.lineWidth = S * 0.026;
-      roundRect(ctx, m, m, w, w, rad); ctx.stroke();
-      var inner2 = m + S * 0.045;   /* 글자 영역 */
+      var m2 = S * 0.05;
+      var inner2 = m2 + S * 0.045;   /* 글자 영역 */
       var iw = S - inner2 * 2;
 
       if (p === 'square-grid') {
@@ -158,38 +294,28 @@ var SHSSealMaker = (function () {
         if (!all.length) all = ['印'];
         var rows = all.length <= 4 ? 2 : 3, cols = rows;
         if (all.length > 9) all = all.slice(0, 9);
-        var cellW = iw / cols, fg = cellW * 0.86;
+        var cellW = iw / cols, fg = cellW * 0.88;
         gridCells(all, cols, rows, o.dir || 'trad').forEach(function (g) {
-          drawChar(ctx, g.ch, inner2 + (g.c + 0.5) * cellW, inner2 + (g.r + 0.5) * cellW, fg, fam);
+          drawGlyph(ctx, g.ch, inner2 + (g.c + 0.5) * cellW, inner2 + (g.r + 0.5) * cellW, fg, fg, st, ink);
         });
       } else if (p === 'square-title') {
-        var t = sub.join(''), nm = main.join('') || '印';
-        var y1 = inner2 + iw * 0.27, y2 = inner2 + iw * 0.7;
-        if (t) {
-          var ft = fitFont(ctx, t, fam, iw * 0.92, iw * 0.24);
-          drawChar(ctx, t, cx, y1, ft, fam);
+        var t = sub, nm = main.length ? main : ['印'];
+        var y1 = inner2 + iw * 0.25, y2 = inner2 + iw * 0.68;
+        if (t.length) {
+          drawLine(ctx, t, cx, y1, iw * 0.9, iw * 0.24, st, ink);
         } else { y2 = cy; }
-        var fn = fitFont(ctx, nm, fam, iw * 0.94, iw * 0.42);
-        drawChar(ctx, nm, cx, y2, fn, fam);
+        drawLine(ctx, nm, cx, y2, iw * 0.94, iw * 0.46, st, ink);
       } else {
-        var lines = [main.join(''), sub.join(''), line3.join('')].filter(function (x) { return x; });
-        if (!lines.length) lines = ['印'];
+        var lines = [main, sub, line3].filter(function (x) { return x.length; });
+        if (!lines.length) lines = [['印']];
         var lh = iw / lines.length;
         lines.forEach(function (ln, i) {
-          var fl = fitFont(ctx, ln, fam, iw * 0.94, lh * 0.78);
-          drawChar(ctx, ln, cx, inner2 + lh * (i + 0.5), fl, fam);
+          drawLine(ctx, ln, cx, inner2 + lh * (i + 0.5), iw * 0.94, lh * 0.78, st, ink);
         });
       }
     }
     if (o.texture !== false) texture(ctx, S, o.seed || 7);
     return cv;
-  }
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
   }
 
   /* 저장용 PNG (420px, 투명 바탕) */
@@ -209,6 +335,17 @@ var SHSSealMaker = (function () {
     mdl.className = 'mdl';
     mdl.id = 'sm-mdl';
     mdl.innerHTML = '<div class="mdl-box wide"><button class="mdl-close" id="sm-close">&times;</button><div id="sm-body"></div></div>';
+    /* 서체 견본 바둑판 모양새 — 이 창에서만 쓰므로 여기서 넣는다 */
+    var css = document.createElement('style');
+    css.textContent =
+      '.sm-styles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:4px}' +
+      '.sm-style{border:1.5px solid var(--gray-2);border-radius:10px;background:#fff;padding:6px 4px 5px;cursor:pointer;text-align:center;transition:border-color .15s,box-shadow .15s}' +
+      '.sm-style canvas{display:block;width:84px;height:84px;margin:0 auto;background:repeating-conic-gradient(#f5f2ec 0 25%,#fff 0 50%) 0 0/12px 12px;border-radius:6px}' +
+      '.sm-style span{display:block;font-size:0.72rem;color:var(--gray-7);margin-top:4px;line-height:1.25}' +
+      '.sm-style:hover{border-color:var(--accent)}' +
+      '.sm-style.on{border-color:var(--navy);box-shadow:0 0 0 2px rgba(15,36,68,.15)}' +
+      '.sm-style.on span{color:var(--navy);font-weight:700}';
+    mdl.appendChild(css);
     document.body.appendChild(mdl);
     mdl.querySelector('#sm-close').addEventListener('click', close);
     mdl.addEventListener('click', function (ev) { if (ev.target === mdl) close(); });
@@ -221,55 +358,58 @@ var SHSSealMaker = (function () {
     var isChurch = opts.kind === 'church';
     var st = {
       preset: isChurch ? 'round-ring' : 'round-name',
-      font: 'gungsuh',
+      font: DEFAULT_FONT,
       main: isChurch ? '직인' : (opts.name || ''),
       ring: isChurch ? (opts.church || '') : (opts.church || ''),
       sub: isChurch ? '' : (opts.title || ''),
       line3: '',
-      dir: 'trad', texture: true, seed: 7
+      /* 이름 도장은 도장집 견본처럼 왼쪽 위부터 읽는 배열이 익숙하다. 직인·바둑판은 전통 배열 */
+      dir: isChurch ? 'trad' : 'modern', texture: true, seed: 7
     };
     var box = ensureModal().querySelector('#sm-body');
     ensureModal().classList.add('open');
+    var fontsReady = false;
+    function allText() { return [st.main, st.ring, st.sub, st.line3].join(''); }
 
     function draw() {
       var need = { ring: st.preset === 'round-ring', sub: st.preset !== 'round-name' && st.preset !== 'round-vert', line3: st.preset === 'square-lines' || st.preset === 'square-grid', dir: /grid|round-ring|round-name/.test(st.preset) };
       box.innerHTML =
         '<h2>' + (isChurch ? '교회 직인 만들기' : '내 도장 만들기') + '</h2>' +
-        '<p style="font-size:0.88rem;color:var(--gray-6);margin:-8px 0 14px">글자를 넣고 모양·글꼴을 고르면 바로 그려집니다. ' +
+        '<p style="font-size:0.88rem;color:var(--gray-5);margin:-8px 0 14px">글자를 넣고 모양·서체를 고르면 바로 그려집니다. ' +
         '마음에 들면 <strong>저장</strong>을 누르세요 — 저장 전에 동의를 묻습니다. 투명 바탕 PNG로 만들어집니다.</p>' +
         '<div style="display:flex;gap:22px;flex-wrap:wrap">' +
         '<div style="flex:0 0 260px;text-align:center">' +
         '<div id="sm-prev" style="width:240px;height:240px;margin:0 auto;background:repeating-conic-gradient(#f3f0ea 0 25%,#fff 0 50%) 0 0/20px 20px;border:1px solid var(--gray-2);border-radius:8px;display:flex;align-items:center;justify-content:center"></div>' +
         '<div style="margin-top:8px"><button type="button" class="btn ghost sm" id="sm-shuffle">질감 바꾸기</button></div>' +
+        '<div id="sm-fontnote" style="font-size:0.76rem;color:var(--gray-5);margin-top:6px"></div>' +
         '</div>' +
         '<div style="flex:1;min-width:280px">' +
         '<div class="field"><label>모양</label><select id="sm-preset">' +
         PRESETS.map(function (p) { return '<option value="' + p.id + '"' + (p.id === st.preset ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('') +
         '</select><small style="color:var(--gray-5)" id="sm-hint"></small></div>' +
-        '<div class="inline-form">' +
-        '<div class="field" style="flex:0 0 170px"><label>글꼴</label><select id="sm-font">' +
-        FONTS.map(function (f) { return '<option value="' + f.id + '"' + (f.id === st.font ? ' selected' : '') + '>' + esc(f.name) + '</option>'; }).join('') + '</select></div>' +
-        (need.dir ? '<div class="field" style="flex:0 0 190px"><label>읽는 방향</label><select id="sm-dir">' +
+        (need.dir ? '<div class="field"><label>읽는 방향</label><select id="sm-dir">' +
           '<option value="trad"' + (st.dir === 'trad' ? ' selected' : '') + '>전통 (오른쪽 위부터 세로)</option>' +
           '<option value="modern"' + (st.dir === 'modern' ? ' selected' : '') + '>현대 (왼쪽 위부터 가로)</option></select></div>' : '') +
-        '</div>' +
         '<div class="field"><label>' + (st.preset === 'round-ring' ? '가운데 글 (이름 또는 印·직인)' : (st.preset === 'square-title' ? '이름 (크게)' : (st.preset === 'square-lines' ? '첫째 줄' : '이름'))) + '</label>' +
         '<input type="text" id="sm-main" value="' + esc(st.main) + '" maxlength="12"></div>' +
         (need.ring ? '<div class="field"><label>테두리 글 (소속·직책, 예: 시화산노회 감사헌의부)</label><input type="text" id="sm-ring" value="' + esc(st.ring) + '" maxlength="24"></div>' : '') +
         (need.sub ? '<div class="field"><label>' + (st.preset === 'square-title' ? '직책 (위에 작게, 예: 감사부장)' : (st.preset === 'square-lines' ? '둘째 줄' : '직책·소속 (바둑판에 이어 채움)')) + '</label><input type="text" id="sm-sub" value="' + esc(st.sub) + '" maxlength="12"></div>' : '') +
         (need.line3 ? '<div class="field"><label>' + (st.preset === 'square-lines' ? '셋째 줄' : '더 채울 글자 (선택)') + '</label><input type="text" id="sm-line3" value="' + esc(st.line3) + '" maxlength="12"></div>' : '') +
         '<div class="field"><label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="sm-tex" style="width:auto;margin:0"' + (st.texture ? ' checked' : '') + '> 인주 자국처럼 살짝 벗겨진 질감</label></div>' +
+        '</div></div>' +
+        /* 서체 견본 — 지금 넣은 글자로 서체마다 작게 그려 보여 준다 */
+        '<div class="field" style="margin-top:6px"><label>서체 <small style="font-weight:400;color:var(--gray-5)">— 도장집 서체 견본을 본뜬 열네 가지. 눌러서 고르세요</small></label>' +
+        '<div id="sm-styles" class="sm-styles"></div></div>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">' +
         '<button type="button" class="btn" id="sm-save">' + (isChurch ? '교회 직인으로 저장' : '내 도장으로 저장') + '</button>' +
         '<a class="btn ghost" id="sm-dl" download="' + esc((isChurch ? (opts.church || '교회') + ' 직인' : (opts.name || '도장')) + '.png') + '">PNG 내려받기</a>' +
         '<button type="button" class="btn ghost" id="sm-cancel">닫기</button></div>' +
-        '<div class="form-msg" id="sm-msg"></div>' +
-        '</div></div>';
+        '<div class="form-msg" id="sm-msg"></div>';
       var hint = PRESETS.filter(function (p) { return p.id === st.preset; })[0];
       box.querySelector('#sm-hint').textContent = hint ? hint.hint : '';
+      buildStyles();
       preview();
       box.querySelector('#sm-preset').addEventListener('change', function () { st.preset = this.value; draw(); });
-      box.querySelector('#sm-font').addEventListener('change', function () { st.font = this.value; preview(); });
       var dirEl = box.querySelector('#sm-dir'); if (dirEl) dirEl.addEventListener('change', function () { st.dir = this.value; preview(); });
       ['main', 'ring', 'sub', 'line3'].forEach(function (k) {
         var el = box.querySelector('#sm-' + k);
@@ -280,11 +420,45 @@ var SHSSealMaker = (function () {
       box.querySelector('#sm-cancel').addEventListener('click', close);
       box.querySelector('#sm-save').addEventListener('click', consent);
     }
-    function preview() {
+    function buildStyles() {
+      var g = box.querySelector('#sm-styles');
+      g.innerHTML = FONTS.map(function (f) {
+        return '<button type="button" class="sm-style' + (f.id === st.font ? ' on' : '') + '" data-font="' + f.id + '" title="' + esc(f.name) + '">' +
+          '<canvas width="84" height="84"></canvas><span>' + esc(f.name) + '</span></button>';
+      }).join('');
+      g.querySelectorAll('.sm-style').forEach(function (b) {
+        b.addEventListener('click', function () {
+          st.font = b.dataset.font;
+          g.querySelectorAll('.sm-style').forEach(function (x) { x.classList.toggle('on', x === b); });
+          preview();
+        });
+      });
+    }
+    var thumbTimer = null;
+    function drawThumbs() {
+      box.querySelectorAll('.sm-style').forEach(function (b) {
+        var c = b.querySelector('canvas'); if (!c) return;
+        var cv = render(Object.assign({}, st, { font: b.dataset.font, size: 168, texture: false }));
+        var g2 = c.getContext('2d'); g2.clearRect(0, 0, 84, 84); g2.drawImage(cv, 0, 0, 84, 84);
+      });
+    }
+    function paint() {
       var cv = render(Object.assign({}, st, { size: 480 }));
       cv.style.width = '220px'; cv.style.height = '220px';
-      var pv = box.querySelector('#sm-prev'); pv.innerHTML = ''; pv.appendChild(cv);
+      var pv = box.querySelector('#sm-prev'); if (!pv) return;
+      pv.innerHTML = ''; pv.appendChild(cv);
       var dl = box.querySelector('#sm-dl'); if (dl) dl.href = toPng(st);
+      clearTimeout(thumbTimer); thumbTimer = setTimeout(drawThumbs, 120);
+    }
+    function preview() {
+      var note = box.querySelector('#sm-fontnote');
+      if (!fontsReady && note) note.textContent = '서체를 내려받는 중…';
+      paint();
+      ready(null, allText()).then(function () {
+        fontsReady = true;
+        if (note) note.textContent = '';
+        paint();
+      });
     }
 
     /* ----- 동의 ----- */
@@ -331,5 +505,5 @@ var SHSSealMaker = (function () {
     draw();
   }
 
-  return { open: open, render: render, toPng: toPng, PRESETS: PRESETS, FONTS: FONTS, CONSENT_VER: CONSENT_VER };
+  return { open: open, render: render, toPng: toPng, ready: ready, PRESETS: PRESETS, FONTS: FONTS, CONSENT_VER: CONSENT_VER };
 })();
