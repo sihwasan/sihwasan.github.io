@@ -716,7 +716,7 @@ var SHSLedger = (function () {
         '<strong>여럿을 한 번에</strong> 「회원 일괄 선택」으로 고릅니다. 고른 사람은 아래 <strong>추가된 명단</strong>에 모입니다.</p>' +
         '<div class="inline-form">' +
         '<div class="field"><label>받는 사람 한 명씩 적기 (이름을 적어 목록에서 고르세요)</label>' +
-        '<input type="text" id="lg-payee" list="lg-members" placeholder="예: 김동석" autocomplete="off">' +
+        '<input type="text" id="lg-payee" list="lg-members" placeholder="이름을 적으면 목록이 나옵니다" autocomplete="off">' +
         '<datalist id="lg-members"></datalist></div>' +
         '<div class="field" style="flex:0 0 150px"><label>1인 금액 (원)</label>' +
         '<input type="number" id="lg-payamt" min="0" step="1000"></div>' +
