@@ -336,7 +336,7 @@ var SHSBoard = (function () {
     }
 
     /* ---------- 감사함 ----------
-     * 감사 기간(3·9월, 또는 관리자가 열어 둔 때)에 감사부장·감사부 서기와
+     * 감사 기간(관리자가 정한 시작일~종료일)에 감사부장·감사부 서기와
      * 노회 관리자에게만 <감사> 카드가 나타난다. 재정부·상비부·시찰 장부를
      * 한눈에 보고, 고른 장부를 이 자리에서 살펴 감사필 처리와 회기 마감 승인을
      * 한다. 증빙(영수증·지급 확인)도 장부 안에서 바로 본다. (79 sql) */
@@ -387,11 +387,12 @@ var SHSBoard = (function () {
       [fyYear(), fyYear() - 1, auditYear].forEach(function (y) { ys[y] = 1; });
       var years = Object.keys(ys).map(Number).sort(function (a, b) { return b - a; });
 
+      var sd = SHSAuditMark.shortDate;
       var h = '<div class="notice-banner" style="border-left:4px solid var(--navy)">' +
         '<strong>' + esc(String(w.year || auditYear)) + '년 ' + esc(w.period || '') + ' 감사 기간</strong>' +
-        (w.manual
-          ? ' <span style="font-size:0.82rem;color:var(--gray-5)">(노회 관리자가 열어 둔 기간' +
-            (w.note ? ' · ' + esc(w.note) : '') + ')</span>' : '') +
+        ' <span style="font-size:0.84rem;color:var(--gray-6)">' + sd(w.from) + ' ~ ' + sd(w.until) +
+        (w.daysLeft > 0 ? ' · ' + w.daysLeft + '일 남음' : ' · 오늘까지') +
+        (w.note ? ' · ' + esc(w.note) : '') + '</span>' +
         ' — 아래에서 장부를 골라 살펴보고 <strong>감사필 처리</strong>와 <strong>회기 마감 승인</strong>을 하세요. ' +
         '영수증·지급 확인 같은 증빙도 장부 안에서 바로 봅니다.</div>';
       h += '<div class="inline-form" style="margin-bottom:8px;align-items:flex-end">' +

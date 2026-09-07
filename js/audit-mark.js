@@ -3,7 +3,7 @@
  * 감사부(감사헌의부)가 상비부·시찰의 회의록과 회계 장부를 감사합니다.
  * 감사 칸은 회의록과 회계 장부가 똑같이 쓰므로 여기 한 곳에 모아 두었습니다.
  *
- *   · 감사 기간은 3월(봄)과 9월(가을)입니다.
+ *   · 감사 기간은 노회 관리자가 정한 시작일~종료일(보통 2주)입니다.
  *     그 달이 되면 감사부에게 '감사필 처리' 단추가 열립니다.
  *   · 감사필을 찍으면 감사부장·서기의 도장이 그때 모습 그대로 담깁니다.
  *     나중에 도장을 바꾸어도 이미 감사가 끝난 자료는 그대로 남습니다.
@@ -26,25 +26,39 @@ var SHSAuditMark = (function () {
   }
 
   /* ---------- 지금이 감사 기간인가 ----------
-   * 봄 정기노회 전 3월, 가을 정기노회 전 9월에 저절로 열린다.
-   * 그 달 안에 감사를 마치지 못하는 일이 있으므로, 노회 관리자가
-   * 시스템 운영 화면에서 손으로 열어 둘 수도 있다. 손으로 열어 둔
-   * 것이 있으면 그것을 먼저 따른다. */
+   * 노회 관리자가 <사이트 관리 → 감사 기간>에서 정한 시작일~종료일 안에만
+   * 열린다. 정해 둔 기간이 없으면 닫혀 있다. (달력의 3·9월 자동 열림은
+   * 한 달 내내 장부가 열려 있게 되어 없앴다.) 데이터베이스의
+   * audit_window_open() 도 같은 규칙으로 판정한다. */
+  function ymdOf(d) {
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
   function windowNow(now) {
     var d = now || new Date();
-    var m = d.getMonth() + 1;
-    if (override && override.open) {
-      return {
-        open: true,
-        year: override.year || d.getFullYear(),
-        period: override.period || (m >= 7 ? '가을' : '봄'),
-        manual: true,
-        note: override.note || ''
-      };
-    }
-    if (m === 3) return { open: true, year: d.getFullYear(), period: '봄' };
-    if (m === 9) return { open: true, year: d.getFullYear(), period: '가을' };
-    return { open: false, year: d.getFullYear(), period: null };
+    var today = ymdOf(d);
+    var o = override || {};
+    var ok = /^\d{4}-\d{2}-\d{2}$/;
+    var from = ok.test(String(o.from || '')) ? o.from : null;
+    var until = ok.test(String(o.until || '')) ? o.until : null;
+    var open = !!(from && until && from <= today && today <= until);
+    var daysLeft = open
+      ? Math.round((new Date(until + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000) : null;
+    return {
+      open: open,
+      year: o.year || d.getFullYear(),
+      period: o.period || null,
+      from: from, until: until,
+      daysLeft: daysLeft,                       /* 오늘 포함 며칠 남았는지 (0 = 오늘이 마지막 날) */
+      upcoming: !!(from && from > today),       /* 아직 시작 전인 감사 기간이 잡혀 있다 */
+      ended: !!(until && until < today),
+      manual: false,
+      note: o.note || ''
+    };
+  }
+  /* 2026-09-07 → 9.7 */
+  function shortDate(s) {
+    var m = String(s || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
+    return m ? parseInt(m[1], 10) + '.' + parseInt(m[2], 10) : String(s || '');
   }
 
   /* 손으로 열어 둔 감사 기간을 서버에서 한 번 읽어 둔다.
@@ -142,10 +156,10 @@ var SHSAuditMark = (function () {
         h += '<button class="btn danger sm" data-audit-undo="' + esc(rec.id) + '">감사 표시 풀기</button>';
       }
     } else if (opts.isAuditor && w.open) {
-      h += '<div class="audit-head">' + w.year + '년 ' + w.period + ' 감사 기간입니다.' +
-        (w.manual ? ' <span style="font-size:0.82rem;color:var(--gray-5)">' +
-          '(노회 관리자가 열어 둔 기간' + (w.note ? ' · ' + esc(w.note) : '') + ')</span>' : '') +
-        '</div>' +
+      h += '<div class="audit-head">' + esc(String(w.year)) + '년 ' + esc(w.period || '') + ' 감사 기간입니다 ' +
+        '<span style="font-size:0.82rem;color:var(--gray-5)">(' + shortDate(w.from) + ' ~ ' + shortDate(w.until) +
+        (w.daysLeft > 0 ? ' · ' + w.daysLeft + '일 남음' : ' · 오늘까지') +
+        (w.note ? ' · ' + esc(w.note) : '') + ')</span></div>' +
         '<div class="field"><label>감사 의견 (선택)</label>' +
         '<input type="text" data-audit-opinion="' + esc(rec.id) + '" ' +
         'placeholder="예: 이상 없음"></div>' +
@@ -153,10 +167,12 @@ var SHSAuditMark = (function () {
         '<div class="form-msg" data-audit-msg="' + esc(rec.id) + '"></div>';
     } else if (opts.isAuditor) {
       h += '<div class="audit-head">아직 감사 전입니다.</div>' +
-        '<div class="audit-note">감사는 <strong>3월(봄)</strong>과 <strong>9월(가을)</strong>에 시행합니다. ' +
-        '지금은 감사 기간이 아니어서 감사필 처리를 할 수 없습니다.<br>' +
-        '기간을 넘겨 감사해야 한다면 노회 관리자가 ' +
-        '<strong>시스템 운영 → 감사 기간</strong>에서 열어 드릴 수 있습니다.</div>';
+        '<div class="audit-note">감사는 노회 관리자가 정한 <strong>감사 기간</strong>(보통 2주)에만 시행합니다. ' +
+        (w.upcoming
+          ? '다음 감사 기간은 <strong>' + shortDate(w.from) + ' ~ ' + shortDate(w.until) + '</strong>입니다.'
+          : '지금은 감사 기간이 아니어서 감사필 처리를 할 수 없습니다.') +
+        '<br>기간을 잡거나 늘려야 한다면 노회 관리자가 ' +
+        '<strong>사이트 관리 → 감사 기간</strong>에서 정합니다.</div>';
     } else {
       h += '<div class="audit-head">아직 감사 전입니다.</div>' +
         '<div class="audit-note">감사는 봄·가을 정기노회 전에 감사부가 시행합니다.</div>';
@@ -255,6 +271,7 @@ var SHSAuditMark = (function () {
     ready: ready,
     forget: forget,
     windowNow: windowNow,
+    shortDate: shortDate,
     loadSeals: loadSeals,
     panel: panel,
     bind: bind,

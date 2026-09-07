@@ -248,62 +248,100 @@ var SHSOps = (function () {
   }
 
   /* ---------- 감사 기간 ----------
-   * 감사는 3월(봄)·9월(가을)에 저절로 열린다. 그 달 안에 마치지 못하는
-   * 일이 있으므로, 노회 관리자가 여기서 손으로 열고 닫을 수 있다. */
+   * 감사부가 장부·회의록을 볼 수 있는 기간을 시작일~종료일로 정한다(보통 2주).
+   * 이 기간 밖에서는 감사부장·서기에게 장부가 보이지 않고 감사필·마감 승인도
+   * 되지 않는다. (데이터베이스의 audit_window_open() 이 같은 날짜로 판정한다) */
   function loadAuditWindow() {
     var box = document.getElementById('ops-aw');
     db.from('site_settings').select('*').eq('key', 'audit_window').maybeSingle()
       .then(function (r) {
-        var v = (r && r.data && r.data.value) || { open: false };
+        var v = (r && r.data && r.data.value) || {};
         drawAuditWindow(v, r && r.error);
-      }, function () { drawAuditWindow({ open: false }, null); });
+      }, function () { drawAuditWindow({}, null); });
+  }
+  function ymdOf(d) {
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function addDays(ymd, n) {
+    var d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + n); return ymdOf(d);
+  }
+  function longDate(s) {
+    var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? m[1] + '년 ' + parseInt(m[2], 10) + '월 ' + parseInt(m[3], 10) + '일' : String(s || '');
   }
 
   function drawAuditWindow(v, err) {
     var box = document.getElementById('ops-aw');
     var now = new Date();
-    var m = now.getMonth() + 1;
-    var byMonth = (m === 3 ? '봄' : (m === 9 ? '가을' : null));
+    var today = ymdOf(now);
+    var ok = /^\d{4}-\d{2}-\d{2}$/;
+    var from = ok.test(String(v.from || '')) ? v.from : '';
+    var until = ok.test(String(v.until || '')) ? v.until : '';
+    var open = !!(from && until && from <= today && today <= until);
+    var upcoming = !!(from && from > today);
+    var ended = !!(until && until < today);
 
     var h = '<h2>감사 기간</h2>' +
-      '<p>봄·가을 정기노회 전에 감사부(감사헌의부)가 상비부·시찰의 ' +
-      '<strong>회의록</strong>과 <strong>회계 장부</strong>를 감사합니다. ' +
-      '감사 기간에만 감사부에게 <strong>감사필 처리</strong> 단추가 열립니다.</p>';
+      '<p>봄·가을 정기노회 전에 감사부(감사헌의부)가 재정부·상비부·시찰의 ' +
+      '<strong>회계 장부</strong>와 <strong>회의록</strong>을 감사합니다. ' +
+      '여기서 정한 <strong>시작일~종료일</strong>(보통 2주) 안에만 감사부장·감사부 서기에게 장부가 보이고, ' +
+      '대시보드의 <strong>감사</strong> 카드, <strong>감사필 처리</strong>, <strong>회기 마감 승인</strong>이 열립니다. ' +
+      '기간이 끝나면 저절로 닫힙니다.</p>';
 
     if (err) {
       h += '<div class="notice-banner">감사 기간 설정을 읽지 못했습니다: ' + e(err.message || '') +
-        '<br>Supabase에서 <strong>37_boards_and_audit_window.sql</strong>을 먼저 실행해 주세요.</div>';
+        '<br>Supabase에서 <strong>80_audit_window_dates.sql</strong>을 먼저 실행해 주세요.</div>';
       box.innerHTML = h;
       return;
     }
 
-    h += '<div class="notice-banner">' +
-      '<strong>달력대로</strong> — 3월이면 봄 감사, 9월이면 가을 감사가 저절로 열립니다. ' +
-      '지금은 ' + now.getFullYear() + '년 ' + m + '월이므로 ' +
-      (byMonth ? '<strong>' + byMonth + ' 감사 기간</strong>입니다.' : '감사 기간이 <strong>아닙니다</strong>.') +
-      '</div>';
+    var daysLeft = open ? Math.round((new Date(until + 'T00:00:00') - new Date(today + 'T00:00:00')) / 86400000) : 0;
+    if (open) {
+      h += '<div class="notice-banner" style="border-left:4px solid #2a7a2a"><strong>지금 감사 기간입니다</strong> — ' +
+        (v.year || '') + '년 ' + e(v.period || '') + ' 감사 · ' + longDate(from) + ' ~ ' + longDate(until) +
+        (daysLeft > 0 ? ' (' + daysLeft + '일 남음)' : ' (오늘이 마지막 날)') +
+        (v.note ? ' · ' + e(v.note) : '') +
+        ' <button class="btn danger sm" id="aw-end" style="margin-left:10px">오늘로 감사 종료</button></div>';
+    } else if (upcoming) {
+      h += '<div class="notice-banner" style="border-left:4px solid #d9a33b"><strong>감사 기간 예정</strong> — ' +
+        (v.year || '') + '년 ' + e(v.period || '') + ' 감사 · ' + longDate(from) + ' ~ ' + longDate(until) +
+        '. 시작일이 되면 저절로 열립니다.</div>';
+    } else if (ended) {
+      h += '<div class="notice-banner"><strong>감사 기간이 아닙니다.</strong> 지난 감사: ' +
+        (v.year || '') + '년 ' + e(v.period || '') + ' · ' + longDate(from) + ' ~ ' + longDate(until) +
+        '. 다음 감사는 아래에서 날짜를 정해 주세요.</div>';
+    } else {
+      h += '<div class="notice-banner"><strong>감사 기간이 정해져 있지 않습니다.</strong> ' +
+        '정해 두지 않으면 감사부에게 장부가 보이지 않습니다. 아래에서 날짜를 정해 주세요.</div>';
+    }
 
+    /* 새로 잡을 때의 기본값: 오늘부터 2주 (이미 잡힌 게 있으면 그대로) */
+    var defFrom = from || today;
+    var defUntil = until || addDays(today, 13);
+    var defPeriod = v.period || (now.getMonth() + 1 >= 7 ? '가을' : '봄');
     h += '<div class="admin-card" style="max-width:720px">' +
-      '<h3 style="margin-top:0">손으로 열어 두기</h3>' +
-      '<p style="font-size:0.86rem;color:var(--gray-7)">' +
-      '3월·9월을 넘겨 감사를 마쳐야 할 때 켜 주세요. 켜 두는 동안에는 달과 상관없이 ' +
-      '감사부가 감사필을 찍을 수 있습니다. 감사를 마치면 <strong>꺼 주세요.</strong></p>' +
-      '<div class="field"><label>' +
-      '<input type="checkbox" id="aw-open"' + (v.open ? ' checked' : '') + '> ' +
-      '지금 감사 기간으로 열어 둔다</label></div>' +
+      '<h3 style="margin-top:0">감사 기간 정하기</h3>' +
+      '<p style="font-size:0.86rem;color:var(--gray-7)">감사는 보통 2주입니다. 종료일이 지나면 저절로 닫히고, ' +
+      '더 필요하면 종료일만 늘리면 됩니다. 저장하면 감사부장·감사부 서기와 노회 회계에게 알림이 갑니다.</p>' +
       '<div class="inline-form">' +
-      '<div class="field" style="flex:0 0 160px"><label>회기 연도</label>' +
-      '<input type="number" id="aw-year" min="2020" max="2100" value="' +
-      (v.year || now.getFullYear()) + '"></div>' +
-      '<div class="field" style="flex:0 0 160px"><label>봄·가을</label>' +
+      '<div class="field" style="flex:0 0 170px"><label>시작일</label>' +
+      '<input type="date" id="aw-from" value="' + e(defFrom) + '"></div>' +
+      '<div class="field" style="flex:0 0 170px"><label>종료일</label>' +
+      '<input type="date" id="aw-until" value="' + e(defUntil) + '"></div>' +
+      '<div class="field" style="flex:0 0 130px"><label>회기 연도</label>' +
+      '<input type="number" id="aw-year" min="2020" max="2100" value="' + (v.year || now.getFullYear()) + '"></div>' +
+      '<div class="field" style="flex:0 0 120px"><label>봄·가을</label>' +
       '<select id="aw-period">' +
       ['봄', '가을'].map(function (x) {
-        return '<option' + ((v.period || byMonth || '봄') === x ? ' selected' : '') + '>' + x + '</option>';
+        return '<option' + (defPeriod === x ? ' selected' : '') + '>' + x + '</option>';
       }).join('') + '</select></div>' +
       '</div>' +
+      '<div style="margin:-4px 0 10px;font-size:0.82rem">' +
+      '<button type="button" class="btn ghost sm" id="aw-2w">오늘부터 2주</button> ' +
+      '<button type="button" class="btn ghost sm" id="aw-plus7">종료일 +7일</button></div>' +
       '<div class="field"><label>메모 (선택 · 감사 칸에 함께 보입니다)</label>' +
       '<input type="text" id="aw-note" value="' + e(v.note || '') +
-      '" placeholder="예: 3월 안에 마치지 못해 4월 10일까지 연장"></div>' +
+      '" placeholder="예: 정기노회 준비로 9월 21일까지 연장"></div>' +
       '<button class="btn" id="aw-save">저장</button>' +
       '<div class="form-msg" id="aw-msg"></div>' +
       (v.at ? '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:10px">마지막 변경 : ' +
@@ -311,25 +349,41 @@ var SHSOps = (function () {
       '</div>';
 
     box.innerHTML = h;
-    document.getElementById('aw-save').addEventListener('click', function () {
+
+    function save(fromV, untilV, label) {
       var msg = document.getElementById('aw-msg');
       var d = {
-        open: document.getElementById('aw-open').checked,
-        year: parseInt(document.getElementById('aw-year').value, 10) || now.getFullYear(),
-        period: document.getElementById('aw-period').value,
-        note: document.getElementById('aw-note').value.trim(),
-        by: user.name,
-        at: new Date().toISOString()
+        p_from: fromV, p_until: untilV,
+        p_year: parseInt(document.getElementById('aw-year').value, 10) || now.getFullYear(),
+        p_period: document.getElementById('aw-period').value,
+        p_note: document.getElementById('aw-note').value.trim()
       };
+      if (!ok.test(d.p_from) || !ok.test(d.p_until)) { msg.className = 'form-msg err'; msg.textContent = '시작일과 종료일을 골라 주세요.'; return; }
+      if (d.p_from > d.p_until) { msg.className = 'form-msg err'; msg.textContent = '종료일이 시작일보다 앞설 수 없습니다.'; return; }
       msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
-      db.from('site_settings').upsert({ key: 'audit_window', value: d, updated_at: d.at })
-        .then(function (r) {
-          if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-          SHSCloud.log('update', '감사 기간 ' + (d.open ? '열기' : '닫기'),
-            d.year + '년 ' + d.period + (d.note ? ' / ' + d.note : ''));
-          if (window.SHSAuditMark) SHSAuditMark.forget();
-          loadAuditWindow();
-        });
+      db.rpc('set_audit_window', d).then(function (r) {
+        if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
+        SHSCloud.log('update', '감사 기간 ' + label,
+          d.p_year + '년 ' + d.p_period + ' ' + d.p_from + ' ~ ' + d.p_until + (d.p_note ? ' / ' + d.p_note : ''));
+        if (window.SHSAuditMark) SHSAuditMark.forget();
+        loadAuditWindow();
+      });
+    }
+    document.getElementById('aw-2w').addEventListener('click', function () {
+      document.getElementById('aw-from').value = today;
+      document.getElementById('aw-until').value = addDays(today, 13);
+    });
+    document.getElementById('aw-plus7').addEventListener('click', function () {
+      var u = document.getElementById('aw-until');
+      if (ok.test(u.value)) u.value = addDays(u.value, 7);
+    });
+    document.getElementById('aw-save').addEventListener('click', function () {
+      save(document.getElementById('aw-from').value, document.getElementById('aw-until').value, '설정');
+    });
+    var endBtn = document.getElementById('aw-end');
+    if (endBtn) endBtn.addEventListener('click', function () {
+      if (!confirm('감사 기간을 오늘로 끝냅니다. 내일부터 감사부에게 장부가 보이지 않습니다.\n계속하시겠습니까?')) return;
+      save(from, today, '종료');
     });
   }
 
