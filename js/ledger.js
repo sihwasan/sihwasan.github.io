@@ -664,7 +664,7 @@ var SHSLedger = (function () {
         '<input type="date" id="lg-date" value="' + today + '"></div>' +
         catField +
         '<div class="field" style="flex:0 0 170px"><label>교회명 (선택)</label>' +
-        '<input type="text" id="lg-church" list="lg-churches" placeholder="예: 반석교회">' +
+        '<input type="text" id="lg-church" list="lg-churches" placeholder="교회를 고르거나 적으세요">' +
         '<datalist id="lg-churches">' +
         (opts.churches || []).map(function (x) {
           return '<option value="' + esc(x) + '"></option>';
