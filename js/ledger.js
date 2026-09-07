@@ -172,9 +172,11 @@ var SHSLedger = (function () {
       '지출': ['사업비', '교통비', '식비', '인쇄비', '경조비', '기타']
     };
     var catUsed = { '수입': [], '지출': [] };
-    /* 회계연도는 4월에 시작해 다음 해 3월에 끝난다. year는 시작 연도다. */
+    /* 회계연도는 4월에 시작해 다음 해 3월에 끝난다. year는 시작 연도다.
+     * 부르는 쪽(감사함 등)이 year 를 주면 그 해부터 연다. */
     var now0 = new Date();
-    var year = now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1;
+    var year = parseInt(opts.year, 10) ||
+      (now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1);
     var viewKind = '수입';   /* 지금 보고 있는 탭 — 수입 또는 지출 */
 
     function fyLabel(y) { return y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)'; }
@@ -201,10 +203,8 @@ var SHSLedger = (function () {
 
     /* 이 장부를 누가 쓰는지 알려 주는 말 */
     function who() {
-      if (ownerKind === 'presbytery') return '노회 회계·부회계';
-      return opts.kind === 'committee'
-        ? SHS.headTitle(opts.owner) + '·서기·회계'
-        : '시찰장·서기·회계';
+      if (ownerKind === 'presbytery') return '노회 회계';
+      return opts.kind === 'committee' ? '상비부 회계' : '시찰장·서기·회계';
     }
 
     function load() {
@@ -1591,7 +1591,8 @@ var SHSLedger = (function () {
     if (!box) return;
     var ownerKind = kindOf(opts.kind);
     var now0 = new Date();
-    var year = now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1;
+    var year = parseInt(opts.year, 10) ||
+      (now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1);
     var receipts = {}, payouts = {};   /* 항목 번호 → 영수증 / 지급 확인 */
     function fyLabel(y) { return y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)'; }
 

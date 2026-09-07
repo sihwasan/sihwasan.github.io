@@ -36,7 +36,7 @@
 <script src="js/audit-mark.js"></script>
 <script src="js/minutes-box.js"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
-<script src="js/ledger.js?v=20260907f"></script>
+<script src="js/ledger.js?v=20260907g"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var com = null, evs = [], isOfficer = false, myDuty = '', isAuditor = false;
   var accReqs = [];
   var view = new Date(); view.setDate(1);
-  var tab = 'cal';
+  var tab = location.hash === '#lg' ? 'lg' : 'cal';   /* 감사함·알림에서 #lg 로 오면 회계 장부 탭 */
 
   function db() { return SHSCloud.init(); }
   function ymd(d) {

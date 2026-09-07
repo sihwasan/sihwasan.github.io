@@ -72,7 +72,8 @@ var SHSBoard = (function () {
       dues: hicon('<path d="M8 40h32"/><rect x="11" y="26" width="6" height="14"/><rect x="21" y="18" width="6" height="22"/><rect x="31" y="10" width="6" height="30"/>'),
       me: hicon('<circle cx="24" cy="17" r="8"/><path d="M9 41a15 15 0 0 1 30 0"/>'),
       schedmgr: hicon('<rect x="8" y="12" width="32" height="28" rx="3"/><path d="M8 20h32M16 8v8M32 8v8"/><path d="M24 26v8M20 30h8"/>'),
-      assembly: hicon('<path d="M6 18 24 8l18 10"/><path d="M11 22v14M19 22v14M29 22v14M37 22v14"/><path d="M6 40h36"/><path d="M8 18h32"/>')
+      assembly: hicon('<path d="M6 18 24 8l18 10"/><path d="M11 22v14M19 22v14M29 22v14M37 22v14"/><path d="M6 40h36"/><path d="M8 18h32"/>'),
+      audit: hicon('<path d="M13 8h22v32H13z"/><path d="M19 8V5h10v3"/><path d="M19 18h10M19 24h10M19 30h6"/><path d="M28 34l3 3 6-7"/>')
     };
 
     function hubCard(id, title, sub, extra) {
@@ -101,6 +102,8 @@ var SHSBoard = (function () {
       cards += hubCard('doc', '서류 발급', '');
       cards += hubCard('report', '교회상황 보고서', '', { cid: 'hub-card-report' });
       cards += hubCard('me', '내 정보', '사진 · 도장 · 연락처');
+      /* 감사함 — 감사 기간에 감사부장·서기(와 관리자)에게만 나타난다 (loadAudit 이 연다) */
+      cards += hubCard('audit', '감사', '회계 장부 감사', { cid: 'hub-card-audit', hidden: true });
       /* 노회장·서기·간사에게는 노회 일정 카드 대신 노회 일정관리 카드를 둔다 */
       if (SHSAuth.canManageMembers(user)) cards += hubCard('schedmgr', '노회 일정관리', '달력 · 임직식');
       /* 노회 사무실 계정은 개인 칸이 없으므로 상회비 전체를 카드로 둔다 */
@@ -145,6 +148,7 @@ var SHSBoard = (function () {
           '<div class="hub-panel hidden" data-hp="com"><div id="dash-com"></div></div>') +
         '<div class="hub-panel hidden" data-hp="doc"><div id="dash-doc">' + LOADING + '</div></div>' +
         '<div class="hub-panel hidden" data-hp="report"><div id="dash-report">' + LOADING + '</div></div>' +
+        '<div class="hub-panel hidden" data-hp="audit"><div id="dash-audit">' + LOADING + '</div></div>' +
         (isSuper
           ? '<div class="hub-panel hidden" data-hp="dues"><div id="dash-dues-sec" class="hidden">' +
             '<p class="dash-more" style="margin-top:0"><a href="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC">관리 화면으로</a></p>' +
@@ -155,7 +159,8 @@ var SHSBoard = (function () {
       var HUB_TITLES = {
         noti: '나의 알림', notice: '노회 공지·일정', assembly: '총회 활동 현황', church: '나의 교회',
         sichal: '나의 시찰 · 납부 현황', mydues: '나의 상회비 · 세례의무금',
-        com: '상비부', doc: '서류 발급', report: '교회상황 보고서', dues: '상회비 전체'
+        com: '상비부', doc: '서류 발급', report: '교회상황 보고서', dues: '상회비 전체',
+        audit: '감사 · 회계 장부'
       };
       /* 상세로 들어가면 주소 뒤에 #hub-항목 이 붙어, 브라우저의
        * <뒤로 가기>를 눌러도 이전 단계(허브)로 돌아온다. */
@@ -327,6 +332,164 @@ var SHSBoard = (function () {
       });
       window.addEventListener('hashchange', hubFromHash);
       hubFromHash();
+      loadAudit();
+    }
+
+    /* ---------- 감사함 ----------
+     * 감사 기간(3·9월, 또는 관리자가 열어 둔 때)에 감사부장·감사부 서기와
+     * 노회 관리자에게만 <감사> 카드가 나타난다. 재정부·상비부·시찰 장부를
+     * 한눈에 보고, 고른 장부를 이 자리에서 살펴 감사필 처리와 회기 마감 승인을
+     * 한다. 증빙(영수증·지급 확인)도 장부 안에서 바로 본다. (79 sql) */
+    var auditYear = fyYear(), auditRows = [], auditWin = null, auditOpen = null;
+    var AUDIT_KIND = { presbytery: '노회 재정부', committee: '상비부', sichal: '시찰' };
+    function auditLink(b) {
+      if (b.owner_kind === 'presbytery') return 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84';
+      if (b.owner_kind === 'committee') return 'committee.html?c=' + encodeURIComponent(b.owner) + '#lg';
+      return 'sichal.html?s=' + encodeURIComponent(b.owner);
+    }
+    function loadAudit() {
+      var card = document.getElementById('hub-card-audit');
+      var panel = document.getElementById('dash-audit');
+      if (!card || !panel || !window.SHSAuditMark || !window.SHSLedger) return;
+      Promise.all([
+        SHSAuditMark.ready(),
+        SHSCloud.init().then(function (c) { return c.rpc('is_audit_reviewer'); })
+          .then(function (r) { return !!(r && r.data === true); }, function () { return false; })
+      ]).then(function (rs) {
+        auditWin = SHSAuditMark.windowNow();
+        var reviewer = rs[1] || SHSAuth.canManageMembers(user);
+        if (!(reviewer && auditWin.open)) return;
+        card.classList.remove('hidden');
+        return fetchAudit();
+      }).catch(function () {});
+    }
+    function fetchAudit() {
+      var panel = document.getElementById('dash-audit');
+      if (!panel) return Promise.resolve();
+      panel.innerHTML = LOADING;
+      return SHSCloud.init().then(function (c) {
+        return c.rpc('audit_ledger_overview', { p_year: auditYear });
+      }).then(function (r) {
+        if (r.error) {
+          panel.innerHTML = '<p class="dash-none">감사 목록을 불러오지 못했습니다: ' + esc(r.error.message) + '</p>';
+          return;
+        }
+        auditRows = r.data || [];
+        drawAudit();
+      });
+    }
+    function drawAudit() {
+      var panel = document.getElementById('dash-audit');
+      if (!panel) return;
+      var w = auditWin || { open: false };
+      function won(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
+      var ys = {};
+      [fyYear(), fyYear() - 1, auditYear].forEach(function (y) { ys[y] = 1; });
+      var years = Object.keys(ys).map(Number).sort(function (a, b) { return b - a; });
+
+      var h = '<div class="notice-banner" style="border-left:4px solid var(--navy)">' +
+        '<strong>' + esc(String(w.year || auditYear)) + '년 ' + esc(w.period || '') + ' 감사 기간</strong>' +
+        (w.manual
+          ? ' <span style="font-size:0.82rem;color:var(--gray-5)">(노회 관리자가 열어 둔 기간' +
+            (w.note ? ' · ' + esc(w.note) : '') + ')</span>' : '') +
+        ' — 아래에서 장부를 골라 살펴보고 <strong>감사필 처리</strong>와 <strong>회기 마감 승인</strong>을 하세요. ' +
+        '영수증·지급 확인 같은 증빙도 장부 안에서 바로 봅니다.</div>';
+      h += '<div class="inline-form" style="margin-bottom:8px;align-items:flex-end">' +
+        '<div class="field" style="flex:0 0 240px"><label>회계 연도</label><select id="au-year">' +
+        years.map(function (y) {
+          return '<option value="' + y + '"' + (y === auditYear ? ' selected' : '') + '>' + y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)</option>';
+        }).join('') + '</select></div>' +
+        '<button type="button" class="btn ghost sm" id="au-refresh">목록 새로 고침</button></div>';
+
+      var done = auditRows.filter(function (b) { return b.audited_yn; }).length;
+      var waiting = auditRows.filter(function (b) { return b.close_requested_at && !b.closed_yn; }).length;
+      h += '<p style="font-size:0.86rem;color:var(--gray-6);margin:0 0 8px">장부 ' + auditRows.length + '권 · 감사필 ' + done + '권' +
+        (waiting ? ' · <strong style="color:#b0731f">마감 승인 대기 ' + waiting + '권</strong>' : '') + '</p>';
+
+      h += '<div style="overflow-x:auto"><table class="tbl" style="font-size:0.86rem"><thead><tr>' +
+        '<th style="width:90px">구분</th><th class="left">장부</th><th>이월금</th><th>수입</th><th>지출</th><th>남은 돈</th>' +
+        '<th>항목·증빙</th><th style="width:80px">마감</th><th style="width:70px">감사</th><th style="width:90px"></th></tr></thead><tbody>';
+      if (!auditRows.length) {
+        h += '<tr><td colspan="10" style="text-align:center;color:var(--gray-5);padding:16px">' + auditYear + ' 회계연도 장부가 없습니다.</td></tr>';
+      }
+      auditRows.forEach(function (b) {
+        var closeCell = b.closed_yn
+          ? '<span class="role-badge" style="color:#2a7a2a;border-color:#2a7a2a">마감</span>'
+          : (b.close_requested_at
+              ? '<span class="role-badge" style="color:#b0731f;border-color:#b0731f">승인 요청</span>'
+              : '<span style="color:var(--gray-5)">-</span>');
+        var audCell = b.audited_yn
+          ? '<span class="role-badge" style="color:#2a7a2a;border-color:#2a7a2a">감사필</span>'
+          : '<span style="color:var(--gray-5)">전</span>';
+        var open = String(auditOpen) === String(b.book_id);
+        h += '<tr' + (open ? ' style="background:var(--gray-1,#f4efe7)"' : '') + '>' +
+          '<td>' + AUDIT_KIND[b.owner_kind] + '</td>' +
+          '<td class="left"><strong>' + esc(b.owner_kind === 'presbytery' ? '노회' : b.owner) + '</strong></td>' +
+          '<td style="text-align:right">' + won(b.opening_balance) + '</td>' +
+          '<td style="text-align:right;color:#2a7a2a">+' + won(b.income) + '</td>' +
+          '<td style="text-align:right;color:#b03a3a">−' + won(b.expense) + '</td>' +
+          '<td style="text-align:right"><strong>' + won(b.balance) + '</strong></td>' +
+          '<td style="font-size:0.8rem">' + b.entries + '건' +
+          (b.receipts ? ' · 영수증 ' + b.receipts : '') + (b.payouts ? ' · 수령 ' + b.payouts : '') + '</td>' +
+          '<td>' + closeCell + '</td><td>' + audCell + '</td>' +
+          '<td><button type="button" class="btn sm" data-auopen="' + b.book_id + '">' + (open ? '보는 중' : '감사하기') + '</button></td></tr>';
+      });
+      h += '</tbody></table></div>';
+      h += '<div id="dash-audit-ledger" style="margin-top:18px"></div>';
+      panel.innerHTML = h;
+
+      document.getElementById('au-year').addEventListener('change', function () {
+        auditYear = parseInt(this.value, 10); auditOpen = null; fetchAudit();
+      });
+      document.getElementById('au-refresh').addEventListener('click', function () { fetchAudit(); });
+      panel.querySelectorAll('button[data-auopen]').forEach(function (b) {
+        b.addEventListener('click', function () { openAuditLedger(b.dataset.auopen); });
+      });
+      if (auditOpen) openAuditLedger(auditOpen);
+    }
+    /* 고른 장부를 목록 아래에 펼친다 — 장부·감사 칸·마감 승인, 그리고 재정보고서 */
+    function openAuditLedger(bookId) {
+      var b = auditRows.filter(function (x) { return String(x.book_id) === String(bookId); })[0];
+      var slot = document.getElementById('dash-audit-ledger');
+      if (!b || !slot) return;
+      var changed = String(auditOpen) !== String(bookId);
+      auditOpen = bookId;
+      var panel = document.getElementById('dash-audit');
+      panel.querySelectorAll('button[data-auopen]').forEach(function (x) {
+        var mine = String(x.dataset.auopen) === String(bookId);
+        x.textContent = mine ? '보는 중' : '감사하기';
+        var tr = x.closest('tr');
+        if (tr) tr.style.background = mine ? 'var(--gray-1,#f4efe7)' : '';
+      });
+      var title = (b.owner_kind === 'presbytery' ? '노회 재정부' : AUDIT_KIND[b.owner_kind] + ' · ' + b.owner) +
+        ' — ' + b.year + ' 회계연도';
+      slot.innerHTML =
+        '<div class="hub-detail-head" style="margin:0 0 10px;flex-wrap:wrap;gap:10px">' +
+        '<h3 style="margin:0">' + esc(title) + '</h3>' +
+        '<div class="tabs" id="au-tabs" style="margin:0;border-bottom:none">' +
+        '<button type="button" class="active" data-aut="ledger">장부 · 감사</button>' +
+        '<button type="button" data-aut="report">재정보고서</button></div>' +
+        '<a class="btn ghost sm" href="' + auditLink(b) + '">그 화면으로 열기</a></div>' +
+        '<div id="au-body"></div>';
+      var body = document.getElementById('au-body');
+      function show(t) {
+        if (t === 'report') {
+          SHSLedger.report(body, { kind: b.owner_kind, owner: b.owner, year: b.year });
+        } else {
+          SHSLedger.mount(body, {
+            kind: b.owner_kind, owner: b.owner, user: user, year: b.year,
+            canEdit: false, isAuditor: true
+          });
+        }
+      }
+      slot.querySelectorAll('#au-tabs button').forEach(function (t) {
+        t.addEventListener('click', function () {
+          slot.querySelectorAll('#au-tabs button').forEach(function (x) { x.classList.toggle('active', x === t); });
+          show(t.dataset.aut);
+        });
+      });
+      show('ledger');
+      if (changed) slot.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     /* 상회비: 정회원 모두에게 '나의 교회 납부 현황'을,

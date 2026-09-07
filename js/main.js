@@ -636,7 +636,7 @@
       var lc = key.match(/^lclose-\d+-(committee|sichal|presbytery)-(.+?)(-ok|-no)?$/);
       if (lc) {
         if (lc[1] === 'presbytery') return 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84';
-        if (lc[1] === 'committee') return 'committee.html?c=' + encodeURIComponent(lc[2]);
+        if (lc[1] === 'committee') return 'committee.html?c=' + encodeURIComponent(lc[2]) + '#lg';
         return 'sichal.html?s=' + encodeURIComponent(lc[2]);
       }
       return null;
