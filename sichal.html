@@ -72,6 +72,8 @@ document.addEventListener('DOMContentLoaded', function () {
   var passSes = null;       /* 자료실 통과 청원서에서 고른 회기 번호 (없으면 현재 회기) */
   var passOpenId = null;    /* 자료실에서 열람 중인 통과 청원서 */
   var docNotice = '';       /* 서류 진단에서 <적합> 처리 뒤 자료실로 넘어올 때 보여 줄 안내 */
+  var docView = 'live';     /* 자료실 보기: live(자료실) / trash(삭제한 자료) */
+  var docsAll = [], subsAll = [];   /* 삭제한 것까지 든 원본 — docs/subs 는 살아 있는 것만 */
   var myChurch = user.church || '';
   var tab = (location.hash || '').replace(/^#/, '') || 'church';
   if (revOpenId) tab = 'review';
@@ -178,10 +180,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         bapAll   = (rs[9] && rs[9].data) || [];
         sicFin   = (rs[10] && rs[10].data) || [];
-        docs     = (rs[4] && rs[4].data) || [];
+        docsAll  = (rs[4] && rs[4].data) || [];
         minutes  = (rs[5] && rs[5].data) || [];
         reports  = (rs[6] && rs[6].data) || [];
-        subs     = (rs[11] && rs[11].data) || [];
+        subsAll  = (rs[11] && rs[11].data) || [];
+        splitLists();
         var sesRow = rs[12] && rs[12].data && rs[12].data[0];
         sessions = (sesRow && sesRow.value) || { current: null, list: [] };
         if (!Array.isArray(sessions.list)) sessions.list = [];
@@ -958,7 +961,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:150px">접수일</th><th style="width:110px">신청자</th>' +
         '<th style="width:180px">서류종류</th><th class="left">제목</th>' +
         '<th style="width:110px">노회 제출</th>' +
-        '<th style="width:90px">열람</th></tr></thead><tbody>';
+        '<th style="width:' + (isOfficer ? '150' : '90') + 'px">' + (isOfficer ? '관리' : '열람') + '</th></tr></thead><tbody>';
       list.forEach(function (p) {
         h += '<tr' + (String(p.id) === String(passOpenId) ? ' style="background:var(--gray-1,#f4f5f8)"' : '') + '>' +
           '<td><input type="checkbox" class="dc-sel" value="' + p.id + '" style="width:auto"></td>' +
@@ -968,11 +971,153 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td class="left">' + e(p.title) + '</td>' +
           '<td>' + fwdStatusHtml(p) +
           (p.forwarded_at ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(when(p.forwarded_at).slice(0, 10)) + '</div>' : '') + '</td>' +
-          '<td><button class="btn sm" data-dcpass="' + p.id + '">열람</button></td></tr>';
+          '<td style="white-space:nowrap"><button class="btn sm" data-dcpass="' + p.id + '">열람</button>' +
+          (isOfficer ? ' <button class="btn danger sm" data-dcpdel="' + p.id + '">삭제</button>' : '') + '</td></tr>';
       });
       h += '</tbody></table></div>';
     }
     return h + '</div>';
+  }
+
+  /* ---------- 삭제 규칙 ----------
+   * 총관리자: 바로 완전히 지운다(자료실에 흔적이 남지 않는다).
+   * 서기·시찰장: <삭제한 자료>로 옮겨 두며, 되돌릴 수 있다. 완전 삭제는 총관리자만 한다. */
+  var trashSubs = [], trashDocs = [];
+  function splitLists() {
+    docs = docsAll.filter(function (d) { return !d.deleted_at; });
+    trashDocs = docsAll.filter(function (d) { return !!d.deleted_at; });
+    subs = subsAll.filter(function (p) { return !p.deleted_at; });
+    trashSubs = subsAll.filter(function (p) { return !!p.deleted_at; });
+  }
+  function isSuper() { return !!(user && user.role === 'superadmin'); }
+  function fail(err) { alert('처리하지 못했습니다: ' + ((err && err.message) || err)); }
+  /* 완전 삭제 */
+  function purgePetition(p) {
+    return db().then(function (c) {
+      return c.from('petition_submissions').delete().eq('id', p.id).select('id');
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      if (!(r.data && r.data.length)) throw new Error('지우지 못했습니다. 권한을 확인해 주세요.');
+      subsAll = subsAll.filter(function (x) { return String(x.id) !== String(p.id); });
+      splitLists();
+    });
+  }
+  function purgeDoc(d) {
+    return db().then(function (c) {
+      var pre = d.file_path
+        ? c.storage.from('sichal-files').remove([d.file_path]).catch(function () {})
+        : Promise.resolve();
+      return pre.then(function () { return c.from('sichal_docs').delete().eq('id', d.id).select('id'); });
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      if (!(r.data && r.data.length)) throw new Error('지우지 못했습니다. 권한을 확인해 주세요.');
+      docsAll = docsAll.filter(function (x) { return String(x.id) !== String(d.id); });
+      splitLists();
+    });
+  }
+  /* 보관함으로 옮기기 / 되돌리기 */
+  function setDeleted(table, row, on) {
+    var now = new Date().toISOString();
+    var patch = on ? { deleted_at: now, deleted_by: user.name || '' } : { deleted_at: null, deleted_by: null };
+    return db().then(function (c) {
+      return c.from(table).update(patch).eq('id', row.id).select('id');
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      if (!(r.data && r.data.length)) throw new Error('처리하지 못했습니다. 권한(시찰장·서기)을 확인해 주세요.');
+      row.deleted_at = patch.deleted_at; row.deleted_by = patch.deleted_by;
+      splitLists();
+    });
+  }
+  function deletePetition(p, after) {
+    if (isSuper()) {
+      if (!confirm('「' + p.title + '」\n\n총관리자 삭제 — 이 청원서를 완전히 지웁니다. 흔적이 남지 않고 되돌릴 수 없으며, ' +
+                   '신청자의 나의 서류에서도 사라집니다. 계속하시겠습니까?')) return;
+      purgePetition(p).then(function () {
+        SHS.logAction('delete', '청원서 완전 삭제', NAME + ' / ' + p.title + ' (번호 ' + p.id + ')');
+        after();
+      }).catch(fail);
+    } else {
+      if (!confirm('「' + p.title + '」\n\n이 청원서를 삭제하면 시찰 자료실의 <삭제한 자료>로 옮겨지고, ' +
+                   '신청자의 나의 서류에서는 보이지 않습니다. 되돌리기는 <삭제한 자료>에서 할 수 있습니다. 삭제하시겠습니까?')) return;
+      setDeleted('petition_submissions', p, true).then(function () {
+        SHS.logAction('delete', '청원서 삭제(보관)', NAME + ' / ' + p.title + ' (번호 ' + p.id + ')');
+        after();
+      }).catch(fail);
+    }
+  }
+  function deleteDoc(d, after) {
+    if (isSuper()) {
+      if (!confirm('"' + d.title + '" 자료\n\n총관리자 삭제 — 파일까지 완전히 지웁니다. 흔적이 남지 않고 되돌릴 수 없습니다. 계속하시겠습니까?')) return;
+      purgeDoc(d).then(function () {
+        SHS.logAction('delete', '시찰 자료 완전 삭제', NAME + ' / ' + d.title);
+        after();
+      }).catch(fail);
+    } else {
+      if (!confirm('"' + d.title + '" 자료를 삭제하면 <삭제한 자료>로 옮겨집니다. 되돌릴 수 있습니다. 삭제하시겠습니까?')) return;
+      setDeleted('sichal_docs', d, true).then(function () {
+        SHS.logAction('delete', '시찰 자료 삭제(보관)', NAME + ' / ' + d.title);
+        after();
+      }).catch(fail);
+    }
+  }
+  function bindViewTabs(box) {
+    box.querySelectorAll('#dc-view button').forEach(function (b) {
+      b.addEventListener('click', function () { docView = b.dataset.dv; passOpenId = null; drawDocs(); });
+    });
+  }
+  /* 삭제한 자료 — 서기·시찰장이 지운 청원서·자료 */
+  function trashBox() {
+    var h = '<div class="admin-card" style="margin-bottom:18px"><h3 style="margin:0 0 6px">삭제한 자료 (' + (trashSubs.length + trashDocs.length) + ')</h3>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5);margin:0 0 12px">시찰장·서기가 지운 청원서와 자료입니다. 되돌리면 원래 자리로 돌아갑니다. ' +
+      (isSuper() ? '총관리자는 여기서 <strong>완전 삭제</strong>할 수 있으며, 완전 삭제는 되돌릴 수 없습니다.' : '완전 삭제는 총관리자만 할 수 있습니다.') + '</p>';
+    if (!trashSubs.length && !trashDocs.length) return h + '<p style="color:var(--gray-5);margin:0">삭제한 자료가 없습니다.</p></div>';
+    h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+      '<th style="width:90px">종류</th><th class="left">제목</th><th style="width:150px">삭제일</th>' +
+      '<th style="width:100px">삭제한 사람</th><th style="width:190px">관리</th></tr></thead><tbody>';
+    var rows = trashSubs.map(function (p) { return { kind: 'sub', row: p }; })
+      .concat(trashDocs.map(function (d) { return { kind: 'doc', row: d }; }))
+      .sort(function (a, b) { return String(b.row.deleted_at).localeCompare(String(a.row.deleted_at)); });
+    rows.forEach(function (x) {
+      var r = x.row;
+      h += '<tr><td>' + (x.kind === 'sub' ? '청원서' : '자료') + '</td>' +
+        '<td class="left">' + e(r.title) +
+        (x.kind === 'sub'
+          ? '<br><small style="color:var(--gray-5)">' + e(r.user_name || '') + ' · ' + e(r.form_title || '') + ' · ' + e(when(r.created_at)) + ' 접수 · ' + e(r.status || '') + '</small>'
+          : (r.doc_date ? '<br><small style="color:var(--gray-5)">' + e(r.doc_date) + '</small>' : '')) + '</td>' +
+        '<td>' + e(when(r.deleted_at)) + '</td><td>' + e(r.deleted_by || '') + '</td>' +
+        '<td style="white-space:nowrap">' +
+        (x.kind === 'sub' ? '<a class="btn ghost sm" href="petition.html?sub=' + r.id + '" target="_blank" rel="noopener">열람</a> ' : '') +
+        '<button class="btn sm" data-trres="' + x.kind + ':' + r.id + '">되돌리기</button>' +
+        (isSuper() ? ' <button class="btn danger sm" data-trpurge="' + x.kind + ':' + r.id + '">완전 삭제</button>' : '') +
+        '</td></tr>';
+    });
+    return h + '</tbody></table></div></div>';
+  }
+  function bindTrashBox(box) {
+    function find(key) {
+      var k = key.split(':'), id = k[1];
+      var list = k[0] === 'sub' ? trashSubs : trashDocs;
+      return { kind: k[0], row: list.filter(function (x) { return String(x.id) === String(id); })[0] };
+    }
+    box.querySelectorAll('[data-trres]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var t = find(b.dataset.trres); if (!t.row) return;
+        setDeleted(t.kind === 'sub' ? 'petition_submissions' : 'sichal_docs', t.row, false).then(function () {
+          SHS.logAction('update', (t.kind === 'sub' ? '청원서' : '시찰 자료') + ' 삭제 되돌리기', NAME + ' / ' + t.row.title);
+          draw();
+        }).catch(fail);
+      });
+    });
+    box.querySelectorAll('[data-trpurge]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var t = find(b.dataset.trpurge); if (!t.row) return;
+        if (!confirm('「' + t.row.title + '」을(를) 완전히 지웁니다. 되돌릴 수 없습니다. 계속하시겠습니까?')) return;
+        (t.kind === 'sub' ? purgePetition(t.row) : purgeDoc(t.row)).then(function () {
+          SHS.logAction('delete', (t.kind === 'sub' ? '청원서' : '시찰 자료') + ' 완전 삭제', NAME + ' / ' + t.row.title);
+          draw();
+        }).catch(fail);
+      });
+    });
   }
 
   /* ---------- 노회 서기에게 제출 (시찰장 도장) ----------
@@ -1084,6 +1229,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (v) v.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
+    box.querySelectorAll('[data-dcpdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var p = subs.filter(function (x) { return String(x.id) === String(b.dataset.dcpdel); })[0];
+        if (p) deletePetition(p, function () { if (String(passOpenId) === String(p.id)) passOpenId = null; draw(); });
+      });
+    });
     if (passOpenId) {
       var open = subs.filter(function (p) { return String(p.id) === String(passOpenId); })[0];
       if (open) { bindPetViewer(open, function () { passOpenId = null; drawDocs(); }); bindForwardBox(open); }
@@ -1118,6 +1269,23 @@ document.addEventListener('DOMContentLoaded', function () {
   function drawDocs() {
     var box = document.getElementById('si-body');
     var h = '';
+
+    /* 자료실 / 삭제한 자료 — 서기·시찰장이 지운 것은 보관되고, 총관리자만 완전히 지운다 */
+    if (isOfficer) {
+      var nTrash = trashSubs.length + trashDocs.length;
+      h += '<div class="tabs" id="dc-view" style="margin-bottom:12px">' +
+        '<button class="' + (docView === 'live' ? 'active' : '') + '" data-dv="live">자료실</button>' +
+        '<button class="' + (docView === 'trash' ? 'active' : '') + '" data-dv="trash">삭제한 자료 (' + nTrash + ')</button></div>';
+    } else {
+      docView = 'live';
+    }
+    if (docView === 'trash') {
+      h += trashBox();
+      box.innerHTML = h;
+      bindViewTabs(box);
+      bindTrashBox(box);
+      return;
+    }
 
     /* 서류 진단에서 <적합> 처리를 마치고 넘어온 경우의 완료 안내 */
     if (docNotice) {
@@ -1156,6 +1324,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (isOfficer) h += docForm();
     box.innerHTML = h;
+    bindViewTabs(box);
     if (isOfficer) bindDocForm();
     bindPassedBox(box);
     if (docNotice) {
@@ -1191,20 +1360,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
     box.querySelectorAll('button[data-dcdel]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var d = docs[+b.dataset.dcdel];
-        if (!confirm('"' + d.title + '" 자료를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
-        db().then(function (c) {
-          var pre = d.file_path
-            ? c.storage.from('sichal-files').remove([d.file_path]).catch(function () {})
-            : Promise.resolve();
-          return pre.then(function () { return c.from('sichal_docs').delete().eq('id', d.id); });
-        }).then(function (r) {
-          if (r.error) { alert(r.error.message); return; }
-          SHSCloud.log('delete', '시찰 자료 삭제', NAME + ' / ' + d.title);
-          load();
-        });
-      });
+      b.addEventListener('click', function () { deleteDoc(docs[+b.dataset.dcdel], drawDocs); });
     });
   }
 
@@ -2225,27 +2381,7 @@ document.addEventListener('DOMContentLoaded', function () {
       b.addEventListener('click', function () {
         var p = subs.filter(function (x) { return String(x.id) === String(b.dataset.rvdel); })[0];
         if (!p) return;
-        if (!confirm('「' + p.title + '」\n\n' +
-          '이 청원서를 삭제하면 되돌릴 수 없고, 신청자의 \'나의 서류\'에서도 사라집니다. ' +
-          '잘못 접수된 서류가 아니라면 삭제 대신 [반려]를 사용해 주세요. 삭제하시겠습니까?')) return;
-        b.disabled = true; b.textContent = '삭제 중...';
-        db().then(function (c) {
-          /* .select() 로 지운 줄을 되받아 정말 지워졌는지 확인한다.
-           * 권한이 없으면 Supabase 는 오류 없이 0줄만 돌려주기 때문이다. */
-          return c.from('petition_submissions').delete().eq('id', p.id).select('id');
-        }).then(function (r) {
-          if (r.error) throw r.error;
-          if (!(r.data && r.data.length)) throw new Error('지우지 못했습니다. 삭제 권한(시찰장·서기)을 확인해 주세요.');
-          SHS.logAction('delete', '청원서 삭제',
-            NAME + ' / ' + p.title + ' (' + (p.user_name || '-') + ' · ' + p.form_title +
-            ' · ' + when(p.created_at) + ' 접수 · 상태 ' + p.status + ' · 번호 ' + p.id + ')');
-          subs = subs.filter(function (x) { return String(x.id) !== String(p.id); });
-          if (String(revOpenId) === String(p.id)) revOpenId = null;
-          draw();   /* 목록·상태별 건수·탭 배지를 곧바로 다시 그린다 */
-        }).catch(function (err) {
-          b.disabled = false; b.textContent = '삭제';
-          alert('삭제하지 못했습니다: ' + ((err && err.message) || err));
-        });
+        deletePetition(p, function () { if (String(revOpenId) === String(p.id)) revOpenId = null; draw(); });
       });
     });
 

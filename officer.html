@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSCloud.init().then(function (c) {
       return c.from('petition_submissions')
         .select('id,sichal,user_name,form_title,title,status,forwarded_at,sichal_head_name,noheo_status,noheo_note,noheo_at,noheo_by')
-        .not('forwarded_at', 'is', null).order('forwarded_at', { ascending: false });
+        .not('forwarded_at', 'is', null).is('deleted_at', null).order('forwarded_at', { ascending: false });
     }).then(function (r) {
       if (r.error) throw r.error;
       var rows = r.data || [];
