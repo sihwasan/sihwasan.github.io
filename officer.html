@@ -24,7 +24,7 @@
 <script src="private/resolutions.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907f"></script>
+<script src="js/main.js?v=20260907g"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
 <script src="js/ledger.js?v=20260907r"></script>
@@ -118,6 +118,14 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '</tbody></table>';
   }
 
+  /* 시찰 경유 청원서 — 시찰장 도장이 찍혀 노회 서기에게 제출된 청원서 (84) */
+  if (SHSAuth.canManageMembers(user)) {
+    html += '<h2>시찰 경유 청원서</h2>';
+    html += '<p>각 시찰의 서류 진단을 통과하고 <strong>시찰장 도장</strong>이 찍혀 노회 서기에게 제출된 청원서입니다. ' +
+      '열람해 확인한 뒤 <strong>접수</strong>하거나, 사유를 적어 <strong>반려</strong>하십시오. 결과는 신청자와 시찰 임원에게 알림으로 갑니다.</p>';
+    html += '<div id="pi-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+  }
+
   /* 상회비 관리 */
   html += '<h2>상회비 관리</h2>';
   html += '<div id="dues-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
@@ -154,6 +162,94 @@ document.addEventListener('DOMContentLoaded', function () {
   SHS.sectionize(area);
   loadChurchReports();
   if (canFinance) loadFinance();
+  if (SHSAuth.canManageMembers(user)) loadPetitionIntake();
+
+  /* ================= 시찰 경유 청원서 접수 =================
+   * 시찰장이 도장을 찍어 보낸 청원서(petition_submissions.forwarded_at)를 모아 보고
+   * 접수·반려한다(84 noheo_petition). 서식 열람은 청원서 화면(petition.html?sub=번호)이 맡는다. */
+  var piFilter = '전송됨';
+  function loadPetitionIntake() {
+    var box = document.getElementById('pi-area');
+    if (!box) return;
+    SHSCloud.init().then(function (c) {
+      return c.from('petition_submissions')
+        .select('id,sichal,user_name,form_title,title,status,forwarded_at,sichal_head_name,noheo_status,noheo_note,noheo_at,noheo_by')
+        .not('forwarded_at', 'is', null).order('forwarded_at', { ascending: false });
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      var rows = r.data || [];
+      function when(t) { return t ? String(t).replace('T', ' ').slice(0, 16) : ''; }
+      function stHtml(p) {
+        var st = p.noheo_status || '전송됨';
+        if (st === '접수') return '<span class="pass">접수</span>';
+        if (st === '반려') return '<span class="fail">반려</span>';
+        return '<span style="color:var(--navy);font-weight:700">접수 대기</span>';
+      }
+      var counts = { '전송됨': 0, '접수': 0, '반려': 0 };
+      rows.forEach(function (p) { var k = p.noheo_status || '전송됨'; if (counts[k] !== undefined) counts[k]++; });
+      var shown = piFilter === '전체' ? rows : rows.filter(function (p) { return (p.noheo_status || '전송됨') === piFilter; });
+      var TABS = [['전송됨', '접수 대기'], ['접수', '접수'], ['반려', '반려'], ['전체', '전체']];
+      var h = '<div class="tabs" id="pi-filter" style="margin-bottom:10px">' + TABS.map(function (t) {
+        var n = t[0] === '전체' ? rows.length : counts[t[0]];
+        return '<button class="' + (piFilter === t[0] ? 'active' : '') + '" data-pif="' + t[0] + '">' + t[1] + ' (' + n + ')</button>';
+      }).join('') + '</div>';
+      if (!shown.length) {
+        h += '<p style="color:var(--gray-5)">해당 청원서가 없습니다.</p>';
+      } else {
+        h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+          '<th style="width:140px">제출일</th><th style="width:90px">시찰</th><th style="width:90px">신청자</th>' +
+          '<th style="width:150px">서류종류</th><th class="left">제목</th><th style="width:90px">시찰장</th>' +
+          '<th style="width:90px">상태</th><th style="width:200px">관리</th></tr></thead><tbody>';
+        shown.forEach(function (p) {
+          h += '<tr><td>' + e(when(p.forwarded_at)) + '</td><td>' + e(p.sichal) + '</td><td>' + e(p.user_name || '-') + '</td>' +
+            '<td>' + e(p.form_title) + '</td>' +
+            '<td class="left">' + e(p.title) +
+            (p.noheo_note ? '<br><small style="color:#b03a3a">의견 : ' + e(p.noheo_note) + '</small>' : '') +
+            (p.noheo_at ? '<br><small style="color:var(--gray-5)">' + e(when(p.noheo_at)) + (p.noheo_by ? ' · ' + e(p.noheo_by) : '') + '</small>' : '') + '</td>' +
+            '<td>' + e(p.sichal_head_name || '') + '</td>' +
+            '<td>' + stHtml(p) + '</td>' +
+            '<td style="white-space:nowrap"><a class="btn sm" href="petition.html?sub=' + p.id + '" target="_blank" rel="noopener">열람</a> ' +
+            ((p.noheo_status || '전송됨') === '전송됨'
+              ? '<button class="btn sm" data-piok="' + p.id + '">접수</button> <button class="btn danger sm" data-pino="' + p.id + '">반려</button>'
+              : '') + '</td></tr>';
+        });
+        h += '</tbody></table></div>';
+      }
+      box.innerHTML = h;
+      box.querySelectorAll('#pi-filter button').forEach(function (b) {
+        b.addEventListener('click', function () { piFilter = b.dataset.pif; loadPetitionIntake(); });
+      });
+      function decide(id, status, note) {
+        var p = rows.filter(function (x) { return String(x.id) === String(id); })[0];
+        if (!p) return;
+        SHSCloud.init().then(function (c) {
+          return c.rpc('noheo_petition', { p_id: p.id, p_status: status, p_note: note || '' });
+        }).then(function (r2) {
+          if (r2.error) throw r2.error;
+          SHSCloud.log('update', '청원서 노회 ' + status, p.sichal + ' / ' + p.title + (note ? ' — ' + note : ''));
+          loadPetitionIntake();
+        }).catch(function (err) { alert('처리하지 못했습니다: ' + ((err && err.message) || err)); });
+      }
+      box.querySelectorAll('button[data-piok]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var p = rows.filter(function (x) { return String(x.id) === String(b.dataset.piok); })[0];
+          if (p && confirm('「' + p.title + '」(' + p.sichal + ')을(를) 접수합니다.')) decide(p.id, '접수', '');
+        });
+      });
+      box.querySelectorAll('button[data-pino]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var p = rows.filter(function (x) { return String(x.id) === String(b.dataset.pino); })[0];
+          if (!p) return;
+          var note = prompt('「' + p.title + '」 반려 사유를 적어 주세요. 신청자와 시찰 임원에게 그대로 전해집니다.', '');
+          if (note === null) return;
+          if (!note.trim()) { alert('반려 사유를 적어 주세요.'); return; }
+          decide(p.id, '반려', note.trim());
+        });
+      });
+    }).catch(function (err) {
+      box.innerHTML = '<p style="color:#a33">불러오지 못했습니다: ' + e((err && err.message) || err) + '</p>';
+    });
+  }
 
   /* ================= 노회 재정부 회계 =================
    * 장부 자체는 상비부·시찰과 같은 js/ledger.js 를 쓴다(kind: presbytery).

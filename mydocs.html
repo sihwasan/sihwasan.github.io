@@ -31,7 +31,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907f"></script>
+<script src="js/main.js?v=20260907g"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -101,9 +101,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     : 'background:var(--gray-1,#f4f5f8);border-left:3px solid var(--gray-3,#d8dbe2);color:var(--gray-7)') +
               '"><strong>시찰 서기 의견</strong><br>' + e(p.note).replace(/\n/g, '<br>') + '</div>';
           }
+          /* 시찰장이 노회 서기에게 제출한 뒤의 흐름 — 제출 · 노회 접수/반려 */
+          var fwdHtml = '';
+          if (p.forwarded_at) {
+            var ns = p.noheo_status || '전송됨';
+            fwdHtml = '<div style="margin-top:4px;font-size:0.82rem;color:var(--navy)">시찰장 ' + e(p.sichal_head_name || '') +
+              ' 도장으로 노회 제출 (' + e(String(p.forwarded_at).replace('T', ' ').slice(0, 16)) + ') · 노회 ' +
+              (ns === '접수' ? '<span class="pass">접수</span>' : ns === '반려' ? '<span class="fail">반려</span>' : '<strong>처리 대기</strong>') + '</div>' +
+              (p.noheo_note ? '<div style="margin-top:4px;padding:8px 10px;border-radius:6px;font-size:0.84rem;background:#fbf1ee;border-left:3px solid #b03a3a;color:#7a2b2b">' +
+                '<strong>노회 서기 의견</strong><br>' + e(p.noheo_note).replace(/\n/g, '<br>') + '</div>' : '');
+          }
           h += '<tr><td class="left">' + e(p.title) +
             '<br><small style="color:var(--gray-5)">' + e(p.form_title || '') + '</small>' +
-            noteHtml + '</td>' +
+            noteHtml + fwdHtml + '</td>' +
             '<td>' + e(p.sichal) + '</td>' +
             '<td>' + e(String(p.created_at).replace('T', ' ').slice(0, 16)) + '</td>' +
             '<td>' + st + '</td>' +

@@ -666,6 +666,13 @@
     /* 청원서 — 시찰 서기에게는 그 청원서의 <서류 진단>,
      * 낸 분에게는 <나의 서류>의 시찰로 보낸 청원서 */
     if (n.kind === '시찰') {
+      /* 시찰장이 노회로 제출(84) — 관리자는 임원방 접수함, 낸 분은 나의 서류 */
+      if (key.indexOf('petfwd-') === 0) {
+        var adm = !!(u && window.SHSAuth && SHSAuth.canManageMembers && SHSAuth.canManageMembers(u));
+        return adm ? 'officer.html#sec-' + encodeURIComponent('시찰-경유-청원서') : 'mydocs.html';
+      }
+      var nh = key.match(/^petnh-(\d+)-(.+)$/);            /* 노회 서기 처리 결과 → 그 시찰의 통과 청원서 */
+      if (nh) return 'sichal.html?s=' + encodeURIComponent(nh[2]) + '#doc';
       var m = key.match(/^petition-(\d+)-(.+)$/);          /* 73 이후의 새 알림 */
       if (m) {
         return 'sichal.html?s=' + encodeURIComponent(m[2]) + '&p=' + m[1] + '#review';

@@ -24,7 +24,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907f"></script>
+<script src="js/main.js?v=20260907g"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
@@ -941,9 +941,10 @@ document.addEventListener('DOMContentLoaded', function () {
         : '<span style="font-size:0.8rem;color:var(--gray-5)">회기 설정이 없어 전체를 보여 줍니다.</span>') +
       '</div>' +
       '<p style="font-size:0.84rem;color:var(--gray-5);margin:6px 0 12px">서류 진단에서 <strong>적합</strong>으로 ' +
-      '진단된 청원서입니다. 제출된 원본 서식이 도장까지 그대로 보이며, 여러 건을 골라 한 번에 인쇄할 수 있습니다.</p>';
+      '진단된 청원서입니다. 제출된 원본 서식이 도장까지 그대로 보이며, 여러 건을 골라 한 번에 인쇄할 수 있습니다. ' +
+      '<strong>시찰장</strong>은 열람에서 내 도장을 찍어 <strong>노회 서기에게 제출</strong>합니다.</p>';
 
-    if (open) h += petViewerHtml(open, '');
+    if (open) h += petViewerHtml(open, forwardBoxHtml(open));
 
     if (!list.length) {
       h += '<p style="color:var(--gray-5);margin:0">이번 회기에 통과된 청원서가 없습니다.</p>';
@@ -956,6 +957,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:36px"><input type="checkbox" id="dc-selall" title="전체선택" style="width:auto"></th>' +
         '<th style="width:150px">접수일</th><th style="width:110px">신청자</th>' +
         '<th style="width:180px">서류종류</th><th class="left">제목</th>' +
+        '<th style="width:110px">노회 제출</th>' +
         '<th style="width:90px">열람</th></tr></thead><tbody>';
       list.forEach(function (p) {
         h += '<tr' + (String(p.id) === String(passOpenId) ? ' style="background:var(--gray-1,#f4f5f8)"' : '') + '>' +
@@ -964,11 +966,109 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td>' + e(p.user_name || '-') + '</td>' +
           '<td>' + e(p.form_title) + '</td>' +
           '<td class="left">' + e(p.title) + '</td>' +
+          '<td>' + fwdStatusHtml(p) +
+          (p.forwarded_at ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(when(p.forwarded_at).slice(0, 10)) + '</div>' : '') + '</td>' +
           '<td><button class="btn sm" data-dcpass="' + p.id + '">열람</button></td></tr>';
       });
       h += '</tbody></table></div>';
     }
     return h + '</div>';
+  }
+
+  /* ---------- 노회 서기에게 제출 (시찰장 도장) ----------
+   * 통과(적합) 청원서를 시찰장이 내 정보의 도장으로 서식의 "시 찰 장 (인)" 자리에 찍어
+   * 노회 서기에게 보낸다(84 forward_petition). 미리보기는 안쪽 청원서 화면에 postMessage 로 보인다. */
+  var headSeal;   /* 시찰장의 내 도장 (member_seals · pastor) — 처음 필요할 때 읽는다 */
+  function fwdStatusHtml(p) {
+    if (!p.forwarded_at) return '<span style="color:var(--gray-5)">미제출</span>';
+    var st = p.noheo_status || '전송됨';
+    var col = st === '접수' ? '#2a7a2a' : (st === '반려' ? '#b03a3a' : 'var(--navy)');
+    return '<span style="color:' + col + ';font-weight:700">' + (st === '전송됨' ? '제출됨' : e(st)) + '</span>';
+  }
+  function forwardBoxHtml(p) {
+    var isHead = myDuty === '시찰장' || (user && user.role === 'superadmin');
+    var h = '<div id="fw-box" style="margin-top:18px;border:1.5px solid #b9c3d6;background:#f5f7fb;border-radius:8px;padding:12px 14px">' +
+      '<h4 class="mn-sub" style="margin:0 0 8px">노회 서기에게 제출</h4>';
+    if (p.forwarded_at) {
+      h += '<p style="margin:0;font-size:0.9rem">' + e(when(p.forwarded_at)) + ' 시찰장 <strong>' + e(p.sichal_head_name || '') +
+        '</strong> 도장으로 노회 서기에게 제출했습니다. 노회 처리: ' + fwdStatusHtml(p) +
+        (p.noheo_at ? ' <small style="color:var(--gray-5)">(' + e(when(p.noheo_at)) + (p.noheo_by ? ' · ' + e(p.noheo_by) : '') + ')</small>' : '') + '</p>' +
+        (p.noheo_note ? '<div style="margin-top:6px;padding:8px 10px;border-radius:6px;font-size:0.86rem;background:#fbf1ee;border-left:3px solid #b03a3a;color:#7a2b2b">' +
+          '<strong>노회 서기 의견</strong><br>' + e(p.noheo_note).replace(/\n/g, '<br>') + '</div>' : '');
+      if (p.noheo_status === '반려') {
+        h += '<p style="font-size:0.84rem;color:var(--gray-6);margin:8px 0 0">반려된 청원서는 신청자가 고쳐 다시 제출한 뒤, 서류 진단을 거쳐 다시 보냅니다.</p>';
+      }
+      return h + '</div>';
+    }
+    if (!isHead) {
+      return h + '<p style="margin:0;font-size:0.88rem;color:var(--gray-6)">아직 제출 전입니다. <strong>시찰장</strong>이 내 정보의 도장으로 ' +
+        '서식의 <strong>시 찰 장 (인)</strong> 자리에 도장을 찍어 노회 서기에게 제출합니다.</p></div>';
+    }
+    h += '<p style="margin:0 0 10px;font-size:0.88rem;color:var(--gray-6)">시찰장 <strong>' + e(user.name || '') + '</strong>의 도장(내 정보 → 내 도장)을 ' +
+      '서식의 <strong>시 찰 장 (인)</strong> 자리에 찍어 노회 서기에게 보냅니다. 「도장 미리보기」로 자리를 확인한 뒤 「제출」을 누르세요.</p>' +
+      '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">' +
+      '<div id="fw-seal" style="width:72px;height:72px;border:1px solid var(--gray-2);border-radius:8px;flex:0 0 72px;' +
+      'background:repeating-conic-gradient(#f3f0ea 0 25%,#fff 0 50%) 0 0/12px 12px;display:flex;align-items:center;justify-content:center;font-size:0.72rem;color:var(--gray-5)">불러오는 중</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn ghost sm" id="fw-preview" disabled>도장 미리보기</button>' +
+      '<button class="btn sm" id="fw-send" disabled>시찰장 도장 찍어 노회 서기에게 제출</button>' +
+      '<a class="btn ghost sm" href="mypage.html" target="_blank" rel="noopener">내 도장 만들기</a></div></div>' +
+      '<div class="form-msg" id="fw-msg"></div>';
+    return h + '</div>';
+  }
+  function bindForwardBox(p) {
+    if (!document.getElementById('fw-box') || p.forwarded_at) return;
+    var prev = document.getElementById('fw-preview'), send = document.getElementById('fw-send');
+    var sealBox = document.getElementById('fw-seal'), msg = document.getElementById('fw-msg');
+    if (!prev || !send) return;
+    function showSeal() {
+      if (headSeal) {
+        sealBox.innerHTML = '<img src="' + headSeal + '" alt="도장" style="width:64px;height:64px">';
+        prev.disabled = false; send.disabled = false;
+      } else {
+        sealBox.textContent = '도장 없음';
+        msg.className = 'form-msg err';
+        msg.textContent = '내 정보에 등록된 내 도장이 없습니다. 「내 도장 만들기」에서 먼저 만든 뒤 이 화면을 새로 고쳐 주세요.';
+      }
+    }
+    if (headSeal === undefined) {
+      db().then(function (c) {
+        return c.from('member_seals').select('image').eq('user_id', user.id).eq('kind', 'pastor');
+      }).then(function (r) {
+        headSeal = (r.data && r.data[0] && r.data[0].image) || null; showSeal();
+      }, function () { headSeal = null; showSeal(); });
+    } else showSeal();
+    function post() {
+      var fr = document.getElementById('pv-frame');
+      if (fr && fr.contentWindow) {
+        fr.contentWindow.postMessage({ type: 'shs-head-seal', name: user.name || '', seal: headSeal }, location.origin);
+      }
+    }
+    prev.addEventListener('click', function () {
+      post();
+      msg.className = 'form-msg';
+      msg.textContent = '서식 아래 「시 찰 장 (인)」 자리에 도장을 찍어 보였습니다. 이대로 좋으면 제출을 누르세요.';
+    });
+    send.addEventListener('click', function () {
+      if (!headSeal) return;
+      if (!confirm('「' + p.title + '」에 시찰장 ' + (user.name || '') + ' 도장을 찍어 노회 서기에게 제출합니다.\n\n' +
+                   '제출한 뒤에는 도장을 지울 수 없습니다. 계속하시겠습니까?')) return;
+      send.disabled = true; send.textContent = '제출 중…';
+      db().then(function (c) {
+        return c.rpc('forward_petition', { p_id: p.id, p_seal: headSeal });
+      }).then(function (r) {
+        if (r.error) throw r.error;
+        var row = r.data || {};
+        Object.keys(row).forEach(function (k) { p[k] = row[k]; });
+        SHS.logAction('update', '청원서 노회 제출', NAME + ' / ' + p.title);
+        docNotice = '「' + e(p.title) + '」을(를) 시찰장 도장을 찍어 <strong>노회 서기에게 제출</strong>했습니다. 노회 서기가 접수하면 알림이 옵니다.';
+        drawDocs();
+      }).catch(function (err) {
+        send.disabled = false; send.textContent = '시찰장 도장 찍어 노회 서기에게 제출';
+        msg.className = 'form-msg err';
+        msg.textContent = '제출하지 못했습니다: ' + ((err && err.message) || err);
+      });
+    });
   }
 
   function bindPassedBox(box) {
@@ -986,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     if (passOpenId) {
       var open = subs.filter(function (p) { return String(p.id) === String(passOpenId); })[0];
-      if (open) bindPetViewer(open, function () { passOpenId = null; drawDocs(); });
+      if (open) { bindPetViewer(open, function () { passOpenId = null; drawDocs(); }); bindForwardBox(open); }
     }
 
     /* 전체선택·선택 → 선택한 청원서 일괄 인쇄 (교회상황 보고서와 같은 방식) */

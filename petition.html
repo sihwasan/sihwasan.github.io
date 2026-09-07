@@ -244,7 +244,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907f"></script>
+<script src="js/main.js?v=20260907g"></script>
 <script>
 (function () {
   'use strict';
@@ -262,7 +262,15 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
     return '주후     년   월   일';
   }
   function sbox(label) {
-    return '<table class="sbox"><tr><td>' + (label || '시 찰 장') + '</td><td>(인)</td></tr></table>';
+    var lab = label || '시 찰 장';
+    /* 시찰장이 노회로 제출하면서 찍은 이름·도장이 있으면 그 자리에 보인다 */
+    if (viewHead && (viewHead.name || viewHead.seal)) {
+      return '<table class="sbox"><tr><td>' + lab + (viewHead.name ? ' ' + e(viewHead.name) : '') + '</td>' +
+        '<td><span class="inwrap">(인)' + (viewHead.seal
+          ? '<img class="pt-seal" src="' + viewHead.seal + '" alt="시찰장 도장" style="left:-8px;margin-top:-23px">' : '') +
+        '</span></td></tr></table>';
+    }
+    return '<table class="sbox"><tr><td>' + lab + '</td><td>(인)</td></tr></table>';
   }
   /* (인) 자리: 도장이 등록되어 있으면 함께 찍어 보여 준다 */
   function inMark() {
@@ -832,11 +840,20 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
   var user = null;
   var sealImg = null;     /* 내 도장 PNG (내 정보의 교회 직인·도장) */
   var viewSeal = null;    /* 받은 청원서를 열람할 때 제출자의 도장 */
+  var viewHead = null;    /* 시찰장 확인 — 노회로 제출될 때 찍힌 시찰장 이름·도장 (또는 시찰방의 미리보기) */
   var sealOn = true;      /* 당회장 도장을 찍을지 (선택사항) */
   var sealPos = { dx: 0, dy: 0 };   /* 미리보기에서 끌어 옮긴 도장 위치 */
   /* ?sub=번호 — 제출된 청원서를 원본 그대로 열람하는 모드 (시찰 서류 진단) */
   var viewSubId = (location.search.match(/[?&]sub=(\d+)/) || [])[1] || null;
   /* ?subs=1,2,3 — 여러 청원서를 이어 붙여 한 번에 인쇄 (시찰 자료실 통과 청원서) */
+  /* 시찰방(통과 청원서)에서 시찰장 도장 미리보기를 보내오면 "시 찰 장 (인)" 자리에 찍어 보여 준다 */
+  window.addEventListener('message', function (ev) {
+    if (ev.origin !== location.origin) return;
+    var d = ev.data || {};
+    if (d.type !== 'shs-head-seal' || !viewSubId || !cur) return;
+    viewHead = (d.name || d.seal) ? { name: d.name || '', seal: d.seal || null } : null;
+    renderPaper();
+  });
   var viewSubIds = ((location.search.match(/[?&]subs=([\d,]+)/) || [])[1] || '')
     .split(',').map(function (x) { return parseInt(x, 10); }).filter(Boolean);
 
@@ -1580,6 +1597,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
       var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
       if (!f) throw new Error('서식(' + p.form_id + ')을 찾지 못했습니다.');
       cur = f; data = p.data || {}; editingId = null; viewSeal = p.seal || null;
+      viewHead = p.sichal_seal ? { name: p.sichal_head_name || '', seal: p.sichal_seal } : null;
       renderForm(); renderPaper();
       document.title = p.title + ' - 시화산노회';
       var info = document.getElementById('pt-viewinfo');
@@ -1637,6 +1655,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
         var f = FORMS.filter(function (x) { return x.id === p.form_id; })[0];
         if (!f) return;
         cur = f; data = p.data || {}; editingId = null; viewSeal = p.seal || null;
+      viewHead = p.sichal_seal ? { name: p.sichal_head_name || '', seal: p.sichal_seal } : null;
         /* 도장 사용 여부·위치는 청원서마다 따로 저장되어 있다 */
         sealOn = !(data._seal && data._seal.on === false);
         sealPos = data._seal
