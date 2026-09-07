@@ -1325,6 +1325,9 @@ document.addEventListener('DOMContentLoaded', function () {
       var fullNames = names.filter(function (nm) { return feeOf(nm, 1) && feeOf(nm, 2); });
       var lateNames = names.filter(function (nm) { return !(feeOf(nm, 1) && feeOf(nm, 2)); });
       var shown = feeFilter === 'full' ? fullNames : (feeFilter === 'late' ? lateNames : names);
+      h += '<div style="display:flex;gap:8px;justify-content:flex-end;max-width:760px;margin:0 0 6px">' +
+        '<button class="btn ghost sm" id="fee-print">인쇄</button>' +
+        '<button class="btn ghost sm" id="fee-pdf">PDF 저장</button></div>';
       h += '<div class="tabs" style="margin-bottom:10px" id="fee-filter">' +
         '<button class="' + (feeFilter === 'all' ? 'active' : '') + '" data-ff="all">전체 ' + names.length + '</button>' +
         '<button class="' + (feeFilter === 'full' ? 'active' : '') + '" data-ff="full">완납 ' + fullNames.length + '</button>' +
@@ -1361,6 +1364,88 @@ document.addEventListener('DOMContentLoaded', function () {
 
       box.querySelectorAll('#fee-filter button').forEach(function (b) {
         b.addEventListener('click', function () { feeFilter = b.dataset.ff; drawFees(); });
+      });
+
+      /* ----- 인쇄 · PDF — 화면에 보이는 목록(전체/완납/미납)을 그대로 종이로 ----- */
+      function feeSheetHtml() {
+        var filterName = feeFilter === 'full' ? ' (완납 교회)' : (feeFilter === 'late' ? ' (미납 교회)' : '');
+        var today = new Date();
+        var stamp = today.getFullYear() + '.' + (today.getMonth() + 1) + '.' + today.getDate();
+        var t = '<h3>' + e(NAME) + ' ' + year + '년 시찰회비 납부 현황' + e(filterName) + '</h3>' +
+          '<p class="sub">시화산노회 ' + e(NAME) + ' · 회원 교회 ' + names.length + '곳 · 출력 ' + stamp + '</p>' +
+          '<p class="sum">상반기 납부 <strong>' + n1 + '/' + names.length + '곳</strong> (' + sum1.toLocaleString('ko-KR') + '만원) &nbsp;·&nbsp; ' +
+          '하반기 납부 <strong>' + n2 + '/' + names.length + '곳</strong> (' + sum2.toLocaleString('ko-KR') + '만원) &nbsp;·&nbsp; ' +
+          '완납 ' + fullNames.length + '곳 · 미납 ' + lateNames.length + '곳</p>' +
+          '<table><thead><tr><th style="width:7%">번호</th><th class="left">교회</th><th style="width:15%">기준액(만원)</th>' +
+          '<th style="width:20%">상반기</th><th style="width:20%">하반기</th><th style="width:14%">비고</th></tr></thead><tbody>';
+        shown.forEach(function (nm, i) {
+          var base = baseOf(nm);
+          function cellP(half) {
+            var f = feeOf(nm, half);
+            return f ? '납부' + (f.paid_on ? '<br><small>' + e(f.paid_on) + '</small>' : '') : '<span class="late">미납</span>';
+          }
+          t += '<tr><td>' + (i + 1) + '</td><td class="left">' + e(nm) + '</td>' +
+            '<td style="text-align:right">' + (base ? base.toLocaleString('ko-KR') : '-') + '</td>' +
+            '<td>' + cellP(1) + '</td><td>' + cellP(2) + '</td>' +
+            '<td>' + (isCustom(nm) ? '시찰 지정' : '') + '</td></tr>';
+        });
+        t += '</tbody></table>' +
+          '<p class="foot">시찰회비는 상반기·하반기 두 차례 내며, 기준액은 노회 상회비 한 달치 또는 시찰회가 정한 금액입니다. ' +
+          '납부 기록은 시찰 회계 장부에 수입으로 함께 적혀 있습니다.</p>';
+        return t;
+      }
+      var FEE_CSS = 'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;padding:24px;color:#111}' +
+        'h3{text-align:center;margin:0 0 4px;font-size:18px}.sub{text-align:center;color:#555;font-size:12px;margin:0 0 10px}' +
+        '.sum{font-size:12.5px;margin:0 0 10px}' +
+        'table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:5px 6px;text-align:center}' +
+        'th{background:#f2f2f2}td.left,th.left{text-align:left}td small{color:#666;font-size:10.5px}.late{color:#b03a3a}' +
+        'tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}' +
+        '.foot{font-size:11px;color:#555;margin-top:12px}';
+      function feePdfTool() {
+        if (window.html2pdf) return Promise.resolve(window.html2pdf);
+        return new Promise(function (resolve, reject) {
+          var sc = document.createElement('script');
+          sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+          sc.onload = function () { resolve(window.html2pdf); };
+          sc.onerror = function () { reject(new Error('PDF 도구를 내려받지 못했습니다.')); };
+          document.head.appendChild(sc);
+        });
+      }
+      var fp = document.getElementById('fee-print');
+      if (fp) fp.addEventListener('click', function () {
+        var w = window.open('', '_blank', 'width=900,height=700');
+        if (!w) { alert('인쇄 창이 막혔습니다. 팝업을 허용해 주세요.'); return; }
+        w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + e(NAME) + ' 시찰회비 납부 현황</title>' +
+          '<style>' + FEE_CSS + '</style></head><body>' + feeSheetHtml() + '</body></html>');
+        w.document.close(); w.focus();
+        setTimeout(function () { w.print(); }, 300);
+        SHS.logAction('view', '시찰회비 납부 현황 인쇄', year + '년 ' + NAME);
+      });
+      var fpdf = document.getElementById('fee-pdf');
+      if (fpdf) fpdf.addEventListener('click', function () {
+        fpdf.disabled = true; fpdf.textContent = '만드는 중…';
+        var stage = document.createElement('div');
+        stage.style.cssText = 'position:absolute;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
+        stage.innerHTML = '<style>' + FEE_CSS.replace('body{', '.fee-sheet{') + '</style><div class="fee-sheet">' + feeSheetHtml() + '</div>';
+        document.body.appendChild(stage);
+        /* 화면을 내린 채 만들면 첫 쪽 위가 그만큼 비므로, 만드는 동안만 맨 위로 올린다 */
+        var keepX = window.scrollX || 0, keepY = window.scrollY || 0;
+        function done() { stage.remove(); fpdf.disabled = false; fpdf.textContent = 'PDF 저장'; window.scrollTo(keepX, keepY); }
+        feePdfTool().then(function (html2pdf) {
+          window.scrollTo(0, 0);
+          return html2pdf().set({
+            margin: 8, filename: NAME + ' ' + year + '년 시찰회비 납부 현황.pdf',
+            pagebreak: { mode: ['css', 'legacy'], avoid: ['tr'] },
+            html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          }).from(stage.lastElementChild).save();
+        }).then(function () {
+          done();
+          SHS.logAction('view', '시찰회비 납부 현황 PDF 저장', year + '년 ' + NAME);
+        }).catch(function (err) {
+          done();
+          alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
+        });
       });
 
       if (!canFee) return;
