@@ -716,6 +716,7 @@ var SHSLedger = (function () {
         '<button type="button" class="btn ghost sm" id="lg-paybulk">회원 일괄 선택</button></div>' +
         '</div>' +
         '<div class="lg-chips" id="lg-paylist"></div>' +
+        '<div class="form-msg" id="lg-paymsg"></div>' +
         '<p style="font-size:0.78rem;color:var(--gray-5);margin:6px 0 0">저장하면 받는 분마다 알림이 가고, 본인이 ' +
         '<strong>수령 확인</strong>을 누르면 영수증을 대신합니다. 계정이 없는 회원은 회계가 수기로 확인 처리합니다.</p>' +
         '</div></details>';
@@ -811,17 +812,36 @@ var SHSLedger = (function () {
       var inp = document.getElementById('lg-payee');
       if (!inp) return;
       loadMembers().then(function () { fillMemberList('lg-members'); });
+      function say(cls, text) {
+        var el = document.getElementById('lg-paymsg');
+        if (el) { el.className = 'form-msg' + (cls ? ' ' + cls : ''); el.textContent = text || ''; }
+      }
+      /* <더하기>는 이름 칸에 적은 한 사람을 넣는다. 빈 채로 누르면(일괄 선택 뒤에 흔히 그런다)
+       * 이미 고른 사람은 저장할 때 함께 적힌다고 알려 주기만 한다. */
       function addFromInput() {
-        var m = matchMember(inp.value);
-        if (!m) { alert('명단에서 찾지 못했습니다. 목록에서 "이름 (교회)"를 골라 주세요.'); return; }
-        addPayee(m); inp.value = ''; inp.focus();
+        var t = inp.value.trim();
+        if (!t) {
+          say('', pendingPayees.length
+            ? '이미 고른 ' + pendingPayees.length + '명은 아래 저장을 누르면 함께 적힙니다. 더 넣으려면 이름을 적거나 회원 일괄 선택을 누르세요.'
+            : '받는 사람 이름을 적어 목록에서 고르거나, 회원 일괄 선택을 누르세요.');
+          inp.focus(); return;
+        }
+        var m = matchMember(t);
+        if (!m) { say('err', '"' + t + '"을(를) 명단에서 찾지 못했습니다. 목록에서 "이름 (교회)"를 골라 주세요.'); inp.focus(); return; }
+        if (pendingPayees.some(function (x) { return x.roster_id === m.roster_id; })) {
+          say('', m.name + ' 님은 이미 목록에 있습니다.'); inp.value = ''; inp.focus(); return;
+        }
+        addPayee(m); inp.value = ''; inp.focus(); say('', '');
       }
       document.getElementById('lg-payadd').addEventListener('click', addFromInput);
       inp.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter') { ev.preventDefault(); addFromInput(); }
       });
       document.getElementById('lg-paybulk').addEventListener('click', function () {
-        openMemberPicker(function (list) { list.forEach(addPayee); });
+        openMemberPicker(function (list) {
+          list.forEach(addPayee);
+          say('', list.length ? list.length + '명을 골랐습니다. 아래 저장을 누르면 함께 적힙니다.' : '');
+        });
       });
       renderPayees();
     }
@@ -1160,8 +1180,19 @@ var SHSLedger = (function () {
         });
       }
       document.getElementById('lg-payadd2').addEventListener('click', function () {
-        var m = matchMember(document.getElementById('lg-payee2').value);
-        if (!m) { alert('명단에서 찾지 못했습니다. 목록에서 "이름 (교회)"를 골라 주세요.'); return; }
+        var inp2 = document.getElementById('lg-payee2');
+        var mm = document.getElementById('lg-po-msg');
+        var t = inp2.value.trim();
+        if (!t) {
+          mm.className = 'form-msg'; mm.textContent = '받는 사람 이름을 적어 목록에서 고르거나, 회원 일괄 선택을 누르세요.';
+          inp2.focus(); return;
+        }
+        var m = matchMember(t);
+        if (!m) {
+          mm.className = 'form-msg err'; mm.textContent = '"' + t + '"을(를) 명단에서 찾지 못했습니다. 목록에서 "이름 (교회)"를 골라 주세요.';
+          inp2.focus(); return;
+        }
+        mm.className = 'form-msg'; mm.textContent = '';
         insertPayees([m], parseInt(document.getElementById('lg-payamt2').value, 10) || 0);
       });
       document.getElementById('lg-paybulk2').addEventListener('click', function () {
