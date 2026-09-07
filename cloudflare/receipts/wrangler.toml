@@ -1,6 +1,9 @@
 name = "sihwasan-receipts"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
+# 늘 시화산노회 계정(Sihwasan_presbytery@naver.com)에 올린다.
+# 다른 계정으로 로그인한 채 deploy 하면 여기서 막혀 엉뚱한 곳에 올라가지 않는다.
+account_id = "0c1cf1f4bfdcd3e33660b6d07e66378f"
 
 # 영수증 자동 읽기 창구 (Claude API)
 #
