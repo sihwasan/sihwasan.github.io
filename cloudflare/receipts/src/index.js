@@ -112,40 +112,90 @@ async function canWriteBook(me, env, bookId) {
   return v === true;
 }
 
-/* Claude 에게 사진을 읽게 한다 */
-async function readReceipt(env, mediaType, imageBase64) {
-  const body = {
-    model: env.ANTHROPIC_MODEL || 'claude-opus-5',
-    max_tokens: 1024,
-    /* 안전 분류기가 거절하면 서버가 대신 다른 모델로 다시 시도한다 */
-    fallbacks: 'default',
-    output_config: {
-      effort: 'low',
-      format: { type: 'json_schema', schema: RESULT_SCHEMA }
-    },
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-        { type: 'text', text: INSTRUCTION }
-      ]
-    }]
+/* Claude API 를 한 번 부른다. { ok, status, data, type, message } 로 돌려준다 */
+async function callClaude(env, body, betaHeader) {
+  const headers = {
+    'x-api-key': env.ANTHROPIC_API_KEY,
+    'anthropic-version': '2023-06-01',
+    'Content-Type': 'application/json'
   };
+  if (betaHeader) headers['anthropic-beta'] = betaHeader;
   const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'server-side-fallback-2026-07-01',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
+    method: 'POST', headers: headers, body: JSON.stringify(body)
   });
   const data = await r.json().catch(function () { return null; });
-  if (!r.ok) {
-    const msg = (data && data.error && data.error.message) || ('HTTP ' + r.status);
-    throw new Error('Claude API 오류: ' + msg);
+  const err = (data && data.error) || {};
+  return {
+    ok: r.ok, status: r.status, data: data,
+    type: err.type || '', message: err.message || (r.ok ? '' : 'HTTP ' + r.status)
+  };
+}
+
+/* 열쇠와 접속이 살아 있는지 — 모델 목록을 물어본다 (토큰을 쓰지 않는다) */
+async function checkApi(env) {
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/models?limit=100', {
+      headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' }
+    });
+    const data = await r.json().catch(function () { return null; });
+    if (!r.ok) {
+      const err = (data && data.error) || {};
+      return { ok: false, status: r.status, type: err.type || '', message: err.message || ('HTTP ' + r.status) };
+    }
+    return { ok: true, status: r.status,
+             models: ((data && data.data) || []).map(function (m) { return m.id; }) };
+  } catch (e) {
+    return { ok: false, status: 0, type: 'network', message: (e && e.message) || String(e) };
   }
+}
+
+/* Claude 에게 사진을 읽게 한다.
+ * 1) 고른 모델 + 서버 대체(fallbacks)  2) 대체 없이  3) 다른 모델 — 순서로 시도한다.
+ * 열쇠에 권한이 없다는 답(403)이나 모델을 못 찾는 답(404)일 때만 다음으로 넘어간다. */
+async function readReceipt(env, mediaType, imageBase64) {
+  const primary = env.ANTHROPIC_MODEL || 'claude-opus-5';
+  const content = [
+    { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+    { type: 'text', text: INSTRUCTION }
+  ];
+  function bodyFor(model, withFallback) {
+    const b = {
+      model: model,
+      max_tokens: 1024,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: RESULT_SCHEMA } },
+      messages: [{ role: 'user', content: content }]
+    };
+    /* 안전 분류기가 거절하면 서버가 대신 다른 모델로 다시 시도한다 */
+    if (withFallback) b.fallbacks = 'default';
+    return b;
+  }
+  const attempts = [
+    { model: primary, fb: true },
+    { model: primary, fb: false },
+    { model: 'claude-sonnet-5', fb: false }
+  ];
+  let last = null;
+  const tried = [];
+  for (const a of attempts) {
+    if (tried.indexOf(a.model) === -1) tried.push(a.model);
+    const r = await callClaude(env, bodyFor(a.model, a.fb), a.fb ? 'server-side-fallback-2026-07-01' : '');
+    if (r.ok) { last = r; break; }
+    last = r;
+    console.error('claude attempt failed', a.model, a.fb ? 'fallbacks' : 'plain', r.status, r.type, r.message);
+    const canMoveOn = r.status === 403 || r.status === 404 ||
+      (r.status === 400 && /fallback|beta/i.test(r.message));
+    if (!canMoveOn) break;
+  }
+  if (!last.ok) {
+    let msg = 'Claude API 오류: ' + last.message;
+    if (last.type) msg += ' [' + last.type + ']';
+    if (last.status === 403) {
+      msg += ' — 열쇠(API 키)가 이 요청을 허용받지 못했습니다. ' +
+        'Anthropic 콘솔에서 키가 속한 작업 공간의 모델 권한·지역 제한을 확인해 주세요 (시도한 모델: ' + tried.join(', ') + ')';
+    }
+    throw new Error(msg);
+  }
+  const data = last.data;
   if (data.stop_reason === 'refusal') {
     throw new Error('사진을 읽을 수 없다고 응답했습니다. 다른 사진으로 다시 시도해 주세요.');
   }
@@ -172,8 +222,12 @@ export default {
 
     if (request.method === 'OPTIONS') return reply(null, 204, origin);
     if (url.pathname === '/' || url.pathname === '/health') {
-      return reply({ ok: true, service: '시화산노회 영수증 자동 읽기',
-                     ready: !!env.ANTHROPIC_API_KEY }, 200, origin);
+      const out = { ok: true, service: '시화산노회 영수증 자동 읽기',
+                    ready: !!env.ANTHROPIC_API_KEY, model: env.ANTHROPIC_MODEL || 'claude-opus-5',
+                    colo: (request.cf && request.cf.colo) || null };
+      /* ?check=1 : 열쇠로 모델 목록을 받아 본다 — 접속·권한 문제를 여기서 바로 본다 */
+      if (url.searchParams.get('check') && env.ANTHROPIC_API_KEY) out.api = await checkApi(env);
+      return reply(out, 200, origin);
     }
     if (url.pathname !== '/read' || request.method !== 'POST') {
       return reply({ error: '없는 주소입니다.' }, 404, origin);
@@ -204,7 +258,9 @@ export default {
       const out = await readReceipt(env, mediaType, image);
       return reply({ ok: true, result: out.result, model: out.model, usage: out.usage }, 200, origin);
     } catch (e) {
-      return reply({ error: (e && e.message) || '읽지 못했습니다.' }, 502, origin);
+      const colo = (request.cf && request.cf.colo) || '?';
+      console.error('read failed', colo, e && e.message);
+      return reply({ error: ((e && e.message) || '읽지 못했습니다.') + ' (접속 지점 ' + colo + ')' }, 502, origin);
     }
   }
 };

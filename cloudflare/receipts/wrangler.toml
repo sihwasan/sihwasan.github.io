@@ -18,5 +18,11 @@ SUPABASE_URL = "https://ltbhgwozkffenahqdzfj.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Ymhnd296a2ZmZW5haHFkemZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDk0MDYsImV4cCI6MjEwMTkyNTQwNn0.nSptHsi7nTCWTiyTe_Kl9xpxyHJ3pkhRGoZLI1BdsnI"
 ANTHROPIC_MODEL = "claude-opus-5"
 
+# Claude API 는 일부 지역(접속 지점)에서 오는 요청을 "Request not allowed"(403)로 거절한다.
+# 스마트 배치를 켜면 Cloudflare 가 이 워커를 api.anthropic.com 에 가까운 곳(미국)에서 실행해
+# 그런 거절을 피한다. 홈페이지와의 거리는 조금 멀어지지만 사진 읽기 시간이 대부분이라 상관없다.
+[placement]
+mode = "smart"
+
 [observability]
 enabled = true
