@@ -135,6 +135,7 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .gnb-sub a {
   display: block; padding: 10px 8px; font-size: 0.88rem; color: var(--gray-7);
   border-bottom: 1px solid var(--gray-1);
+  white-space: normal; word-break: keep-all; line-height: 1.4;   /* 긴 이름은 줄을 바꾼다 */
 }
 .gnb-sub a:hover { background: var(--gray-1); color: var(--navy); font-weight: 500; }
 

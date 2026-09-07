@@ -275,7 +275,11 @@
         return page === here;
       })) ? ' active' : '';
       html += '<li class="gnb-item' + active + '"><a href="' + m.href + '">' + m.title + '</a><div class="gnb-sub">';
-      m.sub.forEach(function (s) { html += '<a href="' + s.h + '">' + s.t + '</a>'; });
+      m.sub.forEach(function (s) {
+        /* '미래교회자립위원회'처럼 긴 이름은 '위원회'를 다음 줄로 내려 칸 밖으로 나가지 않게 한다 */
+        var label = s.t.replace(/^(.{4,})(위원회)$/, '$1<br>$2');
+        html += '<a href="' + s.h + '">' + label + '</a>';
+      });
       html += '</div></li>';
     });
     html += '</ul></nav>';
