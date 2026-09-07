@@ -169,7 +169,7 @@ var SHSLedger = (function () {
     /* 항목 목록 — 기본 항목에 더해, 직접 적어 저장한 항목이 저절로 등재된다 */
     var CAT_BASE = {
       '수입': ['회비', '찬조', '노회 지원금', '이자', '기타'],
-      '지출': ['사업비', '교통비', '식비', '인쇄비', '경조비', '기타']
+      '지출': ['사업비', '회의비', '교통비', '식비', '간식비', '숙박비', '총대비', '상회비', '사례비', '월급', '휴가비', '인쇄비', '경조비', '기타']
     };
     var catUsed = { '수입': [], '지출': [] };
     /* 회계연도는 4월에 시작해 다음 해 3월에 끝난다. year는 시작 연도다.
@@ -442,7 +442,7 @@ var SHSLedger = (function () {
       } else {
         h += '<table class="tbl"><thead><tr><th style="width:120px">일자</th>' +
           (useCats ? '<th style="width:130px">과목</th>' : '') +
-          '<th style="width:140px">교회</th>' +
+          '<th style="width:140px">' + (viewKind === '지출' ? '지출처' : '교회') + '</th>' +
           '<th>' + (useCats ? '적요' : '항목') + '</th>' +
           '<th style="width:140px">금액 (원)</th><th style="width:200px">비고</th>' +
           (viewKind === '지출' ? '<th style="width:92px">영수증</th>' : '') +
@@ -750,8 +750,9 @@ var SHSLedger = (function () {
         '<div class="field" style="flex:0 0 160px"><label>일자</label>' +
         '<input type="date" id="lg-date" value="' + today + '"></div>' +
         catField +
-        '<div class="field" style="flex:0 0 170px"><label>교회명 (선택)</label>' +
-        '<input type="text" id="lg-church" list="lg-churches" placeholder="교회를 고르거나 적으세요">' +
+        /* 수입은 낸 교회, 지출은 돈이 나간 곳(상호·기관·사람) */
+        '<div class="field" style="flex:0 0 170px"><label>' + (viewKind === '지출' ? '지출처 (선택)' : '교회명 (선택)') + '</label>' +
+        '<input type="text" id="lg-church" list="lg-churches" placeholder="' + (viewKind === '지출' ? '지출처를 적으세요' : '교회를 고르거나 적으세요') + '">' +
         '<datalist id="lg-churches">' +
         (opts.churches || []).map(function (x) {
           return '<option value="' + esc(x) + '"></option>';
