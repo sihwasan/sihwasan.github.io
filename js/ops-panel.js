@@ -340,8 +340,7 @@ var SHSOps = (function () {
       '<button type="button" class="btn ghost sm" id="aw-2w">오늘부터 2주</button> ' +
       '<button type="button" class="btn ghost sm" id="aw-plus7">종료일 +7일</button></div>' +
       '<div class="field"><label>메모 (선택 · 감사 칸에 함께 보입니다)</label>' +
-      '<input type="text" id="aw-note" value="' + e(v.note || '') +
-      '" placeholder="예: 정기노회 준비로 9월 21일까지 연장"></div>' +
+      '<input type="text" id="aw-note" value="' + e(v.note || '') + '"></div>' +
       '<button class="btn" id="aw-save">저장</button>' +
       '<div class="form-msg" id="aw-msg"></div>' +
       (v.at ? '<p style="font-size:0.8rem;color:var(--gray-5);margin-top:10px">마지막 변경 : ' +
