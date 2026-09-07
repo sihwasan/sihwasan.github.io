@@ -405,11 +405,13 @@ var SHSLedger = (function () {
       /* 수입·지출을 탭으로 나눠 본다 */
       var incRows = entries.filter(function (x) { return x.kind === '수입'; });
       var outRows = entries.filter(function (x) { return x.kind !== '수입'; });
-      h += '<div class="tabs" id="lg-tabs" style="margin:14px 0 12px">' +
+      /* 수입은 초록, 지출은 붉은 알약 탭으로 한눈에 구분한다 (css .lg-kind-tabs) */
+      h += '<div class="tabs lg-kind-tabs" id="lg-tabs" style="margin:14px 0 12px">' +
         KINDS.map(function (k) {
           var n = k === '수입' ? incRows.length : outRows.length;
-          return '<button class="' + (viewKind === k ? 'active' : '') + '" data-lk="' + k + '">' +
-            k + ' (' + n + '건)</button>';
+          return '<button class="' + (k === '수입' ? 'lg-tab-inc' : 'lg-tab-out') +
+            (viewKind === k ? ' active' : '') + '" data-lk="' + k + '">' +
+            (k === '수입' ? '＋ ' : '－ ') + k + '<span class="lg-tab-n">(' + n + '건)</span></button>';
         }).join('') + '</div>';
 
       /* 입력 섹션이 먼저, 그 아래에 장부가 쌓인다 */
@@ -428,7 +430,7 @@ var SHSLedger = (function () {
           '<th style="width:140px">교회</th>' +
           '<th>' + (useCats ? '적요' : '항목') + '</th>' +
           '<th style="width:140px">금액 (원)</th><th style="width:200px">비고</th>' +
-          '<th style="width:92px">영수증</th>' +
+          (viewKind === '지출' ? '<th style="width:92px">영수증</th>' : '') +
           (canWrite ? '<th style="width:110px">관리</th>' : '') + '</tr></thead><tbody>';
         shown.forEach(function (x) {
           var amt = Number(x.amount) || 0;
@@ -448,8 +450,10 @@ var SHSLedger = (function () {
             '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
             (viewKind === '수입' ? '+' : '−') + won(amt) + '</td>' +
             '<td class="left">' + (x.note ? esc(x.note) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
-            '<td' + (canWrite && !ln ? ' class="lg-dropcell" data-lgdrop="' + x.id + '" title="영수증 사진을 여기에 끌어다 놓아도 됩니다"' : '') +
-            '>' + receiptCell(x, ln, canWrite) + '</td>' +
+            (viewKind === '지출'
+              ? '<td' + (canWrite && !ln ? ' class="lg-dropcell" data-lgdrop="' + x.id + '" title="영수증 사진을 여기에 끌어다 놓아도 됩니다"' : '') +
+                '>' + receiptCell(x, ln, canWrite) + '</td>'
+              : '') +
             (canWrite
               ? (ln
                   /* 연동 항목은 원본(납부 현황·노회 장부)에서 고치면 함께 바뀐다 */
@@ -462,7 +466,8 @@ var SHSLedger = (function () {
         h += '<tr style="font-weight:700;background:var(--gray-1,#f4f5f8)"><td>합계</td>' +
           (useCats ? '<td></td>' : '') + '<td></td><td></td>' +
           '<td class="' + (viewKind === '수입' ? 'lg-inc' : 'lg-out') + '" style="text-align:right">' +
-          (viewKind === '수입' ? '+' : '−') + won(shownSum) + '</td><td></td><td></td>' +
+          (viewKind === '수입' ? '+' : '−') + won(shownSum) + '</td><td></td>' +
+          (viewKind === '지출' ? '<td></td>' : '') +
           (canWrite ? '<td></td>' : '') + '</tr>';
         h += '</tbody></table>';
       }
@@ -651,7 +656,8 @@ var SHSLedger = (function () {
             : '')
         : '';
       return '<div class="admin-card" style="margin-bottom:16px">' +
-        '<h3 style="margin-top:0" id="lg-ftitle">' + viewKind + ' 적기</h3>' +
+        '<h3 style="margin-top:0;color:' + (viewKind === '수입' ? '#1a6d3a' : '#b03a3a') + '" id="lg-ftitle">' +
+        viewKind + ' 적기</h3>' +
         '<input type="hidden" id="lg-id" value="">' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 160px"><label>일자</label>' +
@@ -677,7 +683,8 @@ var SHSLedger = (function () {
         '<input type="number" id="lg-amt" min="0" step="1"></div>' +
         '</div>' +
         '<div class="field"><label>비고 (선택)</label><input type="text" id="lg-note"></div>' +
-        '<div class="field"><label>영수증 사진 (선택)</label>' +
+        /* 영수증 사진은 지출에만 붙인다 — 수입은 증빙이 필요 없다 */
+        (viewKind === '지출' ? '<div class="field"><label>영수증 사진 (선택)</label>' +
         '<div class="lg-drop" id="lg-drop" tabindex="0" role="button">' +
         '<input type="file" id="lg-file" accept="image/*" multiple class="hidden">' +
         '<div id="lg-drop-text">여기에 영수증 사진을 <strong>끌어다 놓거나</strong> 눌러서 고르세요 ' +
@@ -688,7 +695,7 @@ var SHSLedger = (function () {
         (ocrEnabled() ? '사진을 놓으면 일자·사용처·금액을 자동으로 읽어 미리 채웁니다(확인 후 저장). ' : '') +
         '저장하면 사진이 함께 올라가고, ' +
         '줄의 <strong>영수증</strong> 단추로 언제든 다시 볼 수 있습니다. ' +
-        '이미 적은 줄에는 영수증 칸에 사진을 바로 끌어다 놓아도 됩니다.</div></div>' +
+        '이미 적은 줄에는 영수증 칸에 사진을 바로 끌어다 놓아도 됩니다.</div></div>' : '') +
         (viewKind === '지출' ? payeeForm() : '') +
         '<button class="btn" id="lg-save">저장</button> ' +
         '<button class="btn ghost hidden" id="lg-cancel">취소</button>' +
