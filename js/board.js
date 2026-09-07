@@ -400,7 +400,9 @@ var SHSBoard = (function () {
         years.map(function (y) {
           return '<option value="' + y + '"' + (y === auditYear ? ' selected' : '') + '>' + y + ' 회계연도 (' + y + '.4 ~ ' + (y + 1) + '.3)</option>';
         }).join('') + '</select></div>' +
-        '<button type="button" class="btn ghost sm" id="au-refresh">목록 새로 고침</button></div>';
+        '<button type="button" class="btn ghost sm" id="au-refresh">목록 새로 고침</button>' +
+        '<a class="btn sm" href="audit-report.html?y=' + encodeURIComponent(String(w.year || auditYear)) +
+        '&p=' + encodeURIComponent(w.period || '') + '" style="margin-left:auto">감사 결과 · 보고서</a></div>';
 
       var done = auditRows.filter(function (b) { return b.audited_yn; }).length;
       var waiting = auditRows.filter(function (b) { return b.close_requested_at && !b.closed_yn; }).length;

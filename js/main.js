@@ -82,6 +82,7 @@
       { t: '상회비 관리', h: 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC' },
       { t: '세례의무금 관리', h: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC' },
       { t: '재정부 회계', h: 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84' },
+      { t: '감사 결과 보고서', h: 'audit-report.html' },
       { t: '노회 회의록', h: 'minutes.html' }
     ]}
   ];

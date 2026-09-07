@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>감사 결과 · 감사 보고서 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20260906d">
+<style>
+  /* 감사 보고서 종이 모양 — 화면과 인쇄·PDF에 같이 쓴다 */
+  .ar-sheet { background: #fff; border: 1px solid var(--gray-2); border-radius: 10px; padding: 26px 28px; max-width: 980px; }
+  .ar-sheet h3 { text-align: center; margin: 0 0 4px; font-size: 1.4rem; }
+  .ar-sheet .ar-sub { text-align: center; color: var(--gray-6); font-size: 0.9rem; margin: 0 0 18px; }
+  .ar-sheet h4 { margin: 20px 0 8px; font-size: 1rem; border-left: 4px solid var(--navy); padding-left: 8px; }
+  .ar-sheet table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  .ar-sheet th, .ar-sheet td { border: 1px solid #bbb; padding: 5px 7px; text-align: center; }
+  .ar-sheet th { background: #f2efe9; }
+  .ar-sheet td.left, .ar-sheet th.left { text-align: left; }
+  .ar-sheet td.num { text-align: right; white-space: nowrap; }
+  .ar-ok { color: #2a7a2a; font-weight: 700; }
+  .ar-no { color: #a33; }
+  .ar-text { white-space: pre-wrap; border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px; min-height: 48px; background: #fcfbf8; font-size: 0.9rem; }
+  .ar-signs { display: flex; gap: 36px; justify-content: flex-end; margin-top: 26px; flex-wrap: wrap; }
+  .ar-sign { text-align: center; font-size: 0.9rem; }
+  .ar-sign img { width: 64px; height: 64px; object-fit: contain; display: block; margin: 4px auto 0; }
+  .ar-sign .nm { font-weight: 700; }
+  .ar-overview { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .ar-overview div { border: 1px solid var(--gray-2); border-radius: 8px; padding: 10px 14px; min-width: 130px; }
+  .ar-overview span { display: block; font-size: 0.78rem; color: var(--gray-5); }
+  .ar-overview strong { font-size: 1.05rem; }
+  @media print { body { background: #fff; } .ar-sheet { border: none; padding: 0; } }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>감사 결과 · 감사 보고서</h1>
+    <div class="crumb">홈 &gt; 임원방 &gt; 감사 결과</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <p>감사부(감사헌의부)가 감사 기간에 살핀 <strong>회계 장부</strong>와 <strong>회의록</strong>의 감사 결과입니다.
+    감사부장·감사부 서기가 종합 의견을 적어 <strong>확정</strong>하면 정기노회에 낼 <strong>감사 보고서</strong>로 인쇄·PDF 저장할 수 있습니다.</p>
+  <div id="ar-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<script src="js/auth.js"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20260907c"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('ar-area');
+  var e = SHS.esc;
+  function won(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
+  function dt(s) { return String(s || '').replace('T', ' ').slice(0, 16); }
+  function longDate(s) {
+    var m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? m[1] + '년 ' + parseInt(m[2], 10) + '월 ' + parseInt(m[3], 10) + '일' : '';
+  }
+
+  if (!(user && user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+    area.innerHTML = '<div class="notice-banner">감사 결과는 <strong>로그인</strong>하시면 보실 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+    return;
+  }
+  /* 노회 임원·감사부·관리자만 본다 (데이터베이스도 같은 규칙으로 돌려준다) */
+  var isAdmin = SHSAuth.canManageMembers(user);
+  var isReviewer = false;        /* 감사부장·서기 — 종합 의견을 적고 확정한다 */
+
+  /* 감사 회기: 주소의 ?y=&p= → 지금 감사 기간 → 최근 감사 */
+  var q = location.search.match(/[?&]y=(\d{4})/), qp = location.search.match(/[?&]p=([^&]+)/);
+  var year = q ? parseInt(q[1], 10) : null;
+  var period = qp ? decodeURIComponent(qp[1]) : null;
+  var periods = [], win = null, report = null, ledgers = [], minutes = [];
+
+  function db() { return SHSCloud.init(); }
+
+  function boot() {
+    db().then(function (c) {
+      return Promise.all([
+        c.rpc('audit_periods'),
+        c.from('site_settings').select('value').eq('key', 'audit_window').maybeSingle(),
+        c.rpc('is_audit_reviewer').then(function (x) { return x; }, function () { return { data: false }; })
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) throw rs[0].error;
+      periods = rs[0].data || [];
+      win = (rs[1] && rs[1].data && rs[1].data.value) || null;
+      isReviewer = !!(rs[2] && rs[2].data === true) || isAdmin;
+      if (!year || !period) {
+        if (win && win.year && win.period) { year = parseInt(win.year, 10); period = win.period; }
+        else if (periods.length) { year = periods[0].year; period = periods[0].period; }
+        else { var d = new Date(); year = d.getFullYear(); period = d.getMonth() + 1 >= 7 ? '가을' : '봄'; }
+      }
+      if (!periods.some(function (p) { return p.year === year && p.period === period; })) {
+        periods.unshift({ year: year, period: period, source: 'now' });
+      }
+      return load();
+    }).catch(function (err) {
+      area.innerHTML = '<div class="notice-banner">감사 결과를 불러오지 못했습니다: ' + e((err && err.message) || err) +
+        '<br><span style="font-size:0.85rem;color:var(--gray-5)">Supabase에서 <strong>81_audit_report.sql</strong>을 아직 실행하지 않으셨다면 먼저 실행해 주세요.</span></div>';
+    });
+  }
+
+  function load() {
+    return db().then(function (c) {
+      return Promise.all([
+        c.rpc('audit_report_ledgers', { p_year: year, p_period: period }),
+        c.rpc('audit_report_minutes', { p_year: year, p_period: period }),
+        c.from('audit_reports').select('*').eq('year', year).eq('period', period).maybeSingle()
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) throw rs[0].error;
+      ledgers = rs[0].data || [];
+      minutes = (rs[1] && rs[1].data) || [];
+      report = (rs[2] && rs[2].data) || null;
+      draw();
+    });
+  }
+
+  var KIND = { presbytery: '노회 재정부', committee: '상비부', sichal: '시찰' };
+  function fiscalYear() { return period === '봄' ? year - 1 : year; }
+
+  /* 감사 기간 날짜: 확정된 보고서 → 지금 설정된 기간(같은 회기일 때) */
+  function periodDates() {
+    if (report && report.from_on) return { from: report.from_on, until: report.until_on };
+    if (win && parseInt(win.year, 10) === year && win.period === period) return { from: win.from, until: win.until };
+    return null;
+  }
+
+  function sheetHtml() {
+    var fy = fiscalYear();
+    var pd = periodDates();
+    var audited = ledgers.filter(function (b) { return b.audited_yn; });
+    var closed = ledgers.filter(function (b) { return b.closed_yn; });
+    var mTotal = 0, mAud = 0;
+    minutes.forEach(function (m) { mTotal += m.total; mAud += m.audited; });
+    /* 도장: 감사필을 찍은 장부에 담긴 그림을 쓴다 */
+    var seal = audited.filter(function (b) { return b.audit_head_seal || b.audit_clerk_seal; })[0] || {};
+    var headName = (report && report.head) || (audited[0] && audited[0].audit_head) || '';
+    var clerkName = (report && report.clerk) || (audited[0] && audited[0].audit_clerk) || '';
+
+    var h = '<div class="ar-sheet" id="ar-sheet">' +
+      '<h3>시화산노회 감사 보고서</h3>' +
+      '<p class="ar-sub">' + year + '년 ' + e(period) + ' 감사 · ' + fy + ' 회계연도 (' + fy + '.4 ~ ' + (fy + 1) + '.3)' +
+      (pd ? ' · 감사 기간 ' + e(longDate(pd.from)) + ' ~ ' + e(longDate(pd.until)) : '') +
+      ' · 감사부(감사헌의부)' +
+      (report && report.finalized_at ? ' · <strong>확정</strong> ' + e(dt(report.finalized_at)) : ' · <span class="ar-no">확정 전</span>') +
+      '</p>';
+
+    h += '<h4>1. 감사 개요</h4><div class="ar-overview">' +
+      '<div><span>감사 대상 장부</span><strong>' + ledgers.length + '권</strong></div>' +
+      '<div><span>감사필</span><strong class="' + (audited.length === ledgers.length && ledgers.length ? 'ar-ok' : '') + '">' + audited.length + '권</strong></div>' +
+      '<div><span>회기 마감 승인</span><strong>' + closed.length + '권</strong></div>' +
+      '<div><span>회의록</span><strong>' + mAud + ' / ' + mTotal + '건 감사필</strong></div>' +
+      '</div>';
+
+    h += '<h4>2. 회계 장부 감사 결과</h4>' +
+      '<div style="overflow-x:auto"><table><thead><tr>' +
+      '<th style="width:80px">구분</th><th class="left">장부</th><th>이월금</th><th>수입</th><th>지출</th><th>남은 돈</th>' +
+      '<th>증빙</th><th>감사 결과</th><th class="left">감사 의견</th><th>마감</th></tr></thead><tbody>';
+    if (!ledgers.length) {
+      h += '<tr><td colspan="10" style="color:var(--gray-5);padding:14px">' + fy + ' 회계연도 장부가 없습니다.</td></tr>';
+    }
+    ledgers.forEach(function (b) {
+      var thisAudit = b.audited_yn && b.audit_year === year && b.audit_period === period;
+      var aud = b.audited_yn
+        ? '<span class="ar-ok">감사필</span><br><small>' + e(dt(b.audited_at)) +
+          (thisAudit ? '' : '<br>(' + e(String(b.audit_year || '')) + ' ' + e(b.audit_period || '') + ' 감사)') + '</small>'
+        : '<span class="ar-no">미감사</span>';
+      var ev = b.entries + '건' +
+        (b.receipts ? '<br><small>영수증 ' + b.receipts + '</small>' : '') +
+        (b.payouts ? '<br><small>수령 ' + b.payouts_confirmed + '/' + b.payouts + '</small>' : '');
+      var cl = b.closed_yn
+        ? '<span class="ar-ok">승인</span><br><small>' + e(dt(b.close_approved_at)) + (b.close_approved_by ? '<br>' + e(b.close_approved_by) : '') + '</small>'
+        : '<small style="color:var(--gray-5)">-</small>';
+      h += '<tr><td>' + KIND[b.owner_kind] + '</td>' +
+        '<td class="left"><strong>' + e(b.owner_kind === 'presbytery' ? '노회' : b.owner) + '</strong></td>' +
+        '<td class="num">' + won(b.opening_balance) + '</td><td class="num">' + won(b.income) + '</td>' +
+        '<td class="num">' + won(b.expense) + '</td><td class="num"><strong>' + won(b.balance) + '</strong></td>' +
+        '<td>' + ev + '</td><td>' + aud + '</td>' +
+        '<td class="left">' + (b.audit_opinion ? e(b.audit_opinion) : '<small style="color:var(--gray-5)">-</small>') +
+        (b.close_opinion && b.closed_yn ? '<br><small>마감: ' + e(b.close_opinion) + '</small>' : '') + '</td>' +
+        '<td>' + cl + '</td></tr>';
+    });
+    if (ledgers.length) {
+      var sO = 0, sI = 0, sE = 0, sB = 0;
+      ledgers.forEach(function (b) { sO += Number(b.opening_balance) || 0; sI += Number(b.income) || 0; sE += Number(b.expense) || 0; sB += Number(b.balance) || 0; });
+      h += '<tr style="font-weight:700;background:#f2efe9"><td colspan="2">합계</td>' +
+        '<td class="num">' + won(sO) + '</td><td class="num">' + won(sI) + '</td><td class="num">' + won(sE) + '</td>' +
+        '<td class="num">' + won(sB) + '</td><td colspan="4"></td></tr>';
+    }
+    h += '</tbody></table></div>';
+
+    h += '<h4>3. 회의록 감사 결과</h4>' +
+      '<div style="overflow-x:auto"><table><thead><tr><th style="width:80px">구분</th><th class="left">부서·시찰</th>' +
+      '<th>회계연도 회의록</th><th>감사필</th><th>결과</th></tr></thead><tbody>';
+    if (!minutes.length) h += '<tr><td colspan="5" style="color:var(--gray-5);padding:14px">회의록 자료가 없습니다.</td></tr>';
+    minutes.forEach(function (m) {
+      var res = !m.total ? '<small style="color:var(--gray-5)">회의록 없음</small>'
+        : (m.audited >= m.total ? '<span class="ar-ok">감사필</span>'
+          : (m.audited ? '<span class="ar-no">일부 (' + m.audited + '/' + m.total + ')</span>' : '<span class="ar-no">미감사</span>'));
+      h += '<tr><td>' + KIND[m.owner_kind] + '</td><td class="left"><strong>' + e(m.owner) + '</strong></td>' +
+        '<td>' + m.total + '건</td><td>' + m.audited + '건</td><td>' + res + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+
+    h += '<h4>4. 종합 의견</h4><div class="ar-text">' +
+      (report && report.summary ? e(report.summary) : '<span style="color:var(--gray-5)">아직 적지 않았습니다.</span>') + '</div>' +
+      '<h4>5. 지적·권고 사항</h4><div class="ar-text">' +
+      (report && report.findings ? e(report.findings) : '<span style="color:var(--gray-5)">없음</span>') + '</div>';
+
+    h += '<div class="ar-signs">' +
+      '<div class="ar-sign">감사부장<div class="nm">' + e(headName || '(미기재)') + '</div>' +
+      (seal.audit_head_seal ? '<img src="' + seal.audit_head_seal + '" alt="감사부장 도장">' : '') + '</div>' +
+      '<div class="ar-sign">감사부 서기<div class="nm">' + e(clerkName || '(미기재)') + '</div>' +
+      (seal.audit_clerk_seal ? '<img src="' + seal.audit_clerk_seal + '" alt="감사부 서기 도장">' : '') + '</div>' +
+      '</div>';
+    h += '<p style="font-size:0.78rem;color:var(--gray-5);margin:14px 0 0">' +
+      '남은 돈 = 이월금 + 수입 − 지출. 장부의 낱낱 항목과 영수증은 감사 기간에 감사부가 대시보드의 감사 카드에서 살폈습니다.</p>';
+    return h + '</div>';
+  }
+
+  function draw() {
+    var h = '<div class="inline-form" style="margin-bottom:12px;align-items:flex-end">' +
+      '<div class="field" style="flex:0 0 260px"><label>감사 회기</label><select id="ar-period">' +
+      periods.map(function (p) {
+        var sel = p.year === year && p.period === period;
+        return '<option value="' + p.year + '|' + e(p.period) + '"' + (sel ? ' selected' : '') + '>' +
+          p.year + '년 ' + e(p.period) + ' 감사 (' + (p.period === '봄' ? p.year - 1 : p.year) + ' 회계연도)</option>';
+      }).join('') + '</select></div>' +
+      '<button class="btn ghost" id="ar-print">인쇄</button>' +
+      '<button class="btn ghost" id="ar-pdf">PDF 저장</button>' +
+      (isReviewer && (!report || !report.finalized_at)
+        ? '<span style="font-size:0.82rem;color:var(--gray-5);align-self:center">종합 의견을 적고 확정하면 정식 보고서가 됩니다.</span>' : '') +
+      '</div>';
+
+    /* 감사부장·서기: 종합 의견·지적 사항을 적고 확정한다 */
+    if (isReviewer) {
+      var fin = !!(report && report.finalized_at);
+      h += '<div class="admin-card" style="max-width:980px;margin-bottom:16px">' +
+        '<h3 style="margin-top:0">종합 의견 · 지적 사항' +
+        (fin ? ' <span class="role-badge" style="color:#2a7a2a;border-color:#2a7a2a">확정됨</span>' : '') + '</h3>' +
+        '<div class="field"><label>종합 의견</label><textarea id="ar-summary" rows="4"' + (fin ? ' disabled' : '') + '>' +
+        e((report && report.summary) || '') + '</textarea></div>' +
+        '<div class="field"><label>지적·권고 사항 (없으면 비워 두세요)</label><textarea id="ar-findings" rows="3"' + (fin ? ' disabled' : '') + '>' +
+        e((report && report.findings) || '') + '</textarea></div>' +
+        (fin
+          ? '<p style="font-size:0.84rem;color:var(--gray-6)">' + e(dt(report.finalized_at)) + ' ' + e(report.finalized_by || '') +
+            ' 님이 확정했습니다. 고쳐야 하면 <button class="btn ghost sm" id="ar-unfinal">확정 풀기</button></p>'
+          : '<button class="btn ghost" id="ar-save">임시 저장</button> ' +
+            '<button class="btn" id="ar-final">보고서 확정</button>') +
+        '<div class="form-msg" id="ar-msg"></div></div>';
+    }
+
+    h += sheetHtml();
+    area.innerHTML = h;
+    bind();
+  }
+
+  function saveReport(finalize) {
+    var msg = document.getElementById('ar-msg');
+    var pd = periodDates();
+    var d = {
+      year: year, period: period,
+      from_on: pd ? pd.from : null, until_on: pd ? pd.until : null,
+      summary: (document.getElementById('ar-summary') || {}).value || null,
+      findings: (document.getElementById('ar-findings') || {}).value || null,
+      updated_at: new Date().toISOString(), updated_by: user.name
+    };
+    if (finalize) {
+      if (!(d.summary || '').trim()) { msg.className = 'form-msg err'; msg.textContent = '종합 의견을 적어 주세요.'; return; }
+      if (!confirm(year + '년 ' + period + ' 감사 보고서를 확정합니다.\n확정하면 의견을 고칠 수 없습니다(확정 풀기로 되돌릴 수 있습니다).\n계속하시겠습니까?')) return;
+      d.finalized_at = d.updated_at; d.finalized_by = user.name;
+      /* 확정 당시의 감사부장·서기 이름을 함께 남긴다 */
+      var au = ledgers.filter(function (b) { return b.audited_yn && b.audit_head; })[0];
+      d.head = (au && au.audit_head) || null; d.clerk = (au && au.audit_clerk) || null;
+    } else {
+      d.finalized_at = null; d.finalized_by = null;
+    }
+    msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+    db().then(function (c) {
+      return c.from('audit_reports').upsert(d, { onConflict: 'year,period' }).select();
+    }).then(function (r) {
+      var w = SHS.wrote(r);
+      if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
+      SHSCloud.log('update', finalize ? '감사 보고서 확정' : '감사 보고서 저장', year + '년 ' + period);
+      load();
+    });
+  }
+
+  var pdfLoading = null;
+  function loadPdfTool() {
+    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (pdfLoading) return pdfLoading;
+    pdfLoading = new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
+      sc.onload = function () { resolve(window.html2pdf); };
+      sc.onerror = function () { pdfLoading = null; reject(new Error('PDF 도구를 불러오지 못했습니다.')); };
+      document.head.appendChild(sc);
+    });
+    return pdfLoading;
+  }
+  var PRINT_CSS = 'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;padding:24px;color:#111}' +
+    'h3{text-align:center;margin:0 0 4px}.ar-sub{text-align:center;color:#555;font-size:13px;margin:0 0 16px}' +
+    'h4{margin:18px 0 6px;font-size:14px;border-left:4px solid #1f2a44;padding-left:8px}' +
+    'table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:4px 6px;text-align:center}' +
+    'th{background:#f2f2f2}td.left,th.left{text-align:left}td.num{text-align:right}' +
+    '.ar-ok{color:#2a7a2a;font-weight:700}.ar-no{color:#a33}' +
+    '.ar-text{white-space:pre-wrap;border:1px solid #999;padding:8px 10px;min-height:40px;font-size:13px}' +
+    '.ar-signs{display:flex;gap:36px;justify-content:flex-end;margin-top:24px}.ar-sign{text-align:center;font-size:13px}' +
+    '.ar-sign img{width:64px;height:64px;object-fit:contain;display:block;margin:4px auto 0}.ar-sign .nm{font-weight:700}' +
+    '.ar-overview{display:flex;gap:12px;flex-wrap:wrap}.ar-overview div{border:1px solid #999;padding:8px 12px;min-width:120px}' +
+    '.ar-overview span{display:block;font-size:11px;color:#666}.ar-overview strong{font-size:14px}';
+
+  function bind() {
+    document.getElementById('ar-period').addEventListener('change', function () {
+      var v = this.value.split('|');
+      year = parseInt(v[0], 10); period = v[1];
+      history.replaceState(null, '', 'audit-report.html?y=' + year + '&p=' + encodeURIComponent(period));
+      load();
+    });
+    document.getElementById('ar-print').addEventListener('click', function () {
+      var sheet = document.getElementById('ar-sheet');
+      var w = window.open('', '_blank', 'width=900,height=700');
+      if (!w) { alert('인쇄 창이 막혔습니다. 팝업을 허용해 주세요.'); return; }
+      w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>감사 보고서 ' + year + ' ' + e(period) +
+        '</title><style>' + PRINT_CSS + '</style></head><body>' + sheet.innerHTML + '</body></html>');
+      w.document.close(); w.focus();
+      setTimeout(function () { w.print(); }, 400);
+      SHSCloud.log('view', '감사 보고서 인쇄', year + '년 ' + period);
+    });
+    document.getElementById('ar-pdf').addEventListener('click', function () {
+      var btn = this;
+      btn.disabled = true; btn.textContent = '만드는 중…';
+      var stage = document.createElement('div');
+      stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
+      stage.innerHTML = '<style>' + PRINT_CSS + '</style><div>' + document.getElementById('ar-sheet').innerHTML + '</div>';
+      document.body.appendChild(stage);
+      loadPdfTool().then(function (html2pdf) {
+        return html2pdf().set({
+          margin: 8, filename: '시화산노회 감사 보고서 ' + year + '년 ' + period + '.pdf',
+          pagebreak: { mode: ['css', 'legacy'] },
+          html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(stage.lastElementChild).save();
+      }).then(function () {
+        stage.remove(); btn.disabled = false; btn.textContent = 'PDF 저장';
+        SHSCloud.log('view', '감사 보고서 PDF 저장', year + '년 ' + period);
+      }).catch(function (err) {
+        stage.remove(); btn.disabled = false; btn.textContent = 'PDF 저장';
+        alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
+      });
+    });
+    var sv = document.getElementById('ar-save');
+    if (sv) sv.addEventListener('click', function () { saveReport(false); });
+    var fn = document.getElementById('ar-final');
+    if (fn) fn.addEventListener('click', function () { saveReport(true); });
+    var uf = document.getElementById('ar-unfinal');
+    if (uf) uf.addEventListener('click', function () {
+      if (!confirm('확정을 풀고 다시 고칠 수 있게 합니다. 계속하시겠습니까?')) return;
+      db().then(function (c) {
+        return c.from('audit_reports').update({ finalized_at: null, finalized_by: null, updated_at: new Date().toISOString(), updated_by: user.name })
+          .eq('year', year).eq('period', period);
+      }).then(function (r) {
+        if (r.error) { alert(r.error.message); return; }
+        SHSCloud.log('update', '감사 보고서 확정 풀기', year + '년 ' + period);
+        load();
+      });
+    });
+  }
+
+  boot();
+ });
+});
+</script>
+</body>
+</html>
