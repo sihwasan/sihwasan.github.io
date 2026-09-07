@@ -728,7 +728,7 @@ var SHSLedger = (function () {
       if (members) return Promise.resolve(members);
       return SHSCloud.init().then(function (c) {
         return Promise.all([
-          c.from('roster').select('id,name,church,position,category,sichal,sort')
+          c.from('roster').select('id,name,church,position,category,sichal,sort,officer_title,role')
             .eq('active', true).order('sort').order('id'),
           c.from('profiles').select('roster_id,name')
             .then(function (x) { return x; }, function () { return { data: null }; })
@@ -743,11 +743,24 @@ var SHSLedger = (function () {
         });
         members = ((rs[0] && rs[0].data) || []).map(function (m) {
           return { roster_id: m.id, name: m.name, church: m.church || '', position: m.position || '',
-                   category: m.category || '', sichal: m.sichal || '',
+                   category: m.category || '', sichal: m.sichal || '', sort: Number(m.sort) || 0,
+                   title: m.officer_title || '', role: m.role || '',
                    has_account: !!(acc[m.id] || accName[m.name]) };
         });
         return members;
       }, function () { members = []; return members; });
+    }
+
+    /* 상비부 명부(부장·서기·회계·년조·위원) — 처음 한 번만 읽는다 */
+    var committeeRows = null;
+    function loadCommittees() {
+      if (committeeRows) return Promise.resolve(committeeRows);
+      return SHSCloud.init().then(function (c) {
+        return c.from('committees').select('name,head,clerk,treasurer,y1,y2,y3,members,sort').order('sort');
+      }).then(function (r) {
+        committeeRows = (r && !r.error && r.data) || [];
+        return committeeRows;
+      }, function () { committeeRows = []; return committeeRows; });
     }
 
     /* 적은 글이 명단의 누구인지 — "이름 (교회)" 또는 이름만(한 사람일 때) */
@@ -837,14 +850,17 @@ var SHSLedger = (function () {
     var memMdl = null, memSel = {}, memDone = null;
     function memberPicker() {
       if (memMdl) return memMdl;
+      var stale = document.getElementById('lg-mem-mdl');
+      if (stale && stale.parentNode) stale.parentNode.removeChild(stale);
       memMdl = document.createElement('div');
       memMdl.className = 'mdl';
       memMdl.id = 'lg-mem-mdl';
       memMdl.innerHTML =
         '<div class="mdl-box wide">' +
         '<button class="mdl-close" id="lg-mem-close">&times;</button>' +
-        '<h2>회원 일괄 선택</h2>' +
+        '<h2 id="lg-mem-title">회원 일괄 선택</h2>' +
         '<div class="inline-form" style="margin-bottom:8px">' +
+        '<div class="field" style="flex:0 0 190px"><label>명부</label><select id="lg-mem-src"><option value="all">노회 회원 명단</option></select></div>' +
         '<div class="field" style="flex:0 0 150px"><label>시찰</label><select id="lg-mem-sichal"><option value="">전체</option></select></div>' +
         '<div class="field" style="flex:0 0 150px"><label>구분</label><select id="lg-mem-cat"><option value="">전체</option></select></div>' +
         '<div class="field"><label>찾기</label><input type="text" id="lg-mem-q" placeholder="이름·교회"></div>' +
@@ -866,9 +882,10 @@ var SHSLedger = (function () {
       ['lg-mem-sichal', 'lg-mem-cat'].forEach(function (id) {
         memMdl.querySelector('#' + id).addEventListener('change', renderMemberList);
       });
+      memMdl.querySelector('#lg-mem-src').addEventListener('change', applySource);
       memMdl.querySelector('#lg-mem-q').addEventListener('input', renderMemberList);
       memMdl.querySelector('#lg-mem-all').addEventListener('click', function () {
-        visibleMembers().forEach(function (m) { memSel[m.roster_id] = 1; });
+        visibleMembers().forEach(function (m) { if (!m.missing) memSel[m.roster_id] = 1; });
         renderMemberList();
       });
       memMdl.querySelector('#lg-mem-none').addEventListener('click', function () {
@@ -881,36 +898,126 @@ var SHSLedger = (function () {
       });
       return memMdl;
     }
+    /* 어느 명부를 보여 줄지 — 노회 명단 / 노회 임원 / 상비부.
+     * 상비부 장부에서 열면 그 상비부 위원만 보인다(memLock). */
+    var memLock = null;
+    var TITLE_ORDER = ['노회장', '부노회장', '서기', '부서기', '회록서기', '회록부서기', '회계', '부회계', '간사'];
+    function dup(m) { var o = {}; for (var k in m) if (Object.prototype.hasOwnProperty.call(m, k)) o[k] = m[k]; return o; }
+    function firstName(t) { return String(t || '').trim().split(/\s+/)[0] || ''; }
+    function splitNames(t) {
+      return String(t || '').split(/[,，、·\/\n]+/).map(firstName).filter(Boolean);
+    }
+    function currentSource() {
+      if (memLock) return 'c:' + memLock;
+      var sel = memMdl.querySelector('#lg-mem-src');
+      return (sel && sel.value) || 'all';
+    }
+    /* 노회 임원 — 명단의 노회 직책(노회장·서기·회계…)이 있는 사람, 간사 포함 */
+    function officerMembers() {
+      return (members || []).filter(function (m) {
+        return m.title || ['president', 'clerk', 'staff'].indexOf(m.role) >= 0;
+      }).map(function (m) {
+        var o = dup(m);
+        o.tags = [m.title || (m.role === 'staff' ? '간사' : m.role === 'president' ? '노회장' : '서기')];
+        o.group = '노회 임원';
+        return o;
+      }).sort(function (a, b) {
+        var ia = TITLE_ORDER.indexOf(a.tags[0]), ib = TITLE_ORDER.indexOf(b.tags[0]);
+        if (ia < 0) ia = 99; if (ib < 0) ib = 99;
+        return ia - ib || a.sort - b.sort || a.roster_id - b.roster_id;
+      });
+    }
+    /* 상비부 위원 — 상비부 표의 부장·서기·회계·1~3년조·위원 글을 명단과 이름으로 맞춘다.
+     * 같은 이름이 둘이면 둘 다 보여 주고(교회로 구분), 명단에 없으면 고를 수 없게 표시한다. */
+    function committeeMembers(name) {
+      var c = (committeeRows || []).filter(function (x) { return x.name === name; })[0];
+      if (!c) return [];
+      var byName = {};
+      (members || []).forEach(function (m) { (byName[m.name] = byName[m.name] || []).push(m); });
+      var out = [], seen = {};
+      function add(nm, tag, group) {
+        if (!nm) return;
+        var hits = byName[nm] || [];
+        if (!hits.length) {
+          var k = 'x:' + nm;
+          if (seen[k]) { if (seen[k].tags.indexOf(tag) < 0) seen[k].tags.push(tag); return; }
+          seen[k] = { roster_id: 'x-' + out.length, name: nm, church: '', tags: [tag], group: group, missing: true };
+          out.push(seen[k]);
+          return;
+        }
+        hits.forEach(function (m) {
+          if (seen[m.roster_id]) { if (seen[m.roster_id].tags.indexOf(tag) < 0) seen[m.roster_id].tags.push(tag); return; }
+          var o = dup(m); o.tags = [tag]; o.group = group;
+          seen[m.roster_id] = o; out.push(o);
+        });
+      }
+      var OFF = '부장 · 서기 · 회계';
+      add(firstName(c.head), '부장', OFF);
+      add(firstName(c.clerk), '서기', OFF);
+      add(firstName(c.treasurer), '회계', OFF);
+      splitNames(c.y1).forEach(function (n) { add(n, '1년조', '1년조'); });
+      splitNames(c.y2).forEach(function (n) { add(n, '2년조', '2년조'); });
+      splitNames(c.y3).forEach(function (n) { add(n, '3년조', '3년조'); });
+      splitNames(c.members).forEach(function (n) { add(n, '위원', '위원'); });
+      return out;
+    }
+    function sourceMembers() {
+      var src = currentSource();
+      if (src === 'officers') return officerMembers();
+      if (src.indexOf('c:') === 0) return committeeMembers(src.slice(2));
+      return members || [];
+    }
+    /* 명부를 바꾸면 시찰·구분 거름은 노회 명단에서만 쓰인다 */
+    function applySource() {
+      var all = currentSource() === 'all';
+      ['lg-mem-sichal', 'lg-mem-cat'].forEach(function (id) {
+        var el = memMdl.querySelector('#' + id);
+        el.parentNode.style.display = all ? '' : 'none';
+        if (!all) el.value = '';
+      });
+      renderMemberList();
+    }
     function visibleMembers() {
       var sc = memMdl.querySelector('#lg-mem-sichal').value;
       var ct = memMdl.querySelector('#lg-mem-cat').value;
       var q = memMdl.querySelector('#lg-mem-q').value.trim();
-      return (members || []).filter(function (m) {
+      return sourceMembers().filter(function (m) {
         if (sc && m.sichal !== sc) return false;
         if (ct && m.category !== ct) return false;
-        if (q && (m.name + ' ' + m.church).indexOf(q) === -1) return false;
+        if (q && (m.name + ' ' + m.church + ' ' + (m.tags || []).join(' ')).indexOf(q) === -1) return false;
         return true;
       });
     }
     function renderMemberList() {
       var list = memMdl.querySelector('#lg-mem-list');
+      var src = currentSource();
       var vis = visibleMembers();
       var groups = {}, order = [];
       vis.forEach(function (m) {
-        var g = m.sichal || '시찰 없음';
+        var g = m.group || m.sichal || '시찰 없음';
         if (!groups[g]) { groups[g] = []; order.push(g); }
         groups[g].push(m);
       });
+      var empty = src.indexOf('c:') === 0
+        ? (committeeMembers(src.slice(2)).length
+            ? '조건에 맞는 위원이 없습니다.'
+            : esc(src.slice(2)) + '의 위원 명단이 아직 없습니다. 노회 관리자가 상비부 관리에서 부장·서기·회계와 위원을 적어 주시면 여기에 보입니다.')
+        : '조건에 맞는 회원이 없습니다.';
       list.innerHTML = order.map(function (g) {
         return '<div class="lg-mem-group">' + esc(g) + ' <small>' + groups[g].length + '명</small></div>' +
           groups[g].map(function (m) {
-            return '<label><input type="checkbox" data-lgmem="' + m.roster_id + '"' +
-              (memSel[m.roster_id] ? ' checked' : '') + '> ' + esc(m.name) +
-              ' <small>' + esc(m.church) + (m.category ? ' · ' + esc(m.category) : '') + '</small>' +
-              (accKnown && !m.has_account ? ' <small style="color:#b0731f">계정 없음</small>' : '') +
+            var sub = m.tags && m.tags.length
+              ? m.tags.join('·') + (m.church ? ' · ' + m.church : '')
+              : m.church + (m.category ? ' · ' + m.category : '');
+            return '<label' + (m.missing ? ' style="opacity:.55;cursor:default"' : '') + '>' +
+              '<input type="checkbox" data-lgmem="' + m.roster_id + '"' +
+              (m.missing ? ' disabled' : '') + (memSel[m.roster_id] ? ' checked' : '') + '> ' + esc(m.name) +
+              ' <small>' + esc(sub) + '</small>' +
+              (m.missing ? ' <small style="color:#b0731f">명단에 없음</small>'
+                : (accKnown && !m.has_account ? ' <small style="color:#b0731f">계정 없음</small>' : '')) +
               '</label>';
           }).join('');
-      }).join('') || '<p style="color:var(--gray-5)">조건에 맞는 회원이 없습니다.</p>';
+      }).join('') || '<p style="color:var(--gray-5)">' + empty + '</p>';
       list.querySelectorAll('input[data-lgmem]').forEach(function (cb) {
         cb.addEventListener('change', function () {
           if (cb.checked) memSel[cb.dataset.lgmem] = 1; else delete memSel[cb.dataset.lgmem];
@@ -927,7 +1034,7 @@ var SHSLedger = (function () {
       memDone = onDone;
       memSel = {};
       (preselectedIds || []).forEach(function (id) { memSel[id] = 1; });
-      loadMembers().then(function () {
+      Promise.all([loadMembers(), loadCommittees()]).then(function () {
         var m = memberPicker();
         var scs = {}, cts = {};
         members.forEach(function (x) { if (x.sichal) scs[x.sichal] = 1; if (x.category) cts[x.category] = 1; });
@@ -935,8 +1042,23 @@ var SHSLedger = (function () {
           Object.keys(scs).map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
         m.querySelector('#lg-mem-cat').innerHTML = '<option value="">전체</option>' +
           Object.keys(cts).map(function (s) { return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
+        /* 상비부 장부에서는 그 상비부 위원만. 노회·시찰 장부에서는 명부를 고른다. */
+        memLock = opts.kind === 'committee' ? opts.owner : null;
+        var srcSel = m.querySelector('#lg-mem-src');
+        srcSel.parentNode.style.display = memLock ? 'none' : '';
+        if (!memLock) {
+          srcSel.innerHTML = '<option value="all">노회 회원 명단</option><option value="officers">노회 임원</option>' +
+            (committeeRows || []).map(function (c) {
+              return '<option value="c:' + esc(c.name) + '">상비부 · ' + esc(c.name) + '</option>';
+            }).join('');
+          srcSel.value = 'all';
+        }
+        m.querySelector('#lg-mem-title').textContent = memLock ? memLock + ' 위원 선택' : '회원 일괄 선택';
         m.querySelector('#lg-mem-q').value = '';
-        renderMemberList();
+        /* 시찰 장부는 그 시찰부터 보여 준다 */
+        var scSel = m.querySelector('#lg-mem-sichal');
+        scSel.value = (opts.kind === 'sichal' && scs[opts.owner]) ? opts.owner : '';
+        applySource();
         m.classList.add('open');
       });
     }
