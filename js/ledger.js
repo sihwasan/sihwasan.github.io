@@ -708,8 +708,10 @@ var SHSLedger = (function () {
      * 회의비·거마비처럼 영수증이 없는 지출은 받는 사람을 적어 둔다.
      * 계정이 있으면 알림이 가고 본인이 수령 확인을 누른다. (76_ledger_payouts.sql) */
     function payeeForm() {
-      return '<details id="lg-payout" style="margin:4px 0 12px"' + (pendingPayees.length ? ' open' : '') + '>' +
-        '<summary style="cursor:pointer;font-size:0.9rem;color:var(--navy)">지급 확인 받기 — ' +
+      /* 붉은 상자 — 영수증 대신 받는 사람의 확인으로 증빙하는, 성격이 다른 지출임을 드러낸다 */
+      return '<details id="lg-payout" style="margin:4px 0 14px;border:1.5px solid #e0a9a9;background:#fdf3f3;border-radius:8px;padding:10px 14px"' +
+        (pendingPayees.length ? ' open' : '') + '>' +
+        '<summary style="cursor:pointer;font-size:0.92rem;font-weight:700;color:#b03a3a">지급 확인 받기 — ' +
         '회의비·거마비처럼 영수증이 없는 지출</summary>' +
         '<div style="margin-top:8px">' +
         '<p style="font-size:0.82rem;color:var(--gray-5);margin:0 0 8px">받는 사람은 <strong>한 명씩</strong> 이름을 적고 「적은 사람 추가」를 누르거나, ' +
