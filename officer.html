@@ -1403,7 +1403,7 @@ document.addEventListener('DOMContentLoaded', function () {
       stage.remove(); done(); window.scrollTo(keepX, keepY);
       SHSCloud.log('view', '상회비 납입현황 PDF 저장', duesYear + '년');
     }).catch(function (err) {
-      stage.remove(); done();
+      stage.remove(); done(); window.scrollTo(keepX, keepY);
       alert('PDF를 만들지 못했습니다: ' + (err.message || err));
     });
   }
@@ -1581,7 +1581,7 @@ document.addEventListener('DOMContentLoaded', function () {
       loadDues();
       loadOfficerDocs(true);
     }).catch(function (err) {
-      stage.remove();
+      stage.remove(); window.scrollTo(keepX2, keepY2);
       alert('마감하지 못했습니다: ' + (err.message || err));
     });
   }
