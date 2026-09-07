@@ -6,6 +6,5 @@
  * 저장은 언제나 회계가 확인한 뒤에 합니다.
  */
 var SHS_RECEIPTS = {
-  /* 이 워커는 kds08200820 계정에 올라가 있다 (다른 워커 셋과 다른 계정). */
-  base: 'https://sihwasan-receipts.kds08200820.workers.dev'
+  base: 'https://sihwasan-receipts.sihwasan.workers.dev'
 };
