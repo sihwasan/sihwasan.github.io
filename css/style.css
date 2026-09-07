@@ -342,6 +342,20 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .tabs.lg-kind-tabs button.lg-tab-out:hover { color: #b03a3a; border-color: #b03a3a; }
 .tabs.lg-kind-tabs button.lg-tab-inc.active { background: #1a6d3a; border-color: #1a6d3a; color: #fff; font-weight: 700; }
 .tabs.lg-kind-tabs button.lg-tab-out.active { background: #b03a3a; border-color: #b03a3a; color: #fff; font-weight: 700; }
+/* 곁 탭 — 영수증 보관함·재정보고서 (남색 계열) */
+.tabs.lg-kind-tabs .lg-tab-gap { width: 6px; }
+.tabs.lg-kind-tabs button.lg-tab-etc { color: var(--navy); border-color: #b9c3d6; background: #f5f7fb; }
+.tabs.lg-kind-tabs button.lg-tab-etc:hover { color: var(--navy); border-color: var(--navy); }
+.tabs.lg-kind-tabs button.lg-tab-etc.active { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 700; }
+/* 영수증 보관함 — 사진 바둑판 */
+.lg-arc { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.lg-arc-card { border: 1px solid var(--gray-2); border-radius: 8px; overflow: hidden; background: #fff; cursor: pointer; transition: box-shadow 0.15s; }
+.lg-arc-card:hover { box-shadow: 0 4px 14px rgba(15, 36, 68, 0.12); }
+.lg-arc-thumb { height: 140px; background: #f4f1ea; display: flex; align-items: center; justify-content: center; }
+.lg-arc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lg-arc-miss { font-size: 0.78rem; color: var(--gray-5); padding: 8px; text-align: center; }
+.lg-arc-meta { padding: 8px 10px; font-size: 0.8rem; line-height: 1.45; }
+.lg-arc-meta .lg-out { color: var(--red); }
 
 /* 붉은 계열 하위 탭 — 노회장 권한 위임처럼 무게가 다른 일 */
 .tabs.sub-tabs button.tab-danger { color: #b03a3a; border-color: #d8a0a0; }

@@ -406,22 +406,37 @@ var SHSLedger = (function () {
       var incRows = entries.filter(function (x) { return x.kind === '수입'; });
       var outRows = entries.filter(function (x) { return x.kind !== '수입'; });
       /* 수입은 초록, 지출은 붉은 알약 탭으로 한눈에 구분한다 (css .lg-kind-tabs) */
+      var nRc = 0;
+      entries.forEach(function (x) { nRc += (receipts[x.id] || []).length; });
       h += '<div class="tabs lg-kind-tabs" id="lg-tabs" style="margin:14px 0 12px">' +
         KINDS.map(function (k) {
           var n = k === '수입' ? incRows.length : outRows.length;
           return '<button class="' + (k === '수입' ? 'lg-tab-inc' : 'lg-tab-out') +
             (viewKind === k ? ' active' : '') + '" data-lk="' + k + '">' +
             (k === '수입' ? '＋ ' : '－ ') + k + '<span class="lg-tab-n">(' + n + '건)</span></button>';
-        }).join('') + '</div>';
+        }).join('') +
+        /* 영수증 보관함·재정보고서 — 장부 곁에 두어 바로 넘겨 본다 */
+        '<span class="lg-tab-gap"></span>' +
+        '<button class="lg-tab-etc' + (viewKind === 'receipts' ? ' active' : '') + '" data-lk="receipts">' +
+        '&#128206; 영수증 보관함<span class="lg-tab-n">(' + nRc + '장)</span></button>' +
+        '<button class="lg-tab-etc' + (viewKind === 'report' ? ' active' : '') + '" data-lk="report">' +
+        '&#128196; 재정보고서</button>' +
+        '</div>';
+
+      var ledgerView = viewKind === '수입' || viewKind === '지출';
+      if (viewKind === 'receipts') h += archiveHtml(outRows);
+      else if (viewKind === 'report') h += '<div id="lg-report" style="margin-top:4px"></div>';
 
       /* 입력 섹션이 먼저, 그 아래에 장부가 쌓인다 */
-      if (canWrite) h += entryForm();
+      if (ledgerView && canWrite) h += entryForm();
 
       var shown = viewKind === '수입' ? incRows : outRows;
       var shownSum = 0;
       shown.forEach(function (x) { shownSum += Number(x.amount) || 0; });
 
-      if (!shown.length) {
+      if (!ledgerView) {
+        /* 보관함·보고서 탭에서는 장부 표를 그리지 않는다 */
+      } else if (!shown.length) {
         h += '<p style="color:var(--gray-5)">적어 둔 ' + viewKind + '이 없습니다.' +
           (canWrite ? ' 위 입력 칸에 기록하시면 이 자리에 장부가 만들어집니다.' : '') + '</p>';
       } else {
@@ -481,7 +496,9 @@ var SHSLedger = (function () {
       bindYear();
       bindTabs();
       bindReceipts(canWrite);
-      if (canWrite) { bindOpening(); bindEntryForm(); bindEntryList(); if (useCats) bindCats(); }
+      if (canWrite) { bindOpening(); if (ledgerView) { bindEntryForm(); bindEntryList(); if (useCats) bindCats(); } }
+      if (viewKind === 'receipts') bindArchive(canWrite);
+      if (viewKind === 'report') report(document.getElementById('lg-report'), { kind: opts.kind, owner: opts.owner, year: year });
 
       /* 마감 취소 — 잘못 마감했을 때 임원이 되돌린다 */
       var ro = document.getElementById('lg-reopen');
@@ -549,6 +566,76 @@ var SHSLedger = (function () {
       if (sel) sel.addEventListener('change', function () {
         year = parseInt(this.value, 10);
         load();
+      });
+    }
+
+    /* ----- 영수증 보관함 — 이 회계연도의 영수증 사진을 한눈에 ----- */
+    function archiveHtml(rows) {
+      var cards = [], missing = [], nRc = 0, sumRc = 0;
+      rows.forEach(function (x) {
+        var list = receipts[x.id] || [];
+        var po = payouts[x.id] || [];
+        if (list.length) { nRc += list.length; sumRc += Number(x.amount) || 0; }
+        else if (!po.length && !linkInfo(x)) missing.push(x);
+        list.forEach(function (r, i) {
+          var read = [r.taken_on, r.vendor].filter(Boolean).join(' · ');
+          cards.push('<div class="lg-arc-card" data-lgarc="' + x.id + '" data-lgat="' + i + '" title="크게 보기">' +
+            '<div class="lg-arc-thumb"><img data-lgpath="' + esc(r.file_path) + '" alt=""></div>' +
+            '<div class="lg-arc-meta">' +
+            '<div><strong>' + esc(x.entry_date || '') + '</strong> ' + esc(x.title) + '</div>' +
+            '<div class="lg-out" style="font-weight:700">−' + won(x.amount) + '원' +
+            (list.length > 1 ? ' <small style="font-weight:400;color:var(--gray-5)">' + (i + 1) + '/' + list.length + '</small>' : '') + '</div>' +
+            (read ? '<div style="color:var(--gray-5)">' + esc(read) + '</div>' : '') +
+            '</div></div>');
+        });
+      });
+      var h = '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;margin:0 0 10px">' +
+        '<strong style="font-size:1.02rem">영수증 보관함 — ' + fyLabel(year) + '</strong>' +
+        '<span style="color:var(--gray-5);font-size:0.88rem">영수증 ' + nRc + '장 · 영수증이 붙은 지출 ' + won(sumRc) + '원</span></div>';
+      h += cards.length
+        ? '<div class="lg-arc">' + cards.join('') + '</div>'
+        : '<p style="color:var(--gray-5)">아직 올린 영수증이 없습니다. 지출을 적을 때 사진을 붙이거나, 지출 줄의 「+」로 올릴 수 있습니다.</p>';
+      if (missing.length) {
+        h += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#b03a3a;font-weight:600">' +
+          '증빙이 없는 지출 ' + missing.length + '건 <small style="font-weight:400;color:var(--gray-5)">— 영수증도 지급 확인도 없는 항목</small></summary>' +
+          '<table class="tbl" style="margin-top:8px;font-size:0.88rem"><thead><tr><th style="width:110px">일자</th>' +
+          '<th>항목</th><th style="width:130px">금액 (원)</th></tr></thead><tbody>' +
+          missing.map(function (x) {
+            return '<tr><td>' + esc(x.entry_date || '') + '</td><td class="left">' + esc(x.title) +
+              (x.note ? ' <small style="color:var(--gray-5)">' + esc(x.note) + '</small>' : '') + '</td>' +
+              '<td class="lg-out" style="text-align:right">−' + won(x.amount) + '</td></tr>';
+          }).join('') + '</tbody></table>' +
+          '<p style="font-size:0.8rem;color:var(--gray-5)">지출 탭에서 줄의 「+」로 영수증을 붙이거나, 회의비·거마비는 「수령확인」으로 받는 사람의 확인을 받아 두세요.</p></details>';
+      }
+      return h;
+    }
+    /* 보관함 사진은 비공개 저장소에 있으므로 잠시 쓰는 주소를 받아 보여 준다 */
+    function bindArchive(canWrite) {
+      var imgs = box.querySelectorAll('img[data-lgpath]');
+      var paths = [];
+      imgs.forEach(function (im) { if (paths.indexOf(im.dataset.lgpath) < 0) paths.push(im.dataset.lgpath); });
+      if (paths.length) {
+        SHSCloud.init().then(function (c) {
+          var st = c.storage.from('receipts');
+          if (typeof st.createSignedUrls === 'function') return st.createSignedUrls(paths, 600);
+          return Promise.all(paths.map(function (pth) {
+            return st.createSignedUrl(pth, 600).then(function (r) {
+              return { path: pth, signedUrl: r && r.data && r.data.signedUrl };
+            });
+          })).then(function (arr) { return { data: arr }; });
+        }).then(function (res) {
+          var map = {};
+          ((res && res.data) || []).forEach(function (r) { if (r.signedUrl) map[r.path] = r.signedUrl; });
+          imgs.forEach(function (im) {
+            var u = map[im.dataset.lgpath];
+            if (u) im.src = u; else im.parentNode.innerHTML = '<span class="lg-arc-miss">사진을 불러오지 못했습니다</span>';
+          });
+        }, function () {});
+      }
+      box.querySelectorAll('.lg-arc-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          openReceipts(card.dataset.lgarc, canWrite, parseInt(card.dataset.lgat, 10) || 0);
+        });
       });
     }
 
@@ -1502,12 +1589,12 @@ var SHSLedger = (function () {
         img.src = res.data.signedUrl;
       });
     }
-    function openReceipts(entryId, canWrite) {
+    function openReceipts(entryId, canWrite, at) {
       lbList = receipts[entryId] || [];
       if (!lbList.length) return;
       lbEntry = entryId; lbCanWrite = canWrite;
       lightbox().classList.add('open');
-      showLb(0);
+      showLb(at || 0);
     }
 
     function bindReceipts(canWrite) {
