@@ -2099,7 +2099,10 @@ var SHSLedger = (function () {
           });
         }
 
-        var ATT_CSS = '.att-head{page-break-before:always;margin-top:8px}' +
+        /* 쪽이 넘어가는 자리에서 줄(행)이 잘리지 않게 — 인쇄와 PDF 둘 다 같은 규칙 */
+        var ATT_CSS = 'tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}' +
+          'h3,h4{page-break-after:avoid;break-after:avoid}' +
+          '.att-head{page-break-before:always;margin-top:8px}' +
           '.att{page-break-inside:avoid;margin:14px 0 18px;border-top:1px solid #999;padding-top:8px}' +
           '.att h4{margin:0 0 6px;font-size:13px}' +
           '.att-img{page-break-inside:avoid;text-align:center;margin:6px 0}' +
@@ -2141,24 +2144,32 @@ var SHSLedger = (function () {
           askAttachments().then(function (withAtt) {
             pf.disabled = true; pf.textContent = '만드는 중…';
             var stage = document.createElement('div');
-            stage.style.cssText = 'position:fixed;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
+            stage.style.cssText = 'position:absolute;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
+            /* 화면을 아래로 내린 채 만들면 그림 도구(html2canvas)가 내린 만큼을 첫 쪽 위에 빈칸으로
+             * 넣어 버린다. 만드는 동안만 맨 위로 올렸다가 끝나면 제자리로 돌린다. */
+            var sx = window.scrollX || 0, sy = window.scrollY || 0;
+            function done() {
+              stage.remove(); pf.disabled = false; pf.textContent = 'PDF 저장';
+              window.scrollTo(sx, sy);
+            }
             return (withAtt ? attachmentsHtml() : Promise.resolve('')).then(function (att) {
               stage.innerHTML = '<style>' + ATT_CSS + '</style><div>' + sheet.innerHTML + att + '</div>';
               document.body.appendChild(stage);
               return loadPdfTool();
             }).then(function (html2pdf) {
+              window.scrollTo(0, 0);
               return html2pdf().set({
                 margin: 8,
                 filename: opts.owner + ' ' + year + ' 회계연도 재정보고서' + (withAtt ? ' (증빙 포함)' : '') + '.pdf',
-                pagebreak: { mode: ['css', 'legacy'] },
-                html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+                pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'h4', '.att-img'] },
+                html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true, scrollX: 0, scrollY: 0 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
               }).from(stage.firstElementChild.nextElementSibling || stage).save();
             }).then(function () {
-              stage.remove(); pf.disabled = false; pf.textContent = 'PDF 저장';
+              done();
               if (window.SHSCloud) SHSCloud.log('view', '재정보고서 PDF 저장', opts.owner + ' ' + year + '년' + (withAtt ? ' (증빙 포함)' : ''));
             }).catch(function (err) {
-              stage.remove(); pf.disabled = false; pf.textContent = 'PDF 저장';
+              done();
               alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
             });
           });
