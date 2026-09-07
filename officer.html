@@ -27,7 +27,7 @@
 <script src="js/main.js?v=20260907h"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
-<script src="js/ledger.js?v=20260907r"></script>
+<script src="js/ledger.js?v=20260907s"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 노회 재정부 회계 — 회계·부회계가 적고, 관리자와 감사 기간의 감사부장·서기가 본다 */
   if (canFinance) {
     html += '<h2>재정부 회계</h2>';
-    html += '<p>노회 재정부(일반회계) 장부입니다. 상회비·세례의무금 납부를 기록하면 수입으로 저절로 적히고, ' +
+    html += '<p>노회 재정부(일반회계) 장부입니다. 상회비 납부를 기록하면 수입으로 저절로 적히고(세례의무금은 총회 부과금이라 노회 수입에 넣지 않고 <strong>세례의무금 관리</strong>에서 따로 관리합니다), ' +
       '<strong>상비부 배정</strong> 과목으로 지출을 적으면 그 상비부 장부에 수입으로 함께 적힙니다. ' +
       '장부는 노회 회계·부회계가 적으며, 노회장·서기·간사와 감사 기간의 감사부장·서기가 열람합니다.</p>';
     /* 재정보고서는 장부 안의 탭(수입·지출 곁)에서 본다 */

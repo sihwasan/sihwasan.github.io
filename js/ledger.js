@@ -2020,6 +2020,7 @@ var SHSLedger = (function () {
         '<td>합계</td><td></td><td style="text-align:right">' + won(sumOut + left) + '</td></tr>';
       t += '</tbody></table></div>' +
         '<p style="font-size:0.78rem;color:var(--gray-5);margin-top:6px">차인잔액 = 이월금 + 수입합계 − 지출합계. ' +
+        (ownerKind === 'presbytery' ? '세례의무금은 총회 부과금으로 노회가 관리만 하며 이 보고서의 수입에 넣지 않습니다. ' : '') +
         '장부 입력·관리는 임원이 하며, 이 보고서는 회원이 상시로 열람합니다.</p></div>';
 
       box.innerHTML = h + t;
