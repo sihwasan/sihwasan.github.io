@@ -2550,3 +2550,20 @@ td[data-duch]:hover { background: #eef2f8; }
 @media (max-width: 900px) {
   .hero.done .hero-logo-draw { top: 138px; }
 }
+
+/* ---------- 회원 신상관리: 명단 사진 ---------- */
+.tbl td.ro-photo { padding: 5px 4px; }
+.ro-thumb { width: 36px; height: 45px; padding: 0; border: 1px solid var(--gray-2); border-radius: 6px;
+  background: #fff; overflow: hidden; cursor: pointer; display: inline-flex; align-items: center;
+  justify-content: center; vertical-align: middle; }
+.ro-thumb svg { width: 24px; height: 30px; }
+.ro-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ro-thumb.has { border-color: var(--gray-3); }
+.ro-thumb:hover, .ro-thumb:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: none; }
+.ro-photo-big { min-height: 220px; border: 2px dashed var(--gray-3); border-radius: 12px; padding: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.ro-photo-big img { max-width: 100%; max-height: 62vh; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
+.ro-photo-none { color: var(--gray-5); font-size: .92rem; cursor: pointer; padding: 36px 10px; line-height: 1.7; }
+.ro-photo-none span { font-size: .78rem; }
+.ro-photo-note { font-size: .78rem; color: var(--gray-5); margin-top: 8px; }
+#rm-photo-drop.drag-over, .ro-photo-big.drag-over { border-color: var(--navy); background: var(--gray-1); }

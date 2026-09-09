@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260907d">
+<link rel="stylesheet" href="css/style.css?v=20260910a">
 </head>
 <body>
 
@@ -899,7 +899,12 @@ document.addEventListener('DOMContentLoaded', function () {
     var box = document.getElementById('roster-area');
     Promise.all([
       SHSCloud.init().then(function (c) { return c.from('roster').select('*').order('sort').order('id'); }),
-      SHSCloud.init().then(function (c) { return c.from('sichals').select('name').order('sort'); })
+      SHSCloud.init().then(function (c) { return c.from('sichals').select('name').order('sort'); }),
+      /* 회원이 내 정보에서 직접 올린 사진 — 명단에 관리자 사진이 없을 때 대신 보여 준다 */
+      SHSCloud.init().then(function (c) {
+        return c.from('profiles').select('roster_id,photo_path')
+          .not('photo_path', 'is', null).not('roster_id', 'is', null);
+      }).catch(function () { return { data: [] }; })
     ]).then(function (rs) {
       var r = rs[0];
       if (r.error) {
@@ -908,6 +913,209 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       var rows = r.data || [];
       var sichalNames = ((rs[1] && rs[1].data) || []).map(function (x) { return x.name; });
+
+      /* ===== 회원 사진 =====
+       * 관리자가 올린 사진(roster.photo_path, roster/{id}/photo.jpg)이 먼저이고,
+       * 없으면 회원이 내 정보에서 직접 올린 사진(profiles.photo_path)을 대신 보여 준다.
+       * 비공개 보관소라 시간 제한 주소(1시간)를 한 번에 묶어 발급받는다. */
+      var selfPhoto = {};   /* roster_id → 본인이 올린 사진 경로 */
+      ((rs[2] && rs[2].data) || []).forEach(function (p) {
+        if (p.roster_id && p.photo_path && !selfPhoto[p.roster_id]) selfPhoto[p.roster_id] = p.photo_path;
+      });
+      function photoPathOf(m) { return m.photo_path || selfPhoto[m.id] || null; }
+
+      var photoUrl = {};    /* 경로 → 시간 제한 주소 */
+      var THUMB_EMPTY = '<svg viewBox="0 0 40 50" aria-hidden="true">' +
+        '<circle cx="20" cy="17" r="9" fill="#c9c6bd"/>' +
+        '<path d="M4 48c0-10 7-16 16-16s16 6 16 16z" fill="#c9c6bd"/></svg>';
+      function signPhotos(paths) {
+        var need = paths.filter(function (x, i) { return x && !photoUrl[x] && paths.indexOf(x) === i; });
+        if (!need.length) return Promise.resolve(photoUrl);
+        return SHSCloud.init().then(function (c) {
+          return c.storage.from('member-photos').createSignedUrls(need, 3600);
+        }).then(function (r) {
+          ((r && r.data) || []).forEach(function (x) {
+            if (x && x.path && x.signedUrl && !x.error) photoUrl[x.path] = x.signedUrl;
+          });
+          return photoUrl;
+        }).catch(function () { return photoUrl; });
+      }
+      /* 명단 표의 사진 칸 하나를 채운다 (없으면 빈 실루엣) */
+      function fillThumb(btn, path) {
+        if (!path || !photoUrl[path]) {
+          btn.innerHTML = THUMB_EMPTY;
+          btn.classList.remove('has');
+          btn.title = path ? '사진 파일을 찾지 못했습니다 — 눌러서 다시 올리기' : '사진 없음 — 눌러서 올리기';
+          return;
+        }
+        btn.innerHTML = '<img src="' + photoUrl[path] + '" alt="">';
+        btn.classList.add('has');
+        btn.title = '사진 크게 보기';
+      }
+      function loadThumbs() {
+        var btns = Array.prototype.slice.call(box.querySelectorAll('button.ro-thumb[data-path]'));
+        if (!btns.length) return;
+        signPhotos(btns.map(function (b) { return b.dataset.path; })).then(function () {
+          btns.forEach(function (b) { fillThumb(b, b.dataset.path); });
+        });
+      }
+      function refreshThumb(m) {
+        var b = box.querySelector('button.ro-thumb[data-rophoto="' + m.id + '"]');
+        if (!b) return Promise.resolve();
+        var path = photoPathOf(m);
+        if (path) b.dataset.path = path; else b.removeAttribute('data-path');
+        return signPhotos(path ? [path] : []).then(function () { fillThumb(b, path); });
+      }
+
+      /* 어떤 크기든 긴 변 900px 이하 jpg로 줄인다 (내 정보와 같은 방식) */
+      function photoShrink(f) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          var url = URL.createObjectURL(f);
+          img.onload = function () {
+            var MAX = 900;
+            var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+            var cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(img.naturalWidth * sc));
+            cv.height = Math.max(1, Math.round(img.naturalHeight * sc));
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            URL.revokeObjectURL(url);
+            cv.toBlob(function (b) {
+              if (b) resolve(b); else reject(new Error('사진을 변환하지 못했습니다.'));
+            }, 'image/jpeg', 0.85);
+          };
+          img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진 파일을 읽지 못했습니다.')); };
+          img.src = url;
+        });
+      }
+      /* 관리자가 대신 올린다: roster/{id}/photo.jpg 에 저장하고 명단에 경로를 적는다 */
+      function photoUpload(m, f) {
+        if (!f) return Promise.reject(new Error('사진 파일을 골라 주세요.'));
+        if (!/^image\//.test(f.type)) return Promise.reject(new Error('이미지 파일만 올릴 수 있습니다.'));
+        var path = 'roster/' + m.id + '/photo.jpg';
+        return photoShrink(f).then(function (blob) {
+          return SHSCloud.init().then(function (c) {
+            return c.storage.from('member-photos')
+              .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
+              .then(function (r) {
+                if (r.error) throw r.error;
+                return c.from('roster').update({ photo_path: path }).eq('id', m.id);
+              });
+          });
+        }).then(function (r2) {
+          if (r2 && r2.error) throw r2.error;
+          m.photo_path = path;
+          delete photoUrl[path];   /* 같은 경로에 새 파일 — 주소를 다시 받는다 */
+          SHSCloud.log('update', '회원 사진 등록(관리자)', m.name);
+          return refreshThumb(m).then(function () { return path; });
+        });
+      }
+      /* 명단에서 사진을 지운다 (파일도 함께) */
+      function photoRemove(m) {
+        var path = m.photo_path;
+        if (!path) return Promise.resolve();
+        return SHSCloud.init().then(function (c) {
+          return c.storage.from('member-photos').remove([path]).then(function () {
+            return c.from('roster').update({ photo_path: null }).eq('id', m.id);
+          });
+        }).then(function (r) {
+          if (r && r.error) throw r.error;
+          m.photo_path = null;
+          delete photoUrl[path];
+          if (selfPhoto[m.id] === path) delete selfPhoto[m.id];
+          SHSCloud.log('update', '회원 사진 삭제(관리자)', m.name);
+          return refreshThumb(m);
+        });
+      }
+      function pickPhoto(cb) {
+        var fin = document.createElement('input');
+        fin.type = 'file'; fin.accept = 'image/*';
+        fin.addEventListener('change', function () { cb(fin.files && fin.files[0]); });
+        fin.click();
+      }
+      /* 끌어다 놓기 — 칸 위에 올리면 테두리가 바뀌고, 놓으면 cb(파일) */
+      function bindDrop(el, cb) {
+        ['dragenter', 'dragover'].forEach(function (ev) {
+          el.addEventListener(ev, function (x) {
+            x.preventDefault(); x.stopPropagation(); el.classList.add('drag-over');
+          });
+        });
+        ['dragleave', 'drop'].forEach(function (ev) {
+          el.addEventListener(ev, function (x) {
+            x.preventDefault(); x.stopPropagation(); el.classList.remove('drag-over');
+          });
+        });
+        el.addEventListener('drop', function (x) {
+          cb(x.dataTransfer && x.dataTransfer.files && x.dataTransfer.files[0]);
+        });
+      }
+
+      /* 사진 크게 보기 — 명단의 사진 칸을 누르면 열린다. 여기서 올리고·바꾸고·지운다. */
+      function openRosterPhoto(m) {
+        var mo = adminModal(
+          '<h4 style="margin:0 0 12px;padding-right:28px">' + e(m.name) +
+          ' <span style="font-weight:400;color:var(--gray-6);font-size:0.9rem">' +
+          e(m.position || m.category || '') + (m.church ? ' · ' + e(m.church) : '') + '</span></h4>' +
+          '<div id="rp-box" class="ro-photo-big"></div>' +
+          '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+          '<button class="btn sm" id="rp-up" type="button">사진 올리기</button>' +
+          '<button class="btn danger sm hidden" id="rp-del" type="button">사진 지우기</button>' +
+          '<button class="btn ghost sm" id="rp-view" type="button" style="margin-left:auto">회원 정보 보기</button>' +
+          '</div><div class="form-msg" id="rp-msg"></div>', 440);
+        var bx = mo.ov.querySelector('#rp-box');
+        var up = mo.ov.querySelector('#rp-up');
+        var del = mo.ov.querySelector('#rp-del');
+        var msg = mo.ov.querySelector('#rp-msg');
+        function draw() {
+          var path = photoPathOf(m);
+          up.textContent = path ? '사진 바꾸기' : '사진 올리기';
+          del.classList.toggle('hidden', !m.photo_path);
+          if (!path) {
+            bx.innerHTML = '<div class="ro-photo-none">등록된 사진이 없습니다.<br>' +
+              '<span>눌러서 고르거나 사진 파일을 여기에 끌어다 놓으세요.</span></div>';
+            return;
+          }
+          bx.innerHTML = '<div class="ro-photo-none">불러오는 중…</div>';
+          signPhotos([path]).then(function () {
+            if (!photoUrl[path]) {
+              bx.innerHTML = '<div class="ro-photo-none">사진 파일을 찾지 못했습니다.<br>' +
+                '<span>눌러서 다시 올려 주세요.</span></div>';
+              return;
+            }
+            bx.innerHTML = '<img src="' + photoUrl[path] + '" alt="' + e(m.name) + '">' +
+              (m.photo_path ? '' : '<div class="ro-photo-note">회원이 내 정보에서 직접 올린 사진입니다. ' +
+                '새 사진을 올리면 그 사진이 명단에 쓰입니다.</div>');
+          });
+        }
+        function upload(f) {
+          if (!f) return;
+          msg.className = 'form-msg'; msg.textContent = '사진을 웹 크기로 줄여서 올리는 중입니다…';
+          photoUpload(m, f).then(function () {
+            msg.className = 'form-msg ok'; msg.textContent = '사진이 저장되었습니다.';
+            draw();
+          }).catch(function (err) {
+            msg.className = 'form-msg err'; msg.textContent = (err && err.message) || '사진을 올리지 못했습니다.';
+          });
+        }
+        draw();
+        bx.addEventListener('click', function (ev) {
+          if (ev.target && ev.target.closest('.ro-photo-none')) pickPhoto(upload);
+        });
+        bindDrop(bx, upload);
+        up.addEventListener('click', function () { pickPhoto(upload); });
+        del.addEventListener('click', function () {
+          if (!confirm(m.name + ' 님의 사진을 지우시겠습니까?')) return;
+          photoRemove(m).then(function () {
+            msg.className = 'form-msg ok'; msg.textContent = '사진을 지웠습니다.';
+            draw();
+          }).catch(function () {
+            msg.className = 'form-msg err'; msg.textContent = '사진을 지우지 못했습니다.';
+          });
+        });
+        mo.ov.querySelector('#rp-view').addEventListener('click', function () {
+          mo.close(); openRosterView(m);
+        });
+      }
       var hasOrg = rows.filter(function (m) { return m.category; }).length > 0;
 
       function catOptions(v) {
@@ -1000,6 +1208,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       /* 명단 표 — 읽기 전용. [수정]을 누르면 팝업에서 고친다. */
       html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th>' +
+        '<th style="width:52px">사진</th>' +
         '<th style="width:110px">성명</th>' +
         '<th style="width:110px;cursor:pointer;user-select:none" id="ro-th-pos"></th>' +
         '<th>소속 교회</th><th style="width:110px">시찰</th>' +
@@ -1018,6 +1227,9 @@ document.addEventListener('DOMContentLoaded', function () {
           ' data-days="' + days + '" data-pos="' + e(m.position || m.category || '') + '"' +
           ' data-idx="' + i + '">' +
           '<td class="ro-no">' + (i + 1) + '</td>' +
+          '<td class="ro-photo"><button type="button" class="ro-thumb" data-rophoto="' + m.id + '"' +
+          (photoPathOf(m) ? ' data-path="' + e(photoPathOf(m)) + '" title="사진 불러오는 중"' :
+            ' title="사진 없음 — 눌러서 올리기"') + '>' + THUMB_EMPTY + '</button></td>' +
           '<td><a data-roview="' + m.id + '" title="정보 보기" ' +
           'style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;' +
           'text-decoration-style:dotted;text-underline-offset:3px">' + e(m.name) + '</a></td>' +
@@ -1041,10 +1253,12 @@ document.addEventListener('DOMContentLoaded', function () {
       rosterFlash = '';
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">총 <strong>' + rows.length + '</strong>명' +
         '<span id="ro-count"></span>. ' +
-        '<strong>수정</strong>을 누르면 팝업에서 모든 정보를 고칠 수 있습니다. 모든 변경은 감사 기록에 남습니다.<br>' +
+        '<strong>수정</strong>을 누르면 팝업에서 모든 정보를 고칠 수 있습니다. ' +
+        '<strong>사진</strong> 칸을 누르면 크게 보이고, 그 창에서 올리거나 바꿀 수 있습니다. 모든 변경은 감사 기록에 남습니다.<br>' +
         '총회 정년은 만 70세(만 70세가 되는 해 생일 하루 전까지 시무)입니다. <strong>정년이 지난 정회원·임원은 ' +
         '<em>언권회원</em>으로 저절로 바뀝니다.</strong></p>';
       box.innerHTML = html;
+      loadThumbs();
 
       document.getElementById('ro-order').addEventListener('click', function () {
         var msg = document.getElementById('ro-ordmsg');
@@ -1307,66 +1521,31 @@ document.addEventListener('DOMContentLoaded', function () {
         autoGrade(null, document.getElementById('rm-cat'),
                   document.getElementById('rm-birth'), document.getElementById('rm-grade'));
 
-        /* ----- 회원 사진 (관리자가 대신 올린다) ----- */
+        /* ----- 회원 사진 (관리자가 대신 올린다) — 명단 표의 사진 칸과 같은 함수를 쓴다 ----- */
         (function () {
           var prev = document.getElementById('rm-photo-prev');
           var pmsg = document.getElementById('rm-photo-msg');
-          function showPhoto(path) {
+          function showPhoto() {
+            var path = photoPathOf(m);
             if (!path) { prev.textContent = '없음'; return; }
-            SHSCloud.init().then(function (c) {
-              return c.storage.from('member-photos').createSignedUrl(path, 300);
-            }).then(function (r) {
-              if (r.data && r.data.signedUrl) {
-                prev.innerHTML = '<img src="' + r.data.signedUrl +
-                  '" style="width:100%;height:100%;object-fit:cover" alt="사진">';
+            signPhotos([path]).then(function () {
+              if (!photoUrl[path]) { prev.textContent = '없음'; return; }
+              prev.innerHTML = '<img src="' + photoUrl[path] +
+                '" style="width:100%;height:100%;object-fit:cover" alt="사진">';
+              if (!m.photo_path && !pmsg.textContent) {
+                pmsg.className = 'form-msg';
+                pmsg.textContent = '회원이 내 정보에서 직접 올린 사진입니다. 새 사진을 올리면 그 사진이 명단에 쓰입니다.';
               }
-            }).catch(function () {});
-          }
-          showPhoto(m.photo_path);
-
-          /* 어떤 크기든 긴 변 900px 이하 jpg로 줄인다 (내 정보와 같은 방식) */
-          function shrink(f) {
-            return new Promise(function (resolve, reject) {
-              var img = new Image();
-              var url = URL.createObjectURL(f);
-              img.onload = function () {
-                var MAX = 900;
-                var sc = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
-                var cv = document.createElement('canvas');
-                cv.width = Math.max(1, Math.round(img.naturalWidth * sc));
-                cv.height = Math.max(1, Math.round(img.naturalHeight * sc));
-                cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-                URL.revokeObjectURL(url);
-                cv.toBlob(function (b) {
-                  if (b) resolve(b); else reject(new Error('사진을 변환하지 못했습니다.'));
-                }, 'image/jpeg', 0.85);
-              };
-              img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진 파일을 읽지 못했습니다.')); };
-              img.src = url;
             });
           }
+          showPhoto();
 
-          /* 파일 하나를 받아 웹 크기(긴 변 900px, jpg)로 줄여 올린다 */
           function uploadPhoto(f) {
             if (!f) return;
-            if (!/^image\//.test(f.type)) { pmsg.className = 'form-msg err'; pmsg.textContent = '이미지 파일만 올릴 수 있습니다.'; return; }
             pmsg.className = 'form-msg'; pmsg.textContent = '사진을 웹 크기로 줄여서 올리는 중입니다…';
-            var path = 'roster/' + m.id + '/photo.jpg';
-            shrink(f).then(function (blob) {
-              return SHSCloud.init().then(function (c) {
-                return c.storage.from('member-photos')
-                  .upload(path, blob, { upsert: true, contentType: 'image/jpeg' })
-                  .then(function (r) {
-                    if (r.error) throw r.error;
-                    return c.from('roster').update({ photo_path: path }).eq('id', m.id);
-                  });
-              });
-            }).then(function (r2) {
-              if (r2.error) throw r2.error;
-              m.photo_path = path;
-              SHSCloud.log('update', '회원 사진 등록(관리자)', m.name);
+            photoUpload(m, f).then(function () {
               pmsg.className = 'form-msg ok'; pmsg.textContent = '사진이 저장되었습니다.';
-              showPhoto(path);
+              showPhoto();
             }).catch(function (err) {
               pmsg.className = 'form-msg err'; pmsg.textContent = (err && err.message) || '사진을 올리지 못했습니다.';
             });
@@ -1375,40 +1554,17 @@ document.addEventListener('DOMContentLoaded', function () {
           var drop = document.getElementById('rm-photo-drop');
           drop.addEventListener('click', function (ev) {
             if (ev.target && ev.target.id === 'rm-photo-del') return;
-            var fin = document.createElement('input');
-            fin.type = 'file'; fin.accept = 'image/*';
-            fin.addEventListener('change', function () { uploadPhoto(fin.files && fin.files[0]); });
-            fin.click();
+            pickPhoto(uploadPhoto);
           });
-          ['dragenter', 'dragover'].forEach(function (ev) {
-            drop.addEventListener(ev, function (x) {
-              x.preventDefault(); x.stopPropagation();
-              drop.style.borderColor = 'var(--navy)'; drop.style.background = 'var(--gray-1,#f7f6f3)';
-            });
-          });
-          ['dragleave', 'drop'].forEach(function (ev) {
-            drop.addEventListener(ev, function (x) {
-              x.preventDefault(); x.stopPropagation();
-              drop.style.borderColor = ''; drop.style.background = '';
-            });
-          });
-          drop.addEventListener('drop', function (x) {
-            uploadPhoto(x.dataTransfer && x.dataTransfer.files && x.dataTransfer.files[0]);
-          });
+          bindDrop(drop, uploadPhoto);
 
           var pdel = document.getElementById('rm-photo-del');
           if (pdel) pdel.addEventListener('click', function () {
             if (!confirm(m.name + ' 님의 사진을 지우시겠습니까?')) return;
-            SHSCloud.init().then(function (c) {
-              return c.storage.from('member-photos').remove([m.photo_path]).then(function () {
-                return c.from('roster').update({ photo_path: null }).eq('id', m.id);
-              });
-            }).then(function () {
-              m.photo_path = null;
-              SHSCloud.log('update', '회원 사진 삭제(관리자)', m.name);
+            photoRemove(m).then(function () {
               pmsg.className = 'form-msg ok'; pmsg.textContent = '사진을 지웠습니다.';
-              prev.textContent = '없음';
               pdel.remove();
+              showPhoto();
             }).catch(function () {
               pmsg.className = 'form-msg err'; pmsg.textContent = '사진을 지우지 못했습니다.';
             });
@@ -1628,6 +1784,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
 
+      /* 사진 칸 — 누르면 크게 보기 (없으면 그 창에서 올린다) */
+      box.querySelectorAll('button.ro-thumb').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var m = rows.filter(function (x) { return String(x.id) === b.dataset.rophoto; })[0];
+          if (m) openRosterPhoto(m);
+        });
+      });
       box.querySelectorAll('button[data-roedit]').forEach(function (b) {
         b.addEventListener('click', function () {
           var m = rows.filter(function (x) { return String(x.id) === b.dataset.roedit; })[0];
@@ -1732,18 +1895,20 @@ document.addEventListener('DOMContentLoaded', function () {
         }).catch(function () {});
 
         /* 등록된 사진이 있으면 맨 위에 보여 준다 */
-        if (m.photo_path) {
-          SHSCloud.init().then(function (c) {
-            return c.storage.from('member-photos').createSignedUrl(m.photo_path, 300);
-          }).then(function (r) {
+        var vpath = photoPathOf(m);
+        if (vpath) {
+          signPhotos([vpath]).then(function () {
             var slot = mo.ov.querySelector('#rv-photo');
-            if (slot && r.data && r.data.signedUrl) {
-              slot.innerHTML = '<img src="' + r.data.signedUrl + '" alt="' + e(m.name) + '" ' +
-                'style="width:140px;height:175px;object-fit:cover;border-radius:12px;' +
+            if (slot && photoUrl[vpath]) {
+              slot.innerHTML = '<img src="' + photoUrl[vpath] + '" alt="' + e(m.name) + '" title="크게 보기" ' +
+                'style="width:140px;height:175px;object-fit:cover;border-radius:12px;cursor:zoom-in;' +
                 'box-shadow:0 6px 16px rgba(0,0,0,0.18)">';
               slot.classList.remove('hidden');
+              slot.querySelector('img').addEventListener('click', function () {
+                mo.close(); openRosterPhoto(m);
+              });
             }
-          }).catch(function () {});
+          });
         }
       }
       box.querySelectorAll('a[data-roview]').forEach(function (a) {
