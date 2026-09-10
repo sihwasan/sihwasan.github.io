@@ -929,13 +929,13 @@ document.addEventListener('DOMContentLoaded', function () {
         '<circle cx="20" cy="17" r="9" fill="#c9c6bd"/>' +
         '<path d="M4 48c0-10 7-16 16-16s16 6 16 16z" fill="#c9c6bd"/></svg>';
       function signPhotos(paths) {
-        var need = paths.filter(function (x, i) { return x && !photoUrl[x] && paths.indexOf(x) === i; });
+        var need = paths.filter(function (x, i) { return x && !(x in photoUrl) && paths.indexOf(x) === i; });
         if (!need.length) return Promise.resolve(photoUrl);
         return SHSCloud.init().then(function (c) {
           return c.storage.from('member-photos').createSignedUrls(need, 3600);
         }).then(function (r) {
           ((r && r.data) || []).forEach(function (x) {
-            if (x && x.path && x.signedUrl && !x.error) photoUrl[x.path] = x.signedUrl;
+            if (x && x.path) photoUrl[x.path] = (!x.error && x.signedUrl) || '';   /* 못 찾은 경로도 기억해 다시 묻지 않는다 */
           });
           return photoUrl;
         }).catch(function () { return photoUrl; });
