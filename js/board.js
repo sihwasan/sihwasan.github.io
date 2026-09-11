@@ -341,11 +341,13 @@ var SHSBoard = (function () {
      * 한눈에 보고, 고른 장부를 이 자리에서 살펴 감사필 처리와 회기 마감 승인을
      * 한다. 증빙(영수증·지급 확인)도 장부 안에서 바로 본다. (79 sql) */
     var auditYear = fyYear(), auditRows = [], auditWin = null, auditOpen = null;
-    var AUDIT_KIND = { presbytery: '노회 재정부', committee: '상비부', sichal: '시찰' };
+    var AUDIT_KIND = { presbytery: '노회 재정부', committee: '상비부', sichal: '시찰', ministers: '시찰 교역자회' };
     function auditLink(b) {
       if (b.owner_kind === 'presbytery') return 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84';
       if (b.owner_kind === 'committee') return 'committee.html?c=' + encodeURIComponent(b.owner) + '#lg';
-      return 'sichal.html?s=' + encodeURIComponent(b.owner);
+      /* 시찰회 장부 / 교역자회 장부 — 시찰 화면의 회계 관리 탭을 바로 연다 (sichal.html 의 ?acc=) */
+      return 'sichal.html?s=' + encodeURIComponent(b.owner) +
+        (b.owner_kind === 'ministers' ? '&acc=ministers' : '&acc=ledger') + '#ledger';
     }
     function loadAudit() {
       var card = document.getElementById('hub-card-audit');

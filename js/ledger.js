@@ -12,8 +12,9 @@
  * 감사가 끝난 장부는 고치거나 지울 수 없다. (막는 일은 데이터베이스가 한다)
  *
  *   SHSLedger.mount(자리, {
- *     kind:   'sichal' | 'committee' | 'presbytery',
- *     owner:  '북부시찰' | '재정부' | '노회',
+ *     kind:   'sichal' | 'ministers'(시찰 교역자회) | 'committee' | 'presbytery',
+ *     owner:  '북부시찰' | '재정부' | '노회',   (교역자회 장부의 owner 도 시찰 이름)
+ *     label:  화면·기록에 보일 이름 (없으면 owner, 교역자회는 '북부시찰 교역자회')
  *     user:   지금 로그인한 사람,
  *     isAuditor: 감사부인가,
  *     committees: 상비부 이름 목록 (노회 장부의 배정 상대)
@@ -30,7 +31,7 @@
  * 적을 수 있는 사람은 화면이 짐작하지 않고 데이터베이스에 물어본다.
  *   is_ledger_owner(종류, 이름)
  *     상비부 : 부장·서기·회계
- *     시찰   : 시찰장·서기·회계
+ *     시찰   : 시찰장·서기·회계 (교역자회 장부도 같다)
  * 그래야 화면에 보이는 것과 실제로 저장되는 것이 어긋나지 않는다.
  */
 var SHSLedger = (function () {
@@ -40,7 +41,7 @@ var SHSLedger = (function () {
 
   function esc(s) { return SHS.esc(s); }
   function won(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
-  function kindOf(k) { return ['committee', 'sichal', 'presbytery'].indexOf(k) >= 0 ? k : 'sichal'; }
+  function kindOf(k) { return ['committee', 'sichal', 'presbytery', 'ministers'].indexOf(k) >= 0 ? k : 'sichal'; }
 
   /* PDF 도구(html2pdf)는 처음 쓸 때 한 번만 내려받는다 */
   var pdfLoading = null;
@@ -154,6 +155,8 @@ var SHSLedger = (function () {
   function mount(box, opts) {
     if (!box) return;
     var ownerKind = kindOf(opts.kind);
+    /* 화면과 기록에 보일 이름 — 교역자회 장부는 owner(시찰 이름) 뒤에 '교역자회'를 붙인다 */
+    var ownerLabel = opts.label || (ownerKind === 'ministers' ? opts.owner + ' 교역자회' : opts.owner);
     /* 노회 장부는 과목을 고르고 적요를 따로 적는다. 상비부 배정도 여기서 한다. */
     var useCats = ownerKind === 'presbytery';
     var cats = { '수입': [], '지출': [] };   /* 과목 목록 (ledger_categories) */
@@ -498,7 +501,7 @@ var SHSLedger = (function () {
       bindReceipts(canWrite);
       if (canWrite) { bindOpening(); if (ledgerView) { bindEntryForm(); bindEntryList(); if (useCats) bindCats(); } }
       if (viewKind === 'receipts') bindArchive(canWrite);
-      if (viewKind === 'report') report(document.getElementById('lg-report'), { kind: opts.kind, owner: opts.owner, year: year });
+      if (viewKind === 'report') report(document.getElementById('lg-report'), { kind: opts.kind, owner: opts.owner, label: opts.label, year: year });
 
       /* 마감 취소 — 잘못 마감했을 때 임원이 되돌린다 */
       var ro = document.getElementById('lg-reopen');
@@ -509,12 +512,12 @@ var SHSLedger = (function () {
           return c.rpc('reopen_ledger_year', { p_book: book.id });
         }).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
-          SHSCloud.log('update', '회계연도 마감 취소', opts.owner + ' ' + year + ' 회계연도');
+          SHSCloud.log('update', '회계연도 마감 취소', ownerLabel + ' ' + year + ' 회계연도');
           load();
         });
       });
       SHSAuditMark.bind(document.getElementById('lg-audit'), {
-        kind: 'ledger_books', label: opts.owner + ' ' + year + '년 회계 장부', after: load
+        kind: 'ledger_books', label: ownerLabel + ' ' + year + '년 회계 장부', after: load
       });
 
       /* 회기 마감 승인 — 감사부장·서기가 누르면 그 자리에서 이월·잠금까지 된다 */
@@ -530,7 +533,7 @@ var SHSLedger = (function () {
           return c.rpc('approve_ledger_close', { p_book: book.id, p_opinion: op ? op.value.trim() : '' });
         }).then(function (r) {
           if (r.error) { cm.className = 'form-msg err'; cm.textContent = r.error.message; return; }
-          SHSCloud.log('update', '회기 마감 승인', opts.owner + ' ' + year + ' 회계연도 → 이월금 ' + won(r.data) + '원');
+          SHSCloud.log('update', '회기 마감 승인', ownerLabel + ' ' + year + ' 회계연도 → 이월금 ' + won(r.data) + '원');
           load();
         });
       });
@@ -544,7 +547,7 @@ var SHSLedger = (function () {
           return c.rpc('reject_ledger_close', { p_book: book.id, p_reason: reason.trim() });
         }).then(function (r) {
           if (r.error) { cm.className = 'form-msg err'; cm.textContent = r.error.message; return; }
-          SHSCloud.log('update', '회기 마감 반려', opts.owner + ' ' + year + ' 회계연도');
+          SHSCloud.log('update', '회기 마감 반려', ownerLabel + ' ' + year + ' 회계연도');
           load();
         });
       });
@@ -555,7 +558,7 @@ var SHSLedger = (function () {
           return c.rpc('cancel_ledger_close_request', { p_book: book.id });
         }).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
-          SHSCloud.log('update', '회기 마감 요청 취소', opts.owner + ' ' + year + ' 회계연도');
+          SHSCloud.log('update', '회기 마감 요청 취소', ownerLabel + ' ' + year + ' 회계연도');
           load();
         });
       });
@@ -661,7 +664,7 @@ var SHSLedger = (function () {
         }).then(function (r) {
           var w = SHS.wrote(r);
           if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
-          SHSCloud.log('create', '회계 장부 개설', opts.owner + ' ' + year + '년');
+          SHSCloud.log('create', '회계 장부 개설', ownerLabel + ' ' + year + '년');
           load();
         });
       });
@@ -680,7 +683,7 @@ var SHSLedger = (function () {
         }).then(function (r) {
           var w = SHS.wrote(r);
           if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
-          SHSCloud.log('update', '이월금 수정', opts.owner + ' ' + year + '년 → ' + won(open) + '원');
+          SHSCloud.log('update', '이월금 수정', ownerLabel + ' ' + year + '년 → ' + won(open) + '원');
           load();
         });
       });
@@ -693,7 +696,7 @@ var SHSLedger = (function () {
           return c.rpc('carry_over_balance', { p_book: book.id });
         }).then(function (r) {
           if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
-          SHSCloud.log('update', '지난해 잔액 이월', opts.owner + ' ' + year + '년 ← ' + won(r.data) + '원');
+          SHSCloud.log('update', '지난해 잔액 이월', ownerLabel + ' ' + year + '년 ← ' + won(r.data) + '원');
           load();
         });
       });
@@ -716,7 +719,7 @@ var SHSLedger = (function () {
             msg.textContent = r.error.message + ' (78_ledger_close_approval.sql 실행이 필요할 수 있습니다)';
             return;
           }
-          SHSCloud.log('update', '회기 마감 승인 요청', opts.owner + ' ' + year + ' 회계연도');
+          SHSCloud.log('update', '회기 마감 승인 요청', ownerLabel + ' ' + year + ' 회계연도');
           load();
         });
       });
@@ -967,7 +970,7 @@ var SHSLedger = (function () {
         return c.from('ledger_payouts').insert(rows);
       }).then(function (r) {
         if (r.error) { alert('항목은 저장되었지만 지급 확인을 적지 못했습니다: ' + r.error.message); return; }
-        SHSCloud.log('create', '지급 확인 등록', opts.owner + ' ' + year + '년 / 항목 ' + entryId + ' ' + n + '명');
+        SHSCloud.log('create', '지급 확인 등록', ownerLabel + ' ' + year + '년 / 항목 ' + entryId + ' ' + n + '명');
       });
     }
 
@@ -1182,7 +1185,7 @@ var SHSLedger = (function () {
         m.querySelector('#lg-mem-q').value = '';
         /* 시찰 장부는 그 시찰부터 보여 준다 */
         var scSel = m.querySelector('#lg-mem-sichal');
-        scSel.value = (opts.kind === 'sichal' && scs[opts.owner]) ? opts.owner : '';
+        scSel.value = ((opts.kind === 'sichal' || opts.kind === 'ministers') && scs[opts.owner]) ? opts.owner : '';
         applySource();
         m.classList.add('open');
       });
@@ -1280,7 +1283,7 @@ var SHSLedger = (function () {
           return c.from('ledger_payouts').insert(rows);
         }).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
-          SHSCloud.log('create', '지급 확인 등록', opts.owner + ' ' + year + '년 / 항목 ' + poEntry + ' ' + rows.length + '명');
+          SHSCloud.log('create', '지급 확인 등록', ownerLabel + ' ' + year + '년 / 항목 ' + poEntry + ' ' + rows.length + '명');
           load().then(renderPayoutModal);
         });
       }
@@ -1316,7 +1319,7 @@ var SHSLedger = (function () {
             }).eq('id', b.dataset.lgpook);
           }).then(function (r) {
             if (r.error) { alert(r.error.message); return; }
-            SHSCloud.log('update', '지급 수기 확인', opts.owner + ' ' + year + '년 / 지급 ' + b.dataset.lgpook);
+            SHSCloud.log('update', '지급 수기 확인', ownerLabel + ' ' + year + '년 / 지급 ' + b.dataset.lgpook);
             load().then(renderPayoutModal);
           });
         });
@@ -1341,7 +1344,7 @@ var SHSLedger = (function () {
             return c.from('ledger_payouts').delete().eq('id', b.dataset.lgpodel);
           }).then(function (r) {
             if (r.error) { alert(r.error.message); return; }
-            SHSCloud.log('delete', '지급 확인 삭제', opts.owner + ' ' + year + '년 / 지급 ' + b.dataset.lgpodel);
+            SHSCloud.log('delete', '지급 확인 삭제', ownerLabel + ' ' + year + '년 / 지급 ' + b.dataset.lgpodel);
             load().then(renderPayoutModal);
           });
         });
@@ -1409,7 +1412,7 @@ var SHSLedger = (function () {
       }).then(function (r) {
         var w = SHS.wrote(r);
         if (!w.ok) throw new Error(w.why);
-        SHSCloud.log('create', '영수증 등록', opts.owner + ' ' + year + '년 / 항목 ' + entryId);
+        SHSCloud.log('create', '영수증 등록', ownerLabel + ' ' + year + '년 / 항목 ' + entryId);
       });
     }
 
@@ -1556,7 +1559,7 @@ var SHSLedger = (function () {
           });
         }).then(function (res) {
           if (res.error) { alert(res.error.message); return; }
-          SHSCloud.log('delete', '영수증 삭제', opts.owner + ' ' + year + '년 / 항목 ' + lbEntry);
+          SHSCloud.log('delete', '영수증 삭제', ownerLabel + ' ' + year + '년 / 항목 ' + lbEntry);
           closeLb();
           load();
         });
@@ -1671,7 +1674,7 @@ var SHSLedger = (function () {
         }).then(function (r) {
           var w = SHS.wrote(r);
           if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
-          SHSCloud.log('create', '회계 과목 추가', opts.owner + ' ' + viewKind + ' / ' + name);
+          SHSCloud.log('create', '회계 과목 추가', ownerLabel + ' ' + viewKind + ' / ' + name);
           load();
         });
       });
@@ -1684,7 +1687,7 @@ var SHSLedger = (function () {
             return c.from('ledger_categories').delete().eq('id', r.id);
           }).then(function (res) {
             if (res.error) { alert(res.error.message); return; }
-            SHSCloud.log('delete', '회계 과목 삭제', opts.owner + ' ' + viewKind + ' / ' + r.name);
+            SHSCloud.log('delete', '회계 과목 삭제', ownerLabel + ' ' + viewKind + ' / ' + r.name);
             load();
           });
         });
@@ -1766,7 +1769,7 @@ var SHSLedger = (function () {
           var w = SHS.wrote(r);
           if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
           SHSCloud.log(id ? 'update' : 'create', '회계 ' + d.kind + ' ' + (id ? '수정' : '등록'),
-            opts.owner + ' ' + year + '년 / ' + d.title + ' ' + won(d.amount) + '원');
+            ownerLabel + ' ' + year + '년 / ' + d.title + ' ' + won(d.amount) + '원');
           var savedId = id || (r.data && r.data[0] && r.data[0].id);
           rememberCat(d.category).then(function () {
             return savedId ? savePayees(savedId) : null;
@@ -1833,7 +1836,7 @@ var SHSLedger = (function () {
             return c.from('ledger_entries').delete().eq('id', x.id);
           }).then(function (r) {
             if (r.error) { alert(r.error.message); return; }
-            SHSCloud.log('delete', '회계 항목 삭제', opts.owner + ' ' + year + '년 / ' + x.title);
+            SHSCloud.log('delete', '회계 항목 삭제', ownerLabel + ' ' + year + '년 / ' + x.title);
             load();
           });
         });
@@ -1853,6 +1856,8 @@ var SHSLedger = (function () {
   function report(box, opts) {
     if (!box) return;
     var ownerKind = kindOf(opts.kind);
+    /* 화면과 기록에 보일 이름 — 교역자회 장부는 owner(시찰 이름) 뒤에 '교역자회'를 붙인다 */
+    var ownerLabel = opts.label || (ownerKind === 'ministers' ? opts.owner + ' 교역자회' : opts.owner);
     var now0 = new Date();
     var year = parseInt(opts.year, 10) ||
       (now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1);
@@ -1997,7 +2002,7 @@ var SHSLedger = (function () {
       var t = '<div id="fr-sheet">' +
         '<h3 style="text-align:center;margin:6px 0 2px">재정보고서</h3>' +
         '<p style="text-align:center;font-size:0.84rem;color:var(--gray-6);margin:0 0 10px">' +
-        esc(opts.owner) + ' · ' + fyLabel(year) +
+        esc(ownerLabel) + ' · ' + fyLabel(year) +
         (book.closed_yn ? ' · 마감' : '') +
         (book.audited_yn ? ' · 감사필' : '') + '</p>' +
         catTable +
@@ -2099,7 +2104,7 @@ var SHSLedger = (function () {
           });
           return Promise.all(jobs).then(function (parts) {
             return '<div class="att-head"><h3>증빙 서류</h3>' +
-              '<p>' + esc(opts.owner) + ' · ' + fyLabel(year) + ' · 증빙 ' + ids.length + '건 — ' +
+              '<p>' + esc(ownerLabel) + ' · ' + fyLabel(year) + ' · 증빙 ' + ids.length + '건 — ' +
               '보고서의 [증빙 번호]와 같은 번호입니다. 회의비·거마비는 받는 분의 수령 확인이 영수증을 대신합니다.</p></div>' +
               parts.join('');
           });
@@ -2132,13 +2137,13 @@ var SHSLedger = (function () {
               var w = window.open('', '_blank', 'width=900,height=700');
               if (!w) { alert('인쇄 창이 막혔습니다. 팝업을 허용해 주세요.'); return; }
               w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">' +
-                '<title>재정보고서 - ' + esc(opts.owner) + '</title>' +
+                '<title>재정보고서 - ' + esc(ownerLabel) + '</title>' +
                 '<style>' + SHEET_CSS + '</style></head><body>' +
                 sheet.innerHTML + att + '</body></html>');
               w.document.close();
               w.focus();
               setTimeout(function () { w.print(); }, att ? 900 : 300);
-              if (window.SHSCloud) SHSCloud.log('view', '재정보고서 인쇄', opts.owner + ' ' + year + '년' + (att ? ' (증빙 포함)' : ''));
+              if (window.SHSCloud) SHSCloud.log('view', '재정보고서 인쇄', ownerLabel + ' ' + year + '년' + (att ? ' (증빙 포함)' : ''));
             });
           });
         });
@@ -2166,14 +2171,14 @@ var SHSLedger = (function () {
               window.scrollTo(0, 0);
               return html2pdf().set({
                 margin: 8,
-                filename: opts.owner + ' ' + year + ' 회계연도 재정보고서' + (withAtt ? ' (증빙 포함)' : '') + '.pdf',
+                filename: ownerLabel + ' ' + year + ' 회계연도 재정보고서' + (withAtt ? ' (증빙 포함)' : '') + '.pdf',
                 pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', 'h4', '.att-img'] },
                 html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true, scrollX: 0, scrollY: 0 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
               }).from(stage.firstElementChild.nextElementSibling || stage).save();
             }).then(function () {
               done();
-              if (window.SHSCloud) SHSCloud.log('view', '재정보고서 PDF 저장', opts.owner + ' ' + year + '년' + (withAtt ? ' (증빙 포함)' : ''));
+              if (window.SHSCloud) SHSCloud.log('view', '재정보고서 PDF 저장', ownerLabel + ' ' + year + '년' + (withAtt ? ' (증빙 포함)' : ''));
             }).catch(function (err) {
               done();
               alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
