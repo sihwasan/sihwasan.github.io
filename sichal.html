@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
   /* 교역자회(시찰 안 목사들의 모임) 임원 — 회장·서기·회계. 시찰장이 회원 명단의 「시찰위원 선정」에서 임명한다 (93 sql) */
   var minOfficers = [];
-  var isHead = false;      /* 내가 이 시찰의 시찰장인가 — 교역자회 임원 임명은 시찰장만 */
+  var isHead = false;      /* 교역자회 임원을 임명할 수 있는가 — 이 시찰의 시찰장 또는 최고관리자 (94 sql) */
   function minOff(pos) {
     var o = minOfficers.filter(function (x) { return x.position === pos; })[0];
     return o ? o.name + (o.church ? ' (' + o.church + ')' : '') : '-';
@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function () {
           /* 교역자회 임원과 시찰장 여부 (93 을 아직 실행하지 않았어도 넘어간다) */
           c.from('ministers_officers').select('*').eq('sichal', NAME)
             .then(function (x) { return x; }, function () { return { data: [] }; }),
-          c.rpc('is_sichal_head_strict', { p_sichal: NAME })
+          c.rpc('can_appoint_ministers', { p_sichal: NAME })
             .then(function (x) { return x; }, function () { return { data: false }; })
         ]);
       }).then(function (rs) {
@@ -956,9 +956,9 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<div class="notice-banner" style="text-align:left"><strong>교역자회 임원</strong> — ' +
       '회장 ' + e(minOff('회장')) + ' · 서기 ' + e(minOff('서기')) + ' · 회계 ' + e(minOff('회계')) +
       '<div style="font-size:0.84rem;color:var(--gray-6);margin-top:4px">교역자회는 시찰 안 목사들의 모임입니다. ' +
-      '임원은 <strong>시찰장</strong>이 아래 목사 명단의 「시찰위원 선정」 칸에서 임명하며, 회장은 시찰장과 따로 정합니다. ' +
+      '임원은 <strong>시찰장</strong>(또는 최고관리자)이 아래 목사 명단의 「시찰위원 선정」 칸에서 임명하며, 회장은 시찰장과 따로 정합니다. ' +
       '교역자회 서기·회계는 보통 시찰 서기·회계가 겸하고, 교역자회 회계장부와 교역자회비 납부 현황을 관리합니다.' +
-      (isHead ? ' <strong>시찰장으로 로그인하셨으므로 아래 칸에서 바로 고를 수 있습니다.</strong>' : '') +
+      (isHead ? ' <strong>임명 권한이 있는 계정으로 로그인하셨으므로 아래 칸에서 바로 고를 수 있습니다.</strong>' : '') +
       '</div></div>';
 
     /* 시찰위원 선정 칸 — 시찰장에게는 고르는 상자, 그 밖에는 직책 표시 */
@@ -1708,7 +1708,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="cm-officers" style="display:flex;flex-wrap:wrap;gap:6px 18px;font-size:0.9rem;margin:0 0 12px;' +
       'padding:8px 12px;border:1px solid var(--gray-2,#e8eaef);border-radius:8px;background:var(--gray-1,#f7f7f5)">' +
       officerLine(min) +
-      (min ? '<span style="color:var(--gray-5);font-size:0.82rem">교역자회 임원은 시찰장이 회원 명단에서 임명합니다 · 감사 대상 아님</span>' : '') +
+      (min ? '<span style="color:var(--gray-5);font-size:0.82rem">교역자회 임원은 시찰장(또는 최고관리자)이 회원 명단에서 임명합니다 · 감사 대상 아님</span>' : '') +
       '</div><div id="acc-ledger"></div>';
     var lg = document.getElementById('acc-ledger');
     var common = {
