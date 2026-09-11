@@ -956,7 +956,9 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<div class="notice-banner" style="text-align:left"><strong>교역자회 임원</strong> — ' +
       '회장 ' + e(minOff('회장')) + ' · 서기 ' + e(minOff('서기')) + ' · 회계 ' + e(minOff('회계')) +
       '<div style="font-size:0.84rem;color:var(--gray-6);margin-top:4px">교역자회는 시찰 안 목사들의 모임입니다. ' +
-      '임원은 <strong>시찰장</strong>(또는 최고관리자)이 아래 목사 명단의 「교역자회 임원 선정」 칸에서 임명하며, 회장은 시찰장과 따로 정합니다. ' +
+      '임원은 <strong>시찰장</strong>(또는 최고관리자)이 ' +
+      (isHead ? '아래 목사 명단의 「교역자회 임원 선정」 칸에서 ' : '') + '임명하며, 회장은 시찰장과 따로 정합니다. ' +
+      (isHead ? '' : '임명된 분은 아래 목사 명단의 「교역자회 임원」 칸에 표시됩니다. ') +
       '교역자회 서기·회계는 보통 시찰 서기·회계가 겸하고, 교역자회 회계장부와 교역자회비 납부 현황을 관리합니다.' +
       (isHead ? ' <strong>임명 권한이 있는 계정으로 로그인하셨으므로 아래 칸에서 바로 고를 수 있습니다.</strong>' : '') +
       '</div></div>';
@@ -1001,7 +1003,9 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th style="width:110px">직분</th><th>소속 교회</th>' +
         '<th style="width:130px;cursor:pointer;user-select:none' + (pastorSort ? ';color:var(--accent);font-weight:700' : '') + '" ' +
         'data-pasort title="' + paTitle + '">남은 임기' + paArrow + '</th>' +
-        (isPastorGroup ? '<th style="width:180px">교역자회 임원 선정</th>' : '<th style="width:160px">비고</th>') +
+        /* 임명 권한이 있는 시찰장·최고관리자에게는 <선정>, 다른 회원에게는 <교역자회 임원> */
+        (isPastorGroup ? '<th style="width:180px">' + (isHead ? '교역자회 임원 선정' : '교역자회 임원') + '</th>'
+                       : '<th style="width:160px">비고</th>') +
         '</tr></thead><tbody>';
       sorted(groups[g]).forEach(function (m) {
         var ch = churches.filter(function (x) { return x.name === m.church; })[0];
