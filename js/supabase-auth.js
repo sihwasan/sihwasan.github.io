@@ -91,7 +91,7 @@ var SHSCloud = (function () {
   }
 
   /* 성명·소속 교회를 등록하고 노회 명단과 대조하여 등급을 부여받는다. */
-  /* 생년월일은 정년(만 70세) 판정에 쓰이므로 등급을 정하기 전에 먼저 저장한다 */
+  /* 생년월일은 정년(만 71세) 판정에 쓰이므로 등급을 정하기 전에 먼저 저장한다 */
   function claimMembership(name, church, position, phone, birth) {
     return init().then(function (c) {
       if (!c) return { ok: false, msg: '서버에 연결할 수 없습니다.' };

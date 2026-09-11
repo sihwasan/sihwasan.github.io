@@ -23,10 +23,10 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907h"></script>
+<script src="js/main.js?v=20260911a"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
-<script src="js/my-payouts.js"></script>
+<script src="js/my-payouts.js?v=20260911a"></script>
 <script src="js/seal-maker.js?v=20260907b"></script>
 <script src="js/date-pick.js"></script>
 <script>
@@ -106,6 +106,9 @@ document.addEventListener('DOMContentLoaded', function () {
       : '성명 또는 소속 교회를 수정하면 노회 명단과 다시 대조하여 등급이 갱신됩니다.';
     html += '</div>';
 
+    /* 확인하지 않은 지급(회의비·거마비)이 있으면 여기 붉은 안내가 뜬다 (js/my-payouts.js) */
+    html += '<div id="payout-banner"></div>';
+
     /* 내 사진: 회원명단 카드에 보여진다 */
     html += '<h2>내 사진</h2>';
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
@@ -169,7 +172,8 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '<h2>노회에서 맡은 일</h2>';
     html += '<div id="duty-area" style="max-width:620px"></div>';
 
-    /* 회의비·거마비 수령 확인 — 재정부·상비부가 나를 받는 사람으로 적으면 여기에 뜬다 */
+    /* 회의비·거마비 수령 확인 — 재정부·상비부·시찰이 나를 받는 사람으로 적으면 여기에 뜬다.
+     * 확인 대기와 내가 확인한 내역(연도별)을 함께 보여 준다 */
     html += '<h2 id="payouts">지급 수령 확인</h2>';
     html += '<div id="payout-area" style="max-width:760px"></div>';
 
@@ -293,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }).catch(function () {});
     }
     SHSMyDuties.mount(document.getElementById('duty-area'), p);
-    SHSMyPayouts.mount(document.getElementById('payout-area'), p);
+    SHSMyPayouts.mount(document.getElementById('payout-area'), p, document.getElementById('payout-banner'));
     setupAuditSeal();
 
     /* ---------- 감사부장·감사부 서기: 내 도장을 감사필 도장으로 등록 ----------

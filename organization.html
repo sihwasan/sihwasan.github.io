@@ -177,7 +177,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907h"></script>
+<script src="js/main.js?v=20260911a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -587,13 +587,13 @@ document.addEventListener('DOMContentLoaded', function () {
     return m ? m[1] + '. ' + m[2] + '. ' + m[3] + '.' : String(d);
   }
 
-  /* 남은 임기: 총회 정년(만 70세)까지 남은 기간 */
+  /* 남은 임기: 총회 정년(만 71세)까지 남은 기간 */
   function fmtRemain(birth, retire) {
     if (!birth) return null;
     var rd = retire ? new Date(retire + 'T00:00:00') : SHS.retireDate(birth);
     if (!rd || isNaN(rd)) return null;
     var today = new Date(); today.setHours(0, 0, 0, 0);
-    if (rd < today) return '정년(만 70세) 경과';
+    if (rd < today) return '정년(만 71세) 경과';
     var months = (rd.getFullYear() - today.getFullYear()) * 12 + (rd.getMonth() - today.getMonth());
     if (rd.getDate() < today.getDate()) months--;
     var y = Math.floor(months / 12), mm = months % 12;

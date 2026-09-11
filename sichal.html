@@ -24,13 +24,13 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907h"></script>
+<script src="js/main.js?v=20260911a"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/minutes-box.js"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
-<script src="js/ledger.js?v=20260907s"></script>
+<script src="js/ledger.js?v=20260911a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -919,7 +919,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 : pastorSort === 'desc' ? '남은 임기 긴 순 (누르면 기본 순)'
                 : '누르면 남은 임기 짧은 순으로 정렬';
 
-    /* 남은 임기: 회원 명단의 생년월일로 정년(만 70세)까지 계산한다 */
+    /* 남은 임기: 회원 명단의 생년월일로 정년(만 71세)까지 계산한다 */
     function remainLabel(m) {
       var rd = SHS.retireDate(m.birth_date);
       if (!rd) return '<span style="color:var(--gray-5)">-</span>';
@@ -957,7 +957,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     h += '<p style="font-size:0.8rem;color:var(--gray-5)">사진을 누르면 크게 볼 수 있습니다. ' +
       '남은 임기는 회원 명단의 생년월일로 ' +
-      '총회 정년(만 70세)까지 계산한 값입니다. 생년월일이 없는 분은 -로 표시됩니다.</p>';
+      '총회 정년(만 71세)까지 계산한 값입니다. 생년월일이 없는 분은 -로 표시됩니다.</p>';
     box.innerHTML = h;
     loadThumbs(box);
     box.querySelectorAll('button.ro-thumb').forEach(function (b) {

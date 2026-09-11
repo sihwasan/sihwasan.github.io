@@ -46,7 +46,7 @@
       <input type="date" id="reg-birth" data-birth>
       <span style="display:block;font-size:0.82rem;color:var(--gray-5);margin-top:5px">
         손으로 <strong>1955-03-21</strong>처럼 적으셔도 되고, 아래 연·월·일을 굴려 고르셔도 됩니다.<br>
-        총회 정년이 <strong>만 70세</strong>이므로, 정회원 자격 확인을 위해 생년월일이 필요합니다.
+        총회 정년이 <strong>만 71세</strong>이므로, 정회원 자격 확인을 위해 생년월일이 필요합니다.
         적지 않으시면 정회원 등급이 부여되지 않고 승인대기 상태가 됩니다.
       </span>
     </div>
@@ -111,7 +111,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907h"></script>
+<script src="js/main.js?v=20260911a"></script>
 <script src="js/date-pick.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
       msg.className = 'form-msg err';
       msg.textContent = birthEl.value.trim()
         ? '생년월일을 알아볼 수 없습니다. 1955-03-21 처럼 적어 주세요.'
-        : '생년월일을 입력해 주세요. 총회 정년(만 70세) 확인에 필요합니다.';
+        : '생년월일을 입력해 주세요. 총회 정년(만 71세) 확인에 필요합니다.';
       birthEl.focus();
       return null;
     }

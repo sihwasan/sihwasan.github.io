@@ -1485,7 +1485,11 @@ var SHSLedger = (function () {
       }).catch(function (err) {
         f.__ocrTried = true;
         info.className = 'lg-ocr err';
-        info.innerHTML = '자동 읽기를 하지 못했습니다: ' + esc((err && err.message) || '') + ' <small>(사진은 그대로 올라갑니다)</small>';
+        info.innerHTML = '자동 읽기를 하지 못했습니다: ' + esc((err && err.message) || '') +
+          ' <small>(사진은 그대로 올라갑니다)</small> ' +
+          '<button type="button" class="btn ghost sm" id="lg-ocr-retry">다시 읽기</button>';
+        var rb = document.getElementById('lg-ocr-retry');
+        if (rb) rb.addEventListener('click', function () { prefillFromReceipt(f); });
       });
     }
     function bindDrop() {

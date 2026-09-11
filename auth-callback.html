@@ -25,7 +25,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907h"></script>
+<script src="js/main.js?v=20260911a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('cb-area');
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<input type="text" id="cb-etc" placeholder="소속 교회명"></div>' +
       '<div class="field"><label>생년월일</label><input type="date" id="cb-birth">' +
       '<span style="display:block;font-size:0.82rem;color:var(--gray-5);margin-top:5px">' +
-      '총회 정년이 <strong>만 70세</strong>이므로, 정회원 자격 확인을 위해 생년월일이 필요합니다. ' +
+      '총회 정년이 <strong>만 71세</strong>이므로, 정회원 자격 확인을 위해 생년월일이 필요합니다. ' +
       '적지 않으시면 승인대기 상태가 됩니다.</span></div>' +
       '<div class="field"><label>연락처 (선택)</label><input type="tel" id="cb-phone" placeholder="010-0000-0000"></div>' +
       '<button class="btn" id="cb-submit" style="width:100%">등록</button>' +
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       if (!birth) {
         msg.className = 'form-msg err';
-        msg.textContent = '생년월일을 입력해 주세요. 총회 정년(만 70세) 확인에 필요합니다.';
+        msg.textContent = '생년월일을 입력해 주세요. 총회 정년(만 71세) 확인에 필요합니다.';
         document.getElementById('cb-birth').focus();
         return;
       }

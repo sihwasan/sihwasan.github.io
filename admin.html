@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260907h"></script>
+<script src="js/main.js?v=20260911a"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
@@ -87,7 +87,9 @@ document.addEventListener('DOMContentLoaded', function () {
       html += '<table class="tbl"><thead><tr><th>이메일</th><th>성명</th><th>직분</th><th>소속</th>' +
         '<th style="width:150px">개인정보</th><th>등급</th>' +
         '<th style="width:110px">자격</th>' +
-        (canAppoint ? '<th style="width:200px">등급 임명</th>' : '') + '</tr></thead><tbody>';
+        (canAppoint ? '<th style="width:200px">등급 임명</th>' : '') +
+        /* 잘못 가입된 회원 삭제 — 최고관리자만 (90_delete_member.sql) */
+        (user.role === 'superadmin' ? '<th style="width:72px">삭제</th>' : '') + '</tr></thead><tbody>';
       visible.forEach(function (p) {
         var cur = gradeValue(p);
         var issue = SHS.membershipIssue(p);
@@ -114,16 +116,23 @@ document.addEventListener('DOMContentLoaded', function () {
             }).join('') +
             '</select> <button class="btn sm" data-cassign="' + e(p.id) + '">임명</button></td>';
         }
+        if (user.role === 'superadmin') {
+          html += '<td><button class="btn danger sm" data-cdelmem="' + e(p.id) + '" data-cname="' + e(p.name || p.email || '') + '"' +
+            ' title="이 회원의 로그인 계정과 회원 정보를 지웁니다">삭제</button></td>';
+        }
         html += '</tr>';
       });
       html += '</tbody></table>';
       html += '<p style="font-size:0.82rem;color:var(--gray-5)">' +
-        '· 총회 정년은 만 70세이며, 정년이 지나면 <strong>언권회원</strong>이 됩니다. 언권회원은 ' +
+        '· 총회 정년은 만 71세(2026-09 1년 연장)이며, 정년이 지나면 <strong>언권회원</strong>이 됩니다. 언권회원은 ' +
         '<strong>서류 발급·청원서·보고서 작성만 제한</strong>되고 그 밖의 활동은 정회원과 같습니다. ' +
         '정년·임기는 <strong>회원 신상관리</strong>에서 열람합니다.<br>' +
         '· 장로 총대는 다음 봄 정기노회까지 자격이 유지되며, 총대로 다시 등록되지 않으면 자격이 상실됩니다. ' +
         '총대 자격 관리는 <strong>장로 총대 자격</strong> 탭에서 합니다.<br>' +
-        '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.</p>';
+        '· 계정 삭제는 회원 본인이 내 정보에서 탈퇴하거나, 노회 사무실에서 처리합니다.' +
+        (user.role === 'superadmin'
+          ? ' 최고관리자는 잘못 가입된 회원을 <strong>삭제</strong> 단추로 지울 수 있습니다 (로그인 계정까지 지워지며, 지운 회원 정보는 따로 보관됩니다).'
+          : '') + '</p>';
 
       /* 노회 명단·상비부 관리 영역
        * 회원 신상관리 안에서 전체회원 / 목사회원 / 장로회원으로 나누고,
@@ -252,6 +261,48 @@ document.addEventListener('DOMContentLoaded', function () {
           });
         });
       });
+      /* 회원 삭제 (최고관리자) — 등급과 상관없이 잘못 가입된 회원을 지운다.
+       * 계정이 지워지면 사진 파일을 지울 사람이 없으므로 사진을 먼저 지우고 계정을 지운다. (90_delete_member.sql) */
+      area.querySelectorAll('button[data-cdelmem]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var id = b.dataset.cdelmem;
+          var p = rows.filter(function (x) { return String(x.id) === id; })[0];
+          if (!p) return;
+          var label = (p.name || '') + (p.email ? ' <' + p.email + '>' : '');
+          if (!confirm('"' + label + '" 회원을 삭제하시겠습니까?\n\n' +
+                       '로그인 계정과 회원 정보·알림·도장이 함께 지워지며 되돌릴 수 없습니다.\n' +
+                       '(노회 명단의 이름은 그대로 남고, 지운 회원의 정보는 따로 보관됩니다)')) return;
+          var typed = prompt('확인을 위해 이 회원의 성명을 그대로 적어 주세요.', '');
+          if (typed === null) return;
+          if (String(typed || '').trim() !== String(p.name || '').trim()) {
+            alert('성명이 일치하지 않아 삭제하지 않았습니다.');
+            return;
+          }
+          var reason = prompt('삭제 사유를 적어 주세요.', '노회와 관계없는 가입');
+          if (reason === null) return;
+          reason = String(reason || '').trim();
+          b.disabled = true; b.textContent = '삭제 중…';
+          SHSCloud.init().then(function (c) {
+            var paths = [id + '/photo.jpg'];
+            if (p.photo_path && paths.indexOf(p.photo_path) === -1) paths.push(p.photo_path);
+            return c.storage.from('member-photos').remove(paths)
+              .then(function () { return c; }, function () { return c; });
+          }).then(function (c) {
+            return c.rpc('delete_member', { p_id: id, p_reason: reason || null });
+          }).then(function (res) {
+            if (res.error) {
+              alert('삭제하지 못했습니다: ' + res.error.message);
+              b.disabled = false; b.textContent = '삭제';
+              return;
+            }
+            SHSCloud.log('delete', '회원 삭제(최고관리자)', label + (reason ? ' — ' + reason : ''));
+            alert(res.data === 'profile_only'
+              ? '회원 정보를 지웠습니다. (로그인 계정은 남아 있어 다시 로그인하면 승인대기로 올라옵니다)'
+              : '삭제되었습니다.');
+            renderCloud();
+          });
+        });
+      });
       area.querySelectorAll('button[data-cassign]').forEach(function (b) {
         b.addEventListener('click', function () {
           var sel = area.querySelector('select[data-crole="' + b.dataset.cassign + '"]');
@@ -329,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var GRADES = [
     { v: 'pending', t: '승인대기', role: 'pending', title: null },
     { v: 'general', t: '일반회원', role: 'general', title: null },
-    /* 총회 정년(만 70세)이 지나면 정회원·임원은 언권회원이 된다 */
+    /* 총회 정년(만 71세)이 지나면 정회원·임원은 언권회원이 된다 */
     { v: 'advisory', t: '언권회원', role: 'advisory', title: null },
     { v: 'member', t: '정회원', role: 'member', title: null },
     { v: 'staff', t: '간사', role: 'staff', title: '간사' },
@@ -368,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var ROSTER_ROLES = { member: '정회원', general: '일반회원', advisory: '언권회원', officer: '임원',
                        president: '노회장', clerk: '서기', staff: '간사', pending: '승인대기' };
 
-  /* 정년(만 70세)이 지났는가 — SHS 의 판정을 그대로 쓴다 */
+  /* 정년(만 71세)이 지났는가 — SHS 의 판정을 그대로 쓴다 */
   function overAge(birth) {
     return SHS.isRetired(birth);
   }
@@ -1182,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var g = parseGrade(t);
         return g.title || ROSTER_ROLES[g.role] || g.role || '정회원';
       }
-      /* 남은 임기: 목사·장로 모두 생년월일에 따라 정년(만 70세)까지 */
+      /* 남은 임기: 목사·장로 모두 생년월일에 따라 정년(만 71세)까지 */
       function remainLabel(m) {
         var today = new Date();
         var rd = SHS.retireDate(m.birth_date);
@@ -1255,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<span id="ro-count"></span>. ' +
         '<strong>수정</strong>을 누르면 팝업에서 모든 정보를 고칠 수 있습니다. ' +
         '<strong>사진</strong> 칸을 누르면 크게 보이고, 그 창에서 올리거나 바꿀 수 있습니다. 모든 변경은 감사 기록에 남습니다.<br>' +
-        '총회 정년은 만 70세(만 70세가 되는 해 생일 하루 전까지 시무)입니다. <strong>정년이 지난 정회원·임원은 ' +
+        '총회 정년은 만 71세(만 71세가 되는 생일 하루 전까지 시무)입니다. <strong>정년이 지난 정회원·임원은 ' +
         '<em>언권회원</em>으로 저절로 바뀝니다.</strong></p>';
       box.innerHTML = html;
       loadThumbs();
@@ -1383,7 +1434,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
 
       /* 직분·생년월일을 고치면 등급을 규정대로 맞춰 준다.
-       * 정년(만 70세)이 지나면 언권회원, 직원은 간사(관리자).
+       * 정년(만 71세)이 지나면 언권회원, 직원은 간사(관리자).
        * 관리자가 그 뒤에 등급 칸을 직접 바꾸면 그 값이 저장된다. */
       function autoGrade(scope, catEl, birthEl, gradeEl) {
         function tune() {
@@ -1923,7 +1974,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- 장로 총대 관리 ----------
    * 근거: 노회규칙 제16조 2항 (노회총대는 당회장이 제출한다)
-   * 정년(만 70세)과 자격 기간을 두고, 교체되지 않으면 1년씩 자동 연장된다. */
+   * 정년(만 71세)과 자격 기간을 두고, 교체되지 않으면 1년씩 자동 연장된다. */
   /* ---------- 회기(會期) ----------
    * 노회는 정기회마다 회기가 바뀐다. 총대 자격 기간은 날짜가 아니라
    * 회기로 정하는 것이 노회 실무에 맞으므로, 화면에서는 회기로 고르고
@@ -2019,7 +2070,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field"><label>검색</label>' +
           '<input type="text" data-sefq placeholder="교회·성명으로 찾기"></div></div>';
         /* 장로 표는 성명·소속 교회·시찰·장립일까지 공통이고,
-         * 원로장로는 추대일을, 그 밖에는 정년(만 70세)을 보여 준다 */
+         * 원로장로는 추대일을, 그 밖에는 정년(만 71세)을 보여 준다 */
         var today2 = new Date();
         function retireCell(birth) {
           var rd = SHS.retireDate(birth);
@@ -2325,7 +2376,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- 장로 총대 자격 ----------
    * 근거: 노회규칙 제16조 2항 (노회총대는 당회장이 제출한다)
-   * 정년(만 70세)과 자격 회기를 두고, 교체되지 않으면 자동 연장된다. */
+   * 정년(만 71세)과 자격 회기를 두고, 교체되지 않으면 자동 연장된다. */
   function renderElders() {
     var box = document.getElementById('elder-area');
     if (!box) return;
@@ -2380,7 +2431,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var h = '<div class="notice-banner">노회규칙 제16조 2항에 따라 장로 총대는 당회장이 제출합니다. ' +
         '자격은 <strong>회기</strong>로 정하며, 지금은 <strong>제' + SESSIONS.current + '회기</strong>입니다. ' +
-        '교체되지 않은 총대는 다음 회기에 자격이 자동 연장되고, 정년(만 70세)이 지난 분은 연장되지 않습니다.' +
+        '교체되지 않은 총대는 다음 회기에 자격이 자동 연장되고, 정년(만 71세)이 지난 분은 연장되지 않습니다.' +
         (expiring ? ' <strong>지금 자격이 만료된 총대 ' + expiring + '명</strong>' : '') +
         '</div>';
 
