@@ -311,12 +311,15 @@ var SHSLedger = (function () {
       var canWrite = canEdit && !lock && !closed;
       var s = sums();
 
-      var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
-        '회계연도는 <strong>4월부터 다음 해 3월까지</strong>이며, 회계연도 마감을 누르면 ' +
-        '남은 돈이 다음 회계연도 이월금으로 저절로 넘어갑니다. ' +
-        (noAudit
-          ? '<strong>교역자회 장부는 시찰 안 목사들의 모임 장부로 감사를 받지 않으며</strong>, 회계연도 마감은 회계가 직접 합니다.'
-          : '<strong>봄·가을 정기노회 전에 감사부의 감사를 받습니다.</strong>') + '</p>';
+      var h = noAudit
+        ? '<p style="color:var(--gray-5);font-size:0.88rem">' +
+          '<strong>' + esc(ownerLabel) + '</strong> 장부입니다. 회계연도는 <strong>4월부터 다음 해 3월까지</strong>이며, ' +
+          '「회계연도 마감」을 누르면 남은 돈이 다음 회계연도 이월금으로 저절로 넘어갑니다. ' +
+          '교역자회는 시찰 안 목사들의 모임이므로 이 장부는 <strong>감사 대상이 아닙니다</strong>.</p>'
+        : '<p style="color:var(--gray-5);font-size:0.88rem">' +
+          '회계연도는 <strong>4월부터 다음 해 3월까지</strong>이며, 회계연도 마감을 누르면 ' +
+          '남은 돈이 다음 회계연도 이월금으로 저절로 넘어갑니다. ' +
+          '<strong>봄·가을 정기노회 전에 감사부의 감사를 받습니다.</strong></p>';
 
       h += '<div class="inline-form" style="margin-bottom:6px">' +
         '<div class="field" style="flex:0 0 260px"><label>회계 연도</label>' +

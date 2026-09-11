@@ -30,7 +30,7 @@
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/minutes-box.js"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
-<script src="js/ledger.js?v=20260911c"></script>
+<script src="js/ledger.js?v=20260911d"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -1638,19 +1638,21 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ================= 회계 관리 =================
    * 회비 납부 현황과 회계 장부를 탭으로 나눠 보여 준다.
    *   회비 납부 현황 : 시찰회비(한 해 두 차례, 상·하반기) / 교역자회비(한 해 한 번, 시찰회비 1회분)
+   *                    — 두 회비를 각각 상자로 나눠 한 화면에 함께 보인다
    *   회계 장부      : 시찰회 회계장부(owner_kind sichal) / 교역자회 회계장부(owner_kind ministers)
    *                    — 서로 다른 장부이며, 각 회비의 납부 기록은 제 장부에 수입으로 자동 연동된다.
+   *                    교역자회 장부는 감사를 받지 않는다 (93 sql)
    * 시찰회비 1회분은 노회 상회비 한 달치이며 시찰회가 따로 정할 수 있다. (50·51·60·92 sql) */
   var accTab = 'fee';        /* fee | ledger(시찰회 장부) | ministers(교역자회 장부) | report | mreport */
-  var feeTab = 'sichal';     /* 회비 납부 현황 안: sichal(시찰회비) | ministers(교역자회비) */
-  var feeFilter = 'all';     /* 회비 납부 현황 필터: all | full(완납) | late(미납) */
+  var feeFocus = null;       /* 'ministers' 면 회비 화면을 열 때 교역자회비 상자로 내려간다 (?acc=mfee) */
+  var feeFilter = { sichal: 'all', ministers: 'all' };   /* 상자마다: all | full(완납) | late(미납) */
   /* 대시보드 감사함 등에서 ?acc=ministers 로 오면 교역자회 장부를 바로 연다 */
   (function () {
     var m = location.search.match(/[?&]acc=(\w+)/);
     var v = m ? m[1] : '';
     if (v === 'ministers') accTab = 'ministers';
     else if (v === 'ledger') accTab = 'ledger';
-    else if (v === 'mfee') { accTab = 'fee'; feeTab = 'ministers'; }
+    else if (v === 'mfee') { accTab = 'fee'; feeFocus = 'ministers'; }
   })();
 
   /* 시찰 회계인가 — 시찰 명부의 회계 이름과 내 이름이 같으면 */
@@ -1659,12 +1661,22 @@ document.addEventListener('DOMContentLoaded', function () {
     return !!t && t === String(user.name || '').trim();
   }
 
+  /* 임원 표기 — 시찰회(시찰장·서기·회계) / 교역자회(회장·서기·회계) */
+  function officerLine(min) {
+    return min
+      ? '<span><strong>교역자회 회장</strong> ' + e(minOff('회장')) + '</span>' +
+        '<span><strong>교역자회 서기</strong> ' + e(minOff('서기')) + '</span>' +
+        '<span><strong>교역자회 회계</strong> ' + e(minOff('회계')) + '</span>'
+      : '<span><strong>시찰장</strong> ' + e(sic.head || '-') + '</span>' +
+        '<span><strong>서기</strong> ' + e(sic.clerk || '-') + '</span>' +
+        '<span><strong>회계</strong> ' + e(sic.treasurer || '-') + '</span>';
+  }
+
   function drawLedger() {
     var body = document.getElementById('si-body');
-    /* 장부 열람·기록은 시찰 임원(시찰장·서기·회계)과 감사부가 한다.
-     * 재정보고서는 시찰 회원 누구나 상시로 열람한다. */
     /* 시찰회 장부 : 시찰 임원(시찰장·서기·회계)과 감사부.
-     * 교역자회 장부: 시찰 임원과 교역자회 임원(회장·서기·회계). 감사를 받지 않으므로 감사부는 아니다. */
+     * 교역자회 장부: 시찰 임원과 교역자회 임원(회장·서기·회계). 감사를 받지 않으므로 감사부는 아니다.
+     * 재정보고서는 시찰 회원 누구나 상시로 열람한다. */
     var canBook = isOfficer || isTreasurer() || isAuditor;
     var canMin  = isOfficer || isTreasurer() || isMinOfficer();
     if (!canBook && accTab === 'ledger') accTab = 'report';
@@ -1687,39 +1699,43 @@ document.addEventListener('DOMContentLoaded', function () {
         drawLedger();
       });
     });
+    if (accTab === 'fee') { drawFees(); return; }
+
+    /* 장부 위에 그 장부를 맡은 임원을 적어 둔다 */
     var el = document.getElementById('acc-body');
+    var min = accTab === 'ministers' || accTab === 'mreport';
+    el.innerHTML =
+      '<div class="cm-officers" style="display:flex;flex-wrap:wrap;gap:6px 18px;font-size:0.9rem;margin:0 0 12px;' +
+      'padding:8px 12px;border:1px solid var(--gray-2,#e8eaef);border-radius:8px;background:var(--gray-1,#f7f7f5)">' +
+      officerLine(min) +
+      (min ? '<span style="color:var(--gray-5);font-size:0.82rem">교역자회 임원은 시찰장이 회원 명단에서 임명합니다 · 감사 대상 아님</span>' : '') +
+      '</div><div id="acc-ledger"></div>';
+    var lg = document.getElementById('acc-ledger');
     var common = {
       owner: NAME, user: user,
       canEdit: isOfficer || isTreasurer(), isAuditor: isAuditor,
       churches: churches.map(function (x) { return x.name; })
     };
     if (accTab === 'ledger') {
-      SHSLedger.mount(el, Object.assign({ kind: 'sichal' }, common));
+      SHSLedger.mount(lg, Object.assign({ kind: 'sichal' }, common));
     } else if (accTab === 'ministers') {
-      SHSLedger.mount(el, Object.assign({}, common, {
+      SHSLedger.mount(lg, Object.assign({}, common, {
         kind: 'ministers', label: NAME + ' 교역자회',
         canEdit: isOfficer || isTreasurer() || isMinOfficer(), isAuditor: false
       }));
     } else if (accTab === 'report') {
-      SHSLedger.report(el, { kind: 'sichal', owner: NAME });
+      SHSLedger.report(lg, { kind: 'sichal', owner: NAME });
     } else if (accTab === 'mreport') {
-      SHSLedger.report(el, { kind: 'ministers', owner: NAME, label: NAME + ' 교역자회' });
-    } else {
-      drawFees();
+      SHSLedger.report(lg, { kind: 'ministers', owner: NAME, label: NAME + ' 교역자회' });
     }
   }
 
   /* ---------- 회비 납부 현황 ----------
-   * 시찰회비(상·하반기)와 교역자회비(연 1회)를 곁 탭으로 나눠 보여 준다.
+   * 시찰회비(상·하반기)와 교역자회비(연 1회)를 각각 상자로 나눠 함께 보여 준다.
    * 두 회비의 기준액은 같다 — 노회 상회비 한 달치 또는 시찰회가 정한 1회분.
-   * 입력·수정: 노회 관리자, 시찰장·서기, 시찰 회계 (서버 규칙과 같다) */
+   * 입력·수정: 노회 관리자, 시찰장·서기, 시찰 회계. 교역자회비는 교역자회 임원도 (서버 규칙과 같다) */
   function drawFees() {
     var box = document.getElementById('acc-body');
-    var isMin = feeTab === 'ministers';
-    /* 교역자회비는 교역자회 임원(회장·서기·회계)도 적는다 */
-    var canFee = isOfficer || isTreasurer() || (isMin && isMinOfficer());
-    var FEE_NAME = isMin ? '교역자회비' : '시찰회비';
-    var BOOK_NAME = NAME + (isMin ? ' 교역자회 회계장부' : ' 시찰회 회계장부');
     db().then(function (c) {
       return Promise.all([
         c.rpc('sichal_finance_detail', { p_year: fyYear, p_sichal: NAME })
@@ -1779,117 +1795,152 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div style="height:100%;width:' + Math.min(100, pct) + '%;background:' + color + '"></div></div></div>';
       }
 
-      /* 시찰회비 / 교역자회비 곁 탭 */
-      var h = '<div class="tabs" id="fee-tabs" style="margin-bottom:12px">' +
-        '<button class="' + (!isMin ? 'active' : '') + '" data-ft="sichal">시찰회비 <span style="font-weight:400;font-size:0.8rem">(상·하반기)</span></button>' +
-        '<button class="' + (isMin ? 'active' : '') + '" data-ft="ministers">교역자회비 <span style="font-weight:400;font-size:0.8rem">(연 1회)</span></button>' +
-        '</div>';
-
-      if (!isMin) {
-        h += '<div class="notice-banner">시찰회비는 한 해에 <strong>상반기·하반기 두 차례</strong> 내며, ' +
-          '따로 정하지 않으면 1회분은 <strong>노회 상회비 한 달치</strong>를 기준으로 합니다. ' +
-          '금액은 <strong>시찰회가 정할 수 있습니다</strong>.' +
-          (canFee ? ' 기준액의 수정 단추로 회비를 바꾸고, 납부를 누르면 달력에서 납부 날짜를 골라 기록합니다. ' +
-                    '납부 기록은 <strong>시찰회 회계장부에 수입으로 자동 반영</strong>됩니다.'
-                  : ' 입력·수정은 시찰장·서기·회계가 합니다.') +
-          '</div>';
-        h += '<div class="dues-stats" style="margin-bottom:14px">' +
-          '<div class="ds"><div class="n">' + n1 + '/' + names.length + '곳</div><div class="l">상반기 납부 (' + sum1.toLocaleString('ko-KR') + '만원)</div></div>' +
-          '<div class="ds"><div class="n">' + n2 + '/' + names.length + '곳</div><div class="l">하반기 납부 (' + sum2.toLocaleString('ko-KR') + '만원)</div></div>' +
-          '</div>';
-        /* 납부율 그래프 — 상회비 진행률과 같은 붉은 계열 막대 */
-        h += '<div style="display:flex;gap:16px;flex-wrap:wrap;max-width:760px;margin-bottom:16px">' +
-          feeBar('상반기 납부율', n1, names.length, '#b03a3a') +
-          feeBar('하반기 납부율', n2, names.length, '#d97b6c') +
-          '</div>';
-      } else {
-        h += '<div class="notice-banner">교역자회비는 <strong>한 해에 한 번</strong> 내며, 금액은 <strong>시찰회비 1회분</strong>(기준액)과 같습니다. ' +
-          '기준액은 <strong>시찰회비</strong> 탭에서 정합니다.' +
-          (canFee ? ' 납부를 누르면 달력에서 납부 날짜를 골라 기록하며, ' +
-                    '납부 기록은 <strong>교역자회 회계장부에 수입으로 자동 반영</strong>됩니다.'
-                  : ' 입력·수정은 시찰장·서기·회계가 합니다.') +
-          '</div>';
-        h += '<div class="dues-stats" style="margin-bottom:14px">' +
-          '<div class="ds"><div class="n">' + mn + '/' + names.length + '곳</div><div class="l">교역자회비 납부 (' + msum.toLocaleString('ko-KR') + '만원)</div></div>' +
-          '<div class="ds"><div class="n">' + (names.length - mn) + '곳</div><div class="l">미납</div></div>' +
-          '</div>';
-        h += '<div style="display:flex;gap:16px;flex-wrap:wrap;max-width:760px;margin-bottom:16px">' +
-          feeBar('교역자회비 납부율', mn, names.length, '#17335f') +
-          '</div>';
+      /* 완납 / 미납 — 시찰회비는 상·하반기 모두, 교역자회비는 한 번 납부가 완납 */
+      function lists(key) {
+        var isMin = key === 'ministers';
+        var full = names.filter(function (nm) { return isMin ? !!mfeeOf(nm) : !!(feeOf(nm, 1) && feeOf(nm, 2)); });
+        var late = names.filter(function (nm) { return full.indexOf(nm) === -1; });
+        var f = feeFilter[key] || 'all';
+        return { full: full, late: late, shown: f === 'full' ? full : (f === 'late' ? late : names), filter: f };
       }
 
-      /* 완납 / 미납 필터 — 시찰회비는 상·하반기 모두, 교역자회비는 한 번 납부가 완납 */
-      var fullNames = names.filter(function (nm) { return isMin ? !!mfeeOf(nm) : !!(feeOf(nm, 1) && feeOf(nm, 2)); });
-      var lateNames = names.filter(function (nm) { return fullNames.indexOf(nm) === -1; });
-      var shown = feeFilter === 'full' ? fullNames : (feeFilter === 'late' ? lateNames : names);
-      h += '<div style="display:flex;gap:8px;justify-content:flex-end;max-width:760px;margin:0 0 6px">' +
-        '<button class="btn ghost sm" id="fee-print">인쇄</button>' +
-        '<button class="btn ghost sm" id="fee-pdf">PDF 저장</button></div>';
-      h += '<div class="tabs" style="margin-bottom:10px" id="fee-filter">' +
-        '<button class="' + (feeFilter === 'all' ? 'active' : '') + '" data-ff="all">전체 ' + names.length + '</button>' +
-        '<button class="' + (feeFilter === 'full' ? 'active' : '') + '" data-ff="full">' + (isMin ? '납부' : '완납') + ' ' + fullNames.length + '</button>' +
-        '<button class="' + (feeFilter === 'late' ? 'active' : '') + '" data-ff="late">미납 ' + lateNames.length + '</button>' +
-        '</div>';
+      /* 한 회비의 상자 — key: 'sichal' | 'ministers'. 상자마다 색·임원·통계·필터·표가 따로 있다 */
+      function section(key) {
+        var isMin = key === 'ministers';
+        var color = isMin ? '#8a6a1f' : '#17335f';
+        var canFee = isOfficer || isTreasurer() || (isMin && isMinOfficer());
+        var L = lists(key);
+        var h = '<section class="fee-box" id="fee-box-' + key + '" style="border:2px solid ' + color + ';border-radius:10px;' +
+          'background:#fff;margin:0 0 24px;overflow:hidden">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 14px;' +
+          'padding:10px 16px;background:' + color + ';color:#fff">' +
+          '<div><strong style="font-size:1.05rem">' + (isMin ? '교역자회비' : '시찰회비') + '</strong> ' +
+          '<span style="opacity:.85;font-size:0.86rem">' + (isMin ? '한 해 한 번 · 시찰회비 1회분' : '한 해 두 차례 · 상반기·하반기') + '</span></div>' +
+          '<div style="font-size:0.84rem;opacity:.95">' +
+          (isMin
+            ? '교역자회 회장 <strong>' + e(minOff('회장')) + '</strong> · 서기 <strong>' + e(minOff('서기')) + '</strong> · 회계 <strong>' + e(minOff('회계')) + '</strong>'
+            : '시찰장 <strong>' + e(sic.head || '-') + '</strong> · 서기 <strong>' + e(sic.clerk || '-') + '</strong> · 회계 <strong>' + e(sic.treasurer || '-') + '</strong>') +
+          '</div></div>' +
+          '<div style="padding:14px 16px 12px">';
 
-      h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:760px"><thead><tr>' +
-        '<th class="left">교회</th><th style="width:120px">기준액(만원)</th>' +
-        (isMin ? '<th style="width:220px">교역자회비 (연 1회)</th>'
-               : '<th style="width:180px">상반기</th><th style="width:180px">하반기</th>') +
-        '</tr></thead><tbody>';
-      if (!shown.length) {
-        h += '<tr><td colspan="4" style="text-align:center;color:var(--gray-5);padding:16px">해당하는 교회가 없습니다.</td></tr>';
-      }
-      shown.forEach(function (nm) {
-        var base = baseOf(nm);
-        function paidCell(f, half, kind) {
-          if (f) {
-            return '<span style="color:#2a7a2a;font-weight:700">납부</span>' +
-              (f.paid_on ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(f.paid_on) +
-                (Number(f.amount) !== Number(base) ? ' · ' + Number(f.amount || 0).toLocaleString('ko-KR') + '만원' : '') + '</div>' : '') +
-              (canFee ? ' <button class="btn ghost sm" data-feedel="' + f.id + '" data-fc="' + e(nm) + '">취소</button>' : '');
-          }
-          return '<span style="color:#b0731f">미납</span>' +
-            (canFee ? ' <button class="btn sm" data-feepay="' + e(nm) + '" data-fh="' + half + '" data-fk="' + kind + '" data-fa="' + base + '">납부</button>' : '');
+        if (!isMin) {
+          h += '<div class="notice-banner">시찰회비는 한 해에 <strong>상반기·하반기 두 차례</strong> 내며, ' +
+            '따로 정하지 않으면 1회분은 <strong>노회 상회비 한 달치</strong>를 기준으로 합니다. ' +
+            '금액은 <strong>시찰회가 정할 수 있습니다</strong>.' +
+            (canFee ? ' 기준액의 수정 단추로 회비를 바꾸고, 납부를 누르면 달력에서 납부 날짜를 골라 기록합니다. ' +
+                      '납부 기록은 <strong>시찰회 회계장부에 수입으로 자동 반영</strong>됩니다.'
+                    : ' 입력·수정은 시찰장·서기·회계가 합니다.') +
+            '</div>';
+          h += '<div class="dues-stats" style="margin-bottom:14px">' +
+            '<div class="ds"><div class="n">' + n1 + '/' + names.length + '곳</div><div class="l">상반기 납부 (' + sum1.toLocaleString('ko-KR') + '만원)</div></div>' +
+            '<div class="ds"><div class="n">' + n2 + '/' + names.length + '곳</div><div class="l">하반기 납부 (' + sum2.toLocaleString('ko-KR') + '만원)</div></div>' +
+            '</div>';
+          /* 납부율 그래프 — 상회비 진행률과 같은 붉은 계열 막대 */
+          h += '<div style="display:flex;gap:16px;flex-wrap:wrap;max-width:760px;margin-bottom:16px">' +
+            feeBar('상반기 납부율', n1, names.length, '#b03a3a') +
+            feeBar('하반기 납부율', n2, names.length, '#d97b6c') +
+            '</div>';
+        } else {
+          h += '<div class="notice-banner">교역자회비는 <strong>한 해에 한 번</strong> 내며, 금액은 <strong>시찰회비 1회분</strong>(기준액)과 같습니다. ' +
+            '기준액은 위 시찰회비 상자에서 정합니다.' +
+            (canFee ? ' 납부를 누르면 달력에서 납부 날짜를 골라 기록하며, ' +
+                      '납부 기록은 <strong>교역자회 회계장부에 수입으로 자동 반영</strong>됩니다.'
+                    : ' 입력·수정은 시찰장·서기·회계와 교역자회 임원이 합니다.') +
+            '</div>';
+          h += '<div class="dues-stats" style="margin-bottom:14px">' +
+            '<div class="ds"><div class="n">' + mn + '/' + names.length + '곳</div><div class="l">교역자회비 납부 (' + msum.toLocaleString('ko-KR') + '만원)</div></div>' +
+            '<div class="ds"><div class="n">' + (names.length - mn) + '곳</div><div class="l">미납</div></div>' +
+            '</div>';
+          h += '<div style="display:flex;gap:16px;flex-wrap:wrap;max-width:760px;margin-bottom:16px">' +
+            feeBar('교역자회비 납부율', mn, names.length, color) +
+            '</div>';
         }
-        h += '<tr><td class="left"><strong>' + e(nm) + '</strong></td>' +
-          '<td style="text-align:right">' + (base ? base.toLocaleString('ko-KR') : '-') +
-          (isCustom(nm) ? ' <span style="font-size:0.7rem;color:var(--gray-5)">(시찰 지정)</span>' : '') +
-          (canFee && !isMin ? ' <button class="btn ghost sm" data-feerate="' + e(nm) + '" data-fb="' + base + '">수정</button>' : '') +
-          '</td>' +
-          (isMin ? '<td>' + paidCell(mfeeOf(nm), 0, 'ministers') + '</td>'
-                 : '<td>' + paidCell(feeOf(nm, 1), 1, 'sichal') + '</td><td>' + paidCell(feeOf(nm, 2), 2, 'sichal') + '</td>') +
-          '</tr>';
-      });
-      h += '</tbody></table></div>';
-      box.innerHTML = h;
 
-      box.querySelectorAll('#fee-tabs button').forEach(function (b) {
-        b.addEventListener('click', function () { feeTab = b.dataset.ft; feeFilter = 'all'; drawFees(); });
-      });
-      box.querySelectorAll('#fee-filter button').forEach(function (b) {
-        b.addEventListener('click', function () { feeFilter = b.dataset.ff; drawFees(); });
+        h += '<div style="display:flex;gap:8px;justify-content:flex-end;max-width:760px;margin:0 0 6px">' +
+          '<button class="btn ghost sm" data-feeprint="' + key + '">인쇄</button>' +
+          '<button class="btn ghost sm" data-feepdf="' + key + '">PDF 저장</button></div>';
+        h += '<div class="tabs" style="margin-bottom:10px" data-feefilter="' + key + '">' +
+          '<button class="' + (L.filter === 'all' ? 'active' : '') + '" data-ff="all">전체 ' + names.length + '</button>' +
+          '<button class="' + (L.filter === 'full' ? 'active' : '') + '" data-ff="full">' + (isMin ? '납부' : '완납') + ' ' + L.full.length + '</button>' +
+          '<button class="' + (L.filter === 'late' ? 'active' : '') + '" data-ff="late">미납 ' + L.late.length + '</button>' +
+          '</div>';
+
+        h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:760px"><thead><tr>' +
+          '<th class="left">교회</th><th style="width:120px">기준액(만원)</th>' +
+          (isMin ? '<th style="width:220px">교역자회비 (연 1회)</th>'
+                 : '<th style="width:180px">상반기</th><th style="width:180px">하반기</th>') +
+          '</tr></thead><tbody>';
+        if (!L.shown.length) {
+          h += '<tr><td colspan="4" style="text-align:center;color:var(--gray-5);padding:16px">해당하는 교회가 없습니다.</td></tr>';
+        }
+        L.shown.forEach(function (nm) {
+          var base = baseOf(nm);
+          function paidCell(f, half, kind) {
+            if (f) {
+              return '<span style="color:#2a7a2a;font-weight:700">납부</span>' +
+                (f.paid_on ? '<div style="font-size:0.72rem;color:var(--gray-5)">' + e(f.paid_on) +
+                  (Number(f.amount) !== Number(base) ? ' · ' + Number(f.amount || 0).toLocaleString('ko-KR') + '만원' : '') + '</div>' : '') +
+                (canFee ? ' <button class="btn ghost sm" data-feedel="' + f.id + '" data-fc="' + e(nm) + '" data-fk="' + kind + '">취소</button>' : '');
+            }
+            return '<span style="color:#b0731f">미납</span>' +
+              (canFee ? ' <button class="btn sm" data-feepay="' + e(nm) + '" data-fh="' + half + '" data-fk="' + kind + '" data-fa="' + base + '">납부</button>' : '');
+          }
+          h += '<tr><td class="left"><strong>' + e(nm) + '</strong></td>' +
+            '<td style="text-align:right">' + (base ? base.toLocaleString('ko-KR') : '-') +
+            (isCustom(nm) ? ' <span style="font-size:0.7rem;color:var(--gray-5)">(시찰 지정)</span>' : '') +
+            (canFee && !isMin ? ' <button class="btn ghost sm" data-feerate="' + e(nm) + '" data-fb="' + base + '">수정</button>' : '') +
+            '</td>' +
+            (isMin ? '<td>' + paidCell(mfeeOf(nm), 0, 'ministers') + '</td>'
+                   : '<td>' + paidCell(feeOf(nm, 1), 1, 'sichal') + '</td><td>' + paidCell(feeOf(nm, 2), 2, 'sichal') + '</td>') +
+            '</tr>';
+        });
+        h += '</tbody></table></div>';
+        h += '</div></section>';
+        return h;
+      }
+
+      box.innerHTML = section('sichal') + section('ministers');
+
+      /* ?acc=mfee 로 왔으면 교역자회비 상자로 내려간다 */
+      if (feeFocus) {
+        var fb = document.getElementById('fee-box-' + feeFocus);
+        feeFocus = null;
+        if (fb) setTimeout(function () { fb.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+      }
+
+      box.querySelectorAll('[data-feefilter] button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          feeFilter[b.parentNode.dataset.feefilter] = b.dataset.ff;
+          drawFees();
+        });
       });
 
-      /* ----- 인쇄 · PDF — 화면에 보이는 목록(전체/완납/미납)을 그대로 종이로 ----- */
-      function feeSheetHtml() {
-        var filterName = feeFilter === 'full' ? (isMin ? ' (납부 교회)' : ' (완납 교회)') : (feeFilter === 'late' ? ' (미납 교회)' : '');
+      /* ----- 인쇄 · PDF — 그 상자에 보이는 목록(전체/완납/미납)을 그대로 종이로 ----- */
+      function feeSheetHtml(key) {
+        var isMin = key === 'ministers';
+        var FEE_NAME = isMin ? '교역자회비' : '시찰회비';
+        var L = lists(key);
+        var filterName = L.filter === 'full' ? (isMin ? ' (납부 교회)' : ' (완납 교회)') : (L.filter === 'late' ? ' (미납 교회)' : '');
         var today = new Date();
         var stamp = today.getFullYear() + '.' + (today.getMonth() + 1) + '.' + today.getDate();
         var t = '<h3>' + e(NAME) + ' ' + year + '년 ' + FEE_NAME + ' 납부 현황' + e(filterName) + '</h3>' +
-          '<p class="sub">시화산노회 ' + e(NAME) + ' · 회원 교회 ' + names.length + '곳 · 출력 ' + stamp + '</p>';
+          '<p class="sub">시화산노회 ' + e(NAME) + ' · 회원 교회 ' + names.length + '곳 · 출력 ' + stamp + '</p>' +
+          '<p class="sub">' + (isMin
+            ? '교역자회 회장 ' + e(minOff('회장')) + ' · 서기 ' + e(minOff('서기')) + ' · 회계 ' + e(minOff('회계'))
+            : '시찰장 ' + e(sic.head || '-') + ' · 서기 ' + e(sic.clerk || '-') + ' · 회계 ' + e(sic.treasurer || '-')) + '</p>';
         if (isMin) {
           t += '<p class="sum">교역자회비 납부 <strong>' + mn + '/' + names.length + '곳</strong> (' + msum.toLocaleString('ko-KR') + '만원) &nbsp;·&nbsp; ' +
-            '미납 ' + lateNames.length + '곳</p>' +
+            '미납 ' + L.late.length + '곳</p>' +
             '<table><thead><tr><th style="width:7%">번호</th><th class="left">교회</th><th style="width:15%">기준액(만원)</th>' +
             '<th style="width:22%">교역자회비 (연 1회)</th><th style="width:14%">비고</th></tr></thead><tbody>';
         } else {
           t += '<p class="sum">상반기 납부 <strong>' + n1 + '/' + names.length + '곳</strong> (' + sum1.toLocaleString('ko-KR') + '만원) &nbsp;·&nbsp; ' +
             '하반기 납부 <strong>' + n2 + '/' + names.length + '곳</strong> (' + sum2.toLocaleString('ko-KR') + '만원) &nbsp;·&nbsp; ' +
-            '완납 ' + fullNames.length + '곳 · 미납 ' + lateNames.length + '곳</p>' +
+            '완납 ' + L.full.length + '곳 · 미납 ' + L.late.length + '곳</p>' +
             '<table><thead><tr><th style="width:7%">번호</th><th class="left">교회</th><th style="width:15%">기준액(만원)</th>' +
             '<th style="width:20%">상반기</th><th style="width:20%">하반기</th><th style="width:14%">비고</th></tr></thead><tbody>';
         }
-        shown.forEach(function (nm, i) {
+        L.shown.forEach(function (nm, i) {
           var base = baseOf(nm);
           function cellP(f) {
             return f ? '납부' + (f.paid_on ? '<br><small>' + e(f.paid_on) + '</small>' : '') : '<span class="late">미납</span>';
@@ -1907,8 +1958,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return t;
       }
       var FEE_CSS = 'body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;padding:24px;color:#111}' +
-        'h3{text-align:center;margin:0 0 4px;font-size:18px}.sub{text-align:center;color:#555;font-size:12px;margin:0 0 10px}' +
-        '.sum{font-size:12.5px;margin:0 0 10px}' +
+        'h3{text-align:center;margin:0 0 4px;font-size:18px}.sub{text-align:center;color:#555;font-size:12px;margin:0 0 6px}' +
+        '.sum{font-size:12.5px;margin:6px 0 10px}' +
         'table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #333;padding:5px 6px;text-align:center}' +
         'th{background:#f2f2f2}td.left,th.left{text-align:left}td small{color:#666;font-size:10.5px}.late{color:#b03a3a}' +
         'tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}' +
@@ -1923,44 +1974,48 @@ document.addEventListener('DOMContentLoaded', function () {
           document.head.appendChild(sc);
         });
       }
-      var fp = document.getElementById('fee-print');
-      if (fp) fp.addEventListener('click', function () {
-        var w = window.open('', '_blank', 'width=900,height=700');
-        if (!w) { alert('인쇄 창이 막혔습니다. 팝업을 허용해 주세요.'); return; }
-        w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + e(NAME) + ' ' + FEE_NAME + ' 납부 현황</title>' +
-          '<style>' + FEE_CSS + '</style></head><body>' + feeSheetHtml() + '</body></html>');
-        w.document.close(); w.focus();
-        setTimeout(function () { w.print(); }, 300);
-        SHS.logAction('view', FEE_NAME + ' 납부 현황 인쇄', year + '년 ' + NAME);
-      });
-      var fpdf = document.getElementById('fee-pdf');
-      if (fpdf) fpdf.addEventListener('click', function () {
-        fpdf.disabled = true; fpdf.textContent = '만드는 중…';
-        var stage = document.createElement('div');
-        stage.style.cssText = 'position:absolute;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
-        stage.innerHTML = '<style>' + FEE_CSS.replace('body{', '.fee-sheet{') + '</style><div class="fee-sheet">' + feeSheetHtml() + '</div>';
-        document.body.appendChild(stage);
-        /* 화면을 내린 채 만들면 첫 쪽 위가 그만큼 비므로, 만드는 동안만 맨 위로 올린다 */
-        var keepX = window.scrollX || 0, keepY = window.scrollY || 0;
-        function done() { stage.remove(); fpdf.disabled = false; fpdf.textContent = 'PDF 저장'; window.scrollTo(keepX, keepY); }
-        feePdfTool().then(function (html2pdf) {
-          window.scrollTo(0, 0);
-          return html2pdf().set({
-            margin: 8, filename: NAME + ' ' + year + '년 ' + FEE_NAME + ' 납부 현황.pdf',
-            pagebreak: { mode: ['css', 'legacy'], avoid: ['tr'] },
-            html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-          }).from(stage.lastElementChild).save();
-        }).then(function () {
-          done();
-          SHS.logAction('view', FEE_NAME + ' 납부 현황 PDF 저장', year + '년 ' + NAME);
-        }).catch(function (err) {
-          done();
-          alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
+      box.querySelectorAll('button[data-feeprint]').forEach(function (fp) {
+        fp.addEventListener('click', function () {
+          var key = fp.dataset.feeprint;
+          var FEE_NAME = key === 'ministers' ? '교역자회비' : '시찰회비';
+          var w = window.open('', '_blank', 'width=900,height=700');
+          if (!w) { alert('인쇄 창이 막혔습니다. 팝업을 허용해 주세요.'); return; }
+          w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>' + e(NAME) + ' ' + FEE_NAME + ' 납부 현황</title>' +
+            '<style>' + FEE_CSS + '</style></head><body>' + feeSheetHtml(key) + '</body></html>');
+          w.document.close(); w.focus();
+          setTimeout(function () { w.print(); }, 300);
+          SHS.logAction('view', FEE_NAME + ' 납부 현황 인쇄', year + '년 ' + NAME);
         });
       });
-
-      if (!canFee) return;
+      box.querySelectorAll('button[data-feepdf]').forEach(function (fpdf) {
+        fpdf.addEventListener('click', function () {
+          var key = fpdf.dataset.feepdf;
+          var FEE_NAME = key === 'ministers' ? '교역자회비' : '시찰회비';
+          fpdf.disabled = true; fpdf.textContent = '만드는 중…';
+          var stage = document.createElement('div');
+          stage.style.cssText = 'position:absolute;left:-11000px;top:0;width:800px;background:#fff;padding:10px';
+          stage.innerHTML = '<style>' + FEE_CSS.replace('body{', '.fee-sheet{') + '</style><div class="fee-sheet">' + feeSheetHtml(key) + '</div>';
+          document.body.appendChild(stage);
+          /* 화면을 내린 채 만들면 첫 쪽 위가 그만큼 비므로, 만드는 동안만 맨 위로 올린다 */
+          var keepX = window.scrollX || 0, keepY = window.scrollY || 0;
+          function done() { stage.remove(); fpdf.disabled = false; fpdf.textContent = 'PDF 저장'; window.scrollTo(keepX, keepY); }
+          feePdfTool().then(function (html2pdf) {
+            window.scrollTo(0, 0);
+            return html2pdf().set({
+              margin: 8, filename: NAME + ' ' + year + '년 ' + FEE_NAME + ' 납부 현황.pdf',
+              pagebreak: { mode: ['css', 'legacy'], avoid: ['tr'] },
+              html2canvas: { scale: 2, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(stage.lastElementChild).save();
+          }).then(function () {
+            done();
+            SHS.logAction('view', FEE_NAME + ' 납부 현황 PDF 저장', year + '년 ' + NAME);
+          }).catch(function (err) {
+            done();
+            alert('PDF를 만들지 못했습니다: ' + ((err && err.message) || err));
+          });
+        });
+      });
 
       /* 시찰회비 1회분 금액 수정 (시찰회가 정한다) — 교역자회비도 이 금액을 따른다 */
       box.querySelectorAll('button[data-feerate]').forEach(function (b) {
@@ -2050,6 +2105,9 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       box.querySelectorAll('button[data-feedel]').forEach(function (b) {
         b.addEventListener('click', function () {
+          var min = b.dataset.fk === 'ministers';
+          var FEE_NAME = min ? '교역자회비' : '시찰회비';
+          var BOOK_NAME = NAME + (min ? ' 교역자회 회계장부' : ' 시찰회 회계장부');
           if (!confirm(b.dataset.fc + '의 ' + FEE_NAME + ' 납부 기록을 취소할까요?\n' + BOOK_NAME + '의 자동 기록도 함께 지워집니다.')) return;
           db().then(function (c) {
             return c.from('sichal_fees').delete().eq('id', b.dataset.feedel);
