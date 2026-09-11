@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var sichals = [], sic = null, isOfficer = false, myDuty = '', isAuditor = false;
   var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
-  /* 교역자회(시찰 안 목사들의 모임) 임원 — 회장·서기·회계. 시찰장이 회원 명단의 「시찰위원 선정」에서 임명한다 (93 sql) */
+  /* 교역자회(시찰 안 목사들의 모임) 임원 — 회장·서기·회계. 시찰장이 회원 명단의 「교역자회 임원 선정」에서 임명한다 (93 sql) */
   var minOfficers = [];
   var isHead = false;      /* 교역자회 임원을 임명할 수 있는가 — 이 시찰의 시찰장 또는 최고관리자 (94 sql) */
   function minOff(pos) {
@@ -956,12 +956,12 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<div class="notice-banner" style="text-align:left"><strong>교역자회 임원</strong> — ' +
       '회장 ' + e(minOff('회장')) + ' · 서기 ' + e(minOff('서기')) + ' · 회계 ' + e(minOff('회계')) +
       '<div style="font-size:0.84rem;color:var(--gray-6);margin-top:4px">교역자회는 시찰 안 목사들의 모임입니다. ' +
-      '임원은 <strong>시찰장</strong>(또는 최고관리자)이 아래 목사 명단의 「시찰위원 선정」 칸에서 임명하며, 회장은 시찰장과 따로 정합니다. ' +
+      '임원은 <strong>시찰장</strong>(또는 최고관리자)이 아래 목사 명단의 「교역자회 임원 선정」 칸에서 임명하며, 회장은 시찰장과 따로 정합니다. ' +
       '교역자회 서기·회계는 보통 시찰 서기·회계가 겸하고, 교역자회 회계장부와 교역자회비 납부 현황을 관리합니다.' +
       (isHead ? ' <strong>임명 권한이 있는 계정으로 로그인하셨으므로 아래 칸에서 바로 고를 수 있습니다.</strong>' : '') +
       '</div></div>';
 
-    /* 시찰위원 선정 칸 — 시찰장에게는 고르는 상자, 그 밖에는 직책 표시 */
+    /* 교역자회 임원 선정 칸 — 시찰장에게는 고르는 상자, 그 밖에는 직책 표시 */
     function minCell(m) {
       var cur = minOfficers.filter(function (o) { return String(o.roster_id) === String(m.id); })[0];
       var badge = cur
@@ -994,14 +994,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     Object.keys(groups).forEach(function (g) {
-      /* 목사 표(교역자회 회원)에는 비고 대신 시찰위원 선정 칸을 둔다 */
+      /* 목사 표(교역자회 회원)에는 비고 대신 교역자회 임원 선정 칸을 둔다 */
       var isPastorGroup = /목사/.test(g);
       h += '<h3>' + e(g) + ' (' + groups[g].length + '명)</h3>';
       h += '<table class="tbl"><thead><tr><th style="width:52px">사진</th><th style="width:120px">성명</th>' +
         '<th style="width:110px">직분</th><th>소속 교회</th>' +
         '<th style="width:130px;cursor:pointer;user-select:none' + (pastorSort ? ';color:var(--accent);font-weight:700' : '') + '" ' +
         'data-pasort title="' + paTitle + '">남은 임기' + paArrow + '</th>' +
-        (isPastorGroup ? '<th style="width:180px">시찰위원 선정</th>' : '<th style="width:160px">비고</th>') +
+        (isPastorGroup ? '<th style="width:180px">교역자회 임원 선정</th>' : '<th style="width:160px">비고</th>') +
         '</tr></thead><tbody>';
       sorted(groups[g]).forEach(function (m) {
         var ch = churches.filter(function (x) { return x.name === m.church; })[0];
@@ -1038,7 +1038,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
-    /* 시찰위원 선정 — 시찰장만. 한 사람은 한 직책만 맡고, 같은 직책의 앞사람은 해제된다 (set_ministers_officer) */
+    /* 교역자회 임원 선정 — 시찰장·최고관리자만. 한 사람은 한 직책만 맡고, 같은 직책의 앞사람은 해제된다 (set_ministers_officer) */
     box.querySelectorAll('select[data-minsel]').forEach(function (sel) {
       sel.addEventListener('change', function () {
         var m = pastors.filter(function (x) { return String(x.id) === sel.dataset.minsel; })[0];

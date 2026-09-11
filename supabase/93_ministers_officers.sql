@@ -46,7 +46,7 @@ create policy ministers_officers_read on public.ministers_officers for select
 -- 쓰기는 set_ministers_officer() 함수로만 한다 (시찰장 판정을 함수가 한다)
 
 comment on table public.ministers_officers is
-  '시찰 교역자회 임원(회장·서기·회계) — 시찰장이 회원 명단의 「시찰위원 선정」에서 임명';
+  '시찰 교역자회 임원(회장·서기·회계) — 시찰장이 회원 명단의 「교역자회 임원 선정」에서 임명';
 
 
 -- ---------------------------------------------------------------------
