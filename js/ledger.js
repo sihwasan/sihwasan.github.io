@@ -157,6 +157,8 @@ var SHSLedger = (function () {
     var ownerKind = kindOf(opts.kind);
     /* 화면과 기록에 보일 이름 — 교역자회 장부는 owner(시찰 이름) 뒤에 '교역자회'를 붙인다 */
     var ownerLabel = opts.label || (ownerKind === 'ministers' ? opts.owner + ' 교역자회' : opts.owner);
+    /* 교역자회 장부는 시찰 안 목사들의 모임 장부라 감사를 받지 않는다 — 감사 칸 없이 회계가 바로 마감한다 (93 sql) */
+    var noAudit = ownerKind === 'ministers';
     /* 노회 장부는 과목을 고르고 적요를 따로 적는다. 상비부 배정도 여기서 한다. */
     var useCats = ownerKind === 'presbytery';
     var cats = { '수입': [], '지출': [] };   /* 과목 목록 (ledger_categories) */
@@ -200,6 +202,7 @@ var SHSLedger = (function () {
         var r = rs[0];
         if (r && !r.error && typeof r.data === 'boolean') canEdit = r.data;
         isReviewer = !!(rs[1] && !rs[1].error && rs[1].data === true);
+        if (noAudit) isReviewer = false;
       }, function () { /* 못 물어보면 부르는 쪽이 준 값을 그대로 쓴다 */ });
     }
     function dt(s) { return String(s || '').replace('T', ' ').slice(0, 16); }
@@ -207,6 +210,7 @@ var SHSLedger = (function () {
     /* 이 장부를 누가 쓰는지 알려 주는 말 */
     function who() {
       if (ownerKind === 'presbytery') return '노회 회계';
+      if (ownerKind === 'ministers') return '교역자회 임원(회장·서기·회계)과 시찰 임원';
       return opts.kind === 'committee' ? '상비부 회계' : '시찰장·서기·회계';
     }
 
@@ -310,7 +314,9 @@ var SHSLedger = (function () {
       var h = '<p style="color:var(--gray-5);font-size:0.88rem">' +
         '회계연도는 <strong>4월부터 다음 해 3월까지</strong>이며, 회계연도 마감을 누르면 ' +
         '남은 돈이 다음 회계연도 이월금으로 저절로 넘어갑니다. ' +
-        '<strong>봄·가을 정기노회 전에 감사부의 감사를 받습니다.</strong></p>';
+        (noAudit
+          ? '<strong>교역자회 장부는 시찰 안 목사들의 모임 장부로 감사를 받지 않으며</strong>, 회계연도 마감은 회계가 직접 합니다.'
+          : '<strong>봄·가을 정기노회 전에 감사부의 감사를 받습니다.</strong>') + '</p>';
 
       h += '<div class="inline-form" style="margin-bottom:6px">' +
         '<div class="field" style="flex:0 0 260px"><label>회계 연도</label>' +
@@ -366,7 +372,7 @@ var SHSLedger = (function () {
               (book.close_requested_by ? ' <span style="color:var(--gray-5)">(요청 ' + esc(dt(book.close_requested_at)) +
                 ' ' + esc(book.close_requested_by) + ')</span>' : '') + '</div>'
             : '') +
-          (isReviewer || isAdmin()
+          (isReviewer || isAdmin() || (noAudit && canEdit)
             ? ' <button class="btn ghost sm" id="lg-reopen" style="margin-left:8px">마감 취소</button>'
             : '') +
           '</div>';
@@ -401,7 +407,9 @@ var SHSLedger = (function () {
           '<button class="btn ghost" id="lg-opensave">이월금 저장</button>' +
           (books.filter(function (b) { return b.year === year - 1; }).length
             ? '<button class="btn ghost" id="lg-carry">지난해 잔액 가져오기</button>' : '') +
-          (book.close_requested_at ? '' : '<button class="btn ghost" id="lg-close">마감 승인 요청</button>') +
+          (book.close_requested_at ? '' :
+            (noAudit ? '<button class="btn ghost" id="lg-closenow">회계연도 마감</button>'
+                     : '<button class="btn ghost" id="lg-close">마감 승인 요청</button>')) +
           '</div><div class="form-msg" id="lg-omsg"></div>';
       }
 
@@ -490,8 +498,10 @@ var SHSLedger = (function () {
         h += '</tbody></table>';
       }
 
-      h += '<div id="lg-audit" style="margin-top:16px">' +
-        SHSAuditMark.panel(book, { isAuditor: opts.isAuditor }) + '</div>';
+      if (!noAudit) {
+        h += '<div id="lg-audit" style="margin-top:16px">' +
+          SHSAuditMark.panel(book, { isAuditor: opts.isAuditor }) + '</div>';
+      }
       /* 줄의 <올리기>가 쓰는 숨은 파일 입력 (카메라나 사진첩이 열린다) */
       if (canWrite) h += '<input type="file" id="lg-upfile" accept="image/*" multiple class="hidden">';
 
@@ -516,9 +526,11 @@ var SHSLedger = (function () {
           load();
         });
       });
-      SHSAuditMark.bind(document.getElementById('lg-audit'), {
-        kind: 'ledger_books', label: ownerLabel + ' ' + year + '년 회계 장부', after: load
-      });
+      if (!noAudit) {
+        SHSAuditMark.bind(document.getElementById('lg-audit'), {
+          kind: 'ledger_books', label: ownerLabel + ' ' + year + '년 회계 장부', after: load
+        });
+      }
 
       /* 회기 마감 승인 — 감사부장·서기가 누르면 그 자리에서 이월·잠금까지 된다 */
       var ap = document.getElementById('lg-approve');
@@ -720,6 +732,24 @@ var SHSLedger = (function () {
             return;
           }
           SHSCloud.log('update', '회기 마감 승인 요청', ownerLabel + ' ' + year + ' 회계연도');
+          load();
+        });
+      });
+
+      /* 교역자회 장부 — 감사부 승인 없이 회계가 바로 마감한다 (close_ledger_year, 93 sql) */
+      var cn = document.getElementById('lg-closenow');
+      if (cn) cn.addEventListener('click', function () {
+        var s4 = sums();
+        if (!confirm(fyLabel(year) + ' 장부를 마감합니다.\n\n남은 돈 ' + won(s4.left) + '원이 ' + (year + 1) +
+              ' 회계연도 이월금으로 넘어가고, 마감된 장부에는 더 적을 수 없습니다.\n' +
+              '(잘못 마감했으면 <마감 취소>로 되돌릴 수 있습니다)\n\n계속하시겠습니까?')) return;
+        var msg2 = document.getElementById('lg-omsg');
+        msg2.className = 'form-msg'; msg2.textContent = '마감 중입니다...';
+        SHSCloud.init().then(function (c) {
+          return c.rpc('close_ledger_year', { p_book: book.id });
+        }).then(function (r) {
+          if (r.error) { msg2.className = 'form-msg err'; msg2.textContent = r.error.message; return; }
+          SHSCloud.log('update', '회계연도 마감', ownerLabel + ' ' + year + ' 회계연도 → 이월금 ' + won(r.data) + '원');
           load();
         });
       });
@@ -1858,6 +1888,8 @@ var SHSLedger = (function () {
     var ownerKind = kindOf(opts.kind);
     /* 화면과 기록에 보일 이름 — 교역자회 장부는 owner(시찰 이름) 뒤에 '교역자회'를 붙인다 */
     var ownerLabel = opts.label || (ownerKind === 'ministers' ? opts.owner + ' 교역자회' : opts.owner);
+    /* 교역자회 장부는 시찰 안 목사들의 모임 장부라 감사를 받지 않는다 — 감사 칸 없이 회계가 바로 마감한다 (93 sql) */
+    var noAudit = ownerKind === 'ministers';
     var now0 = new Date();
     var year = parseInt(opts.year, 10) ||
       (now0.getMonth() + 1 >= 4 ? now0.getFullYear() : now0.getFullYear() - 1);
