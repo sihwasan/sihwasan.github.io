@@ -118,11 +118,16 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20260911a"></script>
+<script src="js/inapp.js?v=20260911a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   /* 구글 로그인은 서버 설정이 완료된 경우에만 표시한다. */
   if (SHSCloud.enabled()) {
     document.getElementById('social-login').classList.remove('hidden');
+    /* 카카오톡·네이버 앱 안의 브라우저면 구글 로그인이 2단계 인증에서 멈추므로,
+     * 안내를 보이고 구글 단추는 기본 브라우저(크롬·사파리)로 이 주소를 열게 한다 (js/inapp.js) */
+    SHSInApp.mount(document.getElementById('btn-google'));
+    SHSInApp.guardGoogle(document.getElementById('btn-google'));
     document.getElementById('btn-google').addEventListener('click', function () {
       SHSCloud.signInWithGoogle();
     });
