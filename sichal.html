@@ -24,13 +24,16 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260911a"></script>
+<script src="js/main.js?v=20260917a"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/minutes-box.js"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
 <script src="js/ledger.js?v=20260911d"></script>
+<script src="js/photos-config.js"></script>
+<script src="js/photos.js"></script>
+<script src="js/sichal-room.js?v=20260917a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -87,6 +90,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }, function () {});
   }
   var churchStaff = [], bapAll = [], sicFin = [], subs = [];
+  /* 사진첩·게시판 — 사진은 노회 갤러리와 같은 보관소(R2)에 올린다 (95 sql) */
+  var room = null;
+  var myOwnSichal = false;   /* 이 시찰 사람인가 — 시찰 임원이거나 내 교회가 관내 교회일 때 */
   /* 서류 진단 — 상태 거르개와 지금 열람 중인 청원서 */
   var REV_STATUS = ['전체', '제출됨', '적합', '보완요청', '반려'];
   /* 알림함의 <바로 가기>(sichal.html?s=시찰&p=번호#review)로 들어오면
@@ -228,7 +234,11 @@ document.addEventListener('DOMContentLoaded', function () {
         var sesRow = rs[12] && rs[12].data && rs[12].data[0];
         sessions = (sesRow && sesRow.value) || { current: null, list: [] };
         if (!Array.isArray(sessions.list)) sessions.list = [];
-        draw();
+        myOwnSichal = isOfficer || churches.some(function (x) { return x.name === myChurch; });
+        room = SHSRoom.create({
+          sichal: NAME, user: user, isOfficer: isOfficer, canWrite: myOwnSichal
+        });
+        return room.load().then(draw, draw);
       });
     }).catch(function (x) {
       area.innerHTML = '<div class="notice-banner">시찰회 화면을 불러오지 못했습니다: ' +
@@ -350,8 +360,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* 시찰 자료실·회계 관리·회의록·교회상황 보고서는 자기 시찰만 볼 수 있다.
      * (시찰 임원·노회 관리자이거나, 내 교회가 이 시찰 소속일 때) */
-    var myOwnSichal = isOfficer || churches.some(function (x) { return x.name === myChurch; });
-    if (!myOwnSichal && (tab === 'doc' || tab === 'ledger' || tab === 'minutes' || tab === 'report')) tab = 'church';
+    myOwnSichal = isOfficer || churches.some(function (x) { return x.name === myChurch; });
+    if (!myOwnSichal &&
+        ['board', 'photo', 'doc', 'pass', 'ledger', 'minutes', 'report'].indexOf(tab) !== -1) tab = 'church';
     /* 서류 진단은 시찰 임원(시찰장·서기)과 노회 관리자만 본다 */
     if (!isOfficer && tab === 'review') tab = 'church';
 
@@ -362,8 +373,13 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="' + (tab === 'church'  ? 'active' : '') + '" data-t="church">관내 교회 (' + churches.length + ')</button>' +
       '<button class="' + (tab === 'pastor'  ? 'active' : '') + '" data-t="pastor">회원 명단 (' + pastors.length + ')</button>' +
       (myOwnSichal
-        ? '<button class="' + (tab === 'doc'     ? 'active' : '') + '" data-t="doc">시찰 자료실 (' +
-          (docs.length + passedIn(curSesNo()).length) + ')</button>' +
+        ? '<button class="' + (tab === 'board'   ? 'active' : '') + '" data-t="board">게시판 (' +
+          (room ? room.postCount() : 0) + ')</button>' +
+          '<button class="' + (tab === 'photo'   ? 'active' : '') + '" data-t="photo">사진첩 (' +
+          (room ? room.photoCount() : 0) + ')</button>' +
+          '<button class="' + (tab === 'doc'     ? 'active' : '') + '" data-t="doc">자료실 (' + docs.length + ')</button>' +
+          '<button class="' + (tab === 'pass'    ? 'active' : '') + '" data-t="pass">청원서류 (' +
+          passedIn(curSesNo()).length + ')</button>' +
           '<button class="' + (tab === 'minutes' ? 'active' : '') + '" data-t="minutes">회의록 (' + minutes.length + ')</button>' +
           '<button class="' + (tab === 'ledger'  ? 'active' : '') + '" data-t="ledger">' + e(NAME) + ' 회계 관리</button>' +
           '<button class="' + (tab === 'report'  ? 'active' : '') + '" data-t="report">교회상황 보고서</button>'
@@ -441,7 +457,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (tab === 'pastor') drawPastors();
+    else if (tab === 'board') room.drawBoard(document.getElementById('si-body'));
+    else if (tab === 'photo') room.drawPhotos(document.getElementById('si-body'));
     else if (tab === 'doc') drawDocs();
+    else if (tab === 'pass') drawPetitions();
     else if (tab === 'minutes') drawMinutes();
     else if (tab === 'ledger') drawLedger();
     else if (tab === 'report') drawReports();
@@ -1067,8 +1086,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  /* ================= 시찰 자료실 ================= */
-  var docFile = null;
+  /* ================= 시찰 자료실 · 청원서류 ================= */
+  var docOpen = null;      /* 자료실에서 펼쳐 본 자료 */
+  var docEditId = null;    /* 고쳐 쓰는 중인 자료 */
+  var passView = 'live';   /* 청원서류 보기: live / trash */
 
   /* ---------- 회기 · 통과 청원서 ----------
    * 서류 진단에서 <적합>으로 진단된 청원서(petition_submissions)를 회기별로
@@ -1129,8 +1150,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }).join('') + '</select></label>'
         : '<span style="font-size:0.8rem;color:var(--gray-5)">회기 설정이 없어 전체를 보여 줍니다.</span>') +
       '</div>' +
-      '<p style="font-size:0.84rem;color:var(--gray-5);margin:6px 0 12px">서류 진단에서 <strong>적합</strong>으로 ' +
-      '진단된 청원서입니다. 제출된 원본 서식이 도장까지 그대로 보이며, 여러 건을 골라 한 번에 인쇄할 수 있습니다. ' +
+      '<p style="font-size:0.84rem;color:var(--gray-5);margin:6px 0 12px">제출된 원본 서식이 도장까지 그대로 보입니다. ' +
       '<strong>시찰장</strong>은 열람에서 내 도장을 찍어 <strong>노회 서기에게 제출</strong>합니다.</p>';
 
     if (open) h += petViewerHtml(open, forwardBoxHtml(open));
@@ -1209,7 +1229,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return c.from(table).update(patch).eq('id', row.id).select('id');
     }).then(function (r) {
       if (r.error) throw r.error;
-      if (!(r.data && r.data.length)) throw new Error('처리하지 못했습니다. 권한(시찰장·서기)을 확인해 주세요.');
+      if (!(r.data && r.data.length)) throw new Error('처리하지 못했습니다. 권한을 확인해 주세요. (시찰 임원이거나 본인이 올린 것만 지울 수 있습니다)');
       row.deleted_at = patch.deleted_at; row.deleted_by = patch.deleted_by;
       splitLists();
     });
@@ -1223,8 +1243,8 @@ document.addEventListener('DOMContentLoaded', function () {
         after();
       }).catch(fail);
     } else {
-      if (!confirm('「' + p.title + '」\n\n이 청원서를 삭제하면 시찰 자료실의 <삭제한 자료>로 옮겨지고, ' +
-                   '신청자의 나의 서류에서는 보이지 않습니다. 되돌리기는 <삭제한 자료>에서 할 수 있습니다. 삭제하시겠습니까?')) return;
+      if (!confirm('「' + p.title + '」\n\n이 청원서를 삭제하면 <삭제한 청원서>로 옮겨지고, ' +
+                   '신청자의 나의 서류에서는 보이지 않습니다. 되돌리기는 <삭제한 청원서>에서 할 수 있습니다. 삭제하시겠습니까?')) return;
       setDeleted('petition_submissions', p, true).then(function () {
         SHS.logAction('delete', '청원서 삭제(보관)', NAME + ' / ' + p.title + ' (번호 ' + p.id + ')');
         after();
@@ -1246,29 +1266,40 @@ document.addEventListener('DOMContentLoaded', function () {
       }).catch(fail);
     }
   }
-  function bindViewTabs(box) {
+  function bindViewTabs(box, kind) {
     box.querySelectorAll('#dc-view button').forEach(function (b) {
-      b.addEventListener('click', function () { docView = b.dataset.dv; passOpenId = null; drawDocs(); });
+      b.addEventListener('click', function () {
+        if (kind === 'pass') { passView = b.dataset.dv; passOpenId = null; drawPetitions(); }
+        else { docView = b.dataset.dv; docOpen = null; docEditId = null; drawDocs(); }
+      });
     });
   }
-  /* 삭제한 자료 — 서기·시찰장이 지운 청원서·자료 */
-  function trashBox() {
-    var h = '<div class="admin-card" style="margin-bottom:18px"><h3 style="margin:0 0 6px">삭제한 자료 (' + (trashSubs.length + trashDocs.length) + ')</h3>' +
-      '<p style="font-size:0.84rem;color:var(--gray-5);margin:0 0 12px">시찰장·서기가 지운 청원서와 자료입니다. 되돌리면 원래 자리로 돌아갑니다. ' +
-      (isSuper() ? '총관리자는 여기서 <strong>완전 삭제</strong>할 수 있으며, 완전 삭제는 되돌릴 수 없습니다.' : '완전 삭제는 총관리자만 할 수 있습니다.') + '</p>';
-    if (!trashSubs.length && !trashDocs.length) return h + '<p style="color:var(--gray-5);margin:0">삭제한 자료가 없습니다.</p></div>';
-    h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
-      '<th style="width:90px">종류</th><th class="left">제목</th><th style="width:150px">삭제일</th>' +
-      '<th style="width:100px">삭제한 사람</th><th style="width:190px">관리</th></tr></thead><tbody>';
-    var rows = trashSubs.map(function (p) { return { kind: 'sub', row: p }; })
-      .concat(trashDocs.map(function (d) { return { kind: 'doc', row: d }; }))
+  /* 삭제한 것 — 자료실에서는 지운 자료를, 청원서류에서는 지운 청원서를 보여 준다 */
+  function trashBox(kind) {
+    var pass = kind === 'pass';
+    var what = pass ? '청원서' : '자료';
+    var rows = (pass
+      ? trashSubs.map(function (p) { return { kind: 'sub', row: p }; })
+      : trashDocs.map(function (d) { return { kind: 'doc', row: d }; }))
       .sort(function (a, b) { return String(b.row.deleted_at).localeCompare(String(a.row.deleted_at)); });
+
+    var h = '<div class="admin-card" style="margin-bottom:18px">' +
+      '<h3 style="margin:0 0 6px">삭제한 ' + what + ' (' + rows.length + ')</h3>' +
+      '<p style="font-size:0.84rem;color:var(--gray-5);margin:0 0 12px">시찰장·서기가 지운 ' + what +
+      '입니다. 되돌리면 원래 자리로 돌아갑니다. ' +
+      (isSuper() ? '총관리자는 여기서 <strong>완전 삭제</strong>할 수 있으며, 완전 삭제는 되돌릴 수 없습니다.'
+                 : '완전 삭제는 총관리자만 할 수 있습니다.') + '</p>';
+    if (!rows.length) return h + '<p style="color:var(--gray-5);margin:0">삭제한 ' + what + '가 없습니다.</p></div>';
+
+    h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+      '<th class="left">제목</th><th style="width:150px">삭제일</th>' +
+      '<th style="width:100px">삭제한 사람</th><th style="width:190px">관리</th></tr></thead><tbody>';
     rows.forEach(function (x) {
       var r = x.row;
-      h += '<tr><td>' + (x.kind === 'sub' ? '청원서' : '자료') + '</td>' +
-        '<td class="left">' + e(r.title) +
+      h += '<tr><td class="left">' + e(r.title) +
         (x.kind === 'sub'
-          ? '<br><small style="color:var(--gray-5)">' + e(r.user_name || '') + ' · ' + e(r.form_title || '') + ' · ' + e(when(r.created_at)) + ' 접수 · ' + e(r.status || '') + '</small>'
+          ? '<br><small style="color:var(--gray-5)">' + e(r.user_name || '') + ' · ' + e(r.form_title || '') +
+            ' · ' + e(when(r.created_at)) + ' 접수 · ' + e(r.status || '') + '</small>'
           : (r.doc_date ? '<br><small style="color:var(--gray-5)">' + e(r.doc_date) + '</small>' : '')) + '</td>' +
         '<td>' + e(when(r.deleted_at)) + '</td><td>' + e(r.deleted_by || '') + '</td>' +
         '<td style="white-space:nowrap">' +
@@ -1393,7 +1424,7 @@ document.addEventListener('DOMContentLoaded', function () {
         Object.keys(row).forEach(function (k) { p[k] = row[k]; });
         SHS.logAction('update', '청원서 노회 제출', NAME + ' / ' + p.title);
         docNotice = '「' + e(p.title) + '」을(를) 시찰장 도장을 찍어 <strong>노회 서기에게 제출</strong>했습니다. 노회 서기가 접수하면 알림이 옵니다.';
-        drawDocs();
+        drawPetitions();
       }).catch(function (err) {
         send.disabled = false; send.textContent = '시찰장 도장 찍어 노회 서기에게 제출';
         msg.className = 'form-msg err';
@@ -1405,12 +1436,12 @@ document.addEventListener('DOMContentLoaded', function () {
   function bindPassedBox(box) {
     var sel = document.getElementById('dc-ses');
     if (sel) sel.addEventListener('change', function () {
-      passSes = parseInt(sel.value, 10); passOpenId = null; drawDocs();
+      passSes = parseInt(sel.value, 10); passOpenId = null; drawPetitions();
     });
     box.querySelectorAll('[data-dcpass]').forEach(function (b) {
       b.addEventListener('click', function () {
         passOpenId = b.dataset.dcpass;
-        drawDocs();
+        drawPetitions();
         var v = document.getElementById('pv-card');
         if (v) v.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
@@ -1423,7 +1454,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     if (passOpenId) {
       var open = subs.filter(function (p) { return String(p.id) === String(passOpenId); })[0];
-      if (open) { bindPetViewer(open, function () { passOpenId = null; drawDocs(); }); bindForwardBox(open); }
+      if (open) { bindPetViewer(open, function () { passOpenId = null; drawPetitions(); }); bindForwardBox(open); }
     }
 
     /* 전체선택·선택 → 선택한 청원서 일괄 인쇄 (교회상황 보고서와 같은 방식) */
@@ -1452,144 +1483,227 @@ document.addEventListener('DOMContentLoaded', function () {
     selUpdate();
   }
 
+  /* ---------- 자료실 (문서) ----------
+   * 청원서류는 <청원서류> 탭에서 따로 다룬다.
+   * 이 시찰 사람이면 누구나 자료를 올릴 수 있고, 자기가 올린 자료는 자기가 고치고 지운다. */
+  function canEditDoc(d) { return isOfficer || !!(d && d.author_id && d.author_id === user.id); }
+  /* 첨부파일 — 예전에 한 개만 붙이던 자료도 함께 보이게 모은다 */
+  function docFiles(d) {
+    var list = (d && Array.isArray(d.files)) ? d.files.slice() : [];
+    if (d && d.file_path && !list.some(function (f) { return f.path === d.file_path; })) {
+      list.unshift({ path: d.file_path, name: d.file_name || '첨부파일' });
+    }
+    return list;
+  }
+  function openDocFile(path, title) {
+    db().then(function (c) {
+      return c.storage.from('sichal-files').createSignedUrl(path, 60);
+    }).then(function (r) {
+      if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
+      SHSCloud.log('view', '시찰 자료 내려받기', NAME + ' / ' + (title || ''));
+      window.open(r.data.signedUrl, '_blank', 'noopener');
+    });
+  }
+
   function drawDocs() {
     var box = document.getElementById('si-body');
-    var h = '';
+    var h = '<div class="notice-banner" style="margin-bottom:16px">' +
+      '<strong>' + e(NAME) + ' 자료실</strong>입니다. 회의 자료·서식 같은 문서를 모아 둡니다. ' +
+      '파일은 상자에 끌어다 놓으면 올라가고, 여러 개를 한 번에 붙이실 수 있습니다. ' +
+      '청원서류는 <strong>청원서류</strong> 탭에, 사진은 <strong>사진첩</strong>에 따로 모입니다.</div>';
 
-    /* 자료실 / 삭제한 자료 — 서기·시찰장이 지운 것은 보관되고, 총관리자만 완전히 지운다 */
     if (isOfficer) {
-      var nTrash = trashSubs.length + trashDocs.length;
       h += '<div class="tabs" id="dc-view" style="margin-bottom:12px">' +
         '<button class="' + (docView === 'live' ? 'active' : '') + '" data-dv="live">자료실</button>' +
-        '<button class="' + (docView === 'trash' ? 'active' : '') + '" data-dv="trash">삭제한 자료 (' + nTrash + ')</button></div>';
+        '<button class="' + (docView === 'trash' ? 'active' : '') + '" data-dv="trash">삭제한 자료 (' +
+        trashDocs.length + ')</button></div>';
     } else {
       docView = 'live';
     }
     if (docView === 'trash') {
-      h += trashBox();
-      box.innerHTML = h;
-      bindViewTabs(box);
+      box.innerHTML = h + trashBox('doc');
+      bindViewTabs(box, 'doc');
       bindTrashBox(box);
       return;
     }
 
-    /* 서류 진단에서 <적합> 처리를 마치고 넘어온 경우의 완료 안내 */
-    if (docNotice) {
-      h += '<div class="dash-ok" style="margin-bottom:14px" id="dc-notice">' + docNotice + '</div>';
-    }
-
-    /* 이번 회기 통과 청원서 — 자료 목록과 구분되는 별도 구역 */
-    h += passedBox();
+    var open = docOpen ? docs.filter(function (d) { return String(d.id) === String(docOpen); })[0] : null;
+    if (open) h += docViewHtml(open);
 
     h += '<h3 style="margin:0 0 10px">자료 목록 (' + docs.length + ')</h3>';
     if (!docs.length) {
       h += '<p style="color:var(--gray-5)">등록된 자료가 없습니다.</p>';
     } else {
-      h += '<table class="tbl"><thead><tr><th style="width:120px">날짜</th><th>제목</th>' +
-        '<th style="width:120px">열람 범위</th><th style="width:170px">자료</th>' +
-        (isOfficer ? '<th style="width:120px">관리</th>' : '') + '</tr></thead><tbody>';
-      docs.forEach(function (d, i) {
-        h += '<tr><td>' + e(d.doc_date || '-') + '</td>' +
-          '<td class="left">' + e(d.title) +
+      h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+        '<th style="width:110px">날짜</th><th class="left">제목</th>' +
+        '<th style="width:110px">올린 이</th><th style="width:120px">열람 범위</th>' +
+        '<th style="width:70px">첨부</th></tr></thead><tbody>';
+      docs.forEach(function (d) {
+        var fs = docFiles(d);
+        h += '<tr' + (String(d.id) === String(docOpen) ? ' style="background:var(--gray-1,#f4f5f8)"' : '') + '>' +
+          '<td>' + e(d.doc_date || '-') + '</td>' +
+          '<td class="left"><a href="#" data-dcopen="' + d.id + '" style="color:var(--navy)">' + e(d.title) + '</a>' +
           (d.description ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(d.description) + '</div>' : '') +
           '</td>' +
+          '<td>' + e(d.created_by || d.updated_by || '') + '</td>' +
           '<td><span class="role-badge">' + e(accessName(d.access)) + '</span></td>' +
-          '<td>' +
-          (d.file_path ? '<button class="btn sm" data-dcfile="' + i + '">내려받기</button> ' : '') +
-          (d.link_url ? '<a class="btn ghost sm" href="' + e(d.link_url) + '" target="_blank" rel="noopener">링크</a>' : '') +
-          (!d.file_path && !d.link_url ? '<span style="color:var(--gray-5)">-</span>' : '') +
-          '</td>' +
-          (isOfficer
-            ? '<td><button class="btn ghost sm" data-dcedit="' + i + '">수정</button> ' +
-              '<button class="btn danger sm" data-dcdel="' + i + '">삭제</button></td>'
-            : '') +
-          '</tr>';
+          '<td>' + (fs.length ? fs.length + '개' : (d.link_url ? '링크' : '-')) + '</td></tr>';
       });
-      h += '</tbody></table>';
+      h += '</tbody></table></div>';
     }
 
-    if (isOfficer) h += docForm();
+    if (myOwnSichal) h += docForm();
     box.innerHTML = h;
-    bindViewTabs(box);
-    if (isOfficer) bindDocForm();
+    bindViewTabs(box, 'doc');
+    bindDocList(box);
+    if (myOwnSichal) bindDocForm();
+  }
+
+  function docViewHtml(d) {
+    var fs = docFiles(d);
+    var h = '<div class="admin-card" style="margin-bottom:22px" id="dc-open">' +
+      '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">' +
+      '<div><h3 style="margin:0 0 4px">' + e(d.title) + '</h3>' +
+      '<span style="font-size:0.84rem;color:var(--gray-5)">' +
+      '<span class="role-badge">' + e(accessName(d.access)) + '</span> ' +
+      e(d.created_by || '') + (d.doc_date ? ' · ' + e(d.doc_date) : '') + '</span></div>' +
+      '<div style="white-space:nowrap">' +
+      (canEditDoc(d)
+        ? '<button class="btn ghost sm" data-dcedit="' + d.id + '">수정</button> ' +
+          '<button class="btn danger sm" data-dcdel="' + d.id + '">삭제</button> '
+        : '') +
+      '<button class="btn ghost sm" id="dc-vclose">닫기</button></div></div>';
+    if (d.description) h += '<p style="margin:10px 0 0;color:var(--gray-6)">' + e(d.description) + '</p>';
+    if (d.body) h += '<div style="margin:14px 0;white-space:pre-wrap;line-height:1.7">' + e(d.body) + '</div>';
+    if (d.link_url) {
+      h += '<div style="margin:10px 0"><a href="' + e(d.link_url) + '" target="_blank" rel="noopener" ' +
+        'style="color:var(--navy);text-decoration:underline">링크 보기</a></div>';
+    }
+    if (fs.length) {
+      h += '<div style="margin-top:12px"><strong style="font-size:0.88rem">첨부파일</strong>' +
+        '<div style="margin-top:6px">' + fs.map(function (f) {
+          return '<button class="btn sm" style="margin:0 6px 6px 0" data-dcf="' + e(f.path) +
+            '" data-dct="' + e(d.title) + '">' + e(f.name || '파일') + '</button>';
+        }).join('') + '</div></div>';
+    }
+    return h + '</div>';
+  }
+
+  function bindDocList(box) {
+    box.querySelectorAll('a[data-dcopen]').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        docOpen = (String(docOpen) === a.dataset.dcopen) ? null : a.dataset.dcopen;
+        docEditId = null;
+        drawDocs();
+        var v = document.getElementById('dc-open');
+        if (v) v.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+    var cl = document.getElementById('dc-vclose');
+    if (cl) cl.addEventListener('click', function () { docOpen = null; drawDocs(); });
+    box.querySelectorAll('button[data-dcf]').forEach(function (b) {
+      b.addEventListener('click', function () { openDocFile(b.dataset.dcf, b.dataset.dct || ''); });
+    });
+    box.querySelectorAll('button[data-dcedit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        docEditId = b.dataset.dcedit;
+        drawDocs();
+        var f = document.getElementById('dc-form');
+        if (f) f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+    box.querySelectorAll('button[data-dcdel]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var d = docs.filter(function (x) { return String(x.id) === b.dataset.dcdel; })[0];
+        if (d) deleteDoc(d, function () { docOpen = null; drawDocs(); });
+      });
+    });
+  }
+
+  /* ---------- 청원서류 ----------
+   * 서류 진단에서 <적합>으로 진단된 청원서를 회기별로 모아 둔다.
+   * 예전에는 자료실 안에 함께 있었으나, 문서 자료와 섞이지 않도록 따로 뺐다. */
+  function drawPetitions() {
+    var box = document.getElementById('si-body');
+    var h = '<div class="notice-banner" style="margin-bottom:16px">' +
+      '<strong>' + e(NAME) + ' 청원서류</strong>입니다. 회원들이 낸 청원서 가운데 ' +
+      '서류 진단에서 <strong>적합</strong>으로 진단된 것이 회기별로 모입니다. ' +
+      '여러 건을 골라 한 번에 인쇄할 수 있고, 시찰장은 도장을 찍어 노회 서기에게 제출합니다.</div>';
+
+    if (isOfficer) {
+      h += '<div class="tabs" id="dc-view" style="margin-bottom:12px">' +
+        '<button class="' + (passView === 'live' ? 'active' : '') + '" data-dv="live">청원서류</button>' +
+        '<button class="' + (passView === 'trash' ? 'active' : '') + '" data-dv="trash">삭제한 청원서 (' +
+        trashSubs.length + ')</button></div>';
+    } else {
+      passView = 'live';
+    }
+    if (passView === 'trash') {
+      box.innerHTML = h + trashBox('pass');
+      bindViewTabs(box, 'pass');
+      bindTrashBox(box);
+      return;
+    }
+
+    if (docNotice) h += '<div class="dash-ok" style="margin-bottom:14px" id="dc-notice">' + docNotice + '</div>';
+    h += passedBox();
+    box.innerHTML = h;
+    bindViewTabs(box, 'pass');
     bindPassedBox(box);
     if (docNotice) {
       docNotice = '';
       var pb = document.getElementById('dc-pass');
       if (pb) pb.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-
-    box.querySelectorAll('button[data-dcfile]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var d = docs[+b.dataset.dcfile];
-        db().then(function (c) {
-          return c.storage.from('sichal-files').createSignedUrl(d.file_path, 60);
-        }).then(function (r) {
-          if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
-          SHSCloud.log('view', '시찰 자료 내려받기', NAME + ' / ' + d.title);
-          window.open(r.data.signedUrl, '_blank', 'noopener');
-        });
-      });
-    });
-    box.querySelectorAll('button[data-dcedit]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var d = docs[+b.dataset.dcedit];
-        document.getElementById('dc-id').value = d.id;
-        document.getElementById('dc-title').value = d.title;
-        document.getElementById('dc-desc').value = d.description || '';
-        document.getElementById('dc-date').value = d.doc_date || '';
-        document.getElementById('dc-access').value = d.access;
-        document.getElementById('dc-link').value = d.link_url || '';
-        document.getElementById('dc-ftitle').textContent = '자료 수정';
-        document.getElementById('dc-cancel').classList.remove('hidden');
-        document.getElementById('dc-ftitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
-    });
-    box.querySelectorAll('button[data-dcdel]').forEach(function (b) {
-      b.addEventListener('click', function () { deleteDoc(docs[+b.dataset.dcdel], drawDocs); });
-    });
   }
 
   function docForm() {
-    return '<div class="admin-card" style="margin-top:18px">' +
-      '<h3 style="margin-top:0" id="dc-ftitle">자료 등록</h3>' +
-      '<input type="hidden" id="dc-id" value="">' +
+    var d = docEditId ? docs.filter(function (x) { return String(x.id) === String(docEditId); })[0] : null;
+    var has = d ? docFiles(d).length : 0;
+    return '<div class="admin-card" style="margin-top:18px" id="dc-form">' +
+      '<h3 style="margin-top:0" id="dc-ftitle">' + (d ? '자료 수정' : '자료 올리기') + '</h3>' +
       '<div class="inline-form">' +
-      '<div class="field"><label>제목</label><input type="text" id="dc-title"></div>' +
-      '<div class="field" style="flex:0 0 160px"><label>날짜</label><input type="date" id="dc-date"></div>' +
+      '<div class="field"><label>제목</label><input type="text" id="dc-title" value="' +
+      (d ? e(d.title) : '') + '"></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>날짜</label><input type="date" id="dc-date" value="' +
+      (d ? e(d.doc_date || '') : '') + '"></div>' +
       '<div class="field" style="flex:0 0 160px"><label>열람 범위</label><select id="dc-access">' +
-      ACCESS.map(function (a) { return '<option value="' + a.v + '">' + a.t + '</option>'; }).join('') +
-      '</select></div>' +
+      ACCESS.map(function (a) {
+        return '<option value="' + a.v + '"' + (d && d.access === a.v ? ' selected' : '') + '>' + a.t + '</option>';
+      }).join('') + '</select></div>' +
       '</div>' +
-      '<div class="field"><label>설명 (선택)</label><input type="text" id="dc-desc"></div>' +
-      '<div class="field"><label>링크 주소 (선택)</label><input type="text" id="dc-link" placeholder="https://..."></div>' +
-      '<div class="field"><label>첨부파일 (선택 · 다시 올리면 예전 파일을 대신합니다)</label>' +
-      '<input type="file" id="dc-file"></div>' +
-      '<button class="btn" id="dc-save">저장</button> ' +
-      '<button class="btn ghost hidden" id="dc-cancel">취소</button>' +
+      '<div class="field"><label>한 줄 설명 (선택)</label><input type="text" id="dc-desc" value="' +
+      (d ? e(d.description || '') : '') + '"></div>' +
+      '<div class="field"><label>내용 (선택)</label><textarea id="dc-body" rows="5">' +
+      (d ? e(d.body || '') : '') + '</textarea></div>' +
+      '<div class="field"><label>링크 주소 (선택)</label><input type="text" id="dc-link" placeholder="https://..." value="' +
+      (d ? e(d.link_url || '') : '') + '"></div>' +
+      '<div class="field"><label>첨부파일 (선택 · 여러 개 가능)</label>' +
+      '<input type="file" id="dc-file" multiple></div>' +
+      (has
+        ? '<p style="font-size:0.82rem;color:var(--gray-5);margin:-6px 0 12px">이미 붙어 있는 파일 ' + has +
+          '개는 그대로 두고, 새로 고르신 파일이 뒤에 이어 붙습니다.</p>'
+        : '') +
+      '<button class="btn" id="dc-save">' + (d ? '수정 저장' : '올리기') + '</button> ' +
+      (d ? '<button class="btn ghost" id="dc-cancel">취소</button>' : '') +
       '<div class="form-msg" id="dc-msg"></div></div>';
   }
 
   function bindDocForm() {
     SHS.dropZone(document.getElementById('dc-file'), { what: '첨부파일' });
-    document.getElementById('dc-file').addEventListener('change', function () {
-      docFile = this.files[0] || null;
-    });
-    document.getElementById('dc-cancel').addEventListener('click', function () {
-      ['dc-id', 'dc-title', 'dc-desc', 'dc-date', 'dc-link'].forEach(function (id) {
-        document.getElementById(id).value = '';
-      });
-      document.getElementById('dc-ftitle').textContent = '자료 등록';
-      docFile = null;
-      this.classList.add('hidden');
-    });
-    document.getElementById('dc-save').addEventListener('click', function () {
+    var cancel = document.getElementById('dc-cancel');
+    if (cancel) cancel.addEventListener('click', function () { docEditId = null; drawDocs(); });
+
+    var save = document.getElementById('dc-save');
+    save.addEventListener('click', function () {
       var msg = document.getElementById('dc-msg');
-      var id = document.getElementById('dc-id').value;
+      var old = docEditId ? docs.filter(function (x) { return String(x.id) === String(docEditId); })[0] : null;
       var d = {
         sichal: NAME,
         title: document.getElementById('dc-title').value.trim(),
         description: document.getElementById('dc-desc').value.trim() || null,
+        body: document.getElementById('dc-body').value.trim() || null,
         doc_date: document.getElementById('dc-date').value || null,
         access: document.getElementById('dc-access').value,
         link_url: document.getElementById('dc-link').value.trim() || null,
@@ -1597,33 +1711,42 @@ document.addEventListener('DOMContentLoaded', function () {
         updated_by: user.name
       };
       if (!d.title) { msg.className = 'form-msg err'; msg.textContent = '제목을 입력해 주세요.'; return; }
-      if (!id) d.created_by = user.name;
-      msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      if (!old) { d.created_by = user.name; d.author_id = user.id; }
+
+      var files = document.getElementById('dc-file').files;
+      save.disabled = true;
+      msg.className = 'form-msg';
+      msg.textContent = files.length ? '파일을 올리는 중입니다...' : '저장 중입니다...';
 
       db().then(function (c) {
-        var pre = Promise.resolve(null);
-        if (docFile) {
-          var path = safeName(NAME) + '/doc-' + Date.now() + '-' + safeName(docFile.name);
-          pre = c.storage.from('sichal-files').upload(path, docFile).then(function (r) {
-            if (r.error) throw r.error;
-            return { file_path: path, file_name: docFile.name };
+        var chain = Promise.resolve([]);
+        Array.prototype.forEach.call(files, function (f, i) {
+          chain = chain.then(function (acc) {
+            msg.textContent = '파일을 올리는 중입니다... (' + (i + 1) + '/' + files.length + ')';
+            var path = safeName(NAME) + '/doc-' + Date.now() + '-' + i + '-' + safeName(f.name);
+            return c.storage.from('sichal-files').upload(path, f).then(function (r) {
+              if (r.error) throw r.error;
+              acc.push({ path: path, name: f.name, size: f.size });
+              return acc;
+            });
           });
-        }
-        return pre.then(function (f) {
-          if (f) { d.file_path = f.file_path; d.file_name = f.file_name; }
-          return id ? c.from('sichal_docs').update(d).eq('id', id).select()
-                    : c.from('sichal_docs').insert(d).select();
+        });
+        return chain.then(function (ups) {
+          d.files = (old ? docFiles(old) : []).concat(ups);
+          return old ? c.from('sichal_docs').update(d).eq('id', old.id).select()
+                     : c.from('sichal_docs').insert(d).select();
         });
       }).then(function (r) {
         var w = SHS.wrote(r);
         if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
-        SHSCloud.log(id ? 'update' : 'create', '시찰 자료 ' + (id ? '수정' : '등록'), NAME + ' / ' + d.title);
-        docFile = null;
+        SHSCloud.log(old ? 'update' : 'create', '시찰 자료 ' + (old ? '수정' : '등록'), NAME + ' / ' + d.title);
+        docEditId = null;
+        docOpen = (r.data && r.data[0]) ? r.data[0].id : null;
         load();
       }).catch(function (x) {
         msg.className = 'form-msg err';
         msg.textContent = '저장 실패: ' + ((x && x.message) || x);
-      });
+      }).then(function () { save.disabled = false; });
     });
   }
 
@@ -2753,8 +2876,8 @@ document.addEventListener('DOMContentLoaded', function () {
             passOpenId = null;
             docNotice = '「' + e(open.title) + '」을(를) <strong>적합</strong>으로 진단했습니다. ' +
               '신청자에게 알렸고, 아래 <strong>통과 청원서</strong> 목록에 올랐습니다.';
-            tab = 'doc';
-            history.replaceState(null, '', location.pathname + location.search + '#doc');
+            tab = 'pass';
+            history.replaceState(null, '', location.pathname + location.search + '#pass');
           }
           draw();   /* 목록·배지를 곧바로 다시 그린다 */
         }).catch(function (err) {

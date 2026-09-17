@@ -688,7 +688,7 @@
         return adm ? 'officer.html#sec-' + encodeURIComponent('시찰-경유-청원서') : 'mydocs.html';
       }
       var nh = key.match(/^petnh-(\d+)-(.+)$/);            /* 노회 서기 처리 결과 → 그 시찰의 통과 청원서 */
-      if (nh) return 'sichal.html?s=' + encodeURIComponent(nh[2]) + '#doc';
+      if (nh) return 'sichal.html?s=' + encodeURIComponent(nh[2]) + '#pass';
       var m = key.match(/^petition-(\d+)-(.+)$/);          /* 73 이후의 새 알림 */
       if (m) {
         return 'sichal.html?s=' + encodeURIComponent(m[2]) + '&p=' + m[1] + '#review';
