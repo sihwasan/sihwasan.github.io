@@ -28,7 +28,7 @@
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
-<script src="js/minutes-box.js"></script>
+<script src="js/minutes-box.js?v=20260917b"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
 <script src="js/ledger.js?v=20260911d"></script>
 <script src="js/photos-config.js"></script>
@@ -116,7 +116,19 @@ document.addEventListener('DOMContentLoaded', function () {
   var fyElapsed = FY_MONTHS.indexOf(new Date().getMonth() + 1) + 1;
 
   function db() { return SHSCloud.init(); }
-  function safeName(s) { return String(s || '').replace(/[^\w.\-가-힣]/g, '_'); }
+  /* ---------- 올린 파일의 보관 이름 ----------
+   * Supabase 보관함은 한글이 든 이름을 받지 않는다(Invalid key).
+   * 그래서 보관 이름은 영문·숫자로만 만들고, 사람이 읽을 원래 이름은
+   * 표(file_name · files[].name)에 따로 적어 둔다. 내려받을 때 원래 이름으로 돌려준다.
+   * 맨 앞 칸은 시찰 번호이며, 누가 올릴 수 있는지를 이 번호로 가린다. (96 sql) */
+  function safeName(s) { return String(s || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 40); }
+  function fileKey(prefix, name, i) {
+    var dot = String(name || '').lastIndexOf('.');
+    var ext = dot > 0 ? safeName(String(name).slice(dot + 1)).toLowerCase() : '';
+    var stem = safeName(dot > 0 ? String(name).slice(0, dot) : name).replace(/^[._-]+|[._-]+$/g, '');
+    return ((sic && sic.id) || 0) + '/' + prefix + '-' + Date.now() + '-' + (i || 0) +
+      (stem ? '-' + stem : '') + (ext ? '.' + ext : '');
+  }
 
   /* ---------- 불러오기 ---------- */
   function load() {
@@ -1495,9 +1507,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     return list;
   }
-  function openDocFile(path, title) {
+  function openDocFile(path, title, name) {
     db().then(function (c) {
-      return c.storage.from('sichal-files').createSignedUrl(path, 60);
+      return c.storage.from('sichal-files')
+        .createSignedUrl(path, 60, name ? { download: name } : undefined);
     }).then(function (r) {
       if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
       SHSCloud.log('view', '시찰 자료 내려받기', NAME + ' / ' + (title || ''));
@@ -1583,7 +1596,8 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<div style="margin-top:12px"><strong style="font-size:0.88rem">첨부파일</strong>' +
         '<div style="margin-top:6px">' + fs.map(function (f) {
           return '<button class="btn sm" style="margin:0 6px 6px 0" data-dcf="' + e(f.path) +
-            '" data-dct="' + e(d.title) + '">' + e(f.name || '파일') + '</button>';
+            '" data-dct="' + e(d.title) + '" data-dcn="' + e(f.name || '') + '">' +
+            e(f.name || '파일') + '</button>';
         }).join('') + '</div></div>';
     }
     return h + '</div>';
@@ -1603,7 +1617,9 @@ document.addEventListener('DOMContentLoaded', function () {
     var cl = document.getElementById('dc-vclose');
     if (cl) cl.addEventListener('click', function () { docOpen = null; drawDocs(); });
     box.querySelectorAll('button[data-dcf]').forEach(function (b) {
-      b.addEventListener('click', function () { openDocFile(b.dataset.dcf, b.dataset.dct || ''); });
+      b.addEventListener('click', function () {
+        openDocFile(b.dataset.dcf, b.dataset.dct || '', b.dataset.dcn || '');
+      });
     });
     box.querySelectorAll('button[data-dcedit]').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -1723,7 +1739,7 @@ document.addEventListener('DOMContentLoaded', function () {
         Array.prototype.forEach.call(files, function (f, i) {
           chain = chain.then(function (acc) {
             msg.textContent = '파일을 올리는 중입니다... (' + (i + 1) + '/' + files.length + ')';
-            var path = safeName(NAME) + '/doc-' + Date.now() + '-' + i + '-' + safeName(f.name);
+            var path = fileKey('doc', f.name, i);
             return c.storage.from('sichal-files').upload(path, f).then(function (r) {
               if (r.error) throw r.error;
               acc.push({ path: path, name: f.name, size: f.size });
@@ -1755,7 +1771,7 @@ document.addEventListener('DOMContentLoaded', function () {
    * 감사 칸도 그 안에서 함께 붙는다. */
   function drawMinutes() {
     SHSMinutesBox.mount(document.getElementById('si-body'), {
-      kind: 'sichal', owner: NAME, user: user,
+      kind: 'sichal', owner: NAME, ownerId: sic && sic.id, user: user,
       canEdit: isOfficer, isAuditor: isAuditor
     });
   }

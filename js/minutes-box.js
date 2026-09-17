@@ -5,8 +5,9 @@
  * 봄·가을 감사 대상이므로 감사 칸(js/audit-mark.js)을 함께 붙인다.
  *
  *   SHSMinutesBox.mount(자리, {
- *     kind:   'sichal' | 'committee',
- *     owner:  '북부시찰' | '정치부',
+ *     kind:    'sichal' | 'committee',
+ *     owner:   '북부시찰' | '정치부',
+ *     ownerId: 그 시찰·상비부의 번호 (올린 파일을 담아 둘 칸 이름),
  *     user:   지금 로그인한 사람,
  *     canEdit:  등록·수정·삭제를 할 수 있는가 (시찰장·서기 / 부장·서기·회계)
  *     isAuditor: 감사부인가
@@ -43,7 +44,17 @@ var SHSMinutesBox = (function () {
   ];
 
   function esc(s) { return SHS.esc(s); }
-  function safeName(s) { return String(s || '').replace(/[^\w.\-가-힣]/g, '_'); }
+  /* 보관함은 한글이 든 이름을 받지 않으므로(Invalid key) 보관 이름은 영문·숫자로만 만들고,
+   * 원래 이름은 file_name 에 적어 두었다가 내려받을 때 그 이름으로 돌려준다.
+   * 맨 앞 칸은 시찰·상비부 번호이며, 누가 올릴 수 있는지를 그 번호로 가린다. (96 sql) */
+  function safeName(s) { return String(s || '').replace(/[^A-Za-z0-9._-]/g, '').slice(0, 40); }
+  function fileKey(ownerId, prefix, name) {
+    var dot = String(name || '').lastIndexOf('.');
+    var ext = dot > 0 ? safeName(String(name).slice(dot + 1)).toLowerCase() : '';
+    var stem = safeName(dot > 0 ? String(name).slice(0, dot) : name).replace(/^[._-]+|[._-]+$/g, '');
+    return (ownerId || 0) + '/' + prefix + '-' + Date.now() +
+      (stem ? '-' + stem : '') + (ext ? '.' + ext : '');
+  }
 
   /* 적어 둔 것이 하나라도 있을 때에만 개회 예배 칸을 보여 준다 */
   function worshipBox(m) {
@@ -152,7 +163,8 @@ var SHSMinutesBox = (function () {
         b.addEventListener('click', function () {
           var m = rows[+b.dataset.mnfile];
           SHSCloud.init().then(function (c) {
-            return c.storage.from(cfg.bucket).createSignedUrl(m.file_path, 60);
+            return c.storage.from(cfg.bucket)
+              .createSignedUrl(m.file_path, 60, m.file_name ? { download: m.file_name } : undefined);
           }).then(function (r) {
             if (r.error) { alert('내려받지 못했습니다: ' + r.error.message); return; }
             SHSCloud.log('view', cfg.what + ' 회의록 첨부 내려받기', opts.owner + ' / ' + m.title);
@@ -280,7 +292,7 @@ var SHSMinutesBox = (function () {
         SHSCloud.init().then(function (c) {
           var pre = Promise.resolve(null);
           if (file) {
-            var path = safeName(opts.owner) + '/' + cfg.prefix + '-' + Date.now() + '-' + safeName(file.name);
+            var path = fileKey(opts.ownerId, cfg.prefix, file.name);
             pre = c.storage.from(cfg.bucket).upload(path, file).then(function (r) {
               if (r.error) throw r.error;
               return { file_path: path, file_name: file.name };
