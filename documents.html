@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function loadRoster() {
     if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) return;
     SHSCloud.init().then(function (c) {
-      return c.from('roster').select('name,church,position').order('id');
+      return c.from('roster').select('name,church,position').order('sort').order('id');
     }).then(function (r) {
       if (r.error || !r.data) return;
       rosterRows = r.data;

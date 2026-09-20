@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         jobs.push(c.from('church_reports').select('*').eq('year', YEAR).eq('church', CHURCH));
         jobs.push(c.from('roster').select('name,church,position,category,sichal,address,postcode,phone,email')
-          .eq('category', '목사').eq('active', true));
+          .eq('category', '목사').eq('active', true).order('sort').order('id'));
         /* 지난 해 보고서: 새 해에 그대로 이어받아 몇 가지만 고치면 되게 한다 */
         jobs.push(c.from('church_reports').select('*').eq('church', CHURCH).lt('year', YEAR)
           .order('year', { ascending: false }).limit(1)

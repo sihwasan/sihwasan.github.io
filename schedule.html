@@ -673,7 +673,7 @@ document.addEventListener('DOMContentLoaded', function () {
   SHSCloud.init().then(function (c) {
     db = c;
     reload();
-    c.from('roster').select('id,name,church,category,position,active').order('name')
+    c.from('roster').select('id,name,church,category,position,active').order('sort').order('id')
       .then(function (r) { roster = (r && r.data) || []; });
     c.from('site_settings').select('value').eq('key', 'sessions')
       .then(function (r) {

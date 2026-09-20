@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', function () {
           c.rpc('my_sichals'),
           c.from('sichal_churches').select('*').eq('sichal', NAME).order('sort').order('id'),
           c.from('roster').select('id,name,church,position,category,note,birth_date,term_until,address,phone,postcode')
-            .eq('sichal', NAME).order('category').order('sort'),
+            .eq('sichal', NAME).order('sort').order('id'),
           c.from('church_staff').select('*').order('sort').order('id')
             .then(function (x) { return x; }, function () { return { data: [] }; }),
           c.from('sichal_docs').select('*').eq('sichal', NAME)

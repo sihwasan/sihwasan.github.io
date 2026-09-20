@@ -477,7 +477,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return Promise.all([
         c.from('sichal_churches').select('*').order('sichal').order('sort').order('id'),
         c.from('church_staff').select('*').order('sort').order('id'),
-        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode,photo_path,ordained_on,ordained_by')
+        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode,photo_path,ordained_on,ordained_by').order('sort').order('id')
       ]);
     }).then(function (rs) {
       if (rs[1].error) throw rs[1].error;
