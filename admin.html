@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921e">
+<link rel="stylesheet" href="css/style.css?v=20260921f">
 </head>
 <body>
 
@@ -19,12 +19,12 @@
   <div id="admin-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
 </main>
 
-<script src="js/auth.js?v=20260921e"></script>
+<script src="js/auth.js?v=20260921f"></script>
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921e"></script>
-<script src="js/name-picker.js?v=20260921e"></script>
+<script src="js/main.js?v=20260921f"></script>
+<script src="js/name-picker.js?v=20260921f"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/officers-panel.js?v=20260902b"></script>
@@ -510,6 +510,32 @@ document.addEventListener('DOMContentLoaded', function () {
   function chStaffOf(church) {
     return chStaff.filter(function (x) { return chKey(x.church) === chKey(church); });
   }
+  /* 가입일을 '2003년 4월 12일 (23년 5개월째)' 처럼 적는다.
+   * 회원 명단의 부임일 칸과 같은 말씨를 쓴다. */
+  function chJoinedText(d) {
+    var t = d ? new Date(String(d).slice(0, 10) + 'T00:00:00') : null;
+    if (!t || isNaN(t)) return '';
+    var now = new Date();
+    var months = (now.getFullYear() - t.getFullYear()) * 12 + (now.getMonth() - t.getMonth());
+    if (now.getDate() < t.getDate()) months--;
+    if (months < 0) months = 0;
+    var y = Math.floor(months / 12), mo = months % 12;
+    var span = y ? y + '년' + (mo ? ' ' + mo + '개월' : '') : mo + '개월';
+    return t.getFullYear() + '년 ' + (t.getMonth() + 1) + '월 ' + t.getDate() + '일 (' + span + '째)';
+  }
+
+  /* 표 칸에 쓰는 짧은 표기 — '23년 5개월 경과' */
+  function chJoinedSpan(d) {
+    var t = d ? new Date(String(d).slice(0, 10) + 'T00:00:00') : null;
+    if (!t || isNaN(t)) return '';
+    var now = new Date();
+    var months = (now.getFullYear() - t.getFullYear()) * 12 + (now.getMonth() - t.getMonth());
+    if (now.getDate() < t.getDate()) months--;
+    if (months < 0) months = 0;
+    var y = Math.floor(months / 12), mo = months % 12;
+    return (y ? y + '년 ' : '') + (mo ? mo + '개월' : (y ? '' : '한 달 미만')) + ' 경과';
+  }
+
   function chPastorOf(church) {
     return chRoster.filter(function (r) {
       return r.category === '목사' && chKey(r.church) === chKey(church);
@@ -568,9 +594,10 @@ document.addEventListener('DOMContentLoaded', function () {
       (shown.length !== chChurches.length ? ' · 지금 <strong>' + shown.length + '곳</strong> 표시' : '') + '</p>';
     h += '<table class="tbl"><thead><tr><th style="width:90px">시찰</th><th style="width:170px">교회</th>' +
       '<th style="width:150px">담임</th><th style="width:80px">당회</th>' +
-      '<th style="width:110px">교역자·장로</th><th>홈페이지</th><th style="width:70px">관리</th></tr></thead><tbody>';
+      '<th style="width:110px">교역자·장로</th><th style="width:150px">노회 가입일</th>' +
+      '<th>홈페이지</th><th style="width:70px">관리</th></tr></thead><tbody>';
     if (!shown.length) {
-      h += '<tr><td colspan="7" style="color:var(--gray-5)">조건에 맞는 교회가 없습니다.</td></tr>';
+      h += '<tr><td colspan="8" style="color:var(--gray-5)">조건에 맞는 교회가 없습니다.</td></tr>';
     }
     shown.forEach(function (x) {
       var pr = chPastorOf(x.name);
@@ -583,6 +610,10 @@ document.addEventListener('DOMContentLoaded', function () {
           : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
         '<td>' + (chOrganized(x.name) ? '조직' : '<span style="color:var(--gray-5)">미조직</span>') + '</td>' +
         '<td>' + cnt + '명</td>' +
+        '<td>' + (x.joined_on
+          ? e(x.joined_on) + '<div style="font-size:0.76rem;color:var(--gray-5)">' +
+            e(chJoinedSpan(x.joined_on)) + '</div>'
+          : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
         '<td class="left" style="font-size:0.82rem">' + (x.url ? e(x.url) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
         '<td><button class="btn ghost sm" data-chsel="' + e(x.name) + '">수정</button></td></tr>';
     });
@@ -693,8 +724,16 @@ document.addEventListener('DOMContentLoaded', function () {
       chSichalNames().map(function (n) {
         return '<option' + (n === row.sichal ? ' selected' : '') + '>' + e(n) + '</option>';
       }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 160px"><label>노회 가입일</label>' +
+      '<input type="date" id="chv-joined" value="' + e(row.joined_on || '') +
+      '" title="이 교회가 본 노회에 가입한 날"></div>' +
       '<div class="field"><label>홈페이지 주소</label><input type="text" id="chv-url" value="' + e(row.url || '') + '"></div>' +
       '</div>' +
+      /* 가입한 지 얼마나 되었는지 — 부임일 칸과 같은 말씨로 적는다 */
+      (row.joined_on
+        ? '<p style="font-size:0.82rem;color:var(--gray-6);margin:-6px 0 10px">' +
+          '본 노회 가입 <strong>' + e(chJoinedText(row.joined_on)) + '</strong></p>'
+        : '') +
       '<div class="inline-form">' +
       '<div class="field" style="flex:1 1 300px"><label>교회 주소</label>' +
       '<input type="text" id="chv-addr" value="' + e((chPastorOf(chSel) || {}).address || '') + '"' +
@@ -789,6 +828,7 @@ document.addEventListener('DOMContentLoaded', function () {
         name: newName,
         sichal: document.getElementById('chv-sichal').value,
         url: document.getElementById('chv-url').value.trim() || null,
+        joined_on: document.getElementById('chv-joined').value || null,
         note: document.getElementById('chv-note').value.trim() || null,
         updated_at: new Date().toISOString(), updated_by: user.name
       };

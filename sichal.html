@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>시찰회 - 시화산노회</title>
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20260921e">
+<link rel="stylesheet" href="css/style.css?v=20260921f">
 </head>
 <body>
 
@@ -20,13 +20,13 @@
   <div id="si-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
 </main>
 
-<script src="js/auth.js?v=20260921e"></script>
+<script src="js/auth.js?v=20260921f"></script>
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921e"></script>
+<script src="js/main.js?v=20260921f"></script>
 <script src="js/church-report.js?v=20260903a"></script>
-<script src="js/name-picker.js?v=20260921e"></script>
+<script src="js/name-picker.js?v=20260921f"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/minutes-box.js?v=20260917b"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
@@ -491,8 +491,21 @@ document.addEventListener('DOMContentLoaded', function () {
     { k: 'url',     t: '홈페이지' },
     { k: 'address', t: '주소' },
     { k: 'phone',   t: '연락처' },
+    { k: 'joined_on', t: '노회 가입일' },
     { k: 'note',    t: '비고' }
   ];
+  /* 가입한 지 얼마나 되었는지 — '23년 5개월째' */
+  function joinedSpan(d) {
+    var t = d ? new Date(String(d).slice(0, 10) + 'T00:00:00') : null;
+    if (!t || isNaN(t)) return '';
+    var now = new Date();
+    var months = (now.getFullYear() - t.getFullYear()) * 12 + (now.getMonth() - t.getMonth());
+    if (now.getDate() < t.getDate()) months--;
+    if (months < 0) months = 0;
+    var y = Math.floor(months / 12), mo = months % 12;
+    return (y ? y + '년' + (mo ? ' ' + mo + '개월' : '') : mo + '개월') + '째';
+  }
+
   var openCh = null;   /* 지금 열어 둔 교회 */
   /* 주소의 ?ch=교회명 — 대시보드 등에서 특정 교회를 바로 펼쳐 달라는 요청 */
   var WANT_CH = decodeURIComponent((location.search.match(/[?&]ch=([^&]*)/) || [])[1] || '')
@@ -786,6 +799,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (f.k === 'url' && val) {
           val = '<a href="' + e(link) + '" target="_blank" rel="noopener" ' +
                 'style="color:var(--navy);text-decoration:underline">' + e(ch.url) + '</a>';
+        } else if (f.k === 'joined_on' && val) {
+          val = e(val) + ' <span style="color:var(--gray-5)">(' + e(joinedSpan(val)) + ')</span>';
         } else if (f.k === 'pastor' && val) {
           val = e(val) + (ch.pastorPos && ch.pastorPos !== '목사'
             ? ' <span style="color:var(--gray-5)">(' + e(ch.pastorPos) + ')</span>' : '');
@@ -829,8 +844,16 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button class="btn sm" id="ce-add" style="align-self:flex-end">장로 추가</button>' +
         '</div>' +
         '<div class="form-msg" id="ce-msg"></div>' +
+        '<div class="inline-form">' +
+        /* 노회 가입일은 노회의 기록이므로 시찰장·서기(와 노회 관리자)만 고친다 */
+        (isOfficer
+          ? '<div class="field" style="flex:0 0 170px"><label>노회 가입일</label>' +
+            '<input type="date" id="cv-joined" value="' + e(ch.joined_on || '') +
+            '" title="이 교회가 본 노회에 가입한 날"></div>'
+          : '') +
         '<div class="field"><label>비고</label>' +
         '<input type="text" id="cv-note" value="' + e(ch.note || '') + '"></div>' +
+        '</div>' +
         '<button class="btn" id="cv-save">저장</button> ' +
         (isOfficer
           ? '<button class="btn danger" id="cv-del">교회 지우기</button>' : '') +
@@ -852,6 +875,8 @@ document.addEventListener('DOMContentLoaded', function () {
         ['url', 'note'].forEach(function (k) {
           d[k] = document.getElementById('cv-' + k).value.trim() || null;
         });
+        var jEl = document.getElementById('cv-joined');
+        if (jEl) d.joined_on = jEl.value || null;   /* 칸이 없으면 지금 값을 그대로 둔다 */
         msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
         db().then(function (c) {
           /* .select() 로 고친 줄을 되받아 정말 저장되었는지 확인한다.
