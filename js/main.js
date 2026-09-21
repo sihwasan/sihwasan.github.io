@@ -1368,11 +1368,15 @@
     return '준회원은 회의에서 언권만 가지므로 ' + (what || '이 자리') + '에 세울 수 없습니다.';
   }
 
-  /* 언권회원 제한: 서류 발급·청원서·보고서 작성은 할 수 없다.
-   * 그 밖의 활동은 정회원과 동일하다. */
+  /* 언권회원·준회원 제한: 서류 발급·청원서·보고서 작성은 할 수 없다.
+   * 자료 열람과 그 밖의 활동은 정회원과 동일하다. */
+  function isLimitedMember(u) {
+    return !!u && (u.role === 'advisory' || u.role === 'associate');
+  }
+
   function fullMemberGate(u, what) {
-    if (u && u.role === 'advisory') {
-      return '<div class="notice-banner">언권회원은 <strong>' + (what || '이 기능') +
+    if (isLimitedMember(u)) {
+      return '<div class="notice-banner">' + displayRole(u.role) + '은 <strong>' + (what || '이 기능') +
         '</strong>을 이용하실 수 없습니다. 문의는 노회 사무실(031-486-9993)로 해주시기 바랍니다.</div>';
     }
     return null;
@@ -1684,6 +1688,7 @@
     callTerm: callTerm,
     CALL_YEARS: CALL_YEARS,
     isAssociate: isAssociate,
+    isLimitedMember: isLimitedMember,
     associateHint: associateHint,
     associateBlock: associateBlock,
     canServe: canServe,
