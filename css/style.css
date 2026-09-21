@@ -2718,3 +2718,20 @@ td[data-duch]:hover { background: #eef2f8; }
  * 당회가 없는 교회의 담임은 3년마다 다시 청빙청원을 해야 하므로,
  * 명단과 내 정보에서 그 때가 다가온 것을 한눈에 알아보게 한다. */
 .warn { color: #9a6314; font-weight: 600; }
+
+/* ---------- 시무목사 청빙 임기 명단 인쇄 ----------
+ * '인쇄'를 누르면 이 명단만 종이에 앉힌다. 몸통(body) 바로 아래에 인쇄용
+ * 자리를 따로 두고, 인쇄할 때만 그 자리 하나만 남기는 것이 가장 단단하다.
+ * (명단은 관리 화면 깊숙이 들어 있어 위에서부터 하나씩 감추기 어렵다) */
+#call-print { display: none; }
+@media print {
+  body.print-calls > *:not(#call-print) { display: none !important; }
+  body.print-calls #call-print { display: block !important; }
+  #call-print h2 { font-size: 1.2rem; margin: 0 0 4px; }
+  #call-print .cp-sub { font-size: 0.82rem; color: #555; margin: 0 0 14px; }
+  #call-print table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  #call-print th, #call-print td { border: 1px solid #999; padding: 5px 7px; text-align: center; }
+  #call-print th { background: #eee; }
+  #call-print td.left { text-align: left; }
+  @page { size: A4 portrait; margin: 14mm; }
+}

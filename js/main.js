@@ -1919,12 +1919,25 @@
     for (var i = 0; i < list.length; i++) setupZoom(list[i]);
   }
 
+  /* 접혀 있던 탭이 열리거나 자료가 뒤늦게 그려질 때도 넓은 표를 챙긴다.
+   * 감춰져 있는 동안에는 너비가 0 이라 처음에는 넓은지 알 수 없기 때문이다. */
+  var wideTimer = null;
+  function scheduleWide() {
+    clearTimeout(wideTimer);
+    wideTimer = setTimeout(fitWide, 250);
+  }
+
   function start() {
     fitWide();
     scanZoom();
     if ('MutationObserver' in window) {
-      new MutationObserver(scanZoom).observe(document.body, { childList: true, subtree: true });
+      new MutationObserver(function () {
+        scanZoom();
+        scheduleWide();
+      }).observe(document.body, { childList: true, subtree: true });
     }
+    /* 탭을 누르면 그때 비로소 표가 보인다 — 누른 뒤에 한 번 더 재어 본다 */
+    document.addEventListener('click', scheduleWide, true);
   }
 
   if (document.readyState === 'loading') {

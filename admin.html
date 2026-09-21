@@ -1211,6 +1211,97 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button class="btn" id="ro-add">추가</button>' +
         '</div><div class="form-msg" id="ro-msg"></div></div>';
 
+      /* ---------- 시무목사 청빙 임기 명단 ----------
+       * 당회가 조직되지 않은 교회의 담임은 시무목사로서 3년마다 다시 청빙청원을
+       * 해야 한다. 언제까지인지, 얼마나 남았는지를 남은 기간 순으로 모아 둔 자리다.
+       * 노회를 앞두고 이 명단만 보면 이번에 청원할 분들을 가려낼 수 있다. */
+
+      /* 줄 세우기에 쓸 값 — 기록이 없으면 가장 급한 것으로, 이미 끝난 지난
+       * 기록(위임 등)은 맨 뒤로 보낸다. */
+      function callDays(m) {
+        var t = SHS.callTerm(m);
+        if (t.state === 'none') return -999999;
+        if (t.state === 'done') return 999999;
+        return t.days;
+      }
+      var callRows = rows.filter(function (m) { return SHS.callTerm(m).state !== 'na'; });
+
+      html += '<div class="admin-card" id="call-card" style="margin-bottom:16px">' +
+        '<h3 style="margin-top:0">시무목사 청빙 임기</h3>' +
+        '<p style="font-size:0.86rem;color:var(--gray-6);margin:-6px 0 12px">' +
+        '당회가 조직되지 않은 교회의 담임은 시무목사로서 <strong>' + SHS.CALL_YEARS +
+        '년마다</strong> 시무목사 청빙청원을 해야 합니다. 기한이 <span class="warn">반년 안</span>으로 ' +
+        '다가왔거나 <span class="fail">이미 지난</span> 분은 빛깔로 알려 드립니다. ' +
+        '허락일·만료일은 각 줄의 <strong>수정</strong>에서 고칩니다.</p>';
+
+      if (!callRows.length) {
+        html += '<p style="color:var(--gray-5)">해당하는 분이 없습니다.</p></div>';
+      } else {
+        html += '<div class="inline-form no-print" style="margin-bottom:10px">' +
+          '<div class="field" style="flex:0 0 190px"><label for="call-sort">보기 순서</label>' +
+          '<select id="call-sort">' +
+          '<option value="soon">남은 기간 짧은 순</option>' +
+          '<option value="late">남은 기간 긴 순</option>' +
+          '<option value="on">청빙 허락일 순</option>' +
+          '<option value="sichal">시찰 · 이름 순</option>' +
+          '</select></div>' +
+          '<div class="field" style="flex:0 0 150px"><label for="call-sichal">시찰</label>' +
+          '<select id="call-sichal"><option value="">시찰 전체</option>' +
+          sichalNames.map(function (x) { return '<option>' + e(x) + '</option>'; }).join('') +
+          '</select></div>' +
+          '<div class="field" style="flex:0 0 200px"><label for="call-state">형편</label>' +
+          '<select id="call-state">' +
+          '<option value="">전체</option>' +
+          '<option value="due">지났거나 반년 안 (청원 대상)</option>' +
+          '<option value="over">기한이 지난 분만</option>' +
+          '<option value="none">기록이 없는 분만</option>' +
+          '</select></div>' +
+          '<div class="field" style="flex:0 0 auto;align-self:flex-end;margin-bottom:6px">' +
+          '<label style="display:flex;align-items:center;gap:6px;font-weight:400">' +
+          '<input type="checkbox" id="call-past" style="width:auto"> 지난 기록도 보기</label></div>' +
+          '<button class="btn ghost" id="call-print-btn" style="align-self:flex-end;margin-bottom:2px">인쇄</button>' +
+          '</div>';
+
+        html += '<table class="tbl" id="call-tbl" style="margin-bottom:6px"><thead><tr>' +
+          '<th style="width:46px">번호</th><th style="width:100px">성명</th>' +
+          '<th>시무교회</th><th style="width:100px">시찰</th>' +
+          '<th style="width:110px">청빙 허락일</th><th style="width:110px">시무 만료일</th>' +
+          '<th style="width:150px">남은 기간</th><th style="width:100px">임시당회장</th>' +
+          '<th style="width:70px" class="no-print">관리</th></tr></thead><tbody>';
+
+        callRows.slice().sort(function (a, b) {
+          return callDays(a) - callDays(b);
+        }).forEach(function (m) {
+          var t = SHS.callTerm(m);
+          var tone = t.state === 'over' || t.state === 'none' ? 'fail'
+            : (t.state === 'soon' ? 'warn' : '');
+          var left =
+            t.state === 'none' ? '<span class="fail">청빙 기록 없음</span>'
+            : t.state === 'done' ? '<span style="color:var(--gray-5)">' +
+                e(m.position || '') + '로 위임되어 끝남</span>'
+            : t.state === 'over' ? '<span class="fail">' + spanShort(-t.days) + ' 지남</span>'
+            : '<span class="' + tone + '">' + spanShort(t.days) + ' 남음</span>';
+          html += '<tr data-callrow="' + m.id + '" data-cs="' + t.state + '"' +
+            ' data-cd="' + callDays(m) + '" data-csi="' + e(m.sichal || '') + '"' +
+            ' data-cn="' + e(m.name || '') + '" data-con="' + e(t.on || '') + '">' +
+            '<td class="call-no"></td>' +
+            '<td><a data-roview="' + m.id + '" title="정보 보기" ' +
+            'style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;' +
+            'text-decoration-style:dotted;text-underline-offset:3px">' + e(m.name) + '</a></td>' +
+            '<td class="left">' + e(m.church || '-') + '</td>' +
+            '<td>' + e(m.sichal || '-') + '</td>' +
+            '<td>' + (t.on ? e(t.on) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td>' + (t.until ? e(t.until) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td>' + left + '</td>' +
+            '<td>' + (m.call_acting ? e(m.call_acting) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td class="no-print"><button class="btn sm" data-roedit="' + m.id + '">수정</button></td>' +
+            '</tr>';
+        });
+        html += '</tbody></table>';
+        html += '<p style="font-size:0.84rem;color:var(--gray-6)" id="call-sum"></p>';
+        html += '</div>';
+      }
+
       /* 명단 조회 */
       html += '<div class="inline-form" style="margin-bottom:12px">' +
         '<div class="field" style="flex:1 1 240px"><label for="ro-q">명단 조회</label>' +
@@ -1279,7 +1370,8 @@ document.addEventListener('DOMContentLoaded', function () {
       function spanShort(days) {
         if (days < 31) return days + '일';
         var mo = Math.round(days / 30.44), y = Math.floor(mo / 12), mm = mo % 12;
-        return (y ? y + '년 ' : '') + (mm ? mm + '개월' : (y ? '' : '한 달'));
+        if (!y) return (mm || 1) + '개월';
+        return y + '년' + (mm ? ' ' + mm + '개월' : '');
       }
 
       /* 명단 표 — 읽기 전용. [수정]을 누르면 팝업에서 고친다. */
@@ -1338,6 +1430,108 @@ document.addEventListener('DOMContentLoaded', function () {
         '<em>언권회원</em>으로 저절로 바뀝니다.</strong></p>';
       box.innerHTML = html;
       loadThumbs();
+
+      /* ----- 시무목사 청빙 임기 명단: 줄 세우기 · 가려내기 · 인쇄 ----- */
+      (function () {
+        var tbl = document.getElementById('call-tbl');
+        if (!tbl) return;
+        var tbody = tbl.querySelector('tbody');
+        var sortEl = document.getElementById('call-sort');
+        var siEl = document.getElementById('call-sichal');
+        var stEl = document.getElementById('call-state');
+        var pastEl = document.getElementById('call-past');
+        var sumEl = document.getElementById('call-sum');
+
+        function draw() {
+          var mode = sortEl.value, si = siEl.value, st = stEl.value, past = pastEl.checked;
+
+          var trs = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-callrow]'));
+          trs.sort(function (a, b) {
+            if (mode === 'late') return (+b.dataset.cd) - (+a.dataset.cd);
+            if (mode === 'on') {
+              return (a.dataset.con || '9999').localeCompare(b.dataset.con || '9999');
+            }
+            if (mode === 'sichal') {
+              return (a.dataset.csi || '힣').localeCompare(b.dataset.csi || '힣') ||
+                     (a.dataset.cn || '').localeCompare(b.dataset.cn || '');
+            }
+            return (+a.dataset.cd) - (+b.dataset.cd);   /* 남은 기간 짧은 순 */
+          });
+          trs.forEach(function (tr) { tbody.appendChild(tr); });
+
+          var n = 0, over = 0, soon = 0, none = 0;
+          trs.forEach(function (tr) {
+            var s = tr.dataset.cs;
+            var ok = (past || s !== 'done') &&
+                     (!si || tr.dataset.csi === si) &&
+                     (st === '' ||
+                      (st === 'due'  && (s === 'over' || s === 'soon' || s === 'none')) ||
+                      (st === 'over' && s === 'over') ||
+                      (st === 'none' && s === 'none'));
+            tr.classList.toggle('hidden', !ok);
+            if (ok) {
+              tr.querySelector('.call-no').textContent = ++n;
+              if (s === 'over') over++;
+              else if (s === 'soon') soon++;
+              else if (s === 'none') none++;
+            }
+          });
+
+          var parts = ['모두 <strong>' + n + '</strong>명'];
+          if (over) parts.push('<span class="fail">기한 지남 ' + over + '명</span>');
+          if (soon) parts.push('<span class="warn">반년 안 ' + soon + '명</span>');
+          if (none) parts.push('<span class="fail">기록 없음 ' + none + '명</span>');
+          sumEl.innerHTML = parts.join(' · ') +
+            (over + soon + none ? ' — 이번 노회에서 시무목사 청빙청원을 살펴 주세요.' : '');
+        }
+
+        [sortEl, siEl, stEl, pastEl].forEach(function (el) {
+          el.addEventListener('change', draw);
+        });
+        draw();
+
+        /* 인쇄 — 몸통 바로 아래에 인쇄용 자리를 만들어 이 명단만 종이에 앉힌다 */
+        document.getElementById('call-print-btn').addEventListener('click', function () {
+          var shown = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-callrow]'))
+            .filter(function (tr) { return !tr.classList.contains('hidden'); });
+          if (!shown.length) { alert('인쇄할 줄이 없습니다.'); return; }
+
+          var today = new Date();
+          var h = '<h2>시화산노회 시무목사 청빙 임기</h2>' +
+            '<p class="cp-sub">' + today.getFullYear() + '년 ' + (today.getMonth() + 1) + '월 ' +
+            today.getDate() + '일 기준 · ' + shown.length + '명' +
+            (siEl.value ? ' · ' + e(siEl.value) : '') +
+            (stEl.options[stEl.selectedIndex].value ? ' · ' + e(stEl.options[stEl.selectedIndex].text) : '') +
+            '</p>' +
+            '<table><thead><tr><th>번호</th><th>성명</th><th>시무교회</th><th>시찰</th>' +
+            '<th>청빙 허락일</th><th>시무 만료일</th><th>남은 기간</th><th>임시당회장</th></tr></thead><tbody>';
+          shown.forEach(function (tr, i) {
+            var td = tr.querySelectorAll('td');
+            function txt(k) { return e((td[k].textContent || '').trim() || '-'); }
+            h += '<tr><td>' + (i + 1) + '</td><td>' + txt(1) + '</td>' +
+              '<td class="left">' + txt(2) + '</td><td>' + txt(3) + '</td>' +
+              '<td>' + txt(4) + '</td><td>' + txt(5) + '</td>' +
+              '<td>' + txt(6) + '</td><td>' + txt(7) + '</td></tr>';
+          });
+          h += '</tbody></table>';
+
+          var slot = document.getElementById('call-print');
+          if (!slot) {
+            slot = document.createElement('div');
+            slot.id = 'call-print';
+            document.body.appendChild(slot);
+          }
+          slot.innerHTML = h;
+          document.body.classList.add('print-calls');
+          function done() {
+            document.body.classList.remove('print-calls');
+            window.removeEventListener('afterprint', done);
+          }
+          window.addEventListener('afterprint', done);
+          window.print();
+          setTimeout(done, 1500);   /* afterprint 를 주지 않는 기기를 위한 대비 */
+        });
+      })();
 
       document.getElementById('ro-order').addEventListener('click', function () {
         var msg = document.getElementById('ro-ordmsg');
