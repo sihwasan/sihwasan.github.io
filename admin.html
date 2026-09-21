@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921b">
+<link rel="stylesheet" href="css/style.css?v=20260921c">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921b"></script>
+<script src="js/main.js?v=20260921c"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
@@ -1768,25 +1768,19 @@ document.addEventListener('DOMContentLoaded', function () {
           '<input type="text" id="rm-ordby" value="' + e(m.ordained_by || '') + '" placeholder="예: 시화산노회"' +
           ' title="안수증명서 발급 시 이 기록과 대조합니다"></div>' +
           '</div>' +
-          /* 시무목사 청빙 — 당회가 없는 교회의 담임은 3년마다 다시 청원해야 한다.
-           * 만료일은 비워 두면 허락일부터 3년 뒤로 저절로 채워진다.
+          /* 시무목사 청빙 이력 — 3년마다 다시 청원하므로 기록이 여러 번 쌓인다.
            * 목사 갈래에만 보인다 (무임목사가 청빙받아 부임하는 일도 있으므로
-           * 지금 시무목사가 아니더라도 목사면 열어 둔다). 장로·직원에게는 숨긴다. */
+           * 지금 시무목사가 아니더라도 목사면 열어 둔다). 장로·직원에게는 숨긴다.
+           * 이 칸은 관리자만 볼 수 있는 자리이고, 본인은 내 정보에서 볼 뿐이다. */
           (/목사/.test(m.category || '') || m.call_on
-            ? '<div class="inline-form">' +
-              '<div class="field" style="flex:0 0 160px"><label>시무목사 청빙 허락일</label>' +
-              '<input type="date" id="rm-callon" value="' + e(m.call_on || '') +
-              '" title="노회가 시무목사 청빙을 허락한 날"></div>' +
-              '<div class="field" style="flex:0 0 160px"><label>시무 만료일</label>' +
-              '<input type="date" id="rm-calluntil" value="' + e(m.call_until || '') +
-              '" title="비워 두면 허락일부터 3년 뒤로 저절로 채워집니다"></div>' +
-              '<div class="field"><label>임시당회장</label>' +
-              '<input type="text" id="rm-callacting" value="' + e(m.call_acting || '') +
-              '" placeholder="예: 강명우"></div>' +
-              '</div>' +
-              '<span style="display:block;font-size:0.8rem;color:var(--gray-5);margin:-6px 0 12px">' +
+            ? '<div class="field"><label>시무목사 청빙 이력</label>' +
+              '<div id="rm-call-box" style="border:1px solid var(--gray-2,#e5e4df);border-radius:8px;padding:10px 12px">' +
+              '<span style="color:var(--gray-5);font-size:0.85rem">청빙 기록을 불러오는 중...</span></div>' +
+              '<div class="form-msg" id="rm-call-msg"></div>' +
+              '<span style="display:block;font-size:0.8rem;color:var(--gray-5);margin:4px 0 12px">' +
               '당회가 조직되지 않은 교회의 담임은 시무목사로서 3년마다 시무목사 청빙청원을 해야 합니다. ' +
-              '만료일을 비워 두고 저장하면 허락일부터 3년 뒤로 채워집니다.</span>'
+              '만료일을 비워 두고 저장하면 허락일부터 3년 뒤로 채워집니다. ' +
+              '가장 최근 기록이 명단과 내 정보에 <strong>지금 임기</strong>로 나옵니다.</span></div>'
             : '') +
           '<div class="field"><label>상비부</label>' +
           '<div id="rm-com-box" style="border:1px solid var(--gray-2,#e5e4df);border-radius:8px;padding:10px 12px">' +
@@ -1814,13 +1808,16 @@ document.addEventListener('DOMContentLoaded', function () {
         autoGrade(null, document.getElementById('rm-cat'),
                   document.getElementById('rm-birth'), document.getElementById('rm-grade'));
 
-        /* 시무목사 청빙 허락일을 새로 적으면 만료일을 3년 뒤로 함께 옮겨 준다.
-         * 다만 서기가 3년과 다른 날짜를 손수 적어 둔 경우에는 건드리지 않는다
-         * (노회가 기간을 달리 정한 것이므로). */
+        /* ----- 시무목사 청빙 이력 (관리자 전용) -----
+         * 3년마다 다시 청원하므로 기록이 여러 번 쌓인다. 여기서 낱낱이 적어 두면
+         * 가장 최근 기록이 명단과 내 정보의 '지금 임기'가 된다.
+         * 본인은 내 정보에서 볼 수만 있고, 고치는 일은 이 자리에서만 한다. */
         (function () {
-          var onEl = document.getElementById('rm-callon');
-          var untilEl = document.getElementById('rm-calluntil');
-          if (!onEl || !untilEl) return;
+          var box = document.getElementById('rm-call-box');
+          if (!box) return;
+          var msg = document.getElementById('rm-call-msg');
+          var loaded = [];      /* 불러온 그대로 — 지운 줄을 가려내는 데 쓴다 */
+
           function plus3(d) {
             if (!d) return '';
             var t = new Date(d + 'T00:00:00');
@@ -1829,14 +1826,136 @@ document.addEventListener('DOMContentLoaded', function () {
             return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) +
               '-' + ('0' + t.getDate()).slice(-2);
           }
-          var wasAuto = !untilEl.value || untilEl.value === plus3(onEl.value);
-          onEl.addEventListener('change', function () {
-            if (!onEl.value) { untilEl.value = ''; return; }
-            if (wasAuto) untilEl.value = plus3(onEl.value);
-          });
-          untilEl.addEventListener('change', function () {
-            wasAuto = !untilEl.value || untilEl.value === plus3(onEl.value);
-          });
+
+          function rowHtml(c) {
+            c = c || {};
+            return '<div class="inline-form rm-call-row" data-cid="' + e(c.id || '') + '"' +
+              ' style="margin-bottom:8px;align-items:flex-end;background:var(--gray-1,#f7f6f3);' +
+              'border:1px solid var(--gray-2,#e5e4df);border-radius:6px;padding:8px 10px">' +
+              '<div class="field" style="flex:0 0 150px;margin:0"><label style="font-size:0.78rem">청빙 허락일</label>' +
+              '<input type="date" data-ck="approved_on" value="' + e(c.approved_on || '') + '"></div>' +
+              '<div class="field" style="flex:0 0 150px;margin:0"><label style="font-size:0.78rem">시무 만료일</label>' +
+              '<input type="date" data-ck="until_on" value="' + e(c.until_on || '') + '"></div>' +
+              '<div class="field" style="flex:0 0 110px;margin:0"><label style="font-size:0.78rem">임시당회장</label>' +
+              '<input type="text" data-ck="acting" value="' + e(c.acting || '') + '" placeholder="예: 강명우"></div>' +
+              '<div class="field" style="margin:0"><label style="font-size:0.78rem">비고</label>' +
+              '<input type="text" data-ck="note" value="' + e(c.note || '') + '" placeholder="예: 위임으로 마침"></div>' +
+              '<button type="button" class="btn ghost sm" data-cdel="1" style="margin-bottom:2px">삭제</button>' +
+              '</div>';
+          }
+
+          /* 허락일을 적으면 만료일을 3년 뒤로 함께 채운다.
+           * 서기가 3년과 다른 날짜를 손수 적어 둔 줄은 건드리지 않는다. */
+          function wire(row) {
+            var onEl = row.querySelector('[data-ck="approved_on"]');
+            var unEl = row.querySelector('[data-ck="until_on"]');
+            var auto = !unEl.value || unEl.value === plus3(onEl.value);
+            onEl.addEventListener('change', function () {
+              if (!onEl.value) { unEl.value = ''; return; }
+              if (auto) unEl.value = plus3(onEl.value);
+            });
+            unEl.addEventListener('change', function () {
+              auto = !unEl.value || unEl.value === plus3(onEl.value);
+            });
+            row.querySelector('[data-cdel]').addEventListener('click', function () {
+              row.remove();
+              if (!box.querySelector('.rm-call-row')) addRow();
+            });
+          }
+
+          function addRow(c) {
+            var wrap = box.querySelector('#rm-call-rows');
+            wrap.insertAdjacentHTML('beforeend', rowHtml(c));
+            wire(wrap.lastElementChild);
+          }
+
+          function draw(list) {
+            box.innerHTML = '<div id="rm-call-rows"></div>' +
+              '<div style="margin-top:6px">' +
+              '<button type="button" class="btn ghost sm" id="rm-call-add">줄 추가</button>' +
+              '<button type="button" class="btn sm" id="rm-call-save" style="margin-left:6px">청빙 이력 저장</button>' +
+              '</div>';
+            if (list.length) list.forEach(addRow); else addRow();
+            box.querySelector('#rm-call-add').addEventListener('click', function () { addRow(); });
+            box.querySelector('#rm-call-save').addEventListener('click', save);
+          }
+
+          function read() {
+            return Array.prototype.map.call(box.querySelectorAll('.rm-call-row'), function (row) {
+              var o = { id: row.dataset.cid ? +row.dataset.cid : null };
+              row.querySelectorAll('[data-ck]').forEach(function (el) {
+                o[el.dataset.ck] = el.value.trim() || null;
+              });
+              return o;
+            }).filter(function (o) { return o.approved_on; });
+          }
+
+          function save() {
+            var list = read();
+            var seen = {};
+            for (var i = 0; i < list.length; i++) {
+              if (seen[list[i].approved_on]) {
+                msg.className = 'form-msg err';
+                msg.textContent = '같은 허락일(' + list[i].approved_on + ')이 두 번 적혀 있습니다.';
+                return;
+              }
+              seen[list[i].approved_on] = 1;
+            }
+            var keep = {};
+            list.forEach(function (o) { if (o.id) keep[o.id] = 1; });
+            var gone = loaded.filter(function (o) { return !keep[o.id]; });
+
+            msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+            SHSCloud.init().then(function (c) {
+              var jobs = [];
+              gone.forEach(function (o) {
+                jobs.push(c.from('roster_calls').delete().eq('id', o.id));
+              });
+              list.forEach(function (o) {
+                var row = { roster_id: m.id, approved_on: o.approved_on,
+                            until_on: o.until_on, acting: o.acting, note: o.note };
+                jobs.push(o.id
+                  ? c.from('roster_calls').update(row).eq('id', o.id)
+                  : c.from('roster_calls').insert(row));
+              });
+              return Promise.all(jobs);
+            }).then(function (res) {
+              var bad = res.filter(function (r2) { return r2 && r2.error; })[0];
+              if (bad) {
+                msg.className = 'form-msg err';
+                msg.textContent = bad.error.code === '42501'
+                  ? '청빙 날짜는 관리자만 고칠 수 있습니다.' : bad.error.message;
+                return;
+              }
+              SHSCloud.log('update', '시무목사 청빙 이력', m.name + ' ' + list.length + '건');
+              msg.className = 'form-msg ok';
+              msg.textContent = '청빙 이력을 저장했습니다. 명단의 지금 임기도 함께 맞췄습니다.';
+              load();
+              renderRoster();
+            }).catch(function (err) {
+              msg.className = 'form-msg err';
+              msg.textContent = '저장하지 못했습니다: ' + (err.message || err);
+            });
+          }
+
+          function load() {
+            SHSCloud.init().then(function (c) {
+              return c.from('roster_calls').select('*').eq('roster_id', m.id)
+                .order('approved_on', { ascending: false });
+            }).then(function (r) {
+              loaded = ((r && r.data) || []).slice().sort(function (a, b) {
+                return String(b.approved_on).localeCompare(String(a.approved_on));
+              });
+              draw(loaded.map(function (o) {
+                return { id: o.id, approved_on: o.approved_on, until_on: o.until_on,
+                         acting: o.acting, note: o.note };
+              }));
+            }, function () {
+              box.innerHTML = '<span class="fail" style="font-size:0.85rem">' +
+                '청빙 이력을 불러오지 못했습니다.</span>';
+            });
+          }
+          load();
         })();
 
         /* ----- 회원 사진 (관리자가 대신 올린다) — 명단 표의 사진 칸과 같은 함수를 쓴다 ----- */
@@ -2044,7 +2163,6 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('rm-save').addEventListener('click', function () {
           var msg = document.getElementById('rm-msg');
           function v(id) { return document.getElementById(id).value.trim(); }
-          function has(id) { return !!document.getElementById(id); }
           var cat = v('rm-cat') || null;
           var pos = cat;
           /* 위임목사·시무목사는 조직 분류로는 목사 무리에 둔다 */
@@ -2061,11 +2179,8 @@ document.addEventListener('DOMContentLoaded', function () {
             served_from: v('rm-served') || null,
             ordained_on: v('rm-ordon') || null,
             ordained_by: v('rm-ordby') || null,
-            /* 시무목사 청빙 — 목사 갈래에만 칸이 있으므로 없으면 지금 값을 그대로 둔다.
-             * 만료일을 비워 두면 서버가 허락일 + 3년으로 채운다. */
-            call_on: has('rm-callon') ? (v('rm-callon') || null) : (m.call_on || null),
-            call_until: has('rm-calluntil') ? (v('rm-calluntil') || null) : (m.call_until || null),
-            call_acting: has('rm-callacting') ? (v('rm-callacting') || null) : (m.call_acting || null),
+            /* 시무목사 청빙(call_on·call_until·call_acting)은 여기서 보내지 않는다.
+             * 청빙 이력 칸에서 고치고, 가장 최근 기록이 서버에서 그대로 비친다. */
             role: g.role, officer_title: g.title
           };
           if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명은 비울 수 없습니다.'; return; }
@@ -2172,7 +2287,10 @@ document.addEventListener('DOMContentLoaded', function () {
               (m.call_acting
                 ? '<br><span style="color:var(--gray-5);font-size:0.84rem">임시당회장 ' +
                   e(m.call_acting) + ' 목사</span>'
-                : ''));
+                : '')) +
+              /* 여태 허락받은 기록은 아래에서 채워 넣는다 */
+              '<tr id="rv-calls" class="hidden"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">' +
+              '청빙 이력</td><td class="left"></td></tr>';
           })() +
           (term ? viewRow('장로 총대 자격', term) : '') +
           viewRow('연락처', e(m.phone || '')) +
@@ -2186,6 +2304,31 @@ document.addEventListener('DOMContentLoaded', function () {
           mo.close();
           openRosterEdit(m);
         });
+        /* 시무목사 청빙 이력 — 여태 허락받은 기록을 모두 적어 준다 */
+        (function () {
+          var tr = mo.ov.querySelector('#rv-calls');
+          if (!tr) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('roster_calls').select('*').eq('roster_id', m.id)
+              .order('approved_on', { ascending: false });
+          }).then(function (r) {
+            var list = ((r && r.data) || []).slice().sort(function (a, b) {
+              return String(b.approved_on).localeCompare(String(a.approved_on));
+            });
+            if (!list.length) return;
+            tr.classList.remove('hidden');
+            tr.querySelector('td:last-child').innerHTML =
+              '<span style="font-size:0.84rem;color:var(--gray-6)">모두 ' + list.length + '번</span>' +
+              list.map(function (c2, i) {
+                return '<div style="font-size:0.86rem;margin-top:3px">' +
+                  e(c2.approved_on) + ' ~ ' + e(c2.until_on || '?') +
+                  (i === 0 ? ' <strong>(현재)</strong>' : '') +
+                  (c2.acting ? ' <span style="color:var(--gray-5)">· 임시당회장 ' + e(c2.acting) + '</span>' : '') +
+                  (c2.note ? ' <span style="color:var(--gray-5)">· ' + e(c2.note) + '</span>' : '') +
+                  '</div>';
+              }).join('');
+          }, function () {});
+        })();
         /* 시찰 명부에서 시찰장·서기·회계 직책을 찾아 시찰 줄에 함께 보여 준다 */
         SHSCloud.init().then(function (c) {
           return c.from('sichals').select('name,head,clerk,treasurer');

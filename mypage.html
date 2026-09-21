@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내 정보 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921b">
+<link rel="stylesheet" href="css/style.css?v=20260921c">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921b"></script>
+<script src="js/main.js?v=20260921c"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/my-payouts.js?v=20260911a"></script>
@@ -46,8 +46,18 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       /* 회원에 관한 내용은 노회 명단이 원본이다. 명단 기록을 먼저 얹는다. */
       return SHSCloud.init().then(function (c) {
-        return c.rpc('my_member');
-      }).then(function (r) {
+        /* 시무목사 청빙은 3년마다 다시 받으므로 기록이 여러 번 쌓인다.
+         * 지금 기록(명단)과 지난 기록(이력)을 함께 받아 온다. */
+        return Promise.all([
+          c.rpc('my_member'),
+          c.rpc('my_calls').then(null, function () { return { data: [] }; })
+        ]);
+      }).then(function (rs) {
+        var r = rs[0];
+        /* 최근 허락부터 위로 (서버도 그렇게 주지만 여기서 한 번 더 세워 둔다) */
+        p.calls = (((rs[1] && rs[1].data) || []).slice()).sort(function (a, b) {
+          return String(b.out_approved_on).localeCompare(String(a.out_approved_on));
+        });
         var m = r && r.data && r.data[0];
         if (m) {
           p.roster_id   = m.out_id;
@@ -151,26 +161,52 @@ document.addEventListener('DOMContentLoaded', function () {
           '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>';
       })() +
       /* 시무목사 청빙 — 당회가 없는 교회의 담임은 3년마다 다시 청원해야 한다.
-       * 언제 허락받았고 언제까지인지, 얼마나 남았는지를 여기에 적어 둔다. */
+       * 지금 임기와 함께, 여태 허락받은 지난 기록도 모두 보여 준다.
+       * 날짜를 고치는 일은 노회 서기·간사 등 관리자만 할 수 있다(본인은 볼 뿐). */
       (function () {
         var t = SHS.callTerm(p);
-        if (t.state === 'na') return '';
+        var past = p.calls || [];
+        if (t.state === 'na' && !past.length) return '';
         var tone = t.state === 'over' || t.state === 'none' ? 'fail'
           : (t.state === 'soon' ? 'warn' : '');
         var head = t.state === 'none'
           ? '아직 등록되지 않았습니다'
           : (t.on || '-') + ' 허락';
+
+        /* 지난 기록 — 가장 최근 것은 위에 이미 적었으므로 '현재'로 표시만 한다 */
+        var hist = '';
+        if (past.length) {
+          hist = '<table class="tbl" style="margin:8px 0 6px;font-size:0.86rem">' +
+            '<thead><tr><th>청빙 허락일</th><th>시무 만료일</th><th>임시당회장</th><th>비고</th></tr></thead><tbody>' +
+            past.map(function (c2, i) {
+              return '<tr' + (i === 0 ? ' style="background:var(--gray-1)"' : '') + '>' +
+                '<td>' + e(c2.out_approved_on || '-') + (i === 0 ? ' <strong>(현재)</strong>' : '') + '</td>' +
+                '<td>' + e(c2.out_until_on || '-') + '</td>' +
+                '<td>' + e(c2.out_acting ? c2.out_acting + ' 목사' : '-') + '</td>' +
+                '<td>' + e(c2.out_note || '-') + '</td></tr>';
+            }).join('') +
+            '</tbody></table>';
+        }
+
         return '<div class="field"><label>시무목사 청빙 (' + SHS.CALL_YEARS + '년 임기)</label>' +
           '<input type="text" value="' + e(head) + '" disabled>' +
-          '<span class="' + tone + '" style="display:block;font-size:0.84rem;margin-top:4px">' +
-          e(t.label) + '</span>' +
+          (t.label
+            ? '<span class="' + tone + '" style="display:block;font-size:0.84rem;margin-top:4px">' +
+              e(t.label) + '</span>'
+            : '') +
           (p.call_acting
             ? '<span style="display:block;font-size:0.8rem;color:var(--gray-5)">임시당회장 ' +
               e(p.call_acting) + ' 목사</span>'
             : '') +
+          (past.length
+            ? '<span style="display:block;font-size:0.82rem;color:var(--gray-6);margin-top:10px">' +
+              '<strong>여태 허락받은 기록</strong> — 모두 ' + past.length + '번</span>' + hist
+            : '') +
           '<span style="font-size:0.8rem;color:var(--gray-5)">당회가 조직되지 않은 교회의 담임은 ' +
           '시무목사로서 ' + SHS.CALL_YEARS + '년마다 시무목사 청빙청원을 해야 합니다. ' +
-          '기록이 다르면 노회 서기에게 문의해 주세요. ' +
+          '<strong>청빙 날짜는 노회 서기·간사 등 관리자만 고칠 수 있습니다.</strong> ' +
+          '기록이 사실과 다르면 문의해 주세요. ' +
+          '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a>' +
           '<a class="btn ghost sm" style="margin-left:6px" href="petition.html">청빙청원서 작성</a></span></div>';
       })() +
       (/목사|강도사/.test(p.position || '')
