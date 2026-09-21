@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내 정보 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921i">
+<link rel="stylesheet" href="css/style.css?v=20260921j">
 </head>
 <body>
 
@@ -19,11 +19,11 @@
   <div id="my-area"></div>
 </main>
 
-<script src="js/auth.js?v=20260921i"></script>
+<script src="js/auth.js?v=20260921j"></script>
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921i"></script>
+<script src="js/main.js?v=20260921j"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/my-payouts.js?v=20260911a"></script>
@@ -79,6 +79,8 @@ document.addEventListener('DOMContentLoaded', function () {
           /* 준회원 판단의 근거 — 내 정보에서 보여만 준다 */
           p.chongshin_grad = m.out_chongshin_grad;
           p.pyeonmok = m.out_pyeonmok;
+          /* 교회 명부와 이어진 값 — 소속 교회가 노회에 들어온 날 */
+          p.church_joined_on = m.out_church_joined_on || null;
         }
         renderCloud(p);
       }).catch(function () { renderCloud(p); });
@@ -107,6 +109,12 @@ document.addEventListener('DOMContentLoaded', function () {
       date: t.getFullYear() + '년 ' + (t.getMonth() + 1) + '월 ' + t.getDate() + '일',
       span: span + '째'
     };
+  }
+
+  /* 교회가 노회에 들어온 날 — '2003년 4월 12일 (23년 5개월째)' */
+  function joinedText(d) {
+    var sv = sinceText(d);
+    return sv ? sv.date + ' (' + sv.span + ')' : '';
   }
 
   /* ---------- 구글 로그인 회원용 화면 ---------- */
@@ -158,6 +166,10 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>성명</label><input type="text" value="' + e(p.name || '') + '" disabled></div>' +
       '<div class="field"><label>직분</label><input type="text" value="' + e(p.position || '-') + '" disabled></div>' +
       '<div class="field"><label>소속 교회</label><input type="text" value="' + e(p.church || '-') + '" disabled>' +
+      (p.church_joined_on
+        ? '<span style="display:block;font-size:0.82rem;color:var(--gray-6);margin-top:4px">' +
+          '본 노회 가입 <strong>' + e(joinedText(p.church_joined_on)) + '</strong></span>'
+        : '') +
       '<span style="font-size:0.8rem;color:var(--gray-5)">성명·직분·소속 교회의 변경은 서기 또는 간사에게 문의해 주세요. ' +
       '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>' +
       '<div class="field"><label>연락처</label><input type="tel" id="q-phone" value="' + e(p.phone || '') + '" placeholder="010-0000-0000"></div>' +

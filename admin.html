@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921i">
+<link rel="stylesheet" href="css/style.css?v=20260921j">
 </head>
 <body>
 
@@ -19,12 +19,12 @@
   <div id="admin-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
 </main>
 
-<script src="js/auth.js?v=20260921i"></script>
+<script src="js/auth.js?v=20260921j"></script>
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921i"></script>
-<script src="js/name-picker.js?v=20260921i"></script>
+<script src="js/main.js?v=20260921j"></script>
+<script src="js/name-picker.js?v=20260921j"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/officers-panel.js?v=20260902b"></script>
@@ -2475,6 +2475,9 @@ document.addEventListener('DOMContentLoaded', function () {
           e(m.position || m.category || '') + '</span></h4>' +
           '<table class="tbl" style="margin-top:12px"><tbody>' +
           viewRow('소속 교회', e(m.church || '')) +
+          /* 교회 명부와 이어진 값 — 그 교회가 노회에 들어온 날 */
+          '<tr id="rv-cjoin" class="hidden"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">' +
+          '교회 노회 가입일</td><td class="left"></td></tr>' +
           '<tr id="rv-sichal"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">시찰</td>' +
           '<td class="left">' + (m.sichal ? e(m.sichal) : '<span style="color:var(--gray-5)">-</span>') + '</td></tr>' +
           '<tr id="rv-coms"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">상비부</td>' +
@@ -2516,6 +2519,24 @@ document.addEventListener('DOMContentLoaded', function () {
           mo.close();
           openRosterEdit(m);
         });
+        /* 교회 노회 가입일 — 교회 명부(sichal_churches)에서 소속 교회를 찾아 적는다.
+         * 회원의 노회 살림은 그 교회가 노회에 들어온 날부터 시작되기 때문이다. */
+        (function () {
+          var tr = mo.ov.querySelector('#rv-cjoin');
+          if (!tr || !m.church) return;
+          SHSCloud.init().then(function (c) {
+            return c.from('sichal_churches').select('name,joined_on');
+          }).then(function (r) {
+            var key = chKey(m.church);
+            var hit = ((r && r.data) || []).filter(function (x) { return chKey(x.name) === key; })[0];
+            tr.classList.remove('hidden');
+            tr.querySelector('td:last-child').innerHTML = hit && hit.joined_on
+              ? e(hit.joined_on) + ' <span style="color:var(--gray-5)">(' +
+                e(chJoinedSpan(hit.joined_on)) + ')</span>'
+              : '<span style="color:var(--gray-5)">아직 적히지 않았습니다 — 교회 관리에서 적어 주세요</span>';
+          }, function () {});
+        })();
+
         /* 시무목사 청빙 이력 — 여태 허락받은 기록을 모두 적어 준다 */
         (function () {
           var tr = mo.ov.querySelector('#rv-calls');
