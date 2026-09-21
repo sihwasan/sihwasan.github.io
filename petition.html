@@ -1166,18 +1166,48 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
     });
   }
 
-  /* ----- PDF 저장 ----- */
+  /* ----- PDF 저장 -----
+   * 청원서는 다른 화면과 달리 html2pdf 의 통짜 기능을 쓰지 않는다.
+   * 화면에 보이는 종이를 html2canvas 로 그대로 뜬 뒤 jsPDF 로 A4 에 앉힌다
+   * (도장 자리·여러 쪽 나누기·빈 종이 가려내기를 손수 다루기 때문이다).
+   *
+   * 예전에는 html2pdf 묶음(bundle) 하나만 불러 놓고 그 안에 html2canvas 와
+   * jsPDF 가 함께 들어 있으려니 했는데, 0.10.2 묶음은 둘을 제 속에만 두고
+   * 창(window)에 내놓지 않는다. 그래서 묶음이 멀쩡히 내려와도 window.html2canvas
+   * 가 없어 "PDF 도구(html2canvas)를 찾지 못했습니다"로 끝났다.
+   * 이제 쓰는 두 도구를 따로 부른다. (묶음보다 가볍기도 하다) */
+  var H2C_SRC = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+  var JSPDF_SRC = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js';
+
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var sc = document.createElement('script');
+      sc.src = src;
+      sc.onload = function () { resolve(); };
+      sc.onerror = function () { reject(new Error('PDF 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.')); };
+      document.head.appendChild(sc);
+    });
+  }
+
+  function pdfToolsReady() {
+    return !!(window.html2canvas && window.jspdf && window.jspdf.jsPDF);
+  }
+
   var pdfLoading = null;
   function loadPdfTool() {
-    if (window.html2pdf) return Promise.resolve(window.html2pdf);
+    if (pdfToolsReady()) return Promise.resolve();
     if (pdfLoading) return pdfLoading;
-    pdfLoading = new Promise(function (resolve, reject) {
-      var sc = document.createElement('script');
-      /* 이 묶음(bundle) 안에 html2canvas 와 jsPDF 가 함께 들어 있어 따로 부르지 않아도 된다 */
-      sc.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js';
-      sc.onload = function () { resolve(window.html2pdf); };
-      sc.onerror = function () { pdfLoading = null; reject(new Error('PDF 도구를 불러오지 못했습니다.')); };
-      document.head.appendChild(sc);
+
+    var need = [];
+    if (!window.html2canvas) need.push(H2C_SRC);
+    if (!(window.jspdf && window.jspdf.jsPDF)) need.push(JSPDF_SRC);
+
+    pdfLoading = Promise.all(need.map(loadScript)).then(function () {
+      /* 내려받기는 됐는데 도구가 없으면(가로막힌 경우 등) 여기서 알린다 */
+      if (!pdfToolsReady()) throw new Error('PDF 도구를 불러오지 못했습니다.');
+    }).catch(function (err) {
+      pdfLoading = null;            /* 다시 눌러 볼 수 있게 되돌린다 */
+      throw err;
     });
     return pdfLoading;
   }
@@ -1296,16 +1326,21 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
       paper.classList.add('pt-capturing');
       if (!window.html2canvas) throw new Error('PDF 도구(html2canvas)를 찾지 못했습니다.');
       /* 4) 화면에 보이는 종이를 그 자리에서 그대로 뜬다.
-       * html2canvas 에 windowWidth/windowHeight 를 주면 베껴 그리는 문서의 화면 폭이
+       *
+       * 잘라낼 자리(x·y·width·height)는 주지 않는다. 종이(요소)를 건네면
+       * html2canvas 는 x·y 를 '문서 안의 자리'가 아니라 '그 종이의 왼쪽 위에서
+       * 얼마나 떨어진 자리'로 읽는다. 여기에 문서 좌표(왼쪽 253·위 1098 따위)를
+       * 주면 종이 바깥을 잘라 내게 되어 온통 흰 종이가 나왔다.
+       * 아무것도 주지 않으면 종이의 테두리 그대로를 뜬다 — 우리가 바라던 그대로다.
+       *
+       * windowWidth/windowHeight 도 주지 않는다. 주면 베껴 그리는 문서의 화면 폭이
        * 바뀌어, 가운데 정렬(margin:0 auto)된 종이가 그 안에서 옆으로 옮겨 간다.
-       * 잘라낼 자리는 원본 문서에서 잰 값이라 왼쪽이 잘려 나가므로 절대 주지 않는다. */
+       *
+       * scrollX·scrollY 는 0 으로 둔다. 화면을 내린 채로 뜨면 위가 잘리기 때문이다. */
       window.scrollTo(0, 0);
-      var r = paper.getBoundingClientRect();
       return window.html2canvas(paper, {
         scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false,
-        scrollX: 0, scrollY: 0,
-        x: r.left + window.scrollX, y: r.top + window.scrollY,
-        width: paper.offsetWidth, height: paper.offsetHeight
+        scrollX: 0, scrollY: 0
       });
     }).then(function (canvas) {
       checkCanvas(canvas);                              /* 5) 빈 캔버스는 오류 */
