@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921c">
+<link rel="stylesheet" href="css/style.css?v=20260921d">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921c"></script>
+<script src="js/main.js?v=20260921d"></script>
 <script src="js/name-picker.js"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
@@ -1230,18 +1230,18 @@ document.addEventListener('DOMContentLoaded', function () {
         '<h3 style="margin-top:0">시무목사 청빙 임기</h3>' +
         '<p style="font-size:0.86rem;color:var(--gray-6);margin:-6px 0 12px">' +
         '당회가 조직되지 않은 교회의 담임은 시무목사로서 <strong>' + SHS.CALL_YEARS +
-        '년마다</strong> 시무목사 청빙청원을 해야 합니다. 기한이 <span class="warn">반년 안</span>으로 ' +
-        '다가왔거나 <span class="fail">이미 지난</span> 분은 빛깔로 알려 드립니다. ' +
+        '년마다</strong> 시무목사 청빙청원을 해야 합니다. 3년이 <span class="warn">가까워졌거나</span> ' +
+        '<span class="fail">이미 지난</span> 분은 빛깔로 알려 드립니다. ' +
         '허락일·만료일은 각 줄의 <strong>수정</strong>에서 고칩니다.</p>';
 
       if (!callRows.length) {
         html += '<p style="color:var(--gray-5)">해당하는 분이 없습니다.</p></div>';
       } else {
         html += '<div class="inline-form no-print" style="margin-bottom:10px">' +
-          '<div class="field" style="flex:0 0 190px"><label for="call-sort">보기 순서</label>' +
+          '<div class="field" style="flex:0 0 200px"><label for="call-sort">보기 순서</label>' +
           '<select id="call-sort">' +
-          '<option value="soon">남은 기간 짧은 순</option>' +
-          '<option value="late">남은 기간 긴 순</option>' +
+          '<option value="soon">경과 오래된 순 (급한 순)</option>' +
+          '<option value="late">경과 짧은 순</option>' +
           '<option value="on">청빙 허락일 순</option>' +
           '<option value="sichal">시찰 · 이름 순</option>' +
           '</select></div>' +
@@ -1252,7 +1252,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field" style="flex:0 0 200px"><label for="call-state">형편</label>' +
           '<select id="call-state">' +
           '<option value="">전체</option>' +
-          '<option value="due">지났거나 반년 안 (청원 대상)</option>' +
+          '<option value="due">기한이 가깝거나 지난 분 (청원 대상)</option>' +
           '<option value="over">기한이 지난 분만</option>' +
           '<option value="none">기록이 없는 분만</option>' +
           '</select></div>' +
@@ -1266,7 +1266,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<th style="width:46px">번호</th><th style="width:100px">성명</th>' +
           '<th>시무교회</th><th style="width:100px">시찰</th>' +
           '<th style="width:110px">청빙 허락일</th><th style="width:110px">시무 만료일</th>' +
-          '<th style="width:150px">남은 기간</th><th style="width:100px">임시당회장</th>' +
+          '<th style="width:160px">청빙 경과</th><th style="width:100px">임시당회장</th>' +
           '<th style="width:70px" class="no-print">관리</th></tr></thead><tbody>';
 
         callRows.slice().sort(function (a, b) {
@@ -1275,12 +1275,15 @@ document.addEventListener('DOMContentLoaded', function () {
           var t = SHS.callTerm(m);
           var tone = t.state === 'over' || t.state === 'none' ? 'fail'
             : (t.state === 'soon' ? 'warn' : '');
+          /* 남은 기간이 아니라 허락받은 뒤 지난 기간을 적는다.
+           * 3년이 지나면 시무 기한이 끝난 것이므로 붉게 알린다. */
           var left =
             t.state === 'none' ? '<span class="fail">청빙 기록 없음</span>'
             : t.state === 'done' ? '<span style="color:var(--gray-5)">' +
                 e(m.position || '') + '로 위임되어 끝남</span>'
-            : t.state === 'over' ? '<span class="fail">' + spanShort(-t.days) + ' 지남</span>'
-            : '<span class="' + tone + '">' + spanShort(t.days) + ' 남음</span>';
+            : t.state === 'over' ? '<span class="fail">' + spanShort(t.since) +
+                ' 경과 — 재청원 필요</span>'
+            : '<span class="' + tone + '">' + spanShort(t.since) + ' 경과</span>';
           html += '<tr data-callrow="' + m.id + '" data-cs="' + t.state + '"' +
             ' data-cd="' + callDays(m) + '" data-csi="' + e(m.sichal || '') + '"' +
             ' data-cn="' + e(m.name || '') + '" data-con="' + e(t.on || '') + '">' +
@@ -1361,11 +1364,12 @@ document.addEventListener('DOMContentLoaded', function () {
             e(m.position || '') + '로 마침</span>';
         }
         var tone = t.state === 'over' ? 'fail' : (t.state === 'soon' ? 'warn' : '');
+        /* 얼마나 남았는지가 아니라 허락받은 뒤 얼마나 지났는지를 적는다
+         * (재직일 칸의 '15년 9개월 경과'와 같은 말씨) */
         return e(t.on) + ' 허락' +
           '<div class="' + tone + '" style="font-size:0.76rem' + (tone ? '' : ';color:var(--gray-5)') + '">' +
-          (t.state === 'over'
-            ? e(t.until) + ' 만료 — 재청원 필요'
-            : e(t.until) + '까지 (' + spanShort(t.days) + ' 남음)') + '</div>';
+          spanShort(t.since) + ' 경과' +
+          (t.state === 'over' ? ' — 재청원 필요' : '') + '</div>';
       }
       function spanShort(days) {
         if (days < 31) return days + '일';
@@ -1479,7 +1483,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
           var parts = ['모두 <strong>' + n + '</strong>명'];
           if (over) parts.push('<span class="fail">기한 지남 ' + over + '명</span>');
-          if (soon) parts.push('<span class="warn">반년 안 ' + soon + '명</span>');
+          if (soon) parts.push('<span class="warn">기한 임박 ' + soon + '명</span>');
           if (none) parts.push('<span class="fail">기록 없음 ' + none + '명</span>');
           sumEl.innerHTML = parts.join(' · ') +
             (over + soon + none ? ' — 이번 노회에서 시무목사 청빙청원을 살펴 주세요.' : '');
@@ -2282,7 +2286,8 @@ document.addEventListener('DOMContentLoaded', function () {
             var tone = t.state === 'over' || t.state === 'none' ? 'fail'
               : (t.state === 'soon' ? 'warn' : '');
             return viewRow('시무목사 청빙',
-              (t.on ? e(t.on) + ' 허락<br>' : '') +
+              (t.on ? e(t.on) + ' 허락' +
+                (t.until ? ' · ' + e(t.until) + ' 만료' : '') + '<br>' : '') +
               '<span class="' + tone + '">' + e(t.label) + '</span>' +
               (m.call_acting
                 ? '<br><span style="color:var(--gray-5);font-size:0.84rem">임시당회장 ' +

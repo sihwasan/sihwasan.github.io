@@ -2735,3 +2735,42 @@ td[data-duch]:hover { background: #eef2f8; }
   #call-print td.left { text-align: left; }
   @page { size: A4 portrait; margin: 14mm; }
 }
+
+/* ==========================================================================
+   스크롤을 내려도 메뉴는 그 자리에
+   --------------------------------------------------------------------------
+   넓은 화면에서는 남색 메뉴 띠가, 손전화에서는 석 줄 단추가 든 머리글이
+   화면 위에 붙어 있는다. 본문은 그 아래로 자유롭게 지나간다.
+   --nav-h 는 붙어 있는 띠의 높이 — js/main.js 가 재어서 넣어 준다.
+   ========================================================================== */
+@media (min-width: 901px) {
+  .gnb { position: sticky; top: 0; z-index: 100; }
+}
+@media (max-width: 900px) {
+  .site-header { position: sticky; top: 0; z-index: 100; }
+  /* 펴 놓은 메뉴는 머리글 바로 아래에 붙고, 길면 그 안에서 밀어 본다 */
+  .gnb.open {
+    position: sticky; top: var(--nav-h, 64px); z-index: 99;
+    max-height: calc(100vh - var(--nav-h, 64px));
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+}
+@supports (height: 100dvh) {
+  @media (max-width: 900px) {
+    .gnb.open { max-height: calc(100dvh - var(--nav-h, 64px)); }
+  }
+}
+
+/* 안쪽에 또 붙어 있는 띠들은 메뉴 아래로 내려 앉힌다 */
+.exam-progress { top: var(--nav-h, 0px); z-index: 80; }
+.ai-bar        { top: var(--nav-h, 0px); z-index: 90; }
+.lib-side-wrap { top: calc(var(--nav-h, 0px) + 16px); }
+.rp-sticky     { top: var(--nav-h, 0px); }
+
+/* 바로가기(#anchor)로 뛸 때 제목이 메뉴 뒤에 숨지 않게 */
+[id] { scroll-margin-top: calc(var(--nav-h, 0px) + 12px); }
+
+/* 종이에는 붙일 것이 없다 */
+@media print {
+  .gnb, .site-header { position: static !important; }
+}

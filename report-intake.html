@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>교회상황 보고서 접수 - 시화산노회</title>
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20260921c">
+<link rel="stylesheet" href="css/style.css?v=20260921d">
 <style>
 /* 시찰 묶음 */
 .ri-sichal { border: 1px solid var(--gray-2); border-radius: 12px; background: var(--white);
@@ -18,7 +18,9 @@
 .ri-nums div strong { display: block; font-size: 1.05rem; color: var(--navy); }
 .ri-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
           margin: 0 0 14px; padding: 12px 14px; border: 1px solid var(--gray-2);
-          border-radius: 10px; background: var(--white); position: sticky; top: 0; z-index: 30; }
+          border-radius: 10px; background: var(--white); position: sticky;
+          /* 붙어 있는 메뉴 아래로 내려 앉힌다 (--nav-h 는 js/main.js 가 넣어 준다) */
+          top: var(--nav-h, 0px); z-index: 30; }
 </style>
 </head>
 <body>
@@ -38,7 +40,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921c"></script>
+<script src="js/main.js?v=20260921d"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script>
 /* =====================================================================

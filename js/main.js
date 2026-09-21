@@ -1239,32 +1239,51 @@
    *   ok    아직 넉넉히 남았다
    *   soon  반년 안으로 다가왔다 — 다시 청원할 때
    *   over  기한이 지났다 */
+  /* 청빙 허락일부터 오늘까지 몇 날이 지났는가 */
+  function daysSince(on) {
+    var d = new Date(String(on).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d)) return null;
+    return Math.round((todayStart() - d) / 86400000);
+  }
+
   function callTerm(m) {
     var on = m && m.call_on ? String(m.call_on).slice(0, 10) : null;
     var until = callUntil(m);
 
     if (!isSimuPastor(m)) {
-      if (!on) return { state: 'na', on: null, until: null, days: null, label: '' };
+      if (!on) {
+        return { state: 'na', on: null, until: null, days: null, since: null,
+                 sinceLabel: '', label: '' };
+      }
       return { state: 'done', on: on, until: until, days: null,
+        since: daysSince(on), sinceLabel: spanKo(daysSince(on)) + ' 경과',
         label: on + ' 청빙 · 지금은 ' + ((m && (m.position || m.category)) || '다른 직분') +
           '이므로 시무목사 임기는 끝났습니다' };
     }
     if (!on) {
-      return { state: 'none', on: null, until: null, days: null,
-        label: '청빙청원 기록이 없습니다' };
+      return { state: 'none', on: null, until: null, days: null, since: null,
+        sinceLabel: '', label: '청빙청원 기록이 없습니다' };
     }
 
     var d = new Date(until + 'T00:00:00');
     if (isNaN(d)) {
-      return { state: 'none', on: on, until: null, days: null, label: '만료일을 알 수 없습니다' };
+      return { state: 'none', on: on, until: null, days: null, since: null,
+               sinceLabel: '', label: '만료일을 알 수 없습니다' };
     }
+
+    /* 얼마나 남았는지가 아니라 허락받은 뒤 얼마나 지났는지를 적는다.
+     * 3년이 지나면 시무 기한이 끝난 것이므로 그때 다시 청원해야 한다.
+     * (재직일 칸의 '15년 9개월 경과'와 같은 말씨를 쓴다) */
     var days = Math.round((d - todayStart()) / 86400000);
+    var since = daysSince(on);
+    var sinceLabel = spanKo(since) + ' 경과';
     var state = days < 0 ? 'over' : (days <= CALL_SOON_DAYS ? 'soon' : 'ok');
     var label =
-      state === 'over' ? until + ' 만료 (' + spanKo(days) + ' 지남) — 시무목사 청빙청원이 필요합니다'
-      : state === 'soon' ? until + '까지 (' + spanKo(days) + ' 남음) — 다시 청빙청원할 때입니다'
-      : until + '까지 (' + spanKo(days) + ' 남음)';
-    return { state: state, on: on, until: until, days: days, label: label };
+      state === 'over' ? sinceLabel + ' — 시무목사 청빙청원이 필요합니다'
+      : state === 'soon' ? sinceLabel + ' — 다시 청빙청원할 때입니다'
+      : sinceLabel;
+    return { state: state, on: on, until: until, days: days,
+             since: since, sinceLabel: sinceLabel, label: label };
   }
 
   /* 남은 임기 안내 문구 */
@@ -1678,6 +1697,20 @@
     var w = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
     root.setAttribute('data-orient', w > h ? 'landscape' : 'portrait');
     root.style.setProperty('--vh', (h * 0.01) + 'px');
+    markNav();
+  }
+
+  /* 화면 위에 붙어 있는 메뉴 띠의 높이를 --nav-h 에 적어 둔다.
+   * 넓은 화면에서는 남색 메뉴 띠가, 손전화에서는 석 줄 단추가 든 머리글이 붙는다.
+   * 안쪽에 또 붙어 있는 띠(시험 진행줄·검색줄)와 바로가기 자리가 이 값을 쓴다. */
+  var navH = -1;
+  function markNav() {
+    var wide = !(window.matchMedia && window.matchMedia('(max-width: 900px)').matches);
+    var el = document.querySelector(wide ? '.gnb' : '.site-header');
+    var n = el ? Math.round(el.getBoundingClientRect().height) : 0;
+    if (n === navH) return;
+    navH = n;
+    root.style.setProperty('--nav-h', n + 'px');
   }
 
   var turnTimer = null;
@@ -1928,16 +1961,28 @@
   }
 
   function start() {
+    mark();               /* 머리글이 만들어진 뒤라야 메뉴 띠 높이를 잴 수 있다 */
     fitWide();
     scanZoom();
     if ('MutationObserver' in window) {
       new MutationObserver(function () {
         scanZoom();
+        markNav();          /* 머리글·메뉴는 로그인 뒤에 늘어나 높이가 바뀐다 */
         scheduleWide();
       }).observe(document.body, { childList: true, subtree: true });
     }
     /* 탭을 누르면 그때 비로소 표가 보인다 — 누른 뒤에 한 번 더 재어 본다 */
     document.addEventListener('click', scheduleWide, true);
+
+    /* 붙어 있는 메뉴 띠의 높이는 글꼴이 늦게 내려오거나 로그인으로 줄이 늘 때도
+     * 바뀐다. 크기가 달라지면 그때마다 다시 잰다. */
+    if ('ResizeObserver' in window) {
+      var ro = new ResizeObserver(markNav);
+      ['.site-header', '.gnb'].forEach(function (sel) {
+        var el = document.querySelector(sel);
+        if (el) ro.observe(el);
+      });
+    }
   }
 
   if (document.readyState === 'loading') {

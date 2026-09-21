@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내 정보 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921c">
+<link rel="stylesheet" href="css/style.css?v=20260921d">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921c"></script>
+<script src="js/main.js?v=20260921d"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/my-payouts.js?v=20260911a"></script>
@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
           : (t.state === 'soon' ? 'warn' : '');
         var head = t.state === 'none'
           ? '아직 등록되지 않았습니다'
-          : (t.on || '-') + ' 허락';
+          : (t.on || '-') + ' 허락' + (t.until ? '  ·  ' + t.until + ' 만료' : '');
 
         /* 지난 기록 — 가장 최근 것은 위에 이미 적었으므로 '현재'로 표시만 한다 */
         var hist = '';
