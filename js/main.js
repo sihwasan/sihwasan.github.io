@@ -1185,6 +1185,88 @@
     return y + ' (' + Math.floor(days / 365) + '년 ' + Math.floor(days % 365 / 30) + '개월 남음)';
   }
 
+  /* ---------- 시무목사 청빙 (3년 임기) ----------
+   *
+   * 당회가 없는 교회 — 곧 시무장로가 없어 당회를 이루지 못한 교회의 담임은
+   * 위임목사가 아니라 시무목사다. 시무목사는 노회의 허락을 받아 3년씩 시무하고,
+   * 3년이 지나기 전에 다시 시무목사 청빙청원을 해야 한다.
+   * 위임목사는 임기가 없으므로 이 셈에 들지 않는다.
+   *
+   *   call_on     노회가 청빙을 허락한 날
+   *   call_until  시무가 끝나는 날 (비어 있으면 허락일부터 3년 뒤)
+   *   call_acting 임시당회장 */
+  var CALL_YEARS = 3;
+  var CALL_SOON_DAYS = 180;   /* 반년 — 한 회기 앞이면 다시 청원을 준비할 때다 */
+
+  /* 3년마다 청빙청원을 해야 하는 자리인가.
+   * 명단의 직분은 대개 '목사'로 적혀 있고, 위임을 받은 분만 '위임목사'다.
+   * 무임·원로·은퇴·부목사와 장로는 해당하지 않는다. */
+  function isSimuPastor(m) {
+    if (!m) return false;
+    return m.category === '목사' && (m.position === '목사' || m.position === '시무목사');
+  }
+
+  function ymd(d) {
+    return d.getFullYear() + '-' +
+      ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+
+  /* 시무 만료일 — 명단에 따로 적혀 있으면 그것을 따르고, 없으면 허락일 + 3년 */
+  function callUntil(m) {
+    if (!m) return null;
+    if (m.call_until) return String(m.call_until).slice(0, 10);
+    if (!m.call_on) return null;
+    var d = new Date(String(m.call_on).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d)) return null;
+    d.setFullYear(d.getFullYear() + CALL_YEARS);
+    return ymd(d);
+  }
+
+  /* 남은 날수를 '2년 3개월' 같은 우리말로 */
+  function spanKo(days) {
+    days = Math.abs(days);
+    if (days < 31) return days + '일';
+    var mo = Math.round(days / 30.44);
+    var y = Math.floor(mo / 12), m = mo % 12;
+    if (!y) return m + '개월';
+    return y + '년' + (m ? ' ' + m + '개월' : '');
+  }
+
+  /* 시무목사 청빙 형편
+   *   none  청원해야 하는 자리인데 적힌 기록이 없다
+   *   na    해당 없음 (위임목사·부목사·원로·은퇴·무임·장로 등)
+   *   done  시무목사로 청빙받았다가 위임 등으로 자리가 바뀌어 임기가 끝났다
+   *   ok    아직 넉넉히 남았다
+   *   soon  반년 안으로 다가왔다 — 다시 청원할 때
+   *   over  기한이 지났다 */
+  function callTerm(m) {
+    var on = m && m.call_on ? String(m.call_on).slice(0, 10) : null;
+    var until = callUntil(m);
+
+    if (!isSimuPastor(m)) {
+      if (!on) return { state: 'na', on: null, until: null, days: null, label: '' };
+      return { state: 'done', on: on, until: until, days: null,
+        label: on + ' 청빙 · 지금은 ' + ((m && (m.position || m.category)) || '다른 직분') +
+          '이므로 시무목사 임기는 끝났습니다' };
+    }
+    if (!on) {
+      return { state: 'none', on: null, until: null, days: null,
+        label: '청빙청원 기록이 없습니다' };
+    }
+
+    var d = new Date(until + 'T00:00:00');
+    if (isNaN(d)) {
+      return { state: 'none', on: on, until: null, days: null, label: '만료일을 알 수 없습니다' };
+    }
+    var days = Math.round((d - todayStart()) / 86400000);
+    var state = days < 0 ? 'over' : (days <= CALL_SOON_DAYS ? 'soon' : 'ok');
+    var label =
+      state === 'over' ? until + ' 만료 (' + spanKo(days) + ' 지남) — 시무목사 청빙청원이 필요합니다'
+      : state === 'soon' ? until + '까지 (' + spanKo(days) + ' 남음) — 다시 청빙청원할 때입니다'
+      : until + '까지 (' + spanKo(days) + ' 남음)';
+    return { state: state, on: on, until: until, days: days, label: label };
+  }
+
   /* 남은 임기 안내 문구 */
   function termLabel(u) {
     var parts = [];
@@ -1542,6 +1624,10 @@
     fullMemberGate: fullMemberGate,
     termLabel: termLabel,
     retireLabel: retireLabel,
+    isSimuPastor: isSimuPastor,
+    callUntil: callUntil,
+    callTerm: callTerm,
+    CALL_YEARS: CALL_YEARS,
     ageOn: ageOn,
     retireDate: retireDate,
     isRetired: isRetired,

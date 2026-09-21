@@ -2713,3 +2713,8 @@ td[data-duch]:hover { background: #eef2f8; }
 @media (orientation: landscape) and (max-height: 500px) {
   .lb-zoombar { bottom: 34px; }
 }
+
+/* 시무목사 청빙 임기 — 기한이 다가오면 주황, 지나면 붉게(.fail).
+ * 당회가 없는 교회의 담임은 3년마다 다시 청빙청원을 해야 하므로,
+ * 명단과 내 정보에서 그 때가 다가온 것을 한눈에 알아보게 한다. */
+.warn { color: #9a6314; font-weight: 600; }

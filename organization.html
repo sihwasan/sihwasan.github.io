@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://sihwasan.org/images/og-cover.png">
 <meta property="og:site_name" content="시화산노회">
 <meta property="og:locale" content="ko_KR">
-<link rel="stylesheet" href="css/style.css?v=20260921a">
+<link rel="stylesheet" href="css/style.css?v=20260921b">
 </head>
 <body>
 
@@ -177,7 +177,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921a"></script>
+<script src="js/main.js?v=20260921b"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -606,6 +606,12 @@ document.addEventListener('DOMContentLoaded', function () {
       (v ? e(v) : '<span class="mb-dim">미등록</span>') + '</td></tr>';
   }
 
+  /* 줄바꿈·색을 담은 칸 — 넘기는 쪽에서 이미 다듬은 글이라 그대로 넣는다 */
+  function cardRowHtml(k, html) {
+    return '<tr><th>' + k + '</th><td>' +
+      (html || '<span class="mb-dim">미등록</span>') + '</td></tr>';
+  }
+
   function renderCard(meta, info, photoUrl) {
     var ph = photoUrl
       ? '<img class="mb-photo" src="' + e(photoUrl) + '" alt="회원 사진">'
@@ -631,6 +637,20 @@ document.addEventListener('DOMContentLoaded', function () {
         })() +
         cardRow('생년월일', fmtBirth(info.birth)) +
         cardRow('남은 임기', fmtRemain(info.birth, info.retire)) +
+        /* 시무목사 청빙 — 당회가 없는 교회의 담임은 3년마다 다시 청원해야 한다 */
+        (function () {
+          var t = SHS.callTerm(info);
+          if (t.state === 'na') return '';
+          var tone = t.state === 'over' || t.state === 'none' ? 'fail'
+            : (t.state === 'soon' ? 'warn' : '');
+          var v = (t.on ? e(t.on) + ' 허락<br>' : '') +
+            '<span class="' + tone + '">' + e(t.label) + '</span>' +
+            (info.call_acting
+              ? '<br><span style="color:var(--gray-5);font-size:0.84rem">임시당회장 ' +
+                e(info.call_acting) + ' 목사</span>'
+              : '');
+          return cardRowHtml('시무목사 청빙', v);
+        })() +
         '</tbody></table>' +
         '<div class="mb-note">노회 명단에 있는 내용입니다. 본인 정보는 로그인 후 ' +
         '<strong>내 정보</strong>에서, 그 밖의 사항은 노회 서기가 <strong>명단 관리</strong>에서 고칩니다.' +
@@ -678,7 +698,11 @@ document.addEventListener('DOMContentLoaded', function () {
           served_from: p.out_served_from,
           phone: p.out_phone,
           birth: p.out_birth_date, retire: p.out_retire_date,
-          hasAccount: p.out_has_account
+          hasAccount: p.out_has_account,
+          /* 시무목사 청빙 — SHS.callTerm 이 직분(position·category)까지 함께 본다 */
+          call_on: p.out_call_on,
+          call_until: p.out_call_until,
+          call_acting: p.out_call_acting
         };
         if (p.out_photo_path) {
           return c.storage.from('member-photos').createSignedUrl(p.out_photo_path, 300)
