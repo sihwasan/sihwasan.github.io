@@ -4,3 +4,6 @@ private/
 
 # wrangler 작업 캐시
 .wrangler/
+
+# 작업용 도구 설정 (미리보기 서버 등)
+.claude/

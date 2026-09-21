@@ -20,8 +20,16 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { font-size: 16px; }
-/* 어떤 요소가 화면보다 넓어져도 페이지 전체가 옆으로 밀리지 않게 한다 (휴대전화) */
+html {
+  font-size: 16px;
+  /* 손전화를 옆으로 눕히면 사파리가 제 마음대로 글자를 키운다.
+   * 그대로 두면 가로로 돌리는 순간 글씨만 부풀어 짜임새가 무너지므로 막아 둔다.
+   * (손가락으로 넓히는 확대는 그대로 두므로 확대·축소에는 영향이 없다) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+/* 어떤 요소가 화면보다 넓어져도 페이지 전체가 옆으로 밀리지 않게 한다 (휴대전화).
+ * 대신 화면보다 넓은 표에는 js/main.js 가 옆으로 밀어 볼 자리(.x-scroll)를 내어 준다. */
 html, body { overflow-x: hidden; overflow-x: clip; }
 
 body {
@@ -2567,3 +2575,141 @@ td[data-duch]:hover { background: #eef2f8; }
 .ro-photo-none span { font-size: .78rem; }
 .ro-photo-note { font-size: .78rem; color: var(--gray-5); margin-top: 8px; }
 #rm-photo-drop.drag-over, .ro-photo-big.drag-over { border-color: var(--navy); background: var(--gray-1); }
+
+/* ==========================================================================
+   손전화를 옆으로 눕혔을 때(가로 보기) · 확대해서 볼 때
+   --------------------------------------------------------------------------
+   여기까지의 짜임새는 모두 '세로로 든 손전화'를 셈하고 맞춘 것이다.
+   그래서 옆으로 눕히면 화면 높이가 390px 안팎으로 줄어드는데도 머리글과
+   히어로가 예전 높이(440px)를 그대로 차지해, 눕힌 화면에는 머리글만 남고
+   본문이 화면 밖으로 밀려났다. 아래에서 눕힌 화면의 높이에 맞춰 다시 잡는다.
+   ========================================================================== */
+
+/* ----- 화면보다 넓은 표: 그 안에서만 옆으로 밀어 본다 -----
+ * 페이지 전체가 옆으로 밀리지 않도록 html·body 를 잠가 두었기 때문에,
+ * 잠그지 않았다면 밀어서 볼 수 있었을 넓은 표가 잘려 보이지 않았다.
+ * 화면보다 넓은 표에만 js/main.js 가 이 자리를 둘러 준다. */
+.x-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 22px;
+}
+.x-scroll > table { margin-bottom: 0; }
+.x-scroll::-webkit-scrollbar { height: 6px; }
+.x-scroll::-webkit-scrollbar-thumb { background: var(--gray-3); border-radius: 3px; }
+
+/* ----- 화면 높이가 바뀌어도 창이 잘리지 않게 -----
+ * 손전화 브라우저는 주소창이 접혔다 펴지며 높이가 오르내린다.
+ * dvh 를 아는 브라우저에서는 '지금 실제로 보이는 높이'로 재게 한다. */
+@supports (height: 100dvh) {
+  .mdl-box { max-height: 92dvh; }
+  .lightbox img { max-height: 88dvh; }
+}
+
+/* ----- 눕힌 손전화 (가로 보기) ----- */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* 머리글을 얇게 — 눕힌 화면에서는 높이 한 줄이 아깝다 */
+  .topbar .container { height: 30px; }
+  .site-header .container { padding: 6px 16px; }
+  .brand-logo { height: 34px; }
+  .brand-text .denom { display: none; }
+  .brand-text .name { font-size: 1.2rem; letter-spacing: 0; }
+
+  /* 접어 둔 메뉴를 펴면 열두 개가 화면 높이를 넘긴다.
+   * 아래로 밀어 볼 수 있게 하고, 각 줄의 높이도 줄인다. */
+  .gnb.open {
+    max-height: calc(100vh - 88px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .gnb-item > a { padding: 9px 20px; }
+  .gnb-sub a { padding: 8px 20px 8px 34px; }
+
+  /* 히어로 — 세로 화면에 맞춘 높이와 좌표를 눕힌 화면 몫으로 다시 잡는다.
+   * 장식 선은 세로로 긴 자리를 전제로 그어지므로 눕힌 화면에서는 접는다. */
+  .hero { min-height: 232px; align-items: center; }
+  .hero-line-h, .hero-line-v { display: none; }
+  .hero .container,
+  .hero.done .container { padding-top: 14px; padding-bottom: 16px; padding-left: 118px; }
+  .hero .hero-kicker { top: 0; font-size: 0.74rem; letter-spacing: 2px; margin-bottom: 10px; }
+  .hero h1 { font-size: 1.5rem; }
+  .hero-logo-draw { width: min(110px, 30vh); }
+  .hero.done .hero-logo-draw { left: 60px; top: 50%; width: min(92px, 25vh); }
+  .hero-slides { min-height: 84px; margin-top: 8px; }
+  .hs-slide { font-size: 1.22rem; line-height: 1.4; }
+  .hero .hero-verse { margin-top: 12px; font-size: 0.8rem; }
+  .hero-cities { margin-top: 14px; }
+
+  /* 창·큰 사진은 눕힌 화면 높이에 맞춘다 */
+  .mdl.open { padding: 2vh 14px; }
+  .mdl-box { max-height: 94vh; padding: 20px; }
+  .lightbox { padding: 2vh 3vw; }
+  .lightbox img { max-height: 84vh; }
+  .lb-close { top: 10px; right: 14px; }
+  .lb-tools { top: 10px; left: 14px; }
+  .lb-cap { bottom: 10px; }
+
+  /* 쪽 머리(제목 띠)도 한 뼘 줄인다 */
+  .page-head { padding: 22px 0; }
+}
+@supports (height: 100dvh) {
+  @media (orientation: landscape) and (max-height: 500px) {
+    .gnb.open { max-height: calc(100dvh - 88px); }
+    .mdl-box { max-height: 94dvh; }
+    .lightbox img { max-height: 84dvh; }
+  }
+}
+
+/* ==========================================================================
+   큰 사진 확대·축소 (+ · − · 원래대로 · 두 손가락 · 두 번 두드리기)
+   --------------------------------------------------------------------------
+   회의자료를 찍은 사진처럼 글씨가 작은 사진은 화면에 맞춰 줄여 놓으면 읽을 수
+   없다. 돌리기(rotate)는 사진 자체에 걸려 있으므로, 확대는 사진을 감싼 자리에
+   걸어 둘을 겹쳐 쓴다. js/main.js 가 .lb-zoom 과 단추를 만들어 넣는다.
+   ========================================================================== */
+.lightbox { overflow: hidden; }
+.lightbox .lb-close, .lightbox .lb-nav, .lightbox .lb-cap { z-index: 3; }
+.lightbox .lb-zoom {
+  display: flex; align-items: center; justify-content: center;
+  max-width: 100%; max-height: 88vh;
+  transform-origin: center center;
+  transition: transform 0.18s ease;
+  touch-action: none;
+  will-change: transform;
+}
+.lightbox .lb-zoom.dragging { transition: none; }
+.lightbox .lb-zoom.zoomed { cursor: grab; }
+.lightbox .lb-zoom.dragging.zoomed { cursor: grabbing; }
+.lightbox .lb-zoom > img { max-width: 100%; max-height: 88vh; }
+@supports (height: 100dvh) {
+  .lightbox .lb-zoom, .lightbox .lb-zoom > img { max-height: 88dvh; }
+}
+
+.lb-zoombar {
+  position: absolute; right: 16px; bottom: 52px; z-index: 3;
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(10, 16, 28, 0.55); border-radius: 999px; padding: 5px 8px;
+  backdrop-filter: blur(3px);
+}
+.lb-zoombar button {
+  background: rgba(255, 255, 255, 0.14); border: none; color: #fff;
+  border-radius: 999px; width: 38px; height: 38px;
+  font-size: 1.25rem; line-height: 1; font-family: inherit;
+}
+.lb-zoombar button.wide { width: auto; padding: 0 14px; font-size: 0.84rem; }
+.lb-zoombar button:hover { background: rgba(255, 255, 255, 0.28); }
+.lb-zoombar button:disabled { opacity: 0.35; }
+.lb-zoombar .lb-zpct {
+  color: #fff; font-size: 0.8rem; min-width: 46px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 700px) {
+  .lb-zoombar { right: 8px; bottom: 44px; gap: 4px; padding: 4px 6px; }
+  .lb-zoombar button { width: 34px; height: 34px; font-size: 1.1rem; }
+  .lb-zoombar button.wide { padding: 0 10px; font-size: 0.78rem; }
+  .lb-zoombar .lb-zpct { min-width: 40px; font-size: 0.74rem; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .lb-zoombar { bottom: 34px; }
+}

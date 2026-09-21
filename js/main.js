@@ -1569,3 +1569,281 @@
     }
   };
 })();
+
+/* ==========================================================================
+   손전화 화면 — 가로·세로 전환과 확대·축소
+   --------------------------------------------------------------------------
+   1) 눕혔다 세웠다 할 때 화면 크기를 제때 다시 재고 그리는 쪽에도 알린다.
+   2) 화면보다 넓은 표에는 옆으로 밀어 볼 자리를 둘러 준다.
+   3) 큰 사진에 확대·축소(+ · - · 두 손가락 · 두 번 두드리기)를 붙인다.
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var root = document.documentElement;
+
+  /* ---------- 1. 가로·세로 전환 ---------- */
+
+  /* 지금 화면이 가로인지 세로인지, 그리고 실제로 보이는 높이가 얼마인지
+   * 문서에 적어 둔다. 손전화 브라우저는 주소창이 접혔다 펴지며 높이가
+   * 오르내리므로, vh 대신 이 값을 쓰면 창이 잘리지 않는다. */
+  function mark() {
+    var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+    var w = (window.visualViewport && window.visualViewport.width) || window.innerWidth;
+    root.setAttribute('data-orient', w > h ? 'landscape' : 'portrait');
+    root.style.setProperty('--vh', (h * 0.01) + 'px');
+  }
+
+  var turnTimer = null;
+  /* 아이폰·안드로이드는 화면을 돌린 '직후'에는 아직 예전 크기를 알려 준다.
+   * 그래서 두 번(곧바로 한 번, 조금 뒤 한 번) 재고, 캔버스처럼 스스로
+   * 다시 그려야 하는 쪽에도 resize 를 한 번 더 알린다. */
+  function onTurn() {
+    mark();
+    clearTimeout(turnTimer);
+    turnTimer = setTimeout(function () {
+      mark();
+      fitWide();
+      try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+    }, 280);
+  }
+
+  window.addEventListener('orientationchange', onTurn);
+  if (window.screen && screen.orientation && screen.orientation.addEventListener) {
+    screen.orientation.addEventListener('change', onTurn);
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', mark);
+  }
+
+  var sizeTimer = null;
+  window.addEventListener('resize', function () {
+    mark();
+    clearTimeout(sizeTimer);
+    sizeTimer = setTimeout(fitWide, 160);
+  });
+
+  mark();
+
+  /* ---------- 2. 화면보다 넓은 표 ---------- */
+
+  /* 페이지 전체가 옆으로 밀리지 않도록 html·body 를 잠가 두었기 때문에,
+   * 화면보다 넓은 표는 잘린 채 나머지를 볼 길이 없었다. 눕혀도 마찬가지다.
+   * 그런 표에만 옆으로 미는 자리를 둘러 준다. (들어맞는 표는 그대로 둔다) */
+  function fitWide() {
+    var room = root.clientWidth;
+    var tables = document.querySelectorAll('table');
+    for (var i = 0; i < tables.length; i++) {
+      var t = tables[i];
+      if (t.parentNode && t.parentNode.classList &&
+          t.parentNode.classList.contains('x-scroll')) continue;
+      if (t.closest && t.closest('.x-scroll')) continue;
+      if (t.getBoundingClientRect().width <= room - 8) continue;
+
+      var box = document.createElement('div');
+      box.className = 'x-scroll';
+      t.parentNode.insertBefore(box, t);
+      box.appendChild(t);
+    }
+  }
+
+  /* ---------- 3. 큰 사진 확대·축소 ---------- */
+
+  var MIN = 1, MAX = 6;
+
+  function setupZoom(lb) {
+    if (lb.dataset.zoomReady) return;
+    var img = lb.querySelector('img');
+    if (!img) return;
+    lb.dataset.zoomReady = '1';
+
+    /* 돌리기(rotate)는 사진 자체에 걸려 있다. 확대를 같은 자리에 걸면 서로
+     * 덮어쓰므로, 사진을 한 겹 감싸 그 자리에 확대를 건다. */
+    var wrap = document.createElement('div');
+    wrap.className = 'lb-zoom';
+    img.parentNode.insertBefore(wrap, img);
+    wrap.appendChild(img);
+
+    var bar = document.createElement('div');
+    bar.className = 'lb-zoombar';
+    bar.innerHTML =
+      '<button type="button" data-z="out" aria-label="축소" title="축소">&minus;</button>' +
+      '<span class="lb-zpct">100%</span>' +
+      '<button type="button" data-z="in" aria-label="확대" title="확대">&plus;</button>' +
+      '<button type="button" class="wide" data-z="reset" aria-label="원래 크기로">원래대로</button>';
+    lb.appendChild(bar);
+
+    var pct = bar.querySelector('.lb-zpct');
+    var s = 1, tx = 0, ty = 0;
+
+    /* 확대한 사진을 끌어도 화면 밖으로 달아나지 않게 붙잡아 둔다 */
+    function hold() {
+      var mx = Math.max(0, (wrap.offsetWidth * s - lb.clientWidth) / 2);
+      var my = Math.max(0, (wrap.offsetHeight * s - lb.clientHeight) / 2);
+      tx = Math.min(mx, Math.max(-mx, tx));
+      ty = Math.min(my, Math.max(-my, ty));
+    }
+
+    function draw() {
+      hold();
+      wrap.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + s + ')';
+      wrap.classList.toggle('zoomed', s > 1.01);
+      pct.textContent = Math.round(s * 100) + '%';
+      bar.querySelector('[data-z="out"]').disabled = s <= MIN + 0.001;
+      bar.querySelector('[data-z="in"]').disabled = s >= MAX - 0.001;
+    }
+
+    /* px·py 는 큰 사진 칸의 한가운데를 0 으로 본 자리.
+     * 그 자리를 손가락(또는 마우스) 밑에 그대로 붙들어 둔 채 배율만 바꾼다. */
+    function zoomTo(next, px, py) {
+      next = Math.min(MAX, Math.max(MIN, next));
+      if (Math.abs(next - s) < 0.001) return;
+      tx = px - (px - tx) * next / s;
+      ty = py - (py - ty) * next / s;
+      s = next;
+      if (s <= MIN + 0.001) { s = MIN; tx = 0; ty = 0; }
+      draw();
+    }
+
+    function reset() { s = 1; tx = 0; ty = 0; draw(); }
+
+    function local(cx, cy) {
+      var r = lb.getBoundingClientRect();
+      return { x: cx - (r.left + r.width / 2), y: cy - (r.top + r.height / 2) };
+    }
+
+    /* ----- 단추 ----- */
+    bar.addEventListener('click', function (ev) {
+      var b = ev.target.closest ? ev.target.closest('[data-z]') : null;
+      if (!b) return;
+      ev.stopPropagation();
+      var k = b.getAttribute('data-z');
+      if (k === 'in') zoomTo(s * 1.5, 0, 0);
+      else if (k === 'out') zoomTo(s / 1.5, 0, 0);
+      else reset();
+    });
+
+    /* ----- 컴퓨터: 바퀴로 확대, 끌어서 옮기기, 두 번 눌러 확대 ----- */
+    wrap.addEventListener('wheel', function (ev) {
+      ev.preventDefault();
+      var p = local(ev.clientX, ev.clientY);
+      zoomTo(s * (ev.deltaY < 0 ? 1.18 : 1 / 1.18), p.x, p.y);
+    }, { passive: false });
+
+    wrap.addEventListener('dblclick', function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      var p = local(ev.clientX, ev.clientY);
+      if (s > 1.01) reset(); else zoomTo(2.5, p.x, p.y);
+    });
+
+    var drag = null;
+    wrap.addEventListener('mousedown', function (ev) {
+      if (s <= 1.01) return;
+      ev.preventDefault();
+      drag = { x: ev.clientX - tx, y: ev.clientY - ty };
+      wrap.classList.add('dragging');
+    });
+    window.addEventListener('mousemove', function (ev) {
+      if (!drag) return;
+      tx = ev.clientX - drag.x; ty = ev.clientY - drag.y;
+      draw();
+    });
+    window.addEventListener('mouseup', function () {
+      drag = null; wrap.classList.remove('dragging');
+    });
+
+    /* ----- 손가락: 두 손가락으로 넓히기, 끌어서 옮기기, 두 번 두드려 확대 -----
+     * 확대해 놓았을 때는 옆으로 쓸어도 다음 사진으로 넘어가지 않게 막는다.
+     * 확대하지 않았을 때는 그대로 두어 앞·뒤 넘기기가 살아 있게 한다. */
+    var pinch = null, pan = null, lastTap = 0;
+
+    function gap(a, b) {
+      var dx = a.clientX - b.clientX, dy = a.clientY - b.clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    function midOf(a, b) {
+      return local((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+    }
+
+    wrap.addEventListener('touchstart', function (ev) {
+      if (ev.touches.length === 2) {
+        ev.stopPropagation();
+        pan = null;
+        pinch = { d: gap(ev.touches[0], ev.touches[1]), s: s, m: midOf(ev.touches[0], ev.touches[1]) };
+        wrap.classList.add('dragging');
+        return;
+      }
+      if (ev.touches.length === 1) {
+        var now = Date.now();
+        if (now - lastTap < 300) {                 /* 두 번 두드리기 */
+          ev.preventDefault(); ev.stopPropagation();
+          var p = local(ev.touches[0].clientX, ev.touches[0].clientY);
+          if (s > 1.01) reset(); else zoomTo(2.5, p.x, p.y);
+          lastTap = 0;
+          return;
+        }
+        lastTap = now;
+        if (s > 1.01) {
+          ev.stopPropagation();
+          pan = { x: ev.touches[0].clientX - tx, y: ev.touches[0].clientY - ty };
+          wrap.classList.add('dragging');
+        }
+      }
+    }, { passive: false });
+
+    wrap.addEventListener('touchmove', function (ev) {
+      if (pinch && ev.touches.length === 2) {
+        ev.preventDefault(); ev.stopPropagation();
+        var d = gap(ev.touches[0], ev.touches[1]);
+        if (pinch.d > 0) zoomTo(pinch.s * d / pinch.d, pinch.m.x, pinch.m.y);
+        return;
+      }
+      if (pan && ev.touches.length === 1) {
+        ev.preventDefault(); ev.stopPropagation();
+        tx = ev.touches[0].clientX - pan.x;
+        ty = ev.touches[0].clientY - pan.y;
+        draw();
+      }
+    }, { passive: false });
+
+    function endTouch(ev) {
+      if (pinch || pan) ev.stopPropagation();
+      pinch = null; pan = null;
+      wrap.classList.remove('dragging');
+    }
+    wrap.addEventListener('touchend', endTouch);
+    wrap.addEventListener('touchcancel', endTouch);
+
+    /* 다음·이전 사진으로 넘어가거나 창을 닫으면 배율을 원래대로 돌린다 */
+    if ('MutationObserver' in window) {
+      new MutationObserver(function () { if (s !== 1) reset(); })
+        .observe(img, { attributes: true, attributeFilter: ['src'] });
+      new MutationObserver(function () {
+        if (!lb.classList.contains('open') && s !== 1) reset();
+      }).observe(lb, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    draw();
+  }
+
+  /* 큰 사진 창은 갤러리처럼 처음부터 있는 것도, 시찰방·회계처럼 나중에
+   * 만들어 붙이는 것도 있다. 둘 다 잡아 준다. */
+  function scanZoom() {
+    var list = document.querySelectorAll('.lightbox');
+    for (var i = 0; i < list.length; i++) setupZoom(list[i]);
+  }
+
+  function start() {
+    fitWide();
+    scanZoom();
+    if ('MutationObserver' in window) {
+      new MutationObserver(scanZoom).observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+})();
