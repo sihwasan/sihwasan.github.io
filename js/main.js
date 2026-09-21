@@ -232,6 +232,7 @@
     if (role === 'president' || role === 'clerk' || role === 'staff') return '관리자';
     if (role === 'officer') return title || '임원';
     if (role === 'member') return '정회원';
+    if (role === 'associate') return '준회원';
     if (role === 'advisory') return '언권회원';
     if (role === 'general') return '일반회원';
     if (role === 'pending') return '승인대기';
@@ -1332,6 +1333,41 @@
     return !membershipIssue(u);
   }
 
+  /* ---------- 준회원 ----------
+   * 정년이 지났거나, 총신대학교 신학대학원을 졸업하지 않고 편목 과정도
+   * 이수하지 않은 분을 노회가 준회원으로 둔다. 회의에서 언권만 가지므로
+   *   · 상비부에 배정하지 않고
+   *   · 총회 총대·노회 임원으로 세우지 않는다.
+   * 자료 열람과 서류 발급·청원서·보고서는 정회원과 같다.
+   * (그 셋을 못 하는 것은 언권회원이며, 준회원과는 다른 등급이다)
+   *
+   * 등급은 관리자가 손수 정한다. 학력 두 칸(총신 신대원 졸업·편목 이수)은
+   * 그 판단의 근거로 명단에 적어 둘 뿐, 저절로 등급을 바꾸지는 않는다. */
+  function isAssociate(u) {
+    return !!u && u.role === 'associate';
+  }
+
+  /* 준회원으로 볼 만한 사정이 있는가 — 명단에서 눈에 띄게 알려 주는 데 쓴다 */
+  function associateHint(m) {
+    if (!m) return null;
+    if (m.role === 'associate') return null;                  /* 이미 준회원 */
+    if (isRetired(m.birth_date)) return '정년이 지났습니다';
+    if (m.chongshin_grad === false && m.pyeonmok === false) {
+      return '총신 신대원 졸업·편목 이수가 모두 아님';
+    }
+    return null;
+  }
+
+  /* 상비부·총대·임원에 세울 수 있는가 (준회원은 세우지 않는다) */
+  function canServe(m) {
+    return !isAssociate(m);
+  }
+
+  /* 준회원을 세우려 할 때 보여 줄 한 줄 */
+  function associateBlock(what) {
+    return '준회원은 회의에서 언권만 가지므로 ' + (what || '이 자리') + '에 세울 수 없습니다.';
+  }
+
   /* 언권회원 제한: 서류 발급·청원서·보고서 작성은 할 수 없다.
    * 그 밖의 활동은 정회원과 동일하다. */
   function fullMemberGate(u, what) {
@@ -1647,6 +1683,10 @@
     callUntil: callUntil,
     callTerm: callTerm,
     CALL_YEARS: CALL_YEARS,
+    isAssociate: isAssociate,
+    associateHint: associateHint,
+    associateBlock: associateBlock,
+    canServe: canServe,
     ageOn: ageOn,
     retireDate: retireDate,
     isRetired: isRetired,

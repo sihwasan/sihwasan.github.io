@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921d">
+<link rel="stylesheet" href="css/style.css?v=20260921e">
 </head>
 <body>
 
@@ -19,12 +19,12 @@
   <div id="admin-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
 </main>
 
-<script src="js/auth.js"></script>
+<script src="js/auth.js?v=20260921e"></script>
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921d"></script>
-<script src="js/name-picker.js"></script>
+<script src="js/main.js?v=20260921e"></script>
+<script src="js/name-picker.js?v=20260921e"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/officers-panel.js?v=20260902b"></script>
@@ -380,6 +380,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var GRADES = [
     { v: 'pending', t: '승인대기', role: 'pending', title: null },
     { v: 'general', t: '일반회원', role: 'general', title: null },
+    /* 준회원 — 정년이 지났거나, 총신대 신학대학원을 졸업하지 않고 편목 과정도
+     * 이수하지 않은 분. 회의에서 언권만 가지므로 상비부·총대·임원에 세우지 않는다. */
+    { v: 'associate', t: '준회원', role: 'associate', title: null },
     /* 총회 정년(만 71세)이 지나면 정회원·임원은 언권회원이 된다 */
     { v: 'advisory', t: '언권회원', role: 'advisory', title: null },
     { v: 'member', t: '정회원', role: 'member', title: null },
@@ -416,7 +419,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 노회 명단 관리 (추가·수정·삭제) ---------- */
-  var ROSTER_ROLES = { member: '정회원', general: '일반회원', advisory: '언권회원', officer: '임원',
+  var ROSTER_ROLES = { member: '정회원', general: '일반회원', associate: '준회원',
+                       advisory: '언권회원', officer: '임원',
                        president: '노회장', clerk: '서기', staff: '간사', pending: '승인대기' };
 
   /* 정년(만 71세)이 지났는가 — SHS 의 판정을 그대로 쓴다 */
@@ -1786,6 +1790,23 @@ document.addEventListener('DOMContentLoaded', function () {
               '만료일을 비워 두고 저장하면 허락일부터 3년 뒤로 채워집니다. ' +
               '가장 최근 기록이 명단과 내 정보에 <strong>지금 임기</strong>로 나옵니다.</span></div>'
             : '') +
+          /* 준회원 판단의 근거 — 목사에게만 물어본다.
+           * 적어 두기만 할 뿐 등급을 저절로 바꾸지는 않는다(등급은 관리자가 정한다). */
+          (/목사|강도사|전도사/.test(m.category || '')
+            ? '<div class="field"><label>학력 (준회원 판단 근거)</label>' +
+              '<div style="border:1px solid var(--gray-2,#e5e4df);border-radius:8px;padding:10px 12px">' +
+              '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:400;margin-right:18px">' +
+              '<input type="checkbox" id="rm-chongshin" style="width:auto"' +
+              (m.chongshin_grad ? ' checked' : '') + '> 총신대 신학대학원 졸업</label>' +
+              '<label style="display:inline-flex;align-items:center;gap:6px;font-weight:400">' +
+              '<input type="checkbox" id="rm-pyeonmok" style="width:auto"' +
+              (m.pyeonmok ? ' checked' : '') + '> 편목 과정 이수</label>' +
+              '<div id="rm-assoc-hint" style="font-size:0.82rem;margin-top:8px"></div>' +
+              '</div>' +
+              '<span style="display:block;font-size:0.8rem;color:var(--gray-5);margin:4px 0 12px">' +
+              '둘 다 아니거나 정년이 지난 분은 노회가 <strong>준회원</strong>으로 둘 수 있습니다. ' +
+              '적어 두기만 할 뿐 등급이 저절로 바뀌지는 않으니, 위 <strong>부여 등급</strong>에서 직접 정해 주세요.</span></div>'
+            : '') +
           '<div class="field"><label>상비부</label>' +
           '<div id="rm-com-box" style="border:1px solid var(--gray-2,#e5e4df);border-radius:8px;padding:10px 12px">' +
           '<span style="color:var(--gray-5);font-size:0.85rem">상비부 정보를 불러오는 중...</span></div>' +
@@ -1811,6 +1832,41 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('rm-close').addEventListener('click', function () { ov.remove(); });
         autoGrade(null, document.getElementById('rm-cat'),
                   document.getElementById('rm-birth'), document.getElementById('rm-grade'));
+
+        /* ----- 준회원 안내 -----
+         * 정년이 지났거나 두 학력이 모두 아니면 그 자리에서 알려 준다.
+         * 등급을 저절로 바꾸지는 않는다 — 정하는 일은 관리자의 몫이다. */
+        (function () {
+          var hint = document.getElementById('rm-assoc-hint');
+          if (!hint) return;
+          var ch = document.getElementById('rm-chongshin');
+          var py = document.getElementById('rm-pyeonmok');
+          var gradeEl = document.getElementById('rm-grade');
+          var birthEl = document.getElementById('rm-birth');
+          function draw() {
+            var probe = {
+              role: parseGrade(gradeEl.value).role,
+              birth_date: birthEl.value || null,
+              chongshin_grad: ch.checked,
+              pyeonmok: py.checked
+            };
+            if (probe.role === 'associate') {
+              hint.className = '';
+              hint.innerHTML = '<span style="color:var(--gray-6)">지금 <strong>준회원</strong>입니다. ' +
+                '상비부·총회 총대·노회 임원에는 세우지 않습니다.</span>';
+              return;
+            }
+            var why = SHS.associateHint(probe);
+            hint.className = why ? 'warn' : '';
+            hint.innerHTML = why
+              ? why + ' — <strong>준회원</strong>으로 두실 수 있습니다. 위 <strong>부여 등급</strong>에서 골라 주세요.'
+              : '';
+          }
+          [ch, py, gradeEl, birthEl].forEach(function (el) {
+            if (el) el.addEventListener('change', draw);
+          });
+          draw();
+        })();
 
         /* ----- 시무목사 청빙 이력 (관리자 전용) -----
          * 3년마다 다시 청원하므로 기록이 여러 번 쌓인다. 여기서 낱낱이 적어 두면
@@ -2083,6 +2139,27 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (duty2) cur.push({ com: cm.name, band: bandsOf(cm)[0].k, duty: duty2 });
               }
             });
+            /* 준회원은 회의에서 언권만 가지므로 상비부에 배정하지 않는다.
+             * 이미 배정되어 있으면 감추지 않고 알려 주어 내릴 수 있게 한다. */
+            if (m.role === 'associate') {
+              box.innerHTML =
+                '<div class="notice-banner" style="margin:0">' +
+                '<strong>준회원</strong>은 회의에서 언권만 가지므로 상비부에 배정하지 않습니다.' +
+                (cur.length
+                  ? ' 지금 <strong>' + e(cur.map(function (x) { return x.com; }).join(', ')) +
+                    '</strong>에 적혀 있습니다 — 아래 단추로 모두 내릴 수 있습니다.' +
+                    '<div style="margin-top:10px">' +
+                    '<button type="button" class="btn sm" id="rm-com-clear">상비부에서 내리기</button></div>'
+                  : '') +
+                '</div>';
+              if (cur.length) {
+                box.querySelector('#rm-com-clear').addEventListener('click', function () {
+                  if (!confirm(m.name + ' 님을 상비부에서 모두 내리시겠습니까?')) return;
+                  saveComs([]);
+                });
+              }
+              return;
+            }
             box.innerHTML = '<div id="rm-com-rows"></div>' +
               '<button type="button" class="btn ghost sm" id="rm-com-add">배정 추가</button> ' +
               '<button type="button" class="btn sm" id="rm-com-save">상비부 저장</button>' +
@@ -2096,14 +2173,19 @@ document.addEventListener('DOMContentLoaded', function () {
             box.querySelector('#rm-com-save').addEventListener('click', saveComs);
           }
 
-          function saveComs() {
+          /* forced 를 주면 그 배정으로 맞춘다 (준회원을 모두 내릴 때 빈 목록을 준다) */
+          function saveComs(forced) {
             var want = [];
-            box.querySelectorAll('.rm-com-row').forEach(function (row) {
-              var com = row.querySelector('[data-rc="com"]').value;
-              var band = row.querySelector('[data-rc="band"]').value;
-              var duty = row.querySelector('[data-rc="duty"]').value;
-              if (com && band) want.push({ com: com, band: band, duty: duty });
-            });
+            if (Array.isArray(forced)) {
+              want = forced;
+            } else {
+              box.querySelectorAll('.rm-com-row').forEach(function (row) {
+                var com = row.querySelector('[data-rc="com"]').value;
+                var band = row.querySelector('[data-rc="band"]').value;
+                var duty = row.querySelector('[data-rc="duty"]').value;
+                if (com && band) want.push({ com: com, band: band, duty: duty });
+              });
+            }
             cmsg.className = 'form-msg'; cmsg.textContent = '상비부 배정을 저장하는 중입니다...';
             var withPos = SHSNames.fix(m.name, { style: 'withPos' }).value || m.name;
             var updates = [];
@@ -2167,6 +2249,10 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('rm-save').addEventListener('click', function () {
           var msg = document.getElementById('rm-msg');
           function v(id) { return document.getElementById(id).value.trim(); }
+          function chk(id, fallback) {
+            var el = document.getElementById(id);
+            return el ? el.checked : (fallback == null ? null : fallback);
+          }
           var cat = v('rm-cat') || null;
           var pos = cat;
           /* 위임목사·시무목사는 조직 분류로는 목사 무리에 둔다 */
@@ -2185,6 +2271,9 @@ document.addEventListener('DOMContentLoaded', function () {
             ordained_by: v('rm-ordby') || null,
             /* 시무목사 청빙(call_on·call_until·call_acting)은 여기서 보내지 않는다.
              * 청빙 이력 칸에서 고치고, 가장 최근 기록이 서버에서 그대로 비친다. */
+            /* 학력 — 칸이 없는 갈래(장로·직원)는 지금 값을 그대로 둔다 */
+            chongshin_grad: chk('rm-chongshin', m.chongshin_grad),
+            pyeonmok: chk('rm-pyeonmok', m.pyeonmok),
             role: g.role, officer_title: g.title
           };
           if (!d.name) { msg.className = 'form-msg err'; msg.textContent = '성명은 비울 수 없습니다.'; return; }
@@ -3311,7 +3400,8 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<div class="admin-card" style="margin-top:22px"><h3 style="margin-top:0">총대 추가</h3>' +
         '<div class="inline-form">' +
         '<div class="field" style="flex:0 0 150px"><label>구분</label><select id="dg-kind">' + kindOpts('장로 정총대') + '</select></div>' +
-        '<div class="field" style="flex:0 0 130px"><label>성명</label><input type="text" id="dg-name"></div>' +
+        '<div class="field" style="flex:0 0 130px"><label>성명</label>' +
+        '<input type="text" data-names="plain" data-names-deny="serve" id="dg-name"></div>' +
         '<div class="field"><label>소속 교회</label><input type="text" id="dg-church"></div>' +
         '<div class="field" style="flex:0 0 130px"><label>직책 (선택)</label><input type="text" id="dg-title" placeholder="자동총대"></div>' +
         '<div class="field" style="flex:0 0 165px"><label>자격 시작</label><input type="date" id="dg-from" value="' +
@@ -3337,6 +3427,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
       h += '<div class="form-msg" id="dg-rowmsg"></div>';
       box.innerHTML = h;
+      /* 이름은 노회 명단에서 고른다 (준회원은 총대로 세우지 않는다) */
+      if (window.SHSNames) SHSNames.attachAll(box);
 
       /* ----- 수정 팝업 ----- */
       function openDelegateEdit(d0) {
@@ -3344,7 +3436,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(d0.kind) + ' ' + e(d0.name) + ' — 총대 수정</h3>' +
           '<div class="inline-form">' +
           '<div class="field" style="flex:0 0 140px"><label>성명</label>' +
-          '<input type="text" id="dm-name" value="' + e(d0.name) + '"></div>' +
+          '<input type="text" data-names="plain" data-names-deny="serve" id="dm-name" value="' + e(d0.name) + '"></div>' +
           '<div class="field"><label>소속 교회</label>' +
           '<input type="text" id="dm-church" value="' + e(d0.church || '') + '"></div>' +
           '<div class="field" style="flex:0 0 140px"><label>직책</label>' +
@@ -3364,6 +3456,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<p style="font-size:0.8rem;color:var(--gray-5);margin:8px 0 0">교체를 누르면 새 총대를 넣고 ' +
           '이전 총대는 교체 기록으로 남습니다. 삭제는 기록까지 지웁니다.</p>' +
           '<div class="form-msg" id="dm-msg"></div>');
+        SHSNames.attachAll(mo.ov);
         document.getElementById('dm-save').addEventListener('click', function () {
           var msg = document.getElementById('dm-msg');
           var d = {
@@ -3747,8 +3840,9 @@ document.addEventListener('DOMContentLoaded', function () {
    * 어렵다. 한 사람에 한 칸씩 두고, 칸을 더하거나 지울 수 있게 한다.
    * 저장할 때는 예전처럼 쉼표로 이어 한 칸(y1·y2·y3)에 넣는다. */
   function nameRow(v) {
+    /* 준회원은 상비부에 세우지 않는다 — 후보에 흐리게 나오고 고를 수 없다 */
     return '<div class="mm-row">' +
-      '<input type="text" data-names="plain" value="' + SHS.esc(v || '') + '">' +
+      '<input type="text" data-names="plain" data-names-deny="serve" value="' + SHS.esc(v || '') + '">' +
       '<button type="button" class="mm-del" data-ydel aria-label="이 사람 지우기" ' +
       'title="이 사람 지우기">&times;</button></div>';
   }
@@ -3848,9 +3942,9 @@ document.addEventListener('DOMContentLoaded', function () {
         var inner = '<div data-cmt="' + e(cm.name) + '">' +
           '<h3 style="margin:0 0 14px;color:var(--navy)">' + e(cm.name) + ' — 배정 수정</h3>' +
           '<div class="inline-form" style="margin-bottom:8px">' +
-          '<div class="field"><label>' + SHS.headTitle(cm.name) + '</label><input type="text" data-names data-f="head" value="' + e(cm.head || '') + '"></div>' +
-          '<div class="field"><label>서기</label><input type="text" data-names data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
-          '<div class="field"><label>회계</label><input type="text" data-names data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
+          '<div class="field"><label>' + SHS.headTitle(cm.name) + '</label><input type="text" data-names data-names-deny="serve" data-f="head" value="' + e(cm.head || '') + '"></div>' +
+          '<div class="field"><label>서기</label><input type="text" data-names data-names-deny="serve" data-f="clerk" value="' + e(cm.clerk || '') + '"></div>' +
+          '<div class="field"><label>회계</label><input type="text" data-names data-names-deny="serve" data-f="treasurer" value="' + e(cm.treasurer || '') + '"></div>' +
           '</div>' +
           (SHS.isBoard(cm.name)
             ? '<div class="com-years one">' + yearBox('위원', 'members', cm.members) + '</div>'

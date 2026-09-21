@@ -54,13 +54,32 @@ var SHSNames = (function () {
       return Promise.resolve(rows);
     }
     loading = SHSCloud.init().then(function (c) {
-      return c.from('roster').select('id,name,church,position,category,sichal,church_addr,address,postcode,birth_date,phone')
+      return c.from('roster').select('id,name,church,position,category,sichal,church_addr,address,postcode,birth_date,phone,role')
               .order('sort').order('id');
     }).then(function (r) {
       rows = (r && r.data) || [];
       return rows;
     }).catch(function () { rows = []; return rows; });
     return loading;
+  }
+
+  /* ---------- 세울 수 없는 사람 ----------
+   * 준회원은 회의에서 언권만 가지므로 상비부·총회 총대·노회 임원에 세우지 않는다.
+   * 그런 칸에는 deny 를 주어, 후보에 흐리게 내보이되 고르지 못하게 한다.
+   * (아예 감추면 왜 안 나오는지 알 수 없어 서기가 헤매기 때문이다)
+   *
+   *   SHSNames.attach(칸, { multi: true, deny: 'serve' })
+   *   또는 data-names-deny="serve"
+   */
+  var DENY = {
+    serve: function (r) {
+      return r && r.role === 'associate' ? '준회원 (세울 수 없음)' : null;
+    }
+  };
+  function denyOf(opt) {
+    if (typeof opt === 'function') return opt;
+    if (typeof opt === 'string' && DENY[opt]) return DENY[opt];
+    return null;
   }
 
   /* 이름 하나로 명단에서 찾기 (다른 화면에서도 쓴다) */
@@ -115,6 +134,7 @@ var SHSNames = (function () {
     opts = opts || {};
     var multi = !!opts.multi;
     var style = opts.style || (multi ? 'plain' : 'withPos');
+    var deny = denyOf(opts.deny);
 
     input.setAttribute('autocomplete', 'off');
     if (!input.placeholder) {
@@ -145,13 +165,25 @@ var SHSNames = (function () {
       if (!rows || !rows.length) { warn.classList.add('hidden'); return; }
       var r = fix(input.value, { multi: multi, style: style });
       if (r.value !== input.value) input.value = r.value;
-      if (r.unknown.length) {
-        warn.textContent = '회원 명부에 없는 이름입니다 — ' + r.unknown.join(', ');
+      /* 세울 수 없는 사람이 적혀 있으면 함께 알려 준다 */
+      var bad = [];
+      if (deny) {
+        (multi ? String(input.value).split(',') : [input.value]).forEach(function (x) {
+          var hit = find(x);
+          var no = hit ? deny(hit) : null;
+          if (no) bad.push(hit.name + ' (' + no + ')');
+        });
+      }
+      if (r.unknown.length || bad.length) {
+        warn.textContent = [
+          r.unknown.length ? '회원 명부에 없는 이름입니다 — ' + r.unknown.join(', ') : '',
+          bad.length ? '세울 수 없는 분이 적혀 있습니다 — ' + bad.join(', ') : ''
+        ].filter(Boolean).join(' / ');
         warn.classList.remove('hidden');
       } else {
         warn.classList.add('hidden');
       }
-      input.classList.toggle('np-bad', !!r.unknown.length);
+      input.classList.toggle('np-bad', !!(r.unknown.length || bad.length));
     }
 
     /* 여러 사람 칸에서는 마지막 쉼표 뒤가 지금 적는 부분이다 */
@@ -174,10 +206,12 @@ var SHSNames = (function () {
       list = match(token());
       if (!list.length) { close(); return; }
       box.innerHTML = list.map(function (r, i) {
-        return '<div class="np-item' + (i === active ? ' on' : '') + '" data-np="' + i + '" role="option">' +
+        var no = deny ? deny(r) : null;
+        return '<div class="np-item' + (i === active ? ' on' : '') + (no ? ' np-no' : '') +
+          '" data-np="' + i + '" role="option"' + (no ? ' aria-disabled="true"' : '') + '>' +
           '<span class="np-n">' + esc(r.name) + '</span>' +
           '<span class="np-p">' + esc(r.position || '') + '</span>' +
-          '<span class="np-c">' + esc(r.church || '') + '</span>' +
+          '<span class="np-c">' + esc(no || r.church || '') + '</span>' +
           '</div>';
       }).join('');
       box.classList.remove('hidden');
@@ -186,6 +220,12 @@ var SHSNames = (function () {
     function pick(i) {
       var r = list[i];
       if (!r) return;
+      var no = deny ? deny(r) : null;
+      if (no) {
+        warn.textContent = r.name + ' — ' + no;
+        warn.classList.remove('hidden');
+        return;
+      }
       if (multi) {
         var h = head();
         input.value = (h ? h + ' ' : '') + plain(r) + ', ';
@@ -252,10 +292,13 @@ var SHSNames = (function () {
     ready().then(function () {
       (root || document).querySelectorAll('input[data-names]').forEach(function (el) {
         var v = el.getAttribute('data-names') || '';
-        attach(el, v === 'multi' ? { multi: true }
-                 : v === 'plain' ? { style: 'plain' }
-                 : v === 'full'  ? { style: 'full' }
-                 : {});
+        var o = v === 'multi' ? { multi: true }
+              : v === 'plain' ? { style: 'plain' }
+              : v === 'full'  ? { style: 'full' }
+              : {};
+        var d = el.getAttribute('data-names-deny');
+        if (d) o.deny = d;
+        attach(el, o);
       });
     });
   }

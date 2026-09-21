@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>내 정보 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20260921d">
+<link rel="stylesheet" href="css/style.css?v=20260921e">
 </head>
 <body>
 
@@ -19,11 +19,11 @@
   <div id="my-area"></div>
 </main>
 
-<script src="js/auth.js"></script>
+<script src="js/auth.js?v=20260921e"></script>
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921d"></script>
+<script src="js/main.js?v=20260921e"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/my-payouts.js?v=20260911a"></script>
@@ -76,6 +76,9 @@ document.addEventListener('DOMContentLoaded', function () {
           p.call_on     = m.out_call_on || null;
           p.call_until  = m.out_call_until || null;
           p.call_acting = m.out_call_acting || null;
+          /* 준회원 판단의 근거 — 내 정보에서 보여만 준다 */
+          p.chongshin_grad = m.out_chongshin_grad;
+          p.pyeonmok = m.out_pyeonmok;
         }
         renderCloud(p);
       }).catch(function () { renderCloud(p); });
@@ -140,6 +143,15 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>';
 
     html += '<h2>회원 정보</h2>';
+    /* 준회원이면 그 뜻을 맨 위에 적어 둔다 — 회의에서 언권만 가진다 */
+    if (p.role === 'associate') {
+      html += '<div class="notice-banner" style="border-left:4px solid #9a6314">' +
+        '<strong>준회원</strong>입니다. 회의에서 <strong>언권</strong>만 가지며, ' +
+        '상비부·총회 총대·노회 임원에는 세우지 않습니다. ' +
+        '자료 열람과 서류 발급·청원서·교회상황 보고서는 그대로 하실 수 있습니다.<br>' +
+        '<span style="font-size:0.86rem;color:var(--gray-6)">등급은 노회 서기·간사 등 관리자만 고칠 수 있습니다. ' +
+        '사실과 다르면 문의해 주세요.</span></div>';
+    }
     html += '<div class="form-card" style="max-width:520px;margin:0">' +
       '<div class="field"><label id="q-emailtag">이메일</label><input type="email" value="' + e(p.email) + '" disabled></div>' +
       '<div class="field"><label>성명</label><input type="text" value="' + e(p.name || '') + '" disabled></div>' +
