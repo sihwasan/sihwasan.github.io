@@ -54,7 +54,7 @@ var SHSNames = (function () {
       return Promise.resolve(rows);
     }
     loading = SHSCloud.init().then(function (c) {
-      return c.from('roster').select('id,name,church,position,category,sichal,church_addr,address,postcode,birth_date,phone,role')
+      return c.from('roster').select('id,name,church,position,category,sichal,church_addr,address,postcode,phone,role')
               .order('sort').order('id');
     }).then(function (r) {
       rows = (r && r.data) || [];

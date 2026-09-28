@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921j"></script>
+<script src="js/main.js?v=20260928a"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/my-payouts.js?v=20260911a"></script>
@@ -177,6 +177,20 @@ document.addEventListener('DOMContentLoaded', function () {
       '<input type="text" id="q-birth" value="' + e(p.birth_date || '아직 등록되지 않았습니다') + '" disabled>' +
       '<span style="font-size:0.8rem;color:var(--gray-5)">변경이 필요하시면 서기 또는 간사에게 문의해 주세요. ' +
       '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>' +
+      /* 본인 정년 — 생년월일·정년은 관리자와 본인만 본다 */
+      (function () {
+        var rd = SHS.retireDate(p.birth_date);
+        if (!rd) return '';
+        var d = SHS.daysToRetire(p.birth_date);
+        var t = rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.';
+        var v = SHS.isRetired(p.birth_date)
+          ? '<span class="fail">정년 경과</span> (정년일 ' + t + ')'
+          : '정년일 ' + t + ' · ' + SHS.termLabel(p);
+        return '<div class="field"><label>정년(만 71세)</label>' +
+          '<div style="padding:6px 0">' + v + '</div>' +
+          '<span style="font-size:0.8rem;color:var(--gray-5)">총회 정년 규정에 따라 만 71세가 되는 생일 하루 전까지 시무합니다. ' +
+          '정년 정보는 본인과 관리자만 볼 수 있습니다.</span></div>';
+      })() +
       (function () {
         var sv = sinceText(p.served_from);
         return '<div class="field"><label>부임(위임)일</label>' +
@@ -822,7 +836,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div class="form-msg" id="ci-msg"></div>' +
         '<h3 style="margin:22px 0 8px">장로 명단</h3>' +
         '<p style="font-size:0.82rem;color:var(--gray-5)">우리 교회 장로를 노회 명단에 추가하고 ' +
-        '생년월일을 입력하실 수 있습니다. 생년월일은 정년·총대 자격 확인에 쓰입니다.</p>' +
+        '생년월일을 입력하실 수 있습니다. 생년월일은 정년·총대 자격 확인에 쓰입니다. ' +
+        '이미 등록된 생년월일은 개인 신상이라 관리자만 볼 수 있으며, 비워 두고 저장하면 기존 값이 유지됩니다.</p>' +
         '<div id="ci-elders"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
         '</div>';
       box.innerHTML = h;
@@ -854,7 +869,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var box = document.getElementById('ci-elders');
       if (!box) return;
       SHSCloud.init().then(function (c) {
-        return c.from('roster').select('id,name,birth_date')
+        /* 생년월일은 관리자만 읽을 수 있어 여기서는 성명만 받는다(104 sql). 입력한 값만 저장된다. */
+        return c.from('roster').select('id,name')
           .eq('church', p.church).eq('category', '장로').order('sort');
       }).then(function (r) {
         var rows = r.data || [];
@@ -862,7 +878,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<th style="width:170px">생년월일</th><th style="width:80px">저장</th></tr></thead><tbody>';
         rows.forEach(function (m2) {
           h += '<tr><td class="left">' + e(m2.name) + '</td>' +
-            '<td><input type="date" id="el-b-' + m2.id + '" value="' + e(m2.birth_date || '') + '"></td>' +
+            '<td><input type="date" id="el-b-' + m2.id + '" value="" title="비워 두면 기존 값이 유지됩니다"></td>' +
             '<td><button class="btn sm" data-elsave="' + m2.id + '">저장</button></td></tr>';
         });
         if (!rows.length) h += '<tr><td colspan="3" style="color:var(--gray-5)">등록된 장로가 없습니다.</td></tr>';

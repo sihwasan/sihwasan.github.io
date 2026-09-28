@@ -1660,7 +1660,36 @@
     };
   }
 
+  /* 생년월일은 관리자만 열람한다(104_birth_private.sql).
+   * roster·church_staff 표의 birth_date 열은 화면에서 읽을 수 없으므로 select('*') 대신
+   * 아래 열 목록으로 읽고, 관리자는 roster_births()/church_staff_births() 로 (id, 생년월일)만
+   * 따로 받아 합친다. 표에 새 열을 더하면 여기와 104 sql 의 grant 목록에도 넣어야 한다. */
+  var ROSTER_COLS = 'id,name,church,position,role,officer_title,created_at,category,sichal,' +
+    'note,sort,term_from,term_until,active,replaced_at,replaced_by,address,postcode,phone,' +
+    'church_addr,photo_path,email,served_from,ordained_on,ordained_by,licensed_on,licensed_by,' +
+    'retire_applied,call_on,call_until,call_acting,chongshin_grad,pyeonmok';
+  var STAFF_COLS = 'id,church,role,name,ordained_on,phone,is_chongdae,roster_id,note,sort,' +
+    'created_at,updated_at,updated_by,honored_on';
+  /* rows 에 생년월일을 얹어서 돌려준다(Promise). 관리자가 아니면 서버가 빈 목록을 주므로 그대로다. */
+  function withBirths(c, rows, which) {
+    rows = rows || [];
+    var u = getUser();
+    if (!rows.length || !(window.SHSAuth && SHSAuth.canManageMembers && SHSAuth.canManageMembers(u))) {
+      return Promise.resolve(rows);
+    }
+    return c.rpc(which === 'staff' ? 'church_staff_births' : 'roster_births')
+      .then(function (r) {
+        var map = {};
+        ((r && r.data) || []).forEach(function (b) { map[String(b.id)] = b.birth_date; });
+        rows.forEach(function (x) { if (map[String(x.id)]) x.birth_date = map[String(x.id)]; });
+        return rows;
+      }, function () { return rows; });
+  }
+
   window.SHS = {
+    ROSTER_COLS: ROSTER_COLS,
+    STAFF_COLS: STAFF_COLS,
+    withBirths: withBirths,
     notiLinkOf: notiLinkOf,
     notiTargetOf: notiTargetOf,
     user: user,

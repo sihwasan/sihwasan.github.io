@@ -24,9 +24,9 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921j"></script>
+<script src="js/main.js?v=20260928a"></script>
 <script src="js/church-report.js?v=20260903a"></script>
-<script src="js/name-picker.js?v=20260921j"></script>
+<script src="js/name-picker.js?v=20260928a"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/minutes-box.js?v=20260917b"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
@@ -65,6 +65,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var churches = [], pastors = [], docs = [], minutes = [], reports = [], submits = [];
   /* 교역자회(시찰 안 목사들의 모임) 임원 — 회장·서기·회계. 시찰장이 회원 명단의 「교역자회 임원 선정」에서 임명한다 (93 sql) */
   var minOfficers = [];
+  var canBirth = false;    /* 생년월일·정년을 볼 수 있는가 — 관리자(노회장·서기·간사·최고관리자)만 */
   var isHead = false;      /* 교역자회 임원을 임명할 수 있는가 — 이 시찰의 시찰장 또는 최고관리자 (94 sql) */
   function minOff(pos) {
     var o = minOfficers.filter(function (x) { return x.position === pos; })[0];
@@ -165,9 +166,9 @@ document.addEventListener('DOMContentLoaded', function () {
         return Promise.all([
           c.rpc('my_sichals'),
           c.from('sichal_churches').select('*').eq('sichal', NAME).order('sort').order('id'),
-          c.from('roster').select('id,name,church,position,category,note,birth_date,term_until,address,phone,postcode')
+          c.from('roster').select('id,name,church,position,category,note,term_until,address,phone,postcode')
             .eq('sichal', NAME).order('sort').order('id'),
-          c.from('church_staff').select('*').order('sort').order('id')
+          c.from('church_staff').select(SHS.STAFF_COLS).order('sort').order('id')
             .then(function (x) { return x; }, function () { return { data: [] }; }),
           c.from('sichal_docs').select('*').eq('sichal', NAME)
             .order('doc_date', { ascending: false }).order('id', { ascending: false }),
@@ -200,7 +201,10 @@ document.addEventListener('DOMContentLoaded', function () {
           c.from('ministers_officers').select('*').eq('sichal', NAME)
             .then(function (x) { return x; }, function () { return { data: [] }; }),
           c.rpc('can_appoint_ministers', { p_sichal: NAME })
-            .then(function (x) { return x; }, function () { return { data: false }; })
+            .then(function (x) { return x; }, function () { return { data: false }; }),
+          /* 생년월일(정년)은 관리자만 — 104 sql */
+          c.rpc('roster_births').then(function (x) { return x; }, function () { return { data: [] }; }),
+          c.rpc('church_staff_births').then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
         var mine = (rs[0] && rs[0].data) || [];
@@ -219,6 +223,15 @@ document.addEventListener('DOMContentLoaded', function () {
           if (x && x.out_roster_id && x.out_photo_path) photoPaths[x.out_roster_id] = x.out_photo_path;
         });
         churchStaff = (rs[3] && rs[3].data) || [];
+        /* 관리자에게만 서버가 생년월일을 준다 — 명단·교회 명부에 얹는다 */
+        canBirth = SHSAuth.canManageMembers(user);
+        (function () {
+          var bm = {}, sm = {};
+          ((rs[16] && rs[16].data) || []).forEach(function (b) { bm[String(b.id)] = b.birth_date; });
+          ((rs[17] && rs[17].data) || []).forEach(function (b) { sm[String(b.id)] = b.birth_date; });
+          pastors.forEach(function (m) { if (bm[String(m.id)]) m.birth_date = bm[String(m.id)]; });
+          churchStaff.forEach(function (x) { if (sm[String(x.id)]) x.birth_date = sm[String(x.id)]; });
+        })();
         minOfficers = (rs[14] && rs[14].data) || [];
         isHead = !!(rs[15] && rs[15].data === true);
         /* 담임목사·주소·연락처는 회원 명단(노회 명단)이 원본이다.
@@ -531,7 +544,7 @@ document.addEventListener('DOMContentLoaded', function () {
       parts.push('총대 자격 기간 미정');
     }
     var rd = SHS.retireDate(r.birth_date);
-    if (rd) {
+    if (rd && canBirth) {
       parts.push(SHS.isRetired(r.birth_date) ? '정년 경과'
         : '정년 ' + rd.getFullYear() + '. ' + (rd.getMonth() + 1) + '. ' + rd.getDate() + '.');
     }
@@ -641,7 +654,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return mine.filter(function (x) { return x.role === role; }).map(function (x) {
         var extra = [];
         if (x.is_chongdae) extra.push('총대장로');
-        if (x.birth_date) extra.push('생년월일 ' + String(x.birth_date).slice(0, 10));
+        if (canBirth && x.birth_date) extra.push('생년월일 ' + String(x.birth_date).slice(0, 10));
         if (x.ordained_on) extra.push('장립 ' + String(x.ordained_on).slice(0, 4) + '년');
         return e(x.name) + (extra.length
           ? ' <span style="color:var(--gray-5);font-size:0.85em">(' + extra.join(' · ') + ')</span>' : '');
@@ -708,7 +721,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!d.birth_date && ro && ro.birth_date) d.birth_date = ro.birth_date;
       msg.className = 'form-msg'; msg.textContent = '추가 중입니다...';
       db().then(function (c) {
-        return c.from('church_staff').insert(d).select();
+        return c.from('church_staff').insert(d).select('id');
       }).then(function (r) {
         var w = SHS.wrote(r);
         if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
@@ -737,7 +750,7 @@ document.addEventListener('DOMContentLoaded', function () {
       b.addEventListener('click', function () {
         if (!confirm(b.dataset.cen + ' 장로를 명부에서 지우시겠습니까?')) return;
         db().then(function (c) {
-          return c.from('church_staff').delete().eq('id', parseInt(b.dataset.cedel, 10)).select();
+          return c.from('church_staff').delete().eq('id', parseInt(b.dataset.cedel, 10)).select('id');
         }).then(function (r) {
           if (r.error || !(r.data && r.data.length)) {
             alert((r.error && r.error.message) || '지우지 못했습니다. 권한을 확인해 주세요.');
@@ -1055,8 +1068,10 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<h3>' + e(g) + ' (' + groups[g].length + '명)</h3>';
       h += '<table class="tbl"><thead><tr><th style="width:52px">사진</th><th style="width:120px">성명</th>' +
         '<th style="width:110px">직분</th><th>소속 교회</th>' +
-        '<th style="width:130px;cursor:pointer;user-select:none' + (pastorSort ? ';color:var(--accent);font-weight:700' : '') + '" ' +
-        'data-pasort title="' + paTitle + '">남은 임기' + paArrow + '</th>' +
+        (canBirth
+          ? '<th style="width:130px;cursor:pointer;user-select:none' + (pastorSort ? ';color:var(--accent);font-weight:700' : '') + '" ' +
+            'data-pasort title="' + paTitle + '">남은 임기' + paArrow + '</th>'
+          : '') +
         /* 임명 권한이 있는 시찰장·최고관리자에게는 <선정>, 다른 회원에게는 <교역자회 임원> */
         (isPastorGroup ? '<th style="width:180px">' + (isHead ? '교역자회 임원 선정' : '교역자회 임원') + '</th>'
                        : '<th style="width:160px">비고</th>') +
@@ -1073,14 +1088,17 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<a href="' + e(link) + '" target="_blank" rel="noopener" ' +
               'style="color:var(--navy);text-decoration:underline">' + e(m.church || '-') + '</a>'
             : e(m.church || '-')) + '</td>' +
-          '<td>' + remainLabel(m) + '</td>' +
+          (canBirth ? '<td>' + remainLabel(m) + '</td>' : '') +
           (isPastorGroup ? '<td>' + minCell(m) + '</td>' : '<td>' + e(m.note || '-') + '</td>') + '</tr>';
       });
       h += '</tbody></table>';
     });
     h += '<p style="font-size:0.8rem;color:var(--gray-5)">사진을 누르면 크게 볼 수 있습니다. ' +
-      '남은 임기는 회원 명단의 생년월일로 ' +
-      '총회 정년(만 71세)까지 계산한 값입니다. 생년월일이 없는 분은 -로 표시됩니다.</p>';
+      (canBirth
+        ? '남은 임기는 회원 명단의 생년월일로 ' +
+          '총회 정년(만 71세)까지 계산한 값입니다. 생년월일이 없는 분은 -로 표시됩니다. ' +
+          '생년월일·정년은 개인 신상이므로 관리자에게만 보입니다.'
+        : '') + '</p>';
     box.innerHTML = h;
     loadThumbs(box);
     box.querySelectorAll('button.ro-thumb').forEach(function (b) {

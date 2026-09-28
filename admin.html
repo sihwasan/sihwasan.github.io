@@ -23,8 +23,8 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921j"></script>
-<script src="js/name-picker.js?v=20260921j"></script>
+<script src="js/main.js?v=20260928a"></script>
+<script src="js/name-picker.js?v=20260928a"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/officers-panel.js?v=20260902b"></script>
@@ -480,9 +480,15 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSCloud.init().then(function (c) {
       return Promise.all([
         c.from('sichal_churches').select('*').order('sichal').order('sort').order('id'),
-        c.from('church_staff').select('*').order('sort').order('id'),
-        c.from('roster').select('id,name,church,category,position,birth_date,phone,served_from,address,postcode,photo_path,ordained_on,ordained_by,role,officer_title').order('sort').order('id')
-      ]);
+        c.from('church_staff').select(SHS.STAFF_COLS).order('sort').order('id'),
+        c.from('roster').select('id,name,church,category,position,phone,served_from,address,postcode,photo_path,ordained_on,ordained_by,role,officer_title').order('sort').order('id')
+      ]).then(function (rs) {
+        /* 생년월일은 관리자 전용 RPC 로 따로 받아 얹는다 (104 sql) */
+        if (rs[1].error) return rs;
+        return SHS.withBirths(c, rs[1].data, 'staff').then(function () {
+          return SHS.withBirths(c, rs[2].data, 'roster');
+        }).then(function () { return rs; });
+      });
     }).then(function (rs) {
       if (rs[1].error) throw rs[1].error;
       chChurches = (rs[0].data) || [];
@@ -570,7 +576,7 @@ document.addEventListener('DOMContentLoaded', function () {
         b.disabled = true; b.textContent = '바꾸는 중...';
         SHSCloud.init().then(function (c) {
           return c.from('roster').update({ role: 'associate', officer_title: null })
-                  .eq('id', pr.id).select();
+                  .eq('id', pr.id).select('id');
         }).then(function (r) {
           var w = SHS.wrote(r);
           if (!w.ok) { b.disabled = false; b.textContent = label; alert(w.why); return; }
@@ -995,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var ro = chRosterOf(d.name);
         d.roster_id = ro ? ro.id : null;
         SHSCloud.init().then(function (c) {
-          return c.from('church_staff').update(d).eq('id', x.id).select();
+          return c.from('church_staff').update(d).eq('id', x.id).select('id');
         }).then(function (r) {
           var w = SHS.wrote(r);
           if (!w.ok) { alert(w.why); return; }
@@ -1055,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', function () {
       };
       msg.className = 'form-msg'; msg.textContent = '추가 중입니다...';
       SHSCloud.init().then(function (c) {
-        return c.from('church_staff').insert(d).select();
+        return c.from('church_staff').insert(d).select('id');
       }).then(function (r) {
         var w = SHS.wrote(r);
         if (!w.ok) { msg.className = 'form-msg err'; msg.textContent = w.why; return; }
@@ -1070,7 +1076,12 @@ document.addEventListener('DOMContentLoaded', function () {
   function renderRoster() {
     var box = document.getElementById('roster-area');
     Promise.all([
-      SHSCloud.init().then(function (c) { return c.from('roster').select('*').order('sort').order('id'); }),
+      SHSCloud.init().then(function (c) {
+        return c.from('roster').select(SHS.ROSTER_COLS).order('sort').order('id').then(function (r) {
+          if (r.error) return r;
+          return SHS.withBirths(c, r.data, 'roster').then(function () { return r; });
+        });
+      }),
       SHSCloud.init().then(function (c) { return c.from('sichals').select('name').order('sort'); }),
       /* 회원이 내 정보에서 직접 올린 사진 — 명단에 관리자 사진이 없을 때 대신 보여 준다 */
       SHSCloud.init().then(function (c) {
@@ -2692,10 +2703,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!sbox && !rbox) return;
     SHSCloud.init().then(function (c) {
       return Promise.all([
-        c.from('church_staff').select('*').order('church').order('sort'),
+        c.from('church_staff').select(SHS.STAFF_COLS).order('church').order('sort'),
         c.from('sichal_churches').select('name,sichal'),
-        c.from('roster').select('id,name,church,category,birth_date,ordained_on')
-      ]);
+        c.from('roster').select('id,name,church,category,ordained_on')
+      ]).then(function (rs) {
+        if (rs[0].error) return rs;
+        return SHS.withBirths(c, rs[0].data, 'staff').then(function () {
+          return SHS.withBirths(c, rs[2].data, 'roster');
+        }).then(function () { return rs; });
+      });
     }).then(function (rs) {
       if (rs[0].error) {
         if (sbox) sbox.innerHTML = '<div class="notice-banner">불러오지 못했습니다: ' + e(rs[0].error.message) + '</div>';
@@ -3044,10 +3060,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!box) return;
     SHSCloud.init().then(function (c) {
       return Promise.all([
-        c.from('roster').select('*').eq('category', '장로').order('sichal').order('sort'),
+        c.from('roster').select(SHS.ROSTER_COLS).eq('category', '장로').order('sichal').order('sort'),
         c.from('site_settings').select('value').eq('key', 'sessions')
           .then(function (x) { return x; }, function () { return { data: [] }; })
-      ]);
+      ]).then(function (rs) {
+        if (rs[0].error) return rs;
+        return SHS.withBirths(c, rs[0].data, 'roster').then(function () { return rs; });
+      });
     }).then(function (rs) {
       var r = rs[0];
       if (r.error) {

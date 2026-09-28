@@ -177,7 +177,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260921j"></script>
+<script src="js/main.js?v=20260928a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -640,8 +640,11 @@ document.addEventListener('DOMContentLoaded', function () {
           var sv = sinceText(info.served_from);
           return sv ? cardRow('부임(위임)', sv.date + ' · ' + sv.span) : '';
         })() +
-        cardRow('생년월일', fmtBirth(info.birth)) +
-        cardRow('남은 임기', fmtRemain(info.birth, info.retire)) +
+        /* 생년월일·정년은 개인 신상 — 서버(member_card)가 관리자와 본인에게만 준다 */
+        (info.birth
+          ? cardRow('생년월일', fmtBirth(info.birth)) +
+            cardRow('남은 임기', fmtRemain(info.birth, info.retire))
+          : '') +
         /* 시무목사 청빙 — 당회가 없는 교회의 담임은 3년마다 다시 청원해야 한다 */
         (function () {
           var t = SHS.callTerm(info);
@@ -745,7 +748,7 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSCloud.init().then(function (c) {
       return Promise.all([
         c.from('committees').select('*').order('sort'),
-        c.from('roster').select('*').order('sort'),
+        c.from('roster').select(SHS.ROSTER_COLS).order('sort'),
         c.from('sichals').select('*').order('sort'),
         c.from('sichal_churches').select('sichal,name').order('sort').order('id')
           .then(function (x) { return x; }, function () { return { data: [] }; })
