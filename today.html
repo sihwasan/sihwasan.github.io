@@ -56,6 +56,8 @@
 .ta-grade.non { background: #fdf3f3; border-color: var(--red); color: var(--red); }
 .ta-gradeinfo { margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: var(--gray-1); font-size: 0.9rem; text-align: left; }
 .ta-gradeinfo.non { background: #fdf3f3; color: var(--red); }
+.ta-chromebar { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 16px; border: 1px solid #e0c97a; background: #fff9e3; border-radius: 10px; }
+.ta-chromebar .btn { min-height: 44px; }
 /* 투표 */
 .ta-votecard { border: 2px solid var(--navy); }
 .ta-vhead { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -145,6 +147,7 @@ body.ta-qr-open { overflow: hidden; }
 
 <main class="page-body container" id="main">
   <div id="ta-root">
+    <div id="ta-chrome"></div>
     <div id="ta-head"></div>
     <div id="ta-gate"><p style="color:var(--gray-5)">불러오는 중...</p></div>
     <div id="ta-my"></div>
@@ -160,6 +163,6 @@ body.ta-qr-open { overflow: hidden; }
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20261003b"></script>
 <script src="js/vendor/qrcode.js"></script>
-<script src="js/today.js?v=20261003e"></script>
+<script src="js/today.js?v=20261003f"></script>
 </body>
 </html>

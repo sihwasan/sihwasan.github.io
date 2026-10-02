@@ -95,6 +95,45 @@
     });
   }
 
+  /* ---------- 크롬으로 열기 ----------
+   * QR을 찍으면 휴대전화의 기본 브라우저(삼성 인터넷 등)나 카카오톡·네이버 앱 안의
+   * 화면으로 열리는 일이 많다. 구글 로그인과 앱 설치는 크롬에서 가장 잘 되므로,
+   * 안드로이드에서 크롬이 아니면 크롬으로 한 번 넘겨 보고(주소의 nc=1 은 되돌아온 표시),
+   * 넘어가지 못한 분에게는 「크롬으로 열기」 단추를 보여 준다. 아이폰은 사파리 그대로 둔다. */
+  var UA = navigator.userAgent || '';
+  var IS_ANDROID = /Android/i.test(UA);
+  var IS_KAKAO = /KAKAOTALK/i.test(UA);
+  var REAL_CHROME = /Chrome\//.test(UA) &&
+    !/SamsungBrowser|EdgA|Whale|OPR\/|; wv\)|KAKAOTALK|NAVER|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\//i.test(UA);
+  function needChrome() { return IS_KAKAO || (IS_ANDROID && !REAL_CHROME); }
+  function chromeTarget() {
+    var c = getCode();
+    return location.origin + location.pathname + '?' + (c ? 'c=' + encodeURIComponent(c) + '&' : '') + 'nc=1';
+  }
+  function openChrome() {
+    var url = chromeTarget();
+    if (IS_KAKAO) {
+      location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+    } else {
+      location.href = 'intent://' + url.replace(/^https?:\/\//, '') +
+        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+        encodeURIComponent(url) + ';end';
+    }
+  }
+  function chromeBar() {
+    var bar = document.getElementById('ta-chrome');
+    if (!bar) return;
+    if (!needChrome()) { bar.innerHTML = ''; return; }
+    bar.innerHTML = '<div class="ta-chromebar"><div><strong>크롬(Chrome)으로 여는 것이 좋습니다</strong>' +
+      '<div class="ta-sub">지금 화면에서는 구글 로그인이나 앱 설치가 되지 않을 수 있습니다.</div></div>' +
+      '<button class="btn" type="button" id="ta-openchrome">크롬으로 열기</button></div>';
+    document.getElementById('ta-openchrome').addEventListener('click', openChrome);
+    /* QR을 찍고 막 들어온 때에만 한 번 스스로 넘겨 본다 */
+    var tried = false;
+    try { tried = !!sessionStorage.getItem('shs_asm_chrome'); sessionStorage.setItem('shs_asm_chrome', '1'); } catch (x) {}
+    if (qs('c') && !qs('nc') && !tried) openChrome();
+  }
+
   /* ---------- 서버 ---------- */
   function refresh() {
     if (!C) return Promise.resolve();
@@ -216,10 +255,11 @@
         '<h3>로그인해 주세요</h3>' +
         '<p>노회에 입장하려면 먼저 로그인해야 합니다.<br>로그인하면 이 화면으로 돌아와 <strong>입장하기</strong>를 누를 수 있습니다.</p>' +
         '<a class="btn ta-bigbtn" href="login.html">로그인</a>' +
-        '<p class="ta-sub">계정이 없으시면 <a href="signup.html">회원가입</a> 후 이용해 주세요.</p></div>';
+        '<p class="ta-sub">계정이 없으시면 <a href="signup.html">회원가입</a> 후 이용해 주세요. · <a href="today-guide.html">이용 안내 보기</a></p></div>';
     } else if (!m) {
       h = '<div class="ta-card ta-center"><h3>지금 열려 있는 노회가 없습니다</h3>' +
-        '<p>노회 당일, 화면이나 순서지에 있는 <strong>QR 코드</strong>를 휴대전화 카메라로 찍어 주세요.</p></div>';
+        '<p>노회 당일, 화면이나 순서지에 있는 <strong>QR 코드</strong>를 휴대전화 카메라로 찍어 주세요.</p>' +
+        '<p class="ta-sub"><a href="today-guide.html">회원가입 · 앱 설치 · 입장 방법 안내 보기</a></p></div>';
     } else if (!S.entered && m.status !== 'closed') {
       if (!m.today) {
         var md = String(m.meet_date || '').split('-');
@@ -371,6 +411,7 @@
         '<div class="ta-btnrow"><button class="btn" data-act="qrfull">화면에 크게 띄우기 · 인쇄</button>' +
         '<button class="btn ghost" data-act="qrsave">QR 그림 저장 (촬요용)</button></div>' +
         '<div class="ta-sub">저장한 그림을 촬요(회의자료)에 넣어 미리 인쇄해 두면, 노회 날 그 QR로 입장합니다.</div>' +
+        '<div class="ta-sub">회원들에게 나눠 줄 <a href="today-guide.html" target="_blank" rel="noopener">이용 안내문(회원가입 · 앱 설치 · 입장 방법)</a>도 함께 인쇄해 넣어 주세요.</div>' +
         '</div></div>';
 
       /* 명단 */
@@ -633,6 +674,7 @@
     root = document.getElementById('ta-root');
     if (!root) return;
     getCode();
+    chromeBar();
     root.addEventListener('click', onClick);
     root.addEventListener('submit', onSubmit);
     root.addEventListener('change', function (ev) {
