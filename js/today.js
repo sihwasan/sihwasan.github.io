@@ -17,7 +17,8 @@
   var SEL_KEY = 'shs_asm_sel', list = null;
   function getSel() { try { return Number(sessionStorage.getItem(SEL_KEY)) || null; } catch (x) { return null; } }
   function setSel(id) { try { if (id) sessionStorage.setItem(SEL_KEY, id); else sessionStorage.removeItem(SEL_KEY); } catch (x) {} }
-  function listMode() { return !!(S && S.me && isClerk(S.me) && location.hash === '#qr' && !getSel()); }
+  var oldServer = false;
+  function listMode() { return !oldServer && !!(S && S.me && isClerk(S.me) && location.hash === '#qr' && !getSel()); }
 
   function qs(k) {
     var m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)'));
@@ -145,6 +146,14 @@
   function refresh() {
     if (!C) return Promise.resolve();
     return C.rpc('assembly_state', { p_code: getCode() || null, p_meeting: getSel() }).then(function (r) {
+      /* 서버가 아직 옛 판이면(105를 다시 실행하기 전) 옛 방식으로 불러 화면은 열리게 한다 */
+      if (r.error && /p_meeting|schema cache/i.test(r.error.message || '')) {
+        oldServer = true;
+        return C.rpc('assembly_state', { p_code: getCode() || null });
+      }
+      oldServer = false;
+      return r;
+    }).then(function (r) {
       if (r.error) { setupNeeded(r.error); return; }
       S = r.data || {};
       if (S.now) offset = Date.parse(S.now) - Date.now();
@@ -238,6 +247,11 @@
     }
     placeOrder(m, me);
     renderHead(m);
+    if (oldServer && (me.mgr || me.tre)) {
+      paint('ta-chrome', '<div class="notice-banner" style="border-left:4px solid var(--red);margin-bottom:16px">' +
+        '<strong>[서버 갱신 필요]</strong> 새 기능(회기 상자·가결 기준·테스트 투표·QR 지우기)을 쓰려면 ' +
+        '<code>supabase/105_today_assembly.sql</code> 의 최신 내용을 Supabase SQL Editor에서 다시 실행해 주세요.</div>');
+    }
     renderGate(m, me);
     renderMy(m);
     renderVote(m, me);
