@@ -48,6 +48,31 @@
   }
   function pct(a, b) { return b ? (Math.round(a * 1000 / b) / 10) + '%' : '0%'; }
 
+  /* 회원 구분과 그에 따른 안내 */
+  var GRADE_INFO = {
+    '정회원': '정회원입니다. 발언과 투표에 모두 참여할 수 있습니다.',
+    '언권회원': '언권회원입니다. 발언은 할 수 있으나 투표에는 참여할 수 없습니다.',
+    '준회원': '준회원입니다. 투표에는 참여할 수 없습니다.',
+    '일반회원': '일반회원입니다. 노회 회원이 아니므로 방청으로 참석하며, 투표에는 참여할 수 없습니다.',
+    '승인대기': '아직 노회 회원으로 확인되지 않은 계정입니다. 회원이 아니므로 입장할 수 없습니다. 서기에게 문의해 주세요.'
+  };
+  function gradeOf(role) {
+    return role === 'advisory' ? '언권회원' : role === 'associate' ? '준회원'
+         : role === 'general' ? '일반회원' : role === 'pending' ? '승인대기' : '정회원';
+  }
+  /* 이름 · 직분 · 소속 교회(무임이면 없음) · 회원 구분을 한 장에 보여 준다 */
+  function idCard(name, position, church, grade) {
+    if (grade === '회원') grade = '일반회원';
+    var non = grade === '일반회원' || grade === '승인대기';
+    return '<dl class="ta-id">' +
+      '<div><dt>이름</dt><dd><strong>' + e(name || '') + '</strong></dd></div>' +
+      '<div><dt>직분</dt><dd>' + e(position || '-') + '</dd></div>' +
+      '<div><dt>소속 교회</dt><dd>' + (String(church || '').trim() ? e(church) : '없음 (무임)') + '</dd></div>' +
+      '<div><dt>회원 구분</dt><dd><span class="ta-grade' + (grade === '정회원' ? ' full' : non ? ' non' : '') + '">' +
+      e(grade) + '</span></dd></div></dl>' +
+      '<div class="ta-gradeinfo' + (non ? ' non' : '') + '">' + e(GRADE_INFO[grade] || '') + '</div>';
+  }
+
   /* 바뀐 부분만 다시 그린다. 적어 둔 값(data-keep)은 다시 그려도 남긴다. */
   var cache = {};
   function paint(id, html) {
@@ -179,10 +204,13 @@
           '<p>오늘의 노회는 <strong>' + Number(md[1]) + '월 ' + Number(md[2]) + '일 노회 당일</strong>에 열립니다.<br>' +
           '당일 회의장의 QR 코드를 찍어 입장해 주세요.</p></div>';
       } else if (S.code_ok) {
+        var g0 = gradeOf(me.role);
         h = '<div class="ta-card ta-center">' +
-          '<h3>' + e((me.name || '') + ' ' + (me.position || '')) + '님, 환영합니다</h3>' +
-          '<p>아래 단추를 누르면 출석이 기록됩니다.</p>' +
-          '<button class="btn ta-bigbtn" data-act="enter">입장하기</button></div>';
+          '<h3>' + e(me.name || '') + '님, 환영합니다</h3>' +
+          idCard(me.name, me.position, me.church, g0) +
+          (g0 === '승인대기' ? ''
+            : '<p>내용이 맞으면 아래 단추를 눌러 주세요. 출석이 기록됩니다.</p>' +
+              '<button class="btn ta-bigbtn" data-act="enter">입장하기</button>') + '</div>';
       } else {
         h = '<div class="ta-card ta-center">' +
           '<div class="ta-qricon" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
@@ -203,9 +231,10 @@
     var a = S.my, h = '';
     if (m && a) {
       h = '<div class="ta-card"><div class="ta-myrow"><span class="ta-check">✓</span><div>' +
-        '<strong>' + e((a.name || '') + ' ' + (a.position || '')) + '</strong> · ' + e(a.church || '') +
-        '<div class="ta-sub">' + e(a.grade || '') + ' · ' + hm(a.entered_at) + ' 입장' +
-        (a.confirmed ? ' · 확정 명단' : '') + '</div></div></div>';
+        '<strong>입장했습니다</strong>' +
+        '<div class="ta-sub">' + hm(a.entered_at) + ' 입장' +
+        (a.confirmed ? ' · 확정 명단에 올랐습니다' : '') + '</div></div></div>' +
+        idCard(a.name, a.position, a.church, a.grade);
       if (a.allow_status === '지급') {
         h += '<div class="ta-alarm"><div><span class="ta-badge live">회계 알림</span>' +
           '<div class="ta-amt">거마비 ' + won(a.allow_amount) + '</div>' +

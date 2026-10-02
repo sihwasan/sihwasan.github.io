@@ -160,7 +160,7 @@ begin
           when coalesce(p.position, '') like '%장로%' then '장로'
           else '기타' end,
      case p.role when 'advisory' then '언권회원' when 'associate' then '준회원'
-                 when 'general' then '회원' else '정회원' end,
+                 when 'general' then '일반회원' else '정회원' end,
      public.is_full_member())
   on conflict (meeting_id, user_id) do nothing;
   return m.id;
@@ -469,7 +469,7 @@ begin
   end if;
 
   j := jsonb_build_object('login', true, 'now', now(), 'code_ok', v_code,
-    'me', jsonb_build_object('name', p.name, 'position', p.position, 'role', p.role,
+    'me', jsonb_build_object('name', p.name, 'position', p.position, 'church', p.church, 'role', p.role,
                              'full', public.is_full_member(), 'mgr', v_mgr, 'tre', v_tre));
   if m.id is null then return j || jsonb_build_object('meeting', null); end if;
 

@@ -47,6 +47,15 @@
 .ta-rc-title { text-align: center; font-weight: 700; letter-spacing: 6px; margin-bottom: 10px; }
 .ta-rc-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px dotted var(--gray-3); font-size: 0.92rem; }
 .ta-rc-row span { color: var(--gray-5); }
+.ta-id { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--gray-3); border: 1px solid var(--gray-3); border-radius: 10px; overflow: hidden; margin: 14px 0 0; text-align: left; }
+.ta-id > div { background: #fff; padding: 10px 14px; }
+.ta-id dt { font-size: 0.76rem; color: var(--gray-5); }
+.ta-id dd { margin: 2px 0 0; font-size: 1.05rem; }
+.ta-grade { display: inline-block; padding: 2px 12px; border-radius: 99px; background: var(--gray-1); border: 1px solid var(--gray-3); font-weight: 700; font-size: 0.95rem; }
+.ta-grade.full { background: var(--navy); border-color: var(--navy); color: #fff; }
+.ta-grade.non { background: #fdf3f3; border-color: var(--red); color: var(--red); }
+.ta-gradeinfo { margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: var(--gray-1); font-size: 0.9rem; text-align: left; }
+.ta-gradeinfo.non { background: #fdf3f3; color: var(--red); }
 /* 투표 */
 .ta-votecard { border: 2px solid var(--navy); }
 .ta-vhead { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
@@ -150,6 +159,6 @@ body.ta-qr-open { overflow: hidden; }
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20261003a"></script>
 <script src="js/vendor/qrcode.js"></script>
-<script src="js/today.js?v=20261003a"></script>
+<script src="js/today.js?v=20261003b"></script>
 </body>
 </html>
