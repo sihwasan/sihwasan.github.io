@@ -29,13 +29,21 @@
     var m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)'));
     return m ? decodeURIComponent(m[1]) : '';
   }
+  /* 출석은 회의장에서 QR을 찍어야 인정된다.
+   * 휴대전화 카메라로 찍어 들어온 주소(?c=)나 화면 안 카메라로 찍은 코드만 쓰고,
+   * 로그인하러 다녀오는 동안을 위해 30분만 기억한다. 손으로 적는 입장 코드는 받지 않는다. */
+  var FRESH_MS = 30 * 60 * 1000;
+  function saveCode(c) {
+    try { localStorage.setItem(CODE_KEY, JSON.stringify({ c: c, t: Date.now() })); } catch (x) {}
+  }
   function getCode() {
     var c = qs('c');
+    if (c) { saveCode(c); return String(c).trim().toUpperCase(); }
     try {
-      if (c) localStorage.setItem(CODE_KEY, c);
-      else c = localStorage.getItem(CODE_KEY) || '';
+      var o = JSON.parse(localStorage.getItem(CODE_KEY) || 'null');
+      if (o && o.c && Date.now() - o.t < FRESH_MS) return String(o.c).trim().toUpperCase();
     } catch (x) {}
-    return String(c || '').trim().toUpperCase();
+    return '';
   }
   function clearCode() { try { localStorage.removeItem(CODE_KEY); } catch (x) {} }
 
@@ -336,34 +344,24 @@
           '<p>오늘의 노회는 <strong>노회 당일</strong>에 열립니다.' +
           (nd ? '<br>다음 노회 : <strong>' + e(nextDay.kind || '') + ' ' + Number(nd[1]) + '월 ' + Number(nd[2]) + '일</strong>' : '') +
           '<br>당일 회의장의 QR 코드를 찍어 입장해 주세요.</p></div>';
-      } else if (S.code_ok) {
-        var g0 = gradeOf(me.role);
-        h = '<div class="ta-card ta-center">' +
-          '<h3>' + e(me.name || '') + '님, 환영합니다</h3>' +
-          idCard(me.name, me.position, me.church, g0) +
-          (g0 === '승인대기' || g0 === '일반회원' ? ''
-            : '<p>내용이 맞으면 아래 단추를 눌러 주세요. 출석이 기록됩니다.</p>' +
-              '<button class="btn ta-bigbtn" data-act="enter">입장하기</button>') + '</div>';
       } else {
-        if (me.mgr || me.tre) {
+        var g0 = gradeOf(me.role);
+        var can = !(g0 === '승인대기' || g0 === '일반회원');
+        if ((me.mgr || me.tre) && !S.code_ok) {
           h = '<div class="ta-card"><h3>본인 출석</h3>' +
-            '<div class="ta-sub">서기·회계도 출석하려면 QR 코드를 찍거나 입장 코드를 적어 입장해 주세요.</div>' +
-            '<form class="ta-codeform ta-slim" data-form="code"><div>' +
-            '<input id="ta-code" data-keep="code" maxlength="8" autocomplete="off" placeholder="입장 코드 8자리" aria-label="입장 코드">' +
-            '<button class="btn" type="submit">확인</button></div>' +
-            (getCode() ? '<div class="ta-err">입장 코드가 맞지 않습니다. 다시 확인해 주세요.</div>' : '') +
-            '</form></div>';
-        } else
-        h = '<div class="ta-card ta-center">' +
-          '<div class="ta-qricon" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
-          '<h3>QR 코드를 찍어 주세요</h3>' +
-          '<p>회의장 화면이나 순서지(팸플릿)에 있는 <strong>출석 QR 코드</strong>를<br>휴대전화 카메라로 찍으면 입장 화면이 열립니다.</p>' +
-          '<form class="ta-codeform" data-form="code">' +
-          '<label for="ta-code">QR을 찍을 수 없으면 QR 아래의 입장 코드를 적어 주세요</label>' +
-          '<div><input id="ta-code" data-keep="code" maxlength="8" autocomplete="off" placeholder="입장 코드 8자리">' +
-          '<button class="btn" type="submit">확인</button></div>' +
-          (getCode() ? '<div class="ta-err">입장 코드가 맞지 않습니다. 다시 확인해 주세요.</div>' : '') +
-          '</form></div>';
+            '<div class="ta-sub">서기·회계도 회의장의 QR 코드를 찍어야 출석이 인정됩니다.</div>' +
+            '<div class="ta-btnrow"><button class="btn" data-act="enter">입장하기 (QR 찍기)</button></div></div>';
+        } else {
+          h = '<div class="ta-card ta-center">' +
+            '<h3>' + e(me.name || '') + '님, 환영합니다</h3>' +
+            idCard(me.name, me.position, me.church, g0) +
+            (!can ? '' :
+              '<p>' + (S.code_ok
+                ? 'QR 코드가 확인되었습니다. 내용이 맞으면 아래 단추를 눌러 주세요.'
+                : '아래 <strong>입장하기</strong>를 누르면 카메라가 열립니다.<br>회의장에 있는 <strong>출석 QR 코드</strong>를 찍어야 출석이 인정됩니다.') +
+              '</p><button class="btn ta-bigbtn" data-act="enter">입장하기</button>') +
+            '</div>';
+        }
       }
     }
     paint('ta-gate', h);
@@ -539,7 +537,7 @@
       h += '<h3 id="qr">노회 출석 QR 코드' + (m.session_no ? ' <span class="ta-badge">제' + m.session_no + '회기</span>' : '') + '</h3>' +
         '<div class="ta-qrbox">' + qrImg(m.code, 5) + '<div>' +
         '<div class="ta-codebig">' + e(m.code) + '</div>' +
-        '<div class="ta-sub">입장 코드 (QR을 찍을 수 없는 분께 불러 주세요)</div>' +
+        '<div class="ta-sub">QR 코드 번호 — 출석은 회의장에서 이 QR을 찍어야 인정됩니다.</div>' +
         '<div class="ta-btnrow"><button class="btn" data-act="qrfull">화면에 크게 띄우기 · 인쇄</button>' +
         '<button class="btn ghost" data-act="qrsave">QR 그림 저장 (촬요용)</button></div>' +
         '<div class="ta-sub">저장한 그림을 촬요(회의자료)에 넣어 미리 인쇄해 두면, 노회 날 그 QR로 입장합니다.</div>' +
@@ -681,7 +679,7 @@
       '<div class="ta-ovsub">휴대전화 카메라로 QR 코드를 찍고 입장해 주세요</div>' +
       qrImg(m.code, 12) +
       '<div class="ta-codebig">' + e(m.code) + '</div>' +
-      '<div class="ta-ovsub">sihwasan.org → 오늘의 노회 → 입장 코드</div>' +
+      '<div class="ta-ovsub">시화산노회 앱 → 오늘의 노회 → 입장하기 → 이 QR을 찍어 주세요</div>' +
       '<div class="ta-btnrow ta-noprint"><button class="btn" data-ov="print">인쇄</button>' +
       '<button class="btn ghost" data-ov="close">닫기</button></div></div>';
     document.body.appendChild(ov);
@@ -735,12 +733,129 @@
     } catch (err) { alert('QR 그림을 만들지 못했습니다.'); }
   }
 
+  /* ---------- QR 찍기 (화면 안 카메라) ---------- */
+  var scan = null;
+  function loadJsQR() {
+    if (window.jsQR) return Promise.resolve();
+    return new Promise(function (ok, no) {
+      var sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+      sc.onload = ok; sc.onerror = no;
+      document.head.appendChild(sc);
+    });
+  }
+  function codeFrom(text) {
+    var t = String(text || '');
+    var m = t.match(/[?&]c=([A-Za-z0-9]{4,16})/);
+    if (m && /sihwasan|today\.html/i.test(t)) return m[1].toUpperCase();
+    return '';
+  }
+  function scanMsg(t, bad) {
+    var el = document.getElementById('ta-scanmsg');
+    if (el) { el.textContent = t; el.className = 'ta-ovsub' + (bad ? ' ta-err' : ''); }
+  }
+  function openScanner(from) {
+    if (scan) return;
+    scan = { from: from || null, stream: null, raf: 0, done: false };
+    var ov = document.createElement('div');
+    ov.className = 'ta-overlay'; ov.id = 'ta-scan';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'QR 코드 찍기');
+    ov.innerHTML = '<div class="ta-ovbox" tabindex="-1">' +
+      '<button class="ta-x" data-sc="close" aria-label="닫기">&times;</button>' +
+      '<div class="ta-ovtitle">QR 코드를 찍으세요</div>' +
+      '<div class="ta-ovsub" id="ta-scanmsg">회의장 화면이나 촬요에 있는 출석 QR 코드를 네모 안에 맞춰 주세요.</div>' +
+      '<div class="ta-scanbox"><video id="ta-video" playsinline muted></video><i></i></div>' +
+      '<div class="ta-btnrow"><button class="btn ghost" data-sc="close">닫기</button></div></div>';
+    document.body.appendChild(ov);
+    document.body.classList.add('ta-qr-open');
+    var down = false;
+    ov.addEventListener('mousedown', function (ev) { down = ev.target === ov; });
+    ov.addEventListener('click', function (ev) {
+      if ((ev.target.getAttribute && ev.target.getAttribute('data-sc') === 'close') || (down && ev.target === ov)) closeScanner();
+      down = false;
+    });
+    ov.querySelector('.ta-ovbox').focus();
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      scanMsg('이 화면에서는 카메라를 쓸 수 없습니다. 휴대전화의 기본 카메라 앱으로 회의장의 QR 코드를 찍어 주세요.', true);
+      return;
+    }
+    var detector = null;
+    try { if ('BarcodeDetector' in window) detector = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch (x) {}
+    var ready = detector ? Promise.resolve() : loadJsQR();
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(function (st) {
+      if (!scan) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+      scan.stream = st;
+      var v = document.getElementById('ta-video');
+      v.srcObject = st;
+      v.play();
+      var cv = document.createElement('canvas'), cx = cv.getContext('2d');
+      ready.then(function () {
+        var busyScan = false;
+        function step() {
+          if (!scan || scan.done) return;
+          scan.raf = requestAnimationFrame(step);
+          if (busyScan || v.readyState < 2) return;
+          if (detector) {
+            busyScan = true;
+            detector.detect(v).then(function (rs) { busyScan = false; if (rs && rs[0]) found(rs[0].rawValue); },
+                                    function () { busyScan = false; });
+          } else if (window.jsQR) {
+            var w = v.videoWidth, hh = v.videoHeight;
+            if (!w) return;
+            cv.width = w; cv.height = hh;
+            cx.drawImage(v, 0, 0, w, hh);
+            var r = window.jsQR(cx.getImageData(0, 0, w, hh).data, w, hh);
+            if (r && r.data) found(r.data);
+          }
+        }
+        step();
+      }, function () {
+        scanMsg('QR 읽기 도구를 불러오지 못했습니다. 휴대전화의 기본 카메라 앱으로 QR 코드를 찍어 주세요.', true);
+      });
+    }, function () {
+      scanMsg('카메라를 쓸 수 없습니다. 카메라 사용을 허용하시거나, 휴대전화의 기본 카메라 앱으로 QR 코드를 찍어 주세요.', true);
+    });
+  }
+  function found(text) {
+    if (!scan || scan.done) return;
+    var c = codeFrom(text);
+    if (!c) { scanMsg('시화산노회 출석 QR 코드가 아닙니다. 회의장의 출석 QR 코드를 찍어 주세요.', true); return; }
+    scan.done = true;
+    scanMsg('QR 코드를 확인했습니다. 입장하는 중…');
+    saveCode(c);
+    C.rpc('assembly_enter', { p_code: c }).then(function (r) {
+      closeScanner();
+      if (r.error) { alert(r.error.message || '입장하지 못했습니다.'); return; }
+      clearCode();
+      cache = {};
+      refresh();
+    }, function () {
+      closeScanner();
+      alert('서버에 연결하지 못했습니다. 다시 눌러 주세요.');
+    });
+  }
+  function closeScanner() {
+    if (!scan) return;
+    if (scan.raf) cancelAnimationFrame(scan.raf);
+    if (scan.stream) scan.stream.getTracks().forEach(function (t) { t.stop(); });
+    var ov = document.getElementById('ta-scan');
+    if (ov) ov.remove();
+    document.body.classList.remove('ta-qr-open');
+    var from = scan.from;
+    scan = null;
+    if (from && document.body.contains(from)) from.focus();
+  }
+
   /* ---------- 누르는 일 ---------- */
   function onClick(ev) {
     var b = ev.target.closest ? ev.target.closest('[data-act]') : null;
     if (!b || b.disabled) return;
     var act = b.getAttribute('data-act'), id = Number(b.getAttribute('data-id')), m = S.meeting;
-    if (act === 'enter') run(b, 'assembly_enter', { p_code: getCode() }, clearCode);
+    if (act === 'enter') {
+      if (S.code_ok && getCode()) run(b, 'assembly_enter', { p_code: getCode() }, clearCode);
+      else openScanner(b);
+    }
     else if (act === 'receive') {
       if (confirm('거마비 ' + won(S.my.allow_amount) + '을 받으셨습니까?\n수령 확인을 누르면 영수증으로 처리됩니다.')) run(b, 'assembly_allowance_receive', { p_id: id });
     }
@@ -851,7 +966,10 @@
       if (ev.target.id === 'ta-odate') fillSession(true);
       else if (ev.target.id === 'ta-osess') fillSession(false);
     });
-    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && qrOpen) closeQr(); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape') return;
+      if (scan) closeScanner(); else if (qrOpen) closeQr();
+    });
     window.addEventListener('hashchange', function () { cache = {}; refresh(); });
     document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
     setInterval(tick, 250);

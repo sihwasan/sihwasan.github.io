@@ -399,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function () {
       hero.classList.add('hero-today', 'done');
       /* QR을 찍고 로그인하러 다녀온 분은 곧바로 입장 화면으로 보낸다 */
       var code = '';
-      try { code = localStorage.getItem('shs_asm_code') || ''; } catch (x) {}
+      try { var o = JSON.parse(localStorage.getItem('shs_asm_code') || 'null'); if (o && o.c && Date.now() - o.t < 1800000) code = o.c; } catch (x) {}
       if (code) SHS.getUser().then(function (me) { if (me && me.cloud) location.replace('today.html'); });
     }, function () {});
   }
