@@ -122,8 +122,8 @@ begin
   end if;
   if coalesce(p_session, 0) <= 0 then raise exception '노회 회기를 적어 주세요.'; end if;
   if btrim(coalesce(p_title, '')) = '' then raise exception '노회 이름을 적어 주세요.'; end if;
-  if exists (select 1 from public.assembly_meetings where status <> 'closed') then
-    raise exception '이미 열려 있는 노회가 있습니다. 먼저 그 노회를 마쳐 주세요.';
+  if exists (select 1 from public.assembly_meetings where session_no = p_session) then
+    raise exception '제%회기 QR 코드가 이미 있습니다. 다시 만들려면 먼저 그 회기 상자를 지워 주세요.', p_session;
   end if;
   select name into v_me from public.profiles where id = auth.uid();
   v_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 8));
@@ -477,7 +477,8 @@ $fn$;
 -- ---------------------------------------------------------------------
 -- 8. 화면이 몇 초마다 부르는 함수 — 보는 사람에게 허락된 것만 담아 준다
 -- ---------------------------------------------------------------------
-create or replace function public.assembly_state(p_code text default null)
+drop function if exists public.assembly_state(text);
+create or replace function public.assembly_state(p_code text default null, p_meeting bigint default null)
 returns jsonb language plpgsql stable security definer set search_path = public as $fn$
 declare
   v_uid  uuid := auth.uid();
@@ -500,8 +501,20 @@ begin
      where code = upper(btrim(p_code)) and status <> 'closed';
     v_code := m.id is not null;
   end if;
+  -- 서기·회계가 회기 상자에서 고른 노회
+  if m.id is null and p_meeting is not null and (v_mgr or v_tre) then
+    select * into m from public.assembly_meetings where id = p_meeting;
+  end if;
+  -- 오늘 열리는 노회 → 내가 입장해 있는 노회 → 가장 가까운 앞으로의 노회
   if m.id is null then
-    select * into m from public.assembly_meetings where status <> 'closed' order by id desc limit 1;
+    select * into m from public.assembly_meetings x
+     where x.status <> 'closed'
+     order by (x.meet_date = (now() at time zone 'Asia/Seoul')::date) desc,
+              exists (select 1 from public.assembly_attendees t
+                       where t.meeting_id = x.id and t.user_id = v_uid) desc,
+              (x.meet_date >= (now() at time zone 'Asia/Seoul')::date) desc,
+              abs(x.meet_date - (now() at time zone 'Asia/Seoul')::date)
+     limit 1;
   end if;
   if m.id is null then
     -- 마친 노회 — 거마비 수령 확인·승인이 남아 있을 수 있어 60일 동안 보여 준다
@@ -571,6 +584,23 @@ $fn$;
 
 
 -- ---------------------------------------------------------------------
+-- 8-0. 서기 — 회기별 QR 코드 목록 (회기 상자)
+-- ---------------------------------------------------------------------
+create or replace function public.assembly_list()
+returns jsonb language sql stable security definer set search_path = public as $fn$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', m.id, 'title', m.title, 'session_no', m.session_no, 'meet_date', m.meet_date,
+           'status', m.status, 'code', m.code,
+           'today', m.meet_date = (now() at time zone 'Asia/Seoul')::date,
+           'attendees', (select count(*) from public.assembly_attendees a where a.meeting_id = m.id),
+           'votes', (select count(*) from public.assembly_votes v where v.meeting_id = m.id and not v.is_test))
+         order by m.session_no desc nulls last, m.id desc), '[]'::jsonb)
+    from public.assembly_meetings m
+   where public.can_manage();
+$fn$;
+
+
+-- ---------------------------------------------------------------------
 -- 8-1. 오늘이 노회 날인가 — 첫 화면이 묻는다 (로그인 전에도)
 --      노회 날이면 첫 화면이 「오늘의 노회」 창 하나만 보여 준다.
 -- ---------------------------------------------------------------------
@@ -597,7 +627,8 @@ begin
     'assembly_attendee_remove(bigint)', 'assembly_close(bigint)', 'assembly_delete(bigint)',
     'assembly_allowance_approve(bigint, jsonb)', 'assembly_allowance_cancel(bigint)',
     'assembly_allowance_receive(bigint)', 'assembly_vote_start(bigint, text, text, text, boolean)',
-    'assembly_vote_cast(bigint, text)', 'assembly_vote_end(bigint)', 'assembly_state(text)']
+    'assembly_vote_cast(bigint, text)', 'assembly_vote_end(bigint)', 'assembly_state(text, bigint)',
+    'assembly_list()']
   loop
     execute 'revoke all on function public.' || f || ' from public, anon';
     execute 'grant execute on function public.' || f || ' to authenticated';
@@ -605,4 +636,4 @@ begin
 end
 $g$;
 -- 로그인 전에도 화면이 "로그인해 주세요"를 알 수 있게 상태 함수만 열어 둔다
-grant execute on function public.assembly_state(text) to anon;
+grant execute on function public.assembly_state(text, bigint) to anon;

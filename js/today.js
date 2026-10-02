@@ -13,6 +13,11 @@
   var root, C = null, S = null, offset = 0, busy = false, pollTimer = null;
   var roster = null;          /* 서기에게 보여 줄 재적 수 */
   var qrOpen = false, qrFrom = null;
+  /* 서기가 회기 상자에서 고른 노회. 고르지 않았고 주소가 #qr 이면 회기 상자 목록을 보여 준다. */
+  var SEL_KEY = 'shs_asm_sel', list = null;
+  function getSel() { try { return Number(sessionStorage.getItem(SEL_KEY)) || null; } catch (x) { return null; } }
+  function setSel(id) { try { if (id) sessionStorage.setItem(SEL_KEY, id); else sessionStorage.removeItem(SEL_KEY); } catch (x) {} }
+  function listMode() { return !!(S && S.me && isClerk(S.me) && location.hash === '#qr' && !getSel()); }
 
   function qs(k) {
     var m = location.search.match(new RegExp('[?&]' + k + '=([^&]*)'));
@@ -139,13 +144,20 @@
   /* ---------- 서버 ---------- */
   function refresh() {
     if (!C) return Promise.resolve();
-    return C.rpc('assembly_state', { p_code: getCode() || null }).then(function (r) {
+    return C.rpc('assembly_state', { p_code: getCode() || null, p_meeting: getSel() }).then(function (r) {
       if (r.error) { setupNeeded(r.error); return; }
       S = r.data || {};
       if (S.now) offset = Date.parse(S.now) - Date.now();
-      render();
       if (S.me && S.me.mgr && roster === null) loadRoster();
       if (S.me && isClerk(S.me) && sessions === null) loadSessions();
+      if (listMode()) {
+        return C.rpc('assembly_list').then(function (lr) {
+          list = (lr && !lr.error && lr.data) || [];
+          render();
+        });
+      }
+      render();
+
     }, function () {});
   }
   function setupNeeded(err) {
@@ -219,6 +231,12 @@
   /* ---------- 그리기 ---------- */
   function render() {
     var m = S.meeting, me = S.me || {};
+    if (listMode()) {
+      ['ta-head', 'ta-gate', 'ta-my', 'ta-vote', 'ta-tre', 'ta-hist'].forEach(function (id) { paint(id, ''); });
+      renderList();
+      return;
+    }
+    placeOrder(m, me);
     renderHead(m);
     renderGate(m, me);
     renderMy(m);
@@ -226,6 +244,22 @@
     renderClerk(m, me);
     renderTre(m, me);
     tick();
+  }
+
+  /* 중요한 순서대로 놓는다.
+   *   회원      : 노회 → (입장 안내) → 진행 중인 투표 → 내 정보·거마비 → 앞선 투표
+   *   서기·회계 : 노회 → 진행 중인 투표 → 서기 일 → 회계 일 → 내 정보 → 앞선 투표 → (본인 입장 안내)
+   * 거마비 수령 확인이 기다리고 있으면 내 정보를 투표 바로 아래로 올린다. */
+  function placeOrder(m, me) {
+    var admin = !!(me.mgr || me.tre);
+    var due = S.my && S.my.allow_status === '지급';
+    var o = admin
+      ? { 'ta-head': 1, 'ta-vote': 2, 'ta-my': due ? 3 : 6, 'ta-clerk': 4, 'ta-tre': 5, 'ta-hist': 7, 'ta-gate': S.login && m ? 8 : 2 }
+      : { 'ta-head': 1, 'ta-gate': 2, 'ta-vote': 3, 'ta-my': 4, 'ta-hist': 5, 'ta-clerk': 6, 'ta-tre': 7 };
+    Object.keys(o).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.order = o[id];
+    });
   }
 
   function chips(c, confirmed) {
@@ -277,6 +311,15 @@
             : '<p>내용이 맞으면 아래 단추를 눌러 주세요. 출석이 기록됩니다.</p>' +
               '<button class="btn ta-bigbtn" data-act="enter">입장하기</button>') + '</div>';
       } else {
+        if (me.mgr || me.tre) {
+          h = '<div class="ta-card"><h3>본인 출석</h3>' +
+            '<div class="ta-sub">서기·회계도 출석하려면 QR 코드를 찍거나 입장 코드를 적어 입장해 주세요.</div>' +
+            '<form class="ta-codeform ta-slim" data-form="code"><div>' +
+            '<input id="ta-code" data-keep="code" maxlength="8" autocomplete="off" placeholder="입장 코드 8자리" aria-label="입장 코드">' +
+            '<button class="btn" type="submit">확인</button></div>' +
+            (getCode() ? '<div class="ta-err">입장 코드가 맞지 않습니다. 다시 확인해 주세요.</div>' : '') +
+            '</form></div>';
+        } else
         h = '<div class="ta-card ta-center">' +
           '<div class="ta-qricon" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
           '<h3>QR 코드를 찍어 주세요</h3>' +
@@ -320,12 +363,15 @@
 
   function resultHtml(v) {
     var r = v.result;
+    /* 입장한 정회원 가운데 투표하지 않은 사람은 기권으로 센다 */
+    var abst = r.eligible != null ? Math.max(0, r.eligible - r.total) : 0;
     var h = '<div class="ta-result">' +
-      '<div class="ta-r-total">투표 <strong>' + r.total + '</strong>명' +
-      (r.eligible != null ? ' <span>/ 재석 정회원 ' + r.eligible + '명 (투표율 ' + pct(r.total, r.eligible) + ')</span>' : '') + '</div>' +
-      '<div class="ta-r-bars">' +
-      '<div class="ta-r-yes"><span>찬성</span><strong>' + r.yes + '</strong>표<em>' + pct(r.yes, r.total) + '</em></div>' +
-      '<div class="ta-r-no"><span>반대</span><strong>' + r.no + '</strong>표<em>' + pct(r.no, r.total) + '</em></div></div>' +
+      '<div class="ta-r-bars three">' +
+      '<div class="ta-r-all"><span>총 투표수</span><strong>' + r.total + '</strong>표<em>' +
+      (r.eligible != null ? '재석 정회원 ' + r.eligible + '명 중 · ' + pct(r.total, r.eligible) : '&nbsp;') + '</em></div>' +
+      '<div class="ta-r-yes"><span>찬성</span><strong>' + r.yes + '</strong>표<em>득표율 ' + pct(r.yes, r.total) + '</em></div>' +
+      '<div class="ta-r-no"><span>반대</span><strong>' + r.no + '</strong>표<em>득표율 ' + pct(r.no, r.total) + '</em></div>' +
+      '<div class="ta-r-abs"><span>기권</span><strong>' + abst + '</strong>명<em>투표하지 않음</em></div></div>' +
       '<div class="ta-r-bar"><i style="width:' + (r.total ? r.yes * 100 / r.total : 0) + '%"></i></div>' +
       '<div class="ta-sub">가결 기준 — ' + (v.rule === '3분의2'
         ? '찬성이 투표수의 3분의 2 이상 (' + Math.ceil(r.total * 2 / 3) + '표 이상)'
@@ -374,15 +420,18 @@
       }
       h += '</div>';
     }
+    paint('ta-vote', h);
+    h = '';
     if (m && S.history && S.history.length) {
       h += '<details class="ta-card ta-hist"><summary>앞선 투표 결과 ' + S.history.length + '건</summary>' +
         S.history.map(function (x) {
           return x.result ? '<div class="ta-histrow"><b>' + e(x.title) + '</b> <span>(' + e(x.mode) + ')</span> — 찬성 ' +
-            x.result.yes + ' · 반대 ' + x.result.no + ' → <strong class="' + (x.result.passed ? 'pass' : 'fail') + '">' +
+            x.result.yes + ' · 반대 ' + x.result.no +
+            (x.result.eligible != null ? ' · 기권 ' + Math.max(0, x.result.eligible - x.result.total) : '') + ' → <strong class="' + (x.result.passed ? 'pass' : 'fail') + '">' +
             (x.result.passed ? '가결' : '부결') + '</strong></div>' : '';
         }).join('') + '</details>';
     }
-    paint('ta-vote', h);
+    paint('ta-hist', h);
   }
 
   function qrUrl(code) {
@@ -398,9 +447,44 @@
   }
 
   function isClerk(me) { return me.role === 'clerk' || me.role === 'superadmin'; }
+
+  function openForm(heading) {
+    var d = new Date(now());
+    var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    return '<h3>' + heading + '</h3>' +
+      '<p class="ta-sub">노회 회기와 날짜를 정하고 QR 코드를 만듭니다. 미리 만들어 촬요에 인쇄해 두면, 노회 날 그 QR로 입장합니다.</p>' +
+      '<form class="ta-form" data-form="open">' +
+      '<label class="ta-short">노회 회기<input data-keep="osess" id="ta-osess" type="number" min="1" max="999" inputmode="numeric" placeholder="예: 20"></label>' +
+      '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
+      '<label>날짜<input data-keep="odate" id="ta-odate" type="date" value="' + ds + '"></label>' +
+      '<button class="btn" type="submit">QR 코드 생성</button></form>';
+  }
+
+  /* 회기 상자 목록 — <노회 출석 QR 코드 생성> 메뉴로 들어오면 먼저 보이는 화면 */
+  function renderList() {
+    var ST = { open: '<span class="ta-badge live">입장 받는 중</span>', confirmed: '<span class="ta-badge on">명단 확정</span>', closed: '<span class="ta-badge">마침</span>' };
+    var h = '<div class="ta-card ta-admin"><div class="ta-role">서기</div><h3>회기별 출석 QR 코드</h3>';
+    if (!list || !list.length) {
+      h += '<div class="ta-empty">아직 만든 QR 코드가 없습니다 — 아래에서 회기를 정해 만들어 주세요.</div>';
+    } else {
+      h += '<div class="ta-boxes">' + list.map(function (x) {
+        return '<div class="ta-box' + (x.today ? ' today' : '') + '">' +
+          '<div class="ta-box-no">제' + (x.session_no || '?') + '회기</div>' +
+          '<div class="ta-box-title">' + e(x.title) + '</div>' +
+          '<div class="ta-sub">' + e(String(x.meet_date || '').replace(/-/g, '.')) + (x.today ? ' · <strong>오늘</strong>' : '') + '</div>' +
+          '<div class="ta-box-st">' + (ST[x.status] || '') + '</div>' +
+          '<div class="ta-sub">입장 ' + x.attendees + '명 · 투표 ' + x.votes + '건 · 코드 ' + e(x.code) + '</div>' +
+          '<div class="ta-btnrow"><button class="btn sm" data-act="pick" data-id="' + x.id + '">열기</button>' +
+          '<button class="btn danger sm" data-act="delete" data-id="' + x.id + '" data-name="' + e(x.title) + '">삭제</button></div></div>';
+      }).join('') + '</div>';
+    }
+    paint('ta-clerk', h + openForm('새 회기 QR 코드 만들기') + '</div>');
+    fillSession(false);
+  }
   function renderClerk(m, me) {
     if (!me.mgr || ((!m || m.status === 'closed') && !isClerk(me))) { paint('ta-clerk', ''); return; }
-    var h = '<div class="ta-card ta-admin"><div class="ta-role">서기</div>';
+    var h = '<div class="ta-card ta-admin"><div class="ta-role">서기</div>' +
+      (isClerk(me) ? '<div class="ta-back"><button class="btn ghost sm" data-act="tolist">← 회기 목록</button></div>' : '');
     if (!m || m.status === 'closed') {
       var d = new Date(now());
       var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
@@ -415,6 +499,7 @@
         '」 기록 지우기</button></div>';
     } else {
       var c = S.counts || {};
+      var base = h; h = '';
       h += '<h3 id="qr">노회 출석 QR 코드' + (m.session_no ? ' <span class="ta-badge">제' + m.session_no + '회기</span>' : '') + '</h3>' +
         '<div class="ta-qrbox">' + qrImg(m.code, 5) + '<div>' +
         '<div class="ta-codebig">' + e(m.code) + '</div>' +
@@ -425,6 +510,7 @@
         '<div class="ta-sub">회원들에게 나눠 줄 <a href="today-guide.html" target="_blank" rel="noopener">이용 안내문(회원가입 · 앱 설치 · 입장 방법)</a>도 함께 인쇄해 넣어 주세요.</div>' +
         '</div></div>';
 
+      var qrPart = h; h = '';
       /* 명단 */
       var list = S.attendees || [];
       var late = list.filter(function (a) { return !a.confirmed; }).length;
@@ -441,6 +527,7 @@
       }
       h += tableHtml(list, m);
 
+      var listPart = h; h = '';
       /* 투표 */
       h += '<h3>전자투표</h3>';
       if (S.vote && S.vote.status === '진행') {
@@ -458,6 +545,12 @@
           '<div class="ta-sub">「테스트 투표하기」는 본 투표 전에 회원들이 연습해 보는 투표입니다. 주제를 비워 두면 「테스트 투표」로 올라가고, 결과는 기록에 남지 않습니다.</div>' +
           '<div class="ta-sub">입장한 정회원(' + (c.full || 0) + '명)만 투표할 수 있습니다.</div>';
       }
+      /* 입장 받는 동안: QR → 명단·확정 → 투표
+       * 명단 확정 뒤  : 투표 → 확정 명단 → QR(접어 둠) */
+      var votePart = h;
+      h = base + (m.status === 'open'
+        ? qrPart + listPart + votePart
+        : votePart + listPart + '<details class="ta-fold"><summary>출석 QR 코드 다시 보기</summary>' + qrPart + '</details>');
       h += '<div class="ta-btnrow ta-end">' +
         (isClerk(me) ? '<button class="btn danger" data-act="delete">QR 코드 지우기</button>' : '') +
         '<button class="btn ghost" data-act="close">노회 마치기</button></div>' +
@@ -631,10 +724,16 @@
     else if (act === 'close') {
       if (confirm('노회를 마칩니다. 더 이상 입장·투표를 할 수 없습니다.\n(거마비 수령 확인은 계속할 수 있습니다)')) run(b, 'assembly_close', { p_meeting: m.id });
     }
+    else if (act === 'pick') { setSel(id); cache = {}; refresh(); }
+    else if (act === 'tolist') { setSel(null); if (location.hash !== '#qr') history.replaceState(null, '', location.pathname + location.search + '#qr'); cache = {}; refresh(); }
     else if (act === 'delete') {
-      if (confirm('「' + m.title + '」의 QR 코드를 지웁니다.\n입장 명단·투표·거마비 기록과 장부에 자동 기입된 거마비까지 모두 지워지며 되돌릴 수 없습니다.') &&
+      var dname = b.getAttribute('data-name') || m.title, did = id || m.id;
+      if (confirm('「' + dname + '」의 QR 코드를 지웁니다.\n입장 명단·투표·거마비 기록과 장부에 자동 기입된 거마비까지 모두 지워지며 되돌릴 수 없습니다.') &&
           confirm('정말 지우시겠습니까? 촬요에 이미 인쇄한 QR 코드는 더 이상 쓸 수 없게 됩니다.')) {
-        run(b, 'assembly_delete', { p_meeting: m.id }, function () { clearCode(); cache = {}; });
+        run(b, 'assembly_delete', { p_meeting: did }, function () {
+          clearCode(); cache = {};
+          if (getSel() === did) { setSel(null); if (location.hash !== '#qr') history.replaceState(null, '', location.pathname + '#qr'); }
+        });
       }
     }
     else if (act === 'qrfull') openQr(b);
@@ -717,6 +816,7 @@
       else if (ev.target.id === 'ta-osess') fillSession(false);
     });
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && qrOpen) closeQr(); });
+    window.addEventListener('hashchange', function () { cache = {}; refresh(); });
     document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
     setInterval(tick, 250);
     if (!(window.SHSCloud && SHSCloud.enabled())) {

@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="css/style.css?v=20261003a">
 <style>
 /* 오늘의 노회 — 휴대전화에서 한 손으로 누르기 좋게 크게 */
-#ta-root { max-width: 860px; margin: 0 auto; }
+#ta-root { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; }
 #ta-root > div:empty { display: none; }
 .ta-card { background: #fff; border: 1px solid var(--gray-3); border-radius: 12px; padding: 22px; margin-bottom: 16px; }
 .ta-card h3 { font-size: 1.15rem; margin: 18px 0 8px; color: var(--navy); }
@@ -58,6 +58,10 @@
 .ta-gradeinfo.non { background: #fdf3f3; color: var(--red); }
 .ta-chromebar { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 16px; border: 1px solid #e0c97a; background: #fff9e3; border-radius: 10px; }
 .ta-chromebar .btn { min-height: 44px; }
+.ta-codeform.ta-slim { margin-top: 10px; padding-top: 0; border-top: 0; }
+.ta-codeform.ta-slim div { justify-content: flex-start; }
+.ta-fold { margin-top: 20px; border-top: 1px solid var(--gray-3); padding-top: 12px; }
+.ta-fold summary { cursor: pointer; color: var(--navy); font-weight: 700; margin-bottom: 10px; }
 /* 투표 */
 .ta-votecard { border: 2px solid var(--navy); }
 .ta-votecard.test { border-style: dashed; border-color: #b8860b; }
@@ -84,11 +88,18 @@
 .ta-r-bars span { display: block; font-size: 0.9rem; }
 .ta-r-bars strong { font-size: 2.4rem; }
 .ta-r-bars em { display: block; font-style: normal; font-size: 1.1rem; font-weight: 700; }
+.ta-r-bars.three { grid-template-columns: repeat(4, 1fr); }
+.ta-r-abs { background: var(--gray-1); color: var(--gray-5); }
+.ta-r-bars .ta-r-abs em { font-size: 0.8rem; font-weight: 400; }
+.ta-r-all { background: var(--gray-1); color: var(--navy); }
+.ta-r-bars .ta-r-all em { font-size: 0.8rem; font-weight: 400; color: var(--gray-5); }
+@media (max-width: 480px) { .ta-r-bars.three { grid-template-columns: 1fr 1fr; } }
 .ta-r-yes { background: #eef6ee; color: #1f7a3a; }
 .ta-r-no { background: #fdf3f3; color: var(--red); }
 .ta-r-bar { height: 12px; border-radius: 99px; background: var(--red); overflow: hidden; }
 .ta-r-bar i { display: block; height: 100%; background: #1f7a3a; }
 .ta-verdict { margin-top: 18px; padding: 18px; border-radius: 12px; font-family: 'Noto Serif KR', serif; font-size: clamp(3rem, 12vw, 6rem); font-weight: 700; line-height: 1.1; color: #fff; }
+.ta-verdict.pass, .ta-verdict.fail { color: #fff; }
 .ta-verdict.pass { background: #1f7a3a; }
 .ta-verdict.fail { background: var(--red); }
 .ta-names { text-align: left; margin-top: 14px; font-size: 0.9rem; line-height: 1.8; }
@@ -119,6 +130,13 @@
 .ta-amtin { width: 110px; padding: 6px; border: 1px solid var(--gray-3); border-radius: 6px; text-align: right; }
 .ta-bulk { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 0.88rem; }
 .ta-bulk input { width: 110px; padding: 6px; border: 1px solid var(--gray-3); border-radius: 6px; text-align: right; }
+.ta-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 12px 0 22px; }
+.ta-box { background: #fff; border: 1px solid var(--gray-3); border-radius: 10px; padding: 16px; }
+.ta-box.today { border: 2px solid var(--navy); }
+.ta-box-no { font-family: 'Noto Serif KR', serif; font-size: 1.4rem; font-weight: 700; color: var(--navy); }
+.ta-box-title { font-weight: 700; margin-top: 2px; }
+.ta-box-st { margin-top: 8px; }
+.ta-back { margin-bottom: 12px; }
 /* QR 크게 보기 */
 body.ta-qr-open { overflow: hidden; }
 .ta-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(10, 18, 34, 0.86); display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; overscroll-behavior: contain; }
@@ -158,6 +176,7 @@ body.ta-qr-open { overflow: hidden; }
     <div id="ta-vote"></div>
     <div id="ta-clerk"></div>
     <div id="ta-tre"></div>
+    <div id="ta-hist"></div>
   </div>
 </main>
 
@@ -167,6 +186,6 @@ body.ta-qr-open { overflow: hidden; }
 <script src="js/supabase-auth.js"></script>
 <script src="js/main.js?v=20261003b"></script>
 <script src="js/vendor/qrcode.js"></script>
-<script src="js/today.js?v=20261003i"></script>
+<script src="js/today.js?v=20261003n"></script>
 </body>
 </html>
