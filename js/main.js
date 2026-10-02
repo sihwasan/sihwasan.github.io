@@ -1691,10 +1691,10 @@
   /* rows 에 생년월일을 얹어서 돌려준다(Promise). 관리자가 아니면 서버가 빈 목록을 주므로 그대로다. */
   function withBirths(c, rows, which) {
     rows = rows || [];
-    var u = getUser();
-    if (!rows.length || !(window.SHSAuth && SHSAuth.canManageMembers && SHSAuth.canManageMembers(u))) {
-      return Promise.resolve(rows);
-    }
+    /* getUser()는 Promise 라 여기서 등급을 판정할 수 없다(예전에는 그래서 늘 건너뛰었다).
+     * 누가 볼 수 있는지는 서버(roster_births: 노회장·서기·간사·최고관리자)가 정하므로
+     * 그냥 묻고, 권한이 없으면 서버가 빈 목록을 준다. */
+    if (!rows.length || !c) return Promise.resolve(rows);
     return c.rpc(which === 'staff' ? 'church_staff_births' : 'roster_births')
       .then(function (r) {
         var map = {};
