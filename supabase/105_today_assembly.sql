@@ -344,7 +344,11 @@ $fn$;
 -- ---------------------------------------------------------------------
 -- 7. 전자투표
 -- ---------------------------------------------------------------------
-create or replace function public.assembly_vote_start(p_meeting bigint, p_title text, p_mode text)
+-- 가결 기준(정족수): 과반 = 찬성이 투표수의 반을 넘음 / 3분의2 = 찬성이 투표수의 3분의 2 이상
+alter table public.assembly_votes add column if not exists rule text not null default '과반';
+
+drop function if exists public.assembly_vote_start(bigint, text, text);
+create or replace function public.assembly_vote_start(p_meeting bigint, p_title text, p_mode text, p_rule text)
 returns bigint language plpgsql security definer set search_path = public as $fn$
 declare
   v_id bigint;
@@ -353,6 +357,7 @@ begin
   if not public.can_manage() then raise exception '서기만 투표를 올릴 수 있습니다.'; end if;
   if btrim(coalesce(p_title, '')) = '' then raise exception '투표 주제를 적어 주세요.'; end if;
   if p_mode not in ('기명', '무기명') then raise exception '기명·무기명 가운데 골라 주세요.'; end if;
+  if p_rule not in ('과반', '3분의2') then raise exception '가결 기준(과반·3분의 2)을 골라 주세요.'; end if;
   if not exists (select 1 from public.assembly_meetings where id = p_meeting and status <> 'closed') then
     raise exception '진행 중인 노회가 아닙니다.';
   end if;
@@ -360,8 +365,8 @@ begin
     raise exception '진행 중인 투표가 있습니다. 먼저 종료해 주세요.';
   end if;
   select name into v_me from public.profiles where id = auth.uid();
-  insert into public.assembly_votes (meeting_id, title, mode, created_by)
-  values (p_meeting, btrim(p_title), p_mode, v_me) returning id into v_id;
+  insert into public.assembly_votes (meeting_id, title, mode, rule, created_by)
+  values (p_meeting, btrim(p_title), p_mode, p_rule, v_me) returning id into v_id;
   return v_id;
 end
 $fn$;
@@ -419,7 +424,7 @@ begin
   select * into v from public.assembly_votes where id = p_vote;
   if v.id is null then return null; end if;
   j := jsonb_build_object(
-    'id', v.id, 'title', v.title, 'mode', v.mode, 'status', v.status,
+    'id', v.id, 'title', v.title, 'mode', v.mode, 'rule', v.rule, 'status', v.status,
     'started_at', v.started_at, 'ended_at', v.ended_at,
     'cast', (select count(*) from public.assembly_vote_voters x where x.vote_id = v.id),
     'voted', exists (select 1 from public.assembly_vote_voters x
@@ -429,7 +434,8 @@ begin
       into v_yes, v_no from public.assembly_ballots where vote_id = v.id;
     j := j || jsonb_build_object('result', jsonb_build_object(
       'yes', v_yes, 'no', v_no, 'total', v_yes + v_no, 'eligible', v.eligible,
-      'passed', v_yes > v_no,
+      'passed', case when v.rule = '3분의2' then v_yes > 0 and v_yes * 3 >= (v_yes + v_no) * 2
+                     else v_yes > v_no end,
       'names', case when v.mode = '기명' then
                  (select coalesce(jsonb_agg(jsonb_build_object('name', b.voter_name, 'choice', b.choice)
                                             order by b.choice desc, b.voter_name), '[]'::jsonb)
@@ -563,7 +569,7 @@ begin
     'assembly_open(text, date, integer)', 'assembly_enter(text)', 'assembly_confirm(bigint)',
     'assembly_attendee_remove(bigint)', 'assembly_close(bigint)',
     'assembly_allowance_approve(bigint, jsonb)', 'assembly_allowance_cancel(bigint)',
-    'assembly_allowance_receive(bigint)', 'assembly_vote_start(bigint, text, text)',
+    'assembly_allowance_receive(bigint)', 'assembly_vote_start(bigint, text, text, text)',
     'assembly_vote_cast(bigint, text)', 'assembly_vote_end(bigint)', 'assembly_state(text)']
   loop
     execute 'revoke all on function public.' || f || ' from public, anon';

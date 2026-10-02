@@ -73,6 +73,8 @@
       '<div class="ta-gradeinfo' + (non ? ' non' : '') + '">' + e(GRADE_INFO[grade] || '') + '</div>';
   }
 
+  function ruleName(r) { return r === '3분의2' ? '3분의 2 이상' : '과반'; }
+
   /* 바뀐 부분만 다시 그린다. 적어 둔 값(data-keep)은 다시 그려도 남긴다. */
   var cache = {};
   function paint(id, html) {
@@ -325,6 +327,9 @@
       '<div class="ta-r-yes"><span>찬성</span><strong>' + r.yes + '</strong>표<em>' + pct(r.yes, r.total) + '</em></div>' +
       '<div class="ta-r-no"><span>반대</span><strong>' + r.no + '</strong>표<em>' + pct(r.no, r.total) + '</em></div></div>' +
       '<div class="ta-r-bar"><i style="width:' + (r.total ? r.yes * 100 / r.total : 0) + '%"></i></div>' +
+      '<div class="ta-sub">가결 기준 — ' + (v.rule === '3분의2'
+        ? '찬성이 투표수의 3분의 2 이상 (' + Math.ceil(r.total * 2 / 3) + '표 이상)'
+        : '찬성이 투표수의 과반 (' + (Math.floor(r.total / 2) + 1) + '표 이상)') + '</div>' +
       '<div class="ta-verdict ' + (r.passed ? 'pass' : 'fail') + '">' + (r.passed ? '가 결' : '부 결') + '</div>';
     if (r.names && r.names.length) {
       var y = r.names.filter(function (n) { return n.choice === '찬성'; }).map(function (n) { return e(n.name); });
@@ -343,6 +348,7 @@
         '<span class="ta-badge ' + (v.status === '진행' ? 'live' : '') + '">' +
         (v.status === '진행' ? '투표 중' : '투표 종료') + '</span>' +
         '<span class="ta-badge">' + e(v.mode) + ' 투표</span>' +
+        '<span class="ta-badge">가결 기준 ' + ruleName(v.rule) + '</span>' +
         '<span class="ta-timer" data-timer="vote"></span></div>' +
         '<h3 class="ta-vtitle">' + e(v.title) + '</h3>';
       if (v.status === '진행') {
@@ -439,6 +445,9 @@
           '<label>투표 주제<input data-keep="vtitle" id="ta-vtitle" maxlength="120" placeholder="예: 제3호 안건 — ○○교회 설립 허락의 건"></label>' +
           '<div class="ta-radio"><label><input type="radio" name="vmode" value="무기명" data-keep="vm1" checked> 무기명</label>' +
           '<label><input type="radio" name="vmode" value="기명" data-keep="vm2"> 기명</label></div>' +
+          '<div class="ta-radio"><span class="ta-rlabel">가결 기준</span>' +
+          '<label><input type="radio" name="vrule" value="과반" data-keep="vr1" checked> 과반</label>' +
+          '<label><input type="radio" name="vrule" value="3분의2" data-keep="vr2"> 3분의 2</label></div>' +
           '<button class="btn" type="submit">투표하기</button></form>' +
           '<div class="ta-sub">입장한 정회원(' + (c.full || 0) + '명)만 투표할 수 있습니다.</div>';
       }
@@ -663,8 +672,9 @@
       var vt = document.getElementById('ta-vtitle').value.trim();
       if (!vt) { alert('투표 주제를 적어 주세요.'); return; }
       var mode = (f.querySelector('input[name="vmode"]:checked') || {}).value || '무기명';
-      if (!confirm('「' + vt + '」\n' + mode + ' 투표를 시작합니다.')) return;
-      run(btn, 'assembly_vote_start', { p_meeting: S.meeting.id, p_title: vt, p_mode: mode }, function () {
+      var rule = (f.querySelector('input[name="vrule"]:checked') || {}).value || '과반';
+      if (!confirm('「' + vt + '」\n' + mode + ' 투표 · 가결 기준 ' + ruleName(rule) + '\n투표를 시작합니다.')) return;
+      run(btn, 'assembly_vote_start', { p_meeting: S.meeting.id, p_title: vt, p_mode: mode, p_rule: rule }, function () {
         document.getElementById('ta-vtitle').value = '';
       });
     }
