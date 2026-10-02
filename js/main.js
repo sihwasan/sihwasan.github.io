@@ -165,8 +165,8 @@
     else sub.insertBefore(a, sub.firstChild);
   }
 
-  /* 서기에게 임원방 하위에 <노회 출석 QR 코드 생성>을 붙인다.
-   * 미리 QR을 만들어 두면 노회 날 첫 화면이 「오늘의 노회」로 바뀐다. */
+  /* 서기에게만 임원방 하위 맨 아래에 <노회 출석 QR 코드 생성>을 붙인다.
+   * (최고관리자는 관리를 위해 함께 본다) 미리 QR을 만들어 두면 노회 날 첫 화면이 「오늘의 노회」로 바뀐다. */
   function addAttendQrMenu() {
     var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
     if (!links.length) return;
@@ -175,8 +175,7 @@
     var a = document.createElement('a');
     a.href = 'today.html#qr';
     a.textContent = '노회 출석 QR 코드 생성';
-    var proceed = sub.querySelector('a[href="proceed.html"]');
-    if (proceed) sub.insertBefore(a, proceed); else sub.insertBefore(a, sub.firstChild);
+    sub.appendChild(a);   /* 맨 아래 자리 */
   }
 
   /* 회록서기(부회록서기)에게 임원방 하위에 <회의록 작성 안내>를 붙인다.

@@ -104,6 +104,7 @@
       if (S.now) offset = Date.parse(S.now) - Date.now();
       render();
       if (S.me && S.me.mgr && roster === null) loadRoster();
+      if (S.me && isClerk(S.me) && sessions === null) loadSessions();
     }, function () {});
   }
   function setupNeeded(err) {
@@ -111,6 +112,28 @@
       '<strong>[준비 중]</strong> 오늘의 노회 기능이 아직 서버에 설치되지 않았습니다. ' +
       '관리자가 <code>supabase/105_today_assembly.sql</code> 을 Supabase SQL Editor에서 실행하면 열립니다.' +
       '<div style="font-size:.8rem;color:var(--gray-5);margin-top:6px">' + e(err.message || '') + '</div></div>');
+  }
+  /* 회기 설정(사이트 관리)을 읽어, 고른 날짜에 시작하는 회기를 미리 채운다 */
+  var sessions = null;
+  function loadSessions() {
+    sessions = false;
+    C.from('site_settings').select('value').eq('key', 'sessions').then(function (r) {
+      sessions = (r && r.data && r.data[0] && r.data[0].value) || false;
+      fillSession(false);
+    }, function () {});
+  }
+  function guessSession(date) {
+    if (!sessions) return '';
+    var hit = (sessions.list || []).filter(function (x) { return x.from === date; })[0];
+    if (hit) return hit.no;
+    return sessions.current ? Number(sessions.current) + 1 : '';
+  }
+  function fillSession(force) {
+    var se = document.getElementById('ta-osess'), ti = document.getElementById('ta-otitle'),
+        da = document.getElementById('ta-odate');
+    if (!se || !ti) return;
+    if (force || !se.value) se.value = guessSession(da.value);
+    if (se.value && (!ti.value || /^제\d+회 정기노회$/.test(ti.value))) ti.value = '제' + se.value + '회 정기노회';
   }
   function loadRoster() {
     roster = false;
@@ -181,7 +204,7 @@
            : m.status === 'confirmed' ? '<span class="ta-badge on">회의 진행 중 · 명단 확정</span>'
            : '<span class="ta-badge">마친 노회</span>';
     paint('ta-head', '<div class="ta-card ta-headcard">' +
-      '<div class="ta-date">' + e(String(m.meet_date || '').replace(/-/g, '.')) + '</div>' +
+      '<div class="ta-date">' + (m.session_no ? '제' + m.session_no + '회기 · ' : '') + e(String(m.meet_date || '').replace(/-/g, '.')) + '</div>' +
       '<h2>' + e(m.title) + '</h2>' + st +
       (S.counts ? chips(S.counts, false) : '') + '</div>');
   }
@@ -325,25 +348,29 @@
     } catch (x) { return '<div class="ta-err">QR 코드를 만들지 못했습니다.</div>'; }
   }
 
+  function isClerk(me) { return me.role === 'clerk' || me.role === 'superadmin'; }
   function renderClerk(m, me) {
-    if (!me.mgr) { paint('ta-clerk', ''); return; }
+    if (!me.mgr || ((!m || m.status === 'closed') && !isClerk(me))) { paint('ta-clerk', ''); return; }
     var h = '<div class="ta-card ta-admin"><div class="ta-role">서기</div>';
     if (!m || m.status === 'closed') {
       var d = new Date(now());
       var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
       h += '<h3 id="qr">노회 출석 QR 코드 생성</h3>' +
-        '<p class="ta-sub">노회 이름과 날짜를 적고 QR 코드를 만들면, 회원들이 QR을 찍어 입장할 수 있습니다. 미리 만들어 순서지에 인쇄해 두셔도 됩니다.</p>' +
+        '<p class="ta-sub">노회 회기와 날짜를 정하고 QR 코드를 만들면, 회원들이 QR을 찍어 입장할 수 있습니다. 미리 만들어 순서지에 인쇄해 두셔도 됩니다.</p>' +
         '<form class="ta-form" data-form="open">' +
+        '<label class="ta-short">노회 회기<input data-keep="osess" id="ta-osess" type="number" min="1" max="999" inputmode="numeric" placeholder="예: 20"></label>' +
         '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
         '<label>날짜<input data-keep="odate" id="ta-odate" type="date" value="' + ds + '"></label>' +
         '<button class="btn" type="submit">QR 코드 생성</button></form>';
     } else {
       var c = S.counts || {};
-      h += '<h3 id="qr">노회 출석 QR 코드</h3>' +
+      h += '<h3 id="qr">노회 출석 QR 코드' + (m.session_no ? ' <span class="ta-badge">제' + m.session_no + '회기</span>' : '') + '</h3>' +
         '<div class="ta-qrbox">' + qrImg(m.code, 5) + '<div>' +
         '<div class="ta-codebig">' + e(m.code) + '</div>' +
         '<div class="ta-sub">입장 코드 (QR을 찍을 수 없는 분께 불러 주세요)</div>' +
-        '<div class="ta-btnrow"><button class="btn" data-act="qrfull">화면에 크게 띄우기 · 인쇄</button></div>' +
+        '<div class="ta-btnrow"><button class="btn" data-act="qrfull">화면에 크게 띄우기 · 인쇄</button>' +
+        '<button class="btn ghost" data-act="qrsave">QR 그림 저장 (촬요용)</button></div>' +
+        '<div class="ta-sub">저장한 그림을 촬요(회의자료)에 넣어 미리 인쇄해 두면, 노회 날 그 QR로 입장합니다.</div>' +
         '</div></div>';
 
       /* 명단 */
@@ -495,6 +522,30 @@
     if (qrFrom && document.body.contains(qrFrom)) qrFrom.focus();
   }
 
+  /* QR을 큰 PNG 그림으로 내려받는다 — 촬요(회의자료) 편집에 넣는 용도 */
+  function saveQr() {
+    var m = S.meeting;
+    if (!m || !m.code) return;
+    try {
+      var q = qrcode(0, 'M');
+      q.addData(qrUrl(m.code));
+      q.make();
+      var n = q.getModuleCount(), cell = 20, pad = 4 * cell, size = n * cell + pad * 2;
+      var cv = document.createElement('canvas');
+      cv.width = size; cv.height = size;
+      var x = cv.getContext('2d');
+      x.fillStyle = '#fff'; x.fillRect(0, 0, size, size);
+      x.fillStyle = '#000';
+      for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+        if (q.isDark(r, c)) x.fillRect(pad + c * cell, pad + r * cell, cell, cell);
+      }
+      var a = document.createElement('a');
+      a.href = cv.toDataURL('image/png');
+      a.download = '노회출석QR_' + (m.session_no ? '제' + m.session_no + '회_' : '') + m.code + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (err) { alert('QR 그림을 만들지 못했습니다.'); }
+  }
+
   /* ---------- 누르는 일 ---------- */
   function onClick(ev) {
     var b = ev.target.closest ? ev.target.closest('[data-act]') : null;
@@ -521,6 +572,7 @@
       if (confirm('노회를 마칩니다. 더 이상 입장·투표를 할 수 없습니다.\n(거마비 수령 확인은 계속할 수 있습니다)')) run(b, 'assembly_close', { p_meeting: m.id });
     }
     else if (act === 'qrfull') openQr(b);
+    else if (act === 'qrsave') saveQr();
     else if (act === 'bulk') {
       var val = document.getElementById('ta-bulk').value;
       [].forEach.call(document.querySelectorAll('.ta-amtin'), function (i) { i.value = val; });
@@ -561,7 +613,11 @@
     } else if (kind === 'open') {
       var t = document.getElementById('ta-otitle').value.trim();
       if (!t) { alert('노회 이름을 적어 주세요.'); return; }
-      run(btn, 'assembly_open', { p_title: t, p_date: document.getElementById('ta-odate').value || null });
+      var sn = parseInt(document.getElementById('ta-osess').value, 10);
+      if (!(sn > 0)) { alert('노회 회기를 적어 주세요.'); return; }
+      if (!confirm('제' + sn + '회기 「' + t + '」 (' + document.getElementById('ta-odate').value + ')\n' +
+          '출석 QR 코드를 만듭니다.')) return;
+      run(btn, 'assembly_open', { p_title: t, p_date: document.getElementById('ta-odate').value || null, p_session: sn });
     } else if (kind === 'vote') {
       var vt = document.getElementById('ta-vtitle').value.trim();
       if (!vt) { alert('투표 주제를 적어 주세요.'); return; }
@@ -579,6 +635,10 @@
     getCode();
     root.addEventListener('click', onClick);
     root.addEventListener('submit', onSubmit);
+    root.addEventListener('change', function (ev) {
+      if (ev.target.id === 'ta-odate') fillSession(true);
+      else if (ev.target.id === 'ta-osess') fillSession(false);
+    });
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && qrOpen) closeQr(); });
     document.addEventListener('visibilitychange', function () { if (!document.hidden) refresh(); });
     setInterval(tick, 250);

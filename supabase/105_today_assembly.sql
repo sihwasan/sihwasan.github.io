@@ -106,21 +106,29 @@ alter table public.assembly_ballots     enable row level security;
 -- ---------------------------------------------------------------------
 -- 2. 서기 — 노회 열기 (출석 QR 코드 생성)
 -- ---------------------------------------------------------------------
-create or replace function public.assembly_open(p_title text, p_date date)
+alter table public.assembly_meetings add column if not exists session_no integer;  -- 노회 회기
+
+-- QR 코드 생성은 서기만 (최고관리자는 관리를 위해 함께)
+drop function if exists public.assembly_open(text, date);
+create or replace function public.assembly_open(p_title text, p_date date, p_session integer)
 returns text language plpgsql security definer set search_path = public as $fn$
 declare
   v_code text;
   v_me   text;
 begin
-  if not public.can_manage() then raise exception '서기만 노회를 열 수 있습니다.'; end if;
+  if not exists (select 1 from public.profiles
+                  where id = auth.uid() and role in ('clerk', 'superadmin')) then
+    raise exception '서기만 출석 QR 코드를 만들 수 있습니다.';
+  end if;
+  if coalesce(p_session, 0) <= 0 then raise exception '노회 회기를 적어 주세요.'; end if;
   if btrim(coalesce(p_title, '')) = '' then raise exception '노회 이름을 적어 주세요.'; end if;
   if exists (select 1 from public.assembly_meetings where status <> 'closed') then
     raise exception '이미 열려 있는 노회가 있습니다. 먼저 그 노회를 마쳐 주세요.';
   end if;
   select name into v_me from public.profiles where id = auth.uid();
   v_code := upper(substr(md5(random()::text || clock_timestamp()::text), 1, 8));
-  insert into public.assembly_meetings (title, meet_date, code, created_by)
-  values (btrim(p_title), coalesce(p_date, current_date), v_code, v_me);
+  insert into public.assembly_meetings (title, meet_date, code, created_by, session_no)
+  values (btrim(p_title), coalesce(p_date, current_date), v_code, v_me, p_session);
   return v_code;
 end
 $fn$;
@@ -478,7 +486,7 @@ begin
 
   select * into a from public.assembly_attendees where meeting_id = m.id and user_id = v_uid;
   j := j || jsonb_build_object(
-    'meeting', jsonb_build_object('id', m.id, 'title', m.title, 'meet_date', m.meet_date,
+    'meeting', jsonb_build_object('id', m.id, 'title', m.title, 'session_no', m.session_no, 'meet_date', m.meet_date,
                  'status', m.status, 'confirmed_at', m.confirmed_at,
                  'today', m.meet_date = (now() at time zone 'Asia/Seoul')::date,
                  'code', case when v_mgr then m.code else null end),
@@ -552,7 +560,7 @@ declare
   f text;
 begin
   foreach f in array array[
-    'assembly_open(text, date)', 'assembly_enter(text)', 'assembly_confirm(bigint)',
+    'assembly_open(text, date, integer)', 'assembly_enter(text)', 'assembly_confirm(bigint)',
     'assembly_attendee_remove(bigint)', 'assembly_close(bigint)',
     'assembly_allowance_approve(bigint, jsonb)', 'assembly_allowance_cancel(bigint)',
     'assembly_allowance_receive(bigint)', 'assembly_vote_start(bigint, text, text)',
