@@ -435,15 +435,20 @@
         '<span class="ta-timer" data-timer="vote"></span></div>' +
         '<h3 class="ta-vtitle">' + e(v.title) + '</h3>';
       if (v.status === '진행') {
-        h += '<div class="ta-sub">지금까지 ' + v.cast + '명 투표' +
-          (S.counts ? ' / 재석 정회원 ' + S.counts.full + '명' : '') + '</div>';
+        /* 무기명은 진행 중 상황(투표 인원)을 누구에게도 보이지 않는다 */
+        if (v.mode === '기명' && v.cast != null) {
+          h += '<div class="ta-sub">지금까지 ' + v.cast + '명 투표' +
+            (S.counts ? ' / 재석 정회원 ' + S.counts.full + '명' : '') + '</div>';
+        } else {
+          h += '<div class="ta-sub">무기명 투표 — 진행 중에는 투표 상황이 공개되지 않으며, 종료 후 결과만 발표됩니다.</div>';
+        }
         if (v.voted) h += '<div class="ta-done">투표를 마쳤습니다. 결과는 투표가 종료된 뒤에 나옵니다.</div>';
         else if (S.entered && me.full) {
           h += '<div class="ta-vbtns">' +
             '<button class="ta-vbtn yes" data-act="cast" data-choice="찬성">찬성</button>' +
             '<button class="ta-vbtn no" data-act="cast" data-choice="반대">반대</button></div>' +
             (v.mode === '기명' ? '<div class="ta-sub">기명 투표입니다 — 누가 어떻게 투표했는지 결과에 표시됩니다.</div>'
-                               : '<div class="ta-sub">무기명 투표입니다 — 누가 어떻게 투표했는지 기록되지 않습니다.</div>');
+                               : '<div class="ta-sub">무기명 투표입니다 — 누가 어떻게 투표했는지 어디에도 기록되지 않으며, 서기도 알 수 없습니다.</div>');
         } else if (S.entered) h += '<div class="ta-done">투표는 정회원만 참여할 수 있습니다.</div>';
         else h += '<div class="ta-done">입장한 정회원만 투표할 수 있습니다.</div>';
         if (me.mgr) h += '<button class="btn danger ta-endbtn" data-act="vend" data-id="' + v.id + '">투표 종료하기</button>';
