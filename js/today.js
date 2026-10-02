@@ -486,7 +486,11 @@
     var d = new Date(now());
     var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     return '<h3>' + heading + '</h3>' +
-      '<p class="ta-sub">노회 회기와 날짜를 정하고 QR 코드를 만듭니다. 미리 만들어 촬요에 인쇄해 두면, 노회 날 그 QR로 입장합니다.</p>' +
+      '<p class="ta-sub">노회 회기와 날짜를 정하고 출석 QR 코드를 만듭니다. 출석 QR은 노회 날 회의장에 띄우거나 붙여 둡니다.</p>' +
+      '<div class="ta-guidebox"><strong>촬요용 「앱 설치 안내」 QR</strong>' +
+      '<div class="ta-sub">촬요에는 출석 QR이 아니라 이 QR을 인쇄해 주세요. 찍으면 회원가입 → 크롬으로 앱 설치 → 노회 날 입장 방법 안내가 열려, 노회 전에 미리 준비할 수 있습니다.</div>' +
+      '<div class="ta-btnrow"><button class="btn" type="button" data-act="guidesave">앱 설치 안내 QR 저장 (촬요용)</button>' +
+      '<a class="btn ghost" href="today-guide.html" target="_blank" rel="noopener">안내문 보기 · 인쇄</a></div></div>' +
       '<form class="ta-form" data-form="open">' +
       '<label class="ta-short">노회 회기<input data-keep="osess" id="ta-osess" type="number" min="1" max="999" inputmode="numeric" placeholder="예: 20"></label>' +
       '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
@@ -539,8 +543,9 @@
         '<div class="ta-codebig">' + e(m.code) + '</div>' +
         '<div class="ta-sub">QR 코드 번호 — 출석은 회의장에서 이 QR을 찍어야 인정됩니다.</div>' +
         '<div class="ta-btnrow"><button class="btn" data-act="qrfull">화면에 크게 띄우기 · 인쇄</button>' +
-        '<button class="btn ghost" data-act="qrsave">QR 그림 저장 (촬요용)</button></div>' +
-        '<div class="ta-sub">저장한 그림을 촬요(회의자료)에 넣어 미리 인쇄해 두면, 노회 날 그 QR로 입장합니다.</div>' +
+        '<button class="btn ghost" data-act="qrsave">출석 QR 그림 저장 (회의장 게시용)</button></div>' +
+        '<div class="ta-sub">출석 QR은 노회 날 회의장 화면이나 입구에만 게시해 주세요. 촬요에는 아래 「앱 설치 안내」 QR을 넣습니다.</div>' +
+        '<div class="ta-btnrow"><button class="btn ghost sm" type="button" data-act="guidesave">앱 설치 안내 QR 저장 (촬요용)</button></div>' +
         '<div class="ta-sub">회원들에게 나눠 줄 <a href="today-guide.html" target="_blank" rel="noopener">이용 안내문(회원가입 · 앱 설치 · 입장 방법)</a>도 함께 인쇄해 넣어 주세요.</div>' +
         '</div></div>';
 
@@ -710,12 +715,12 @@
   }
 
   /* QR을 큰 PNG 그림으로 내려받는다 — 촬요(회의자료) 편집에 넣는 용도 */
-  function saveQr() {
+  function saveQr(url, name) {
     var m = S.meeting;
-    if (!m || !m.code) return;
+    if (!url && (!m || !m.code)) return;
     try {
       var q = qrcode(0, 'M');
-      q.addData(qrUrl(m.code));
+      q.addData(url || qrUrl(m.code));
       q.make();
       var n = q.getModuleCount(), cell = 20, pad = 4 * cell, size = n * cell + pad * 2;
       var cv = document.createElement('canvas');
@@ -728,7 +733,7 @@
       }
       var a = document.createElement('a');
       a.href = cv.toDataURL('image/png');
-      a.download = '노회출석QR_' + (m.session_no ? '제' + m.session_no + '회_' : '') + m.code + '.png';
+      a.download = name || '노회출석QR_' + (m.session_no ? '제' + m.session_no + '회_' : '') + m.code + '.png';
       document.body.appendChild(a); a.click(); a.remove();
     } catch (err) { alert('QR 그림을 만들지 못했습니다.'); }
   }
@@ -763,7 +768,7 @@
     ov.innerHTML = '<div class="ta-ovbox" tabindex="-1">' +
       '<button class="ta-x" data-sc="close" aria-label="닫기">&times;</button>' +
       '<div class="ta-ovtitle">QR 코드를 찍으세요</div>' +
-      '<div class="ta-ovsub" id="ta-scanmsg">회의장 화면이나 촬요에 있는 출석 QR 코드를 네모 안에 맞춰 주세요.</div>' +
+      '<div class="ta-ovsub" id="ta-scanmsg">회의장에 게시된 출석 QR 코드를 네모 안에 맞춰 주세요.</div>' +
       '<div class="ta-scanbox"><video id="ta-video" playsinline muted></video><i></i></div>' +
       '<div class="ta-btnrow"><button class="btn ghost" data-sc="close">닫기</button></div></div>';
     document.body.appendChild(ov);
@@ -880,7 +885,7 @@
     else if (act === 'delete') {
       var dname = b.getAttribute('data-name') || m.title, did = id || m.id;
       if (confirm('「' + dname + '」의 QR 코드를 지웁니다.\n입장 명단·투표·거마비 기록과 장부에 자동 기입된 거마비까지 모두 지워지며 되돌릴 수 없습니다.') &&
-          confirm('정말 지우시겠습니까? 촬요에 이미 인쇄한 QR 코드는 더 이상 쓸 수 없게 됩니다.')) {
+          confirm('정말 지우시겠습니까? 이미 인쇄해 둔 출석 QR 코드는 더 이상 쓸 수 없게 됩니다.')) {
         run(b, 'assembly_delete', { p_meeting: did }, function () {
           clearCode(); cache = {};
           if (getSel() === did) { setSel(null); if (location.hash !== '#qr') history.replaceState(null, '', location.pathname + '#qr'); }
@@ -889,6 +894,7 @@
     }
     else if (act === 'qrfull') openQr(b);
     else if (act === 'qrsave') saveQr();
+    else if (act === 'guidesave') saveQr('https://sihwasan.org/today-guide.html', '시화산노회_앱설치안내QR.png');
     else if (act === 'vtest') startVote(b.form, b, true);
     else if (act === 'bulk') {
       var val = document.getElementById('ta-bulk').value;

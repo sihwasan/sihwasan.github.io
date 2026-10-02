@@ -26,6 +26,14 @@
 .tg-note { font-size: 0.88rem; color: var(--gray-5); margin-top: 6px; }
 .tg-warn { margin-top: 8px; padding: 10px 14px; border-left: 4px solid var(--red); background: #fdf3f3; font-size: 0.92rem; }
 .tg-foot { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--navy); text-align: center; font-size: 0.9rem; color: var(--gray-5); }
+.tg-help { margin: 18px 0; padding: 16px; border: 2px solid var(--navy); border-radius: 12px; }
+.tg-help-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px dotted var(--gray-3); }
+.tg-help-row[hidden] { display: none; }
+.tg-help-row:last-of-type { border-bottom: 0; }
+.tg-help-row .btn { min-height: 44px; min-width: 150px; text-align: center; }
+.tg-help-row.done span::after { content: ' ✓ 완료'; color: #1f7a3a; font-weight: 700; }
+.tg-sub { font-size: 0.88rem; color: var(--gray-5); margin-top: 8px; }
+@media print { .tg-help { display: none !important; } }
 .tg-actions { max-width: 780px; margin: 0 auto 14px; display: flex; gap: 8px; justify-content: flex-end; }
 @media (max-width: 560px) {
   .tg { padding: 22px 16px; }
@@ -63,6 +71,16 @@
       <p>이번 정기노회부터 출석 · 거마비 수령 확인 · 표결을 휴대전화로 합니다</p>
     </div>
 
+    <div class="tg-help" id="tg-help">
+      <div class="tg-help-row" id="tg-h-chrome" hidden>
+        <span>지금 화면은 크롬이 아닙니다</span><button class="btn" type="button" id="tg-b-chrome">① 크롬으로 열기</button></div>
+      <div class="tg-help-row" id="tg-h-sign">
+        <span id="tg-t-sign">홈페이지 회원가입</span><a class="btn" id="tg-b-sign" href="signup.html">② 회원가입</a></div>
+      <div class="tg-help-row" id="tg-h-inst">
+        <span id="tg-t-inst">휴대전화에 앱 설치</span><button class="btn" type="button" id="tg-b-inst">③ 앱 설치하기</button></div>
+      <div class="tg-sub" id="tg-inst-msg"></div>
+    </div>
+
     <div class="tg-lead">
       노회 날 회의장에서 <strong>QR 코드를 찍고 「입장하기」</strong>만 누르시면 출석이 됩니다.
       다만 <strong>홈페이지 회원가입</strong>이 되어 있어야 하므로, 노회 전에 아래 ①~③을 미리 해 두시기 바랍니다. (5분이면 됩니다)
@@ -73,13 +91,13 @@
       <div class="tg-body">
         <h3>크롬(Chrome)으로 노회 홈페이지에 들어갑니다</h3>
         <ul>
-          <li>휴대전화 카메라로 오른쪽 QR 코드를 찍거나, <strong>크롬</strong> 주소창에 <strong>sihwasan.org</strong> 를 적습니다.</li>
+          <li>휴대전화 카메라로 오른쪽 QR 코드를 찍으면 이 안내가 휴대전화에서 열립니다. 아래 단추를 차례로 누르시면 됩니다.</li>
           <li>크롬은 <span class="tg-key">🔴🟡🟢🔵 동그란 아이콘</span>의 인터넷 앱입니다. 없으면 Play 스토어(아이폰은 App Store)에서 「Chrome」을 설치합니다.</li>
         </ul>
         <div class="tg-warn">카카오톡·네이버 앱 안에서 열린 화면에서는 구글 로그인과 앱 설치가 되지 않습니다. 화면에 나오는 <strong>「크롬으로 열기」</strong>를 눌러 주세요.</div>
         <div class="tg-note">아이폰은 크롬 대신 <strong>사파리(Safari)</strong>를 쓰셔도 됩니다.</div>
       </div>
-      <div class="tg-qr"><span id="tg-qr-home"></span>sihwasan.org<br>회원가입</div>
+      <div class="tg-qr"><span id="tg-qr-home"></span>찍으면<br>이 안내가 열립니다</div>
     </section>
 
     <section class="tg-step">
@@ -152,11 +170,62 @@
 (function () {
   try {
     var q = qrcode(0, 'M');
-    q.addData('https://sihwasan.org/signup.html');
+    q.addData('https://sihwasan.org/today-guide.html');
     q.make();
     document.getElementById('tg-qr-home').innerHTML =
-      '<img src="' + q.createDataURL(6, 2) + '" alt="시화산노회 홈페이지 회원가입 QR 코드">';
+      '<img src="' + q.createDataURL(6, 2) + '" alt="시화산노회 앱 설치 안내 QR 코드">';
   } catch (x) {}
+})();
+
+/* 휴대전화에서 누르는 도우미 — ① 크롬으로 열기 ② 회원가입 ③ 앱 설치 */
+(function () {
+  var ua = navigator.userAgent || '';
+  var android = /Android/i.test(ua), ios = /iPhone|iPad|iPod/i.test(ua), kakao = /KAKAOTALK/i.test(ua);
+  var chrome = /Chrome\//.test(ua) && !/SamsungBrowser|EdgA|Whale|OPR\/|; wv\)|KAKAOTALK|NAVER|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\//i.test(ua);
+  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+  var msg = document.getElementById('tg-inst-msg');
+  var url = location.origin + location.pathname;
+
+  if (kakao || (android && !chrome)) {
+    document.getElementById('tg-h-chrome').hidden = false;
+    document.getElementById('tg-b-chrome').addEventListener('click', function () {
+      if (kakao) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+      else location.href = 'intent://' + url.replace(/^https?:\/\//, '') +
+        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
+    });
+  }
+
+  /* 로그인되어 있으면 회원가입은 끝난 것 */
+  var t = setInterval(function () {
+    if (!window.__shsUser) return;
+    clearInterval(t);
+    var u = window.__shsUser;
+    document.getElementById('tg-h-sign').classList.add('done');
+    document.getElementById('tg-t-sign').textContent = (u.name || '') + '님 가입됨';
+    var b = document.getElementById('tg-b-sign');
+    b.textContent = '내 정보 확인'; b.href = 'mypage.html';
+  }, 500);
+  setTimeout(function () { clearInterval(t); }, 15000);
+
+  var ev = null;
+  window.addEventListener('beforeinstallprompt', function (x) { x.preventDefault(); ev = x; });
+  function installed() {
+    document.getElementById('tg-h-inst').classList.add('done');
+    document.getElementById('tg-t-inst').textContent = '앱 설치됨';
+    msg.textContent = '바탕 화면의 「시화산노회」 아이콘으로 들어오시면 됩니다.';
+  }
+  if (standalone) installed();
+  window.addEventListener('appinstalled', installed);
+  document.getElementById('tg-b-inst').addEventListener('click', function () {
+    if (ev) {
+      ev.prompt();
+      ev.userChoice.then(function (r) { if (r.outcome === 'accepted') installed(); ev = null; });
+      return;
+    }
+    if (ios) msg.innerHTML = '아이폰은 <strong>사파리</strong> 아래쪽 <strong>공유 ⬆</strong> 단추 → <strong>홈 화면에 추가</strong> → <strong>추가</strong>를 눌러 주세요.';
+    else if (android && !chrome) msg.innerHTML = '먼저 위의 <strong>① 크롬으로 열기</strong>를 눌러 주세요.';
+    else msg.innerHTML = '크롬 오른쪽 위 <strong>⋮</strong> → <strong>홈 화면에 추가</strong>(또는 앱 설치) → <strong>설치</strong>를 눌러 주세요.';
+  });
 })();
 </script>
 </body>
