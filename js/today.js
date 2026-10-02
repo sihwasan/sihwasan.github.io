@@ -18,6 +18,11 @@
   function getSel() { try { return Number(sessionStorage.getItem(SEL_KEY)) || null; } catch (x) { return null; } }
   function setSel(id) { try { if (id) sessionStorage.setItem(SEL_KEY, id); else sessionStorage.removeItem(SEL_KEY); } catch (x) {} }
   var oldServer = false;
+  var dayOpen = false, nextDay;
+  function ymdToday() {
+    var d = new Date(Date.now() + offset);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
   function listMode() { return !oldServer && !!(S && S.me && isClerk(S.me) && location.hash === '#qr' && !getSel()); }
 
   function qs(k) {
@@ -155,6 +160,20 @@
       return r;
     }).then(function (r) {
       if (r.error) { setupNeeded(r.error); return; }
+      /* 노회 날인지는 시스템의 노회 일정이 정한다 (QR을 만든 날짜와 무관) */
+      return Promise.all([
+        C.rpc('assembly_today'),
+        nextDay === undefined
+          ? C.from('meetings').select('kind,meet_date').gte('meet_date', ymdToday())
+              .order('meet_date', { ascending: true }).limit(1)
+          : Promise.resolve(null)
+      ]).then(function (rs) {
+        dayOpen = !!(rs[0] && !rs[0].error && rs[0].data);
+        if (rs[1]) nextDay = (rs[1].data && rs[1].data[0]) || null;
+        return r;
+      }, function () { return r; });
+    }).then(function (r) {
+      if (!r || r.error) return;
       S = r.data || {};
       if (S.now) offset = Date.parse(S.now) - Date.now();
       if (S.me && S.me.mgr && roster === null) loadRoster();
@@ -311,11 +330,12 @@
         '<p>노회 당일, 화면이나 순서지에 있는 <strong>QR 코드</strong>를 휴대전화 카메라로 찍어 주세요.</p>' +
         '<p class="ta-sub"><a href="today-guide.html">회원가입 · 앱 설치 · 입장 방법 안내 보기</a></p></div>';
     } else if (!S.entered && m.status !== 'closed') {
-      if (!m.today) {
-        var md = String(m.meet_date || '').split('-');
+      if (!dayOpen) {
+        var nd = nextDay && nextDay.meet_date ? String(nextDay.meet_date).split('-') : null;
         h = '<div class="ta-card ta-center"><h3>' + e(m.title) + '</h3>' +
-          '<p>오늘의 노회는 <strong>' + Number(md[1]) + '월 ' + Number(md[2]) + '일 노회 당일</strong>에 열립니다.<br>' +
-          '당일 회의장의 QR 코드를 찍어 입장해 주세요.</p></div>';
+          '<p>오늘의 노회는 <strong>노회 당일</strong>에 열립니다.' +
+          (nd ? '<br>다음 노회 : <strong>' + e(nextDay.kind || '') + ' ' + Number(nd[1]) + '월 ' + Number(nd[2]) + '일</strong>' : '') +
+          '<br>당일 회의장의 QR 코드를 찍어 입장해 주세요.</p></div>';
       } else if (S.code_ok) {
         var g0 = gradeOf(me.role);
         h = '<div class="ta-card ta-center">' +
