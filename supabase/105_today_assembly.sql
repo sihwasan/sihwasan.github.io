@@ -347,8 +347,13 @@ $fn$;
 -- 가결 기준(정족수): 과반 = 찬성이 투표수의 반을 넘음 / 3분의2 = 찬성이 투표수의 3분의 2 이상
 alter table public.assembly_votes add column if not exists rule text not null default '과반';
 
+-- 테스트 투표: 본 투표 전에 해 보는 연습. 결과 기록(앞선 투표 결과)에 남기지 않는다.
+alter table public.assembly_votes add column if not exists is_test boolean not null default false;
+
 drop function if exists public.assembly_vote_start(bigint, text, text);
-create or replace function public.assembly_vote_start(p_meeting bigint, p_title text, p_mode text, p_rule text)
+drop function if exists public.assembly_vote_start(bigint, text, text, text);
+create or replace function public.assembly_vote_start(p_meeting bigint, p_title text, p_mode text, p_rule text,
+                                                      p_test boolean default false)
 returns bigint language plpgsql security definer set search_path = public as $fn$
 declare
   v_id bigint;
@@ -365,8 +370,8 @@ begin
     raise exception '진행 중인 투표가 있습니다. 먼저 종료해 주세요.';
   end if;
   select name into v_me from public.profiles where id = auth.uid();
-  insert into public.assembly_votes (meeting_id, title, mode, rule, created_by)
-  values (p_meeting, btrim(p_title), p_mode, p_rule, v_me) returning id into v_id;
+  insert into public.assembly_votes (meeting_id, title, mode, rule, is_test, created_by)
+  values (p_meeting, btrim(p_title), p_mode, p_rule, coalesce(p_test, false), v_me) returning id into v_id;
   return v_id;
 end
 $fn$;
@@ -424,7 +429,7 @@ begin
   select * into v from public.assembly_votes where id = p_vote;
   if v.id is null then return null; end if;
   j := jsonb_build_object(
-    'id', v.id, 'title', v.title, 'mode', v.mode, 'rule', v.rule, 'status', v.status,
+    'id', v.id, 'title', v.title, 'mode', v.mode, 'rule', v.rule, 'test', v.is_test, 'status', v.status,
     'started_at', v.started_at, 'ended_at', v.ended_at,
     'cast', (select count(*) from public.assembly_vote_voters x where x.vote_id = v.id),
     'voted', exists (select 1 from public.assembly_vote_voters x
@@ -525,7 +530,7 @@ begin
     'vote', public.assembly_vote_json(v_vote),
     'history', (select coalesce(jsonb_agg(public.assembly_vote_json(x.id) order by x.id desc), '[]'::jsonb)
                   from public.assembly_votes x
-                 where x.meeting_id = m.id and x.status = '종료' and x.id <> coalesce(v_vote, 0)));
+                 where x.meeting_id = m.id and x.status = '종료' and x.id <> coalesce(v_vote, 0) and not x.is_test));
 
   if v_mgr or v_tre then
     j := j || jsonb_build_object('attendees', (
@@ -569,7 +574,7 @@ begin
     'assembly_open(text, date, integer)', 'assembly_enter(text)', 'assembly_confirm(bigint)',
     'assembly_attendee_remove(bigint)', 'assembly_close(bigint)',
     'assembly_allowance_approve(bigint, jsonb)', 'assembly_allowance_cancel(bigint)',
-    'assembly_allowance_receive(bigint)', 'assembly_vote_start(bigint, text, text, text)',
+    'assembly_allowance_receive(bigint)', 'assembly_vote_start(bigint, text, text, text, boolean)',
     'assembly_vote_cast(bigint, text)', 'assembly_vote_end(bigint)', 'assembly_state(text)']
   loop
     execute 'revoke all on function public.' || f || ' from public, anon';

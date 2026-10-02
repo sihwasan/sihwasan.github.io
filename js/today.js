@@ -330,7 +330,8 @@
       '<div class="ta-sub">가결 기준 — ' + (v.rule === '3분의2'
         ? '찬성이 투표수의 3분의 2 이상 (' + Math.ceil(r.total * 2 / 3) + '표 이상)'
         : '찬성이 투표수의 과반 (' + (Math.floor(r.total / 2) + 1) + '표 이상)') + '</div>' +
-      '<div class="ta-verdict ' + (r.passed ? 'pass' : 'fail') + '">' + (r.passed ? '가 결' : '부 결') + '</div>';
+      '<div class="ta-verdict ' + (r.passed ? 'pass' : 'fail') + '">' + (r.passed ? '가 결' : '부 결') +
+      (v.test ? '<small>테스트 결과</small>' : '') + '</div>';
     if (r.names && r.names.length) {
       var y = r.names.filter(function (n) { return n.choice === '찬성'; }).map(function (n) { return e(n.name); });
       var n2 = r.names.filter(function (n) { return n.choice === '반대'; }).map(function (n) { return e(n.name); });
@@ -344,7 +345,9 @@
   function renderVote(m, me) {
     var v = S.vote, h = '';
     if (m && v) {
-      h = '<div class="ta-card ta-votecard"><div class="ta-vhead">' +
+      h = '<div class="ta-card ta-votecard' + (v.test ? ' test' : '') + '">' +
+        (v.test ? '<div class="ta-testbar">테스트 투표 — 연습입니다. 실제 결의가 아닙니다.</div>' : '') +
+        '<div class="ta-vhead">' +
         '<span class="ta-badge ' + (v.status === '진행' ? 'live' : '') + '">' +
         (v.status === '진행' ? '투표 중' : '투표 종료') + '</span>' +
         '<span class="ta-badge">' + e(v.mode) + ' 투표</span>' +
@@ -448,7 +451,9 @@
           '<div class="ta-radio"><span class="ta-rlabel">가결 기준</span>' +
           '<label><input type="radio" name="vrule" value="과반" data-keep="vr1" checked> 과반</label>' +
           '<label><input type="radio" name="vrule" value="3분의2" data-keep="vr2"> 3분의 2</label></div>' +
-          '<button class="btn" type="submit">투표하기</button></form>' +
+          '<button class="btn" type="submit">투표하기</button>' +
+          '<button class="btn ghost" type="button" data-act="vtest">테스트 투표하기</button></form>' +
+          '<div class="ta-sub">「테스트 투표하기」는 본 투표 전에 회원들이 연습해 보는 투표입니다. 주제를 비워 두면 「테스트 투표」로 올라가고, 결과는 기록에 남지 않습니다.</div>' +
           '<div class="ta-sub">입장한 정회원(' + (c.full || 0) + '명)만 투표할 수 있습니다.</div>';
       }
       h += '<div class="ta-btnrow ta-end"><button class="btn ghost" data-act="close">노회 마치기</button></div>';
@@ -623,6 +628,7 @@
     }
     else if (act === 'qrfull') openQr(b);
     else if (act === 'qrsave') saveQr();
+    else if (act === 'vtest') startVote(b.form, b, true);
     else if (act === 'bulk') {
       var val = document.getElementById('ta-bulk').value;
       [].forEach.call(document.querySelectorAll('.ta-amtin'), function (i) { i.value = val; });
@@ -669,15 +675,23 @@
           '출석 QR 코드를 만듭니다.')) return;
       run(btn, 'assembly_open', { p_title: t, p_date: document.getElementById('ta-odate').value || null, p_session: sn });
     } else if (kind === 'vote') {
-      var vt = document.getElementById('ta-vtitle').value.trim();
-      if (!vt) { alert('투표 주제를 적어 주세요.'); return; }
-      var mode = (f.querySelector('input[name="vmode"]:checked') || {}).value || '무기명';
-      var rule = (f.querySelector('input[name="vrule"]:checked') || {}).value || '과반';
-      if (!confirm('「' + vt + '」\n' + mode + ' 투표 · 가결 기준 ' + ruleName(rule) + '\n투표를 시작합니다.')) return;
-      run(btn, 'assembly_vote_start', { p_meeting: S.meeting.id, p_title: vt, p_mode: mode, p_rule: rule }, function () {
-        document.getElementById('ta-vtitle').value = '';
-      });
+      startVote(f, btn, false);
     }
+  }
+
+  /* 투표 올리기 — test 가 참이면 연습용 테스트 투표 */
+  function startVote(f, btn, test) {
+    var input = document.getElementById('ta-vtitle');
+    var vt = input.value.trim();
+    if (!vt && test) vt = '테스트 투표';
+    if (!vt) { alert('투표 주제를 적어 주세요.'); return; }
+    var mode = (f.querySelector('input[name="vmode"]:checked') || {}).value || '무기명';
+    var rule = (f.querySelector('input[name="vrule"]:checked') || {}).value || '과반';
+    if (!confirm((test ? '[테스트 투표 — 연습]\n' : '') + '「' + vt + '」\n' + mode + ' 투표 · 가결 기준 ' +
+                 ruleName(rule) + '\n투표를 시작합니다.')) return;
+    run(btn, 'assembly_vote_start',
+      { p_meeting: S.meeting.id, p_title: vt, p_mode: mode, p_rule: rule, p_test: !!test },
+      function () { if (!test) input.value = ''; });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
