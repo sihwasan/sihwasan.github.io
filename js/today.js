@@ -411,6 +411,8 @@
         '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
         '<label>날짜<input data-keep="odate" id="ta-odate" type="date" value="' + ds + '"></label>' +
         '<button class="btn" type="submit">QR 코드 생성</button></form>';
+      if (m) h += '<div class="ta-btnrow ta-end"><button class="btn danger sm" data-act="delete">마친 「' + e(m.title) +
+        '」 기록 지우기</button></div>';
     } else {
       var c = S.counts || {};
       h += '<h3 id="qr">노회 출석 QR 코드' + (m.session_no ? ' <span class="ta-badge">제' + m.session_no + '회기</span>' : '') + '</h3>' +
@@ -456,7 +458,10 @@
           '<div class="ta-sub">「테스트 투표하기」는 본 투표 전에 회원들이 연습해 보는 투표입니다. 주제를 비워 두면 「테스트 투표」로 올라가고, 결과는 기록에 남지 않습니다.</div>' +
           '<div class="ta-sub">입장한 정회원(' + (c.full || 0) + '명)만 투표할 수 있습니다.</div>';
       }
-      h += '<div class="ta-btnrow ta-end"><button class="btn ghost" data-act="close">노회 마치기</button></div>';
+      h += '<div class="ta-btnrow ta-end">' +
+        (isClerk(me) ? '<button class="btn danger" data-act="delete">QR 코드 지우기</button>' : '') +
+        '<button class="btn ghost" data-act="close">노회 마치기</button></div>' +
+        (isClerk(me) ? '<div class="ta-sub" style="text-align:right">「QR 코드 지우기」는 연습으로 만든 노회를 입장 명단·투표·거마비 기록까지 모두 지웁니다.</div>' : '');
     }
     paint('ta-clerk', h + '</div>');
   }
@@ -625,6 +630,12 @@
     }
     else if (act === 'close') {
       if (confirm('노회를 마칩니다. 더 이상 입장·투표를 할 수 없습니다.\n(거마비 수령 확인은 계속할 수 있습니다)')) run(b, 'assembly_close', { p_meeting: m.id });
+    }
+    else if (act === 'delete') {
+      if (confirm('「' + m.title + '」의 QR 코드를 지웁니다.\n입장 명단·투표·거마비 기록과 장부에 자동 기입된 거마비까지 모두 지워지며 되돌릴 수 없습니다.') &&
+          confirm('정말 지우시겠습니까? 촬요에 이미 인쇄한 QR 코드는 더 이상 쓸 수 없게 됩니다.')) {
+        run(b, 'assembly_delete', { p_meeting: m.id }, function () { clearCode(); cache = {}; });
+      }
     }
     else if (act === 'qrfull') openQr(b);
     else if (act === 'qrsave') saveQr();

@@ -240,6 +240,28 @@ end
 $fn$;
 
 
+-- 서기 — 만든 QR 코드(노회)를 통째로 지운다. 연습으로 만든 것을 치울 때 쓴다.
+-- 입장 명단·투표·거마비 기록과 알림, 장부에 자동 기입된 거마비 지출까지 함께 지운다.
+-- (이미 마감·감사된 장부의 항목은 그대로 남는다)
+create or replace function public.assembly_delete(p_meeting bigint)
+returns void language plpgsql security definer set search_path = public as $fn$
+declare
+  r record;
+begin
+  if not exists (select 1 from public.profiles
+                  where id = auth.uid() and role in ('clerk', 'superadmin')) then
+    raise exception '서기만 QR 코드를 지울 수 있습니다.';
+  end if;
+  for r in select id from public.assembly_attendees where meeting_id = p_meeting loop
+    perform public.drop_linked_entry('allowance', r.id);
+    delete from public.notifications where dedupe_key = 'allow-' || r.id;
+  end loop;
+  delete from public.notifications where dedupe_key = 'asmconf-' || p_meeting;
+  delete from public.assembly_meetings where id = p_meeting;
+end
+$fn$;
+
+
 -- ---------------------------------------------------------------------
 -- 5. 회계 — 거마비 지급 승인 / 취소
 --    p_items : [{"id": 참석자 번호, "amount": 금액}, ...]
@@ -572,7 +594,7 @@ declare
 begin
   foreach f in array array[
     'assembly_open(text, date, integer)', 'assembly_enter(text)', 'assembly_confirm(bigint)',
-    'assembly_attendee_remove(bigint)', 'assembly_close(bigint)',
+    'assembly_attendee_remove(bigint)', 'assembly_close(bigint)', 'assembly_delete(bigint)',
     'assembly_allowance_approve(bigint, jsonb)', 'assembly_allowance_cancel(bigint)',
     'assembly_allowance_receive(bigint)', 'assembly_vote_start(bigint, text, text, text, boolean)',
     'assembly_vote_cast(bigint, text)', 'assembly_vote_end(bigint)', 'assembly_state(text)']
