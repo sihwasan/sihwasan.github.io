@@ -165,6 +165,20 @@
     else sub.insertBefore(a, sub.firstChild);
   }
 
+  /* 서기에게 임원방 하위에 <노회 출석 QR 코드 생성>을 붙인다.
+   * 미리 QR을 만들어 두면 노회 날 첫 화면이 「오늘의 노회」로 바뀐다. */
+  function addAttendQrMenu() {
+    var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
+    if (!links.length) return;
+    var sub = links[0].parentNode.querySelector('.gnb-sub');
+    if (!sub || sub.querySelector('a[href="today.html#qr"]')) return;
+    var a = document.createElement('a');
+    a.href = 'today.html#qr';
+    a.textContent = '노회 출석 QR 코드 생성';
+    var proceed = sub.querySelector('a[href="proceed.html"]');
+    if (proceed) sub.insertBefore(a, proceed); else sub.insertBefore(a, sub.firstChild);
+  }
+
   /* 회록서기(부회록서기)에게 임원방 하위에 <회의록 작성 안내>를 붙인다.
    * 총회 표준 회의록 작성 및 보존 규정을 정리한 안내와 샘플이다. */
   function addMinutesWriteMenu() {
@@ -556,6 +570,7 @@
         /* 노회 진행 매니저 — 서기만 (최고관리자는 관리를 위해 함께 본다) */
         if (p.role === 'clerk' || p.role === 'superadmin') {
           addProceedMenu();
+          addAttendQrMenu();
         }
 
         /* 회의록 작성 매니저 — 회록서기만 (부회록서기는 열람만, 최고관리자 포함) */
@@ -669,6 +684,10 @@
     /* 회의비·거마비 지급 — 내 정보의 <지급 수령 확인> */
     if (n.kind === '회계' && key.indexOf('payout-') === 0) {
       return 'mypage.html#payouts';
+    }
+    /* 오늘의 노회 — 거마비 수령 확인(받는 분), 확정 명단 전달(회계) */
+    if (n.kind === '회계' && (key.indexOf('allow-') === 0 || key.indexOf('asmconf-') === 0)) {
+      return 'today.html';
     }
     /* 회기 마감 요청·승인·반려 — 그 장부 화면으로 (열쇠말: lclose-번호-종류-이름) */
     if (n.kind === '회계' && key.indexOf('lclose-') === 0) {

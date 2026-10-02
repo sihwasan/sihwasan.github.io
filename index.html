@@ -50,7 +50,7 @@
   }
 }
 </script>
-<link rel="stylesheet" href="css/style.css?v=20260921j">
+<link rel="stylesheet" href="css/style.css?v=20261003a">
 </head>
 <body>
 
@@ -84,6 +84,13 @@
     <div class="hero-kicker">대한예수교장로회(합동)</div>
     <!-- 세 문구가 같은 자리·같은 크기에서 차례로 교체된다 -->
     <h1 class="sr-only">시화산노회가 하나 됨을 이루고 함께 지어져 가는 교회를 세웁니다</h1>
+    <!-- 정기노회 날에는 히어로에 이 창 하나만 보인다 (아래 스크립트가 켠다) -->
+    <a class="hero-today-card hidden" id="hero-today" href="today.html">
+      <span class="ht-kicker">TODAY</span>
+      <span class="ht-title">오늘의 노회</span>
+      <span class="ht-name" id="hero-today-name"></span>
+      <span class="ht-go">들어가기 &rarr;</span>
+    </a>
     <div class="hero-slides" id="hero-slides" aria-hidden="true">
       <div class="hs-slide">시화산노회가 하나 됨을 이루고<br>함께 지어져 가는 교회를 세웁니다</div>
       <div class="hs-slide hs-small">교회들이 그리스도 안에서 한 몸을 이루어<br>복음 전파와 교회 섬김의 사명을 감당하고 있습니다.</div>
@@ -135,7 +142,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20260928a"></script>
+<script src="js/main.js?v=20261003a"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
@@ -377,6 +384,26 @@ document.addEventListener('DOMContentLoaded', function () {
     SHSBoard.mount(document.getElementById('dash-area'), me);
   });
 
+  /* 정기노회 날(서기가 출석 QR을 만든 노회의 날짜)에는 히어로에
+   * 「오늘의 노회」 창 하나만 보여 준다. 그 밖의 날은 평소 화면 그대로다. */
+  if (window.SHSCloud && SHSCloud.enabled()) {
+    SHSCloud.init().then(function (c) {
+      return c ? c.rpc('assembly_today') : null;
+    }).then(function (r) {
+      if (!r || r.error || !r.data) return;
+      var hero = document.querySelector('.hero');
+      var card = document.getElementById('hero-today');
+      if (!hero || !card) return;
+      document.getElementById('hero-today-name').textContent = r.data.title || '';
+      card.classList.remove('hidden');
+      hero.classList.add('hero-today', 'done');
+      /* QR을 찍고 로그인하러 다녀온 분은 곧바로 입장 화면으로 보낸다 */
+      var code = '';
+      try { code = localStorage.getItem('shs_asm_code') || ''; } catch (x) {}
+      if (code) SHS.getUser().then(function (me) { if (me && me.cloud) location.replace('today.html'); });
+    }, function () {});
+  }
+
   /* 우선 내장 자료로 표시 */
   renderNotices(SHSData.notices);
   renderSchedule(SHSData.schedule);
@@ -443,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <!-- 아래쪽 안내는 글로 미리 적어 둔다.
      검색로봇은 자바스크립트를 돌리지 않으므로, 이렇게 적어 두어야
      노회 주소·연락처와 안쪽 화면들을 찾아 읽어 갈 수 있다.
-     (js/main.js?v=20260928a 는 이 자리가 이미 있으면 새로 만들지 않는다) -->
+     (js/main.js?v=20261003a 는 이 자리가 이미 있으면 새로 만들지 않는다) -->
 <footer class="site-footer"><div class="container">
   <div class="f-name">대한예수교장로회(합동) 시화산노회</div>
   <div>노회 사무실 : 경기도 안산시 단원구 와동공원로1안길 13-7 (반월교회 교육관 1층)</div>

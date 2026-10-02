@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오늘의 노회 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261003a">
+<style>
+/* 오늘의 노회 — 휴대전화에서 한 손으로 누르기 좋게 크게 */
+#ta-root { max-width: 860px; margin: 0 auto; }
+#ta-root > div:empty { display: none; }
+.ta-card { background: #fff; border: 1px solid var(--gray-3); border-radius: 12px; padding: 22px; margin-bottom: 16px; }
+.ta-card h3 { font-size: 1.15rem; margin: 18px 0 8px; color: var(--navy); }
+.ta-card h3:first-of-type { margin-top: 0; }
+.ta-center { text-align: center; padding: 34px 22px; }
+.ta-center p { color: var(--gray-7, #555); margin: 8px 0 18px; line-height: 1.7; }
+.ta-sub { font-size: 0.86rem; color: var(--gray-5); margin-top: 6px; line-height: 1.6; }
+.ta-err { color: var(--red); font-size: 0.86rem; margin-top: 8px; }
+.ta-empty { padding: 18px; text-align: center; color: var(--gray-5); background: var(--gray-1); border-radius: 8px; margin-top: 10px; }
+.ta-headcard { text-align: center; }
+.ta-headcard h2 { font-family: 'Noto Serif KR', serif; font-size: 1.6rem; margin: 4px 0 10px; }
+.ta-date { color: var(--gray-5); font-size: 0.9rem; }
+.ta-badge { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 0.78rem; background: var(--gray-1); color: var(--gray-5); border: 1px solid var(--gray-3); margin-right: 4px; white-space: nowrap; }
+.ta-badge.live { background: #fdf3f3; color: var(--red); border-color: var(--red); }
+.ta-badge.on { background: #eef6ee; color: #1f7a3a; border-color: #8cc79d; }
+.ta-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+.ta-chip { background: var(--gray-1); border-radius: 10px; padding: 10px 16px; min-width: 92px; text-align: center; font-size: 0.85rem; color: var(--gray-5); }
+.ta-chip span { display: block; font-size: 0.78rem; }
+.ta-chip strong { font-size: 1.5rem; color: var(--navy); margin-right: 2px; }
+.ta-chip.big { background: var(--navy); color: #dfe7f5; }
+.ta-chip.big strong { color: #fff; }
+.ta-bigbtn { font-size: 1.1rem; padding: 14px 34px; min-height: 52px; border-radius: 10px; user-select: none; }
+.ta-btnrow { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+.ta-end { justify-content: flex-end; border-top: 1px solid var(--gray-3); padding-top: 14px; margin-top: 22px; }
+.ta-qricon { width: 74px; height: 74px; margin: 0 auto 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ta-qricon i { border: 5px solid var(--navy); border-radius: 6px; }
+.ta-qricon i:last-child { border-style: dotted; }
+.ta-codeform { margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--gray-3); font-size: 0.86rem; color: var(--gray-5); }
+.ta-codeform div { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.ta-codeform input { width: 170px; padding: 10px; font-size: 1.05rem; letter-spacing: 3px; text-transform: uppercase; text-align: center; border: 1px solid var(--gray-3); border-radius: 8px; }
+.ta-myrow { display: flex; gap: 12px; align-items: center; }
+.ta-check { width: 42px; height: 42px; border-radius: 50%; background: #1f7a3a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
+.ta-alarm { margin-top: 16px; padding: 16px; border: 2px solid var(--red); border-radius: 10px; background: #fffafa; display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ta-amt { font-size: 1.4rem; font-weight: 700; color: var(--navy); margin-top: 6px; }
+.ta-receipt { margin-top: 16px; padding: 18px; border: 1px dashed var(--gray-5); border-radius: 8px; background: #fcfcf8; max-width: 380px; }
+.ta-rc-title { text-align: center; font-weight: 700; letter-spacing: 6px; margin-bottom: 10px; }
+.ta-rc-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px dotted var(--gray-3); font-size: 0.92rem; }
+.ta-rc-row span { color: var(--gray-5); }
+/* 투표 */
+.ta-votecard { border: 2px solid var(--navy); }
+.ta-vhead { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ta-timer { margin-left: auto; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--navy); }
+.ta-card h3.ta-vtitle { font-size: 1.4rem; margin: 14px 0 6px; line-height: 1.4; }
+.ta-vbtns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.ta-vbtn { min-height: 92px; font-size: 1.6rem; font-weight: 700; border-radius: 12px; border: 2px solid; cursor: pointer; user-select: none; }
+.ta-vbtn.yes { background: #eef6ee; border-color: #1f7a3a; color: #1f7a3a; }
+.ta-vbtn.no { background: #fdf3f3; border-color: var(--red); color: var(--red); }
+.ta-vbtn:disabled { opacity: 0.5; }
+.ta-done { margin-top: 14px; padding: 14px; background: var(--gray-1); border-radius: 8px; text-align: center; }
+.ta-endbtn { margin-top: 16px; width: 100%; min-height: 50px; font-size: 1.05rem; }
+.ta-count { text-align: center; padding: 20px 0; color: var(--gray-5); }
+.ta-count div { font-size: 5rem; font-weight: 700; color: var(--navy); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ta-result { text-align: center; margin-top: 12px; }
+.ta-r-total { font-size: 1.05rem; }
+.ta-r-total strong { font-size: 1.5rem; }
+.ta-r-total span { color: var(--gray-5); font-size: 0.9rem; }
+.ta-r-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 10px; }
+.ta-r-bars > div { padding: 14px 8px; border-radius: 10px; }
+.ta-r-bars span { display: block; font-size: 0.9rem; }
+.ta-r-bars strong { font-size: 2.4rem; }
+.ta-r-bars em { display: block; font-style: normal; font-size: 1.1rem; font-weight: 700; }
+.ta-r-yes { background: #eef6ee; color: #1f7a3a; }
+.ta-r-no { background: #fdf3f3; color: var(--red); }
+.ta-r-bar { height: 12px; border-radius: 99px; background: var(--red); overflow: hidden; }
+.ta-r-bar i { display: block; height: 100%; background: #1f7a3a; }
+.ta-verdict { margin-top: 18px; padding: 18px; border-radius: 12px; font-family: 'Noto Serif KR', serif; font-size: clamp(3rem, 12vw, 6rem); font-weight: 700; line-height: 1.1; color: #fff; }
+.ta-verdict.pass { background: #1f7a3a; }
+.ta-verdict.fail { background: var(--red); }
+.ta-names { text-align: left; margin-top: 14px; font-size: 0.9rem; line-height: 1.8; }
+.ta-names summary, .ta-hist summary { cursor: pointer; color: var(--navy); }
+.ta-histrow { padding: 8px 0; border-bottom: 1px dotted var(--gray-3); font-size: 0.92rem; }
+.ta-histrow span { color: var(--gray-5); }
+.pass { color: #1f7a3a; } .fail { color: var(--red); }
+/* 서기·회계 */
+.ta-admin { position: relative; background: #fbfcfe; }
+.ta-role { position: absolute; top: 14px; right: 16px; font-size: 0.75rem; background: var(--navy); color: #fff; padding: 3px 12px; border-radius: 99px; }
+.ta-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 10px; }
+.ta-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--gray-5); flex: 1 1 220px; }
+.ta-form input:not([type=radio]) { padding: 10px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 1rem; min-height: 42px; }
+.ta-form .btn { min-height: 42px; }
+.ta-radio { display: flex; gap: 14px; align-items: center; min-height: 42px; }
+.ta-radio label { flex: none; flex-direction: row; align-items: center; font-size: 0.95rem; color: inherit; }
+.ta-qrbox { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.ta-qr { image-rendering: pixelated; max-width: 100%; height: auto; }
+.ta-codebig { font-size: 1.8rem; font-weight: 700; letter-spacing: 6px; color: var(--navy); font-variant-numeric: tabular-nums; }
+.ta-tablewrap { overflow-x: auto; margin-top: 12px; }
+.ta-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.ta-table th, .ta-table td { padding: 8px 6px; border-bottom: 1px solid var(--gray-3); text-align: left; white-space: nowrap; }
+.ta-table th { background: var(--gray-1); font-size: 0.8rem; color: var(--gray-5); }
+.ta-table tr.late td { background: #fffaf0; }
+.ta-table input[type=checkbox] { width: 20px; height: 20px; }
+.ta-amtin { width: 110px; padding: 6px; border: 1px solid var(--gray-3); border-radius: 6px; text-align: right; }
+.ta-bulk { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 0.88rem; }
+.ta-bulk input { width: 110px; padding: 6px; border: 1px solid var(--gray-3); border-radius: 6px; text-align: right; }
+/* QR 크게 보기 */
+body.ta-qr-open { overflow: hidden; }
+.ta-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(10, 18, 34, 0.86); display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; overscroll-behavior: contain; }
+.ta-ovbox { position: relative; background: #fff; border-radius: 14px; padding: 30px 26px; text-align: center; max-width: 620px; width: 100%; outline: none; }
+.ta-ovbox .ta-qr { width: min(70vh, 100%); }
+.ta-ovbox .ta-btnrow { justify-content: center; }
+.ta-ovtitle { font-family: 'Noto Serif KR', serif; font-size: 1.7rem; font-weight: 700; }
+.ta-ovsub { color: var(--gray-5); margin: 6px 0 10px; }
+.ta-x { position: absolute; top: 8px; right: 12px; width: 40px; height: 40px; border: 0; background: none; font-size: 1.8rem; cursor: pointer; color: var(--gray-5); }
+@media print {
+  body.ta-qr-open > *:not(.ta-overlay) { display: none !important; }
+  .ta-overlay { position: static; background: #fff; padding: 0; }
+  .ta-noprint, .ta-x { display: none !important; }
+}
+@media (max-width: 480px) {
+  .ta-card { padding: 16px; }
+  .ta-role { position: static; display: inline-block; margin-bottom: 8px; }
+  .ta-alarm .ta-bigbtn { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>오늘의 노회</h1>
+    <div class="crumb">홈 &gt; 오늘의 노회</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="ta-root">
+    <div id="ta-head"></div>
+    <div id="ta-gate"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+    <div id="ta-my"></div>
+    <div id="ta-vote"></div>
+    <div id="ta-clerk"></div>
+    <div id="ta-tre"></div>
+  </div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261003a"></script>
+<script src="js/vendor/qrcode.js"></script>
+<script src="js/today.js?v=20261003a"></script>
+</body>
+</html>

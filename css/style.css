@@ -2781,3 +2781,21 @@ td[data-duch]:hover { background: #eef2f8; }
 .np-item.np-no .np-n { color: var(--gray-6); }
 .np-item.np-no .np-c { color: var(--red); font-size: 0.8rem; }
 .np-item.np-no:hover { background: transparent; }
+
+
+/* ---------- 오늘의 노회 — 정기노회 날의 히어로 ----------
+ * 로고·문구를 모두 거두고 「오늘의 노회」 창 하나만 가운데에 둔다. */
+.hero.hero-today .hero-logo-draw, .hero.hero-today .hero-line-h, .hero.hero-today .hero-line-v,
+.hero.hero-today .hero-kicker, .hero.hero-today .hero-slides { display: none !important; }
+.hero.hero-today .container { opacity: 1 !important; transform: none !important;
+  padding: 64px 16px !important; display: flex; justify-content: center; }
+.hero-today-card { display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: min(100%, 460px); padding: 38px 28px; border-radius: 18px; text-align: center;
+  background: rgba(255, 255, 255, 0.96); color: var(--navy); text-decoration: none;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28); transition: transform .2s ease; user-select: none; }
+.hero-today-card.hidden { display: none; }
+.hero-today-card:hover { transform: translateY(-3px); }
+.hero-today-card .ht-kicker { font-size: 0.78rem; letter-spacing: 5px; color: var(--accent, #b08a3c); }
+.hero-today-card .ht-title { font-family: 'Noto Serif KR', serif; font-size: clamp(2rem, 7vw, 2.8rem); font-weight: 700; }
+.hero-today-card .ht-name { color: var(--gray-5); }
+.hero-today-card .ht-go { margin-top: 12px; padding: 12px 34px; border-radius: 99px; background: var(--navy); color: #fff; font-weight: 700; }
