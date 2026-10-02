@@ -449,6 +449,54 @@ document.addEventListener('DOMContentLoaded', function () {
         }).join('') + '</tbody></table>';
     });
     fill('elders-body', eldersHtml);
+    decorateBirths();
+  }
+
+  /* 관리자(노회장·서기·간사)와 최고관리자에게는 회원명단의 이름 옆에
+   * 생년월일과 남은 임기(정년까지)를 함께 보여 준다. 서버가 그 밖의 분에게는 주지 않는다. */
+  var canBirth = SHSAuth.canManageMembers(user) || (user && user.role === 'superadmin');
+  var birthMap = null;
+  function bkey(n, c) { return String(n || '').replace(/\s+/g, '') + '|' + String(c || '').replace(/\s+/g, '').replace(/교회$/, ''); }
+  function remainShort(b) {
+    if (SHS.isRetired(b)) return '정년 경과';
+    var d = SHS.daysToRetire(b);
+    if (d == null) return '';
+    return d < 365 ? d + '일 남음' : Math.floor(d / 365) + '년 ' + Math.floor(d % 365 / 30) + '개월 남음';
+  }
+  function paintBirths() {
+    if (!birthMap) return;
+    [].forEach.call(document.querySelectorAll('#members .mb-link'), function (a) {
+      if (a.nextSibling && a.nextSibling.className === 'mb-birth') return;
+      var b = birthMap[bkey(a.dataset.name, a.dataset.church)] || birthMap[bkey(a.dataset.name, '')];
+      if (!b) return;
+      var sp = document.createElement('span');
+      sp.className = 'mb-birth';
+      sp.style.cssText = 'display:block;font-size:0.78rem;color:var(--gray-5);white-space:nowrap';
+      sp.textContent = String(b).slice(0, 10).replace(/-/g, '.') + ' · ' + remainShort(b);
+      a.parentNode.insertBefore(sp, a.nextSibling);
+    });
+  }
+  function decorateBirths() {
+    if (!canBirth || !canSee) return;
+    if (birthMap) { paintBirths(); return; }
+    if (!(window.SHSCloud && SHSCloud.enabled())) return;
+    birthMap = {};
+    SHSCloud.init().then(function (c) {
+      return Promise.all([c.from('roster').select('id,name,church'), c.rpc('roster_births')]);
+    }).then(function (rs) {
+      var byId = {};
+      ((rs[1] && rs[1].data) || []).forEach(function (x) { byId[x.id] = x.birth_date; });
+      var count = {};
+      ((rs[0] && rs[0].data) || []).forEach(function (r) {
+        var b = byId[r.id];
+        if (!b) return;
+        birthMap[bkey(r.name, r.church)] = b;
+        var k = bkey(r.name, '');
+        count[k] = (count[k] || 0) + 1;
+        birthMap[k] = count[k] === 1 ? b : null;   /* 같은 이름이 둘이면 교회까지 맞아야 */
+      });
+      paintBirths();
+    }, function () {});
   }
 
   function renderSichals(list) {
