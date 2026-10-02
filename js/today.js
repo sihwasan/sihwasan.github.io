@@ -365,17 +365,19 @@
     var r = v.result;
     /* 입장한 정회원 가운데 투표하지 않은 사람은 기권으로 센다 */
     var abst = r.eligible != null ? Math.max(0, r.eligible - r.total) : 0;
+    /* 가결 기준과 득표율은 입장한 정회원 전체(기권 포함)를 기준으로 한다 */
+    var base = Math.max(r.eligible || 0, r.total);
     var h = '<div class="ta-result">' +
       '<div class="ta-r-bars three">' +
       '<div class="ta-r-all"><span>총 투표수</span><strong>' + r.total + '</strong>표<em>' +
       (r.eligible != null ? '재석 정회원 ' + r.eligible + '명 중 · ' + pct(r.total, r.eligible) : '&nbsp;') + '</em></div>' +
-      '<div class="ta-r-yes"><span>찬성</span><strong>' + r.yes + '</strong>표<em>득표율 ' + pct(r.yes, r.total) + '</em></div>' +
-      '<div class="ta-r-no"><span>반대</span><strong>' + r.no + '</strong>표<em>득표율 ' + pct(r.no, r.total) + '</em></div>' +
-      '<div class="ta-r-abs"><span>기권</span><strong>' + abst + '</strong>명<em>투표하지 않음</em></div></div>' +
-      '<div class="ta-r-bar"><i style="width:' + (r.total ? r.yes * 100 / r.total : 0) + '%"></i></div>' +
+      '<div class="ta-r-yes"><span>찬성</span><strong>' + r.yes + '</strong>표<em>득표율 ' + pct(r.yes, base) + '</em></div>' +
+      '<div class="ta-r-no"><span>반대</span><strong>' + r.no + '</strong>표<em>득표율 ' + pct(r.no, base) + '</em></div>' +
+      '<div class="ta-r-abs"><span>기권</span><strong>' + abst + '</strong>명<em>' + pct(abst, base) + '</em></div></div>' +
+      '<div class="ta-r-bar"><i style="width:' + (base ? r.yes * 100 / base : 0) + '%"></i></div>' +
       '<div class="ta-sub">가결 기준 — ' + (v.rule === '3분의2'
-        ? '찬성이 투표수의 3분의 2 이상 (' + Math.ceil(r.total * 2 / 3) + '표 이상)'
-        : '찬성이 투표수의 과반 (' + (Math.floor(r.total / 2) + 1) + '표 이상)') + '</div>' +
+        ? '찬성이 재석 정회원 ' + base + '명의 3분의 2 이상 (' + Math.ceil(base * 2 / 3) + '표 이상)'
+        : '찬성이 재석 정회원 ' + base + '명의 과반 (' + (Math.floor(base / 2) + 1) + '표 이상)') + '</div>' +
       '<div class="ta-verdict ' + (r.passed ? 'pass' : 'fail') + '">' + (r.passed ? '가 결' : '부 결') +
       (v.test ? '<small>테스트 결과</small>' : '') + '</div>';
     if (r.names && r.names.length) {

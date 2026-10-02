@@ -366,7 +366,7 @@ $fn$;
 -- ---------------------------------------------------------------------
 -- 7. 전자투표
 -- ---------------------------------------------------------------------
--- 가결 기준(정족수): 과반 = 찬성이 투표수의 반을 넘음 / 3분의2 = 찬성이 투표수의 3분의 2 이상
+-- 가결 기준(정족수): 과반 = 찬성이 입장한 정회원 수의 반을 넘음 / 3분의2 = 3분의 2 이상 (기권 포함)
 alter table public.assembly_votes add column if not exists rule text not null default '과반';
 
 -- 테스트 투표: 본 투표 전에 해 보는 연습. 결과 기록(앞선 투표 결과)에 남기지 않는다.
@@ -461,8 +461,10 @@ begin
       into v_yes, v_no from public.assembly_ballots where vote_id = v.id;
     j := j || jsonb_build_object('result', jsonb_build_object(
       'yes', v_yes, 'no', v_no, 'total', v_yes + v_no, 'eligible', v.eligible,
-      'passed', case when v.rule = '3분의2' then v_yes > 0 and v_yes * 3 >= (v_yes + v_no) * 2
-                     else v_yes > v_no end,
+      -- 기준은 입장한 정회원 전체(투표하지 않은 사람은 기권). 예: 10명이면 과반은 6표
+      'passed', case when v.rule = '3분의2'
+                     then v_yes > 0 and v_yes * 3 >= greatest(coalesce(v.eligible, 0), v_yes + v_no) * 2
+                     else v_yes * 2 > greatest(coalesce(v.eligible, 0), v_yes + v_no) end,
       'names', case when v.mode = '기명' then
                  (select coalesce(jsonb_agg(jsonb_build_object('name', b.voter_name, 'choice', b.choice)
                                             order by b.choice desc, b.voter_name), '[]'::jsonb)
