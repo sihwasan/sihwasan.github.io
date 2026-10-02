@@ -4,7 +4,7 @@
 --  흐름
 --    1) 서기가 <노회 출석 QR 코드 생성>으로 노회를 연다. (assembly_open)
 --    2) 회원이 QR을 찍고 로그인해 「입장하기」를 누른다. (assembly_enter)
---       정회원·언권회원·준회원·일반회원 모두 입장하고 계수된다.
+--       정회원·언권회원·준회원이 입장하고 계수된다. (일반회원·승인대기는 입장 불가)
 --    3) 회의가 시작되면 서기가 「명단 확정하기」를 누른다. (assembly_confirm)
 --       확정 명단은 회계에게 알림으로 전달된다.
 --    4) 회계가 확정 명단에서 거마비 받을 사람·금액을 정해 승인한다.
@@ -147,6 +147,9 @@ begin
   j := to_jsonb(p);
   if p.id is null or p.role = 'pending' then
     raise exception '승인 대기 중인 계정은 입장할 수 없습니다. 서기에게 문의해 주세요.';
+  end if;
+  if p.role = 'general' then
+    raise exception '일반회원은 노회 회원이 아니므로 입장할 수 없습니다.';
   end if;
   if coalesce((j->>'suspended')::boolean, false) then
     raise exception '이용이 정지된 계정입니다.';
