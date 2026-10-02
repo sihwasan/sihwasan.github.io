@@ -513,13 +513,17 @@
           '<div class="ta-box-st">' + (ST[x.status] || '') + '</div>' +
           '<div class="ta-sub">입장 ' + x.attendees + '명 · 투표 ' + x.votes + '건 · 코드 ' + e(x.code) + '</div>' +
           '<div class="ta-btnrow"><button class="btn sm" data-act="pick" data-id="' + x.id + '">열기</button>' +
-          '<button class="btn danger sm" data-act="delete" data-id="' + x.id + '" data-name="' + e(x.title) + '">삭제</button></div></div>';
+          (x.votes ? '<span class="ta-badge on" title="회의에서 표결된 기록은 지울 수 없습니다">표결 기록 영구 보존</span>'
+                   : '<button class="btn danger sm" data-act="delete" data-id="' + x.id + '" data-name="' + e(x.title) + '">삭제</button>') +
+          '</div></div>';
       }).join('') + '</div>';
     }
     paint('ta-clerk', h + openForm('새 회기 QR 코드 만들기') + '</div>');
     fillSession(false);
   }
   function renderClerk(m, me) {
+    /* 본 투표(테스트가 아닌)가 하나라도 있으면 이 노회 기록은 영구 보존 */
+    var voted = !!((S.vote && !S.vote.test) || (S.history && S.history.length));
     if (!me.mgr || ((!m || m.status === 'closed') && !isClerk(me))) { paint('ta-clerk', ''); return; }
     var h = '<div class="ta-card ta-admin"><div class="ta-role">서기</div>' +
       (isClerk(me) ? '<div class="ta-back"><button class="btn ghost sm" data-act="tolist">← 회기 목록</button></div>' : '');
@@ -533,7 +537,7 @@
         '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
         '<label>날짜<input data-keep="odate" id="ta-odate" type="date" value="' + ds + '"></label>' +
         '<button class="btn" type="submit">QR 코드 생성</button></form>';
-      if (m) h += '<div class="ta-btnrow ta-end"><button class="btn danger sm" data-act="delete">마친 「' + e(m.title) +
+      if (m && !voted) h += '<div class="ta-btnrow ta-end"><button class="btn danger sm" data-act="delete">마친 「' + e(m.title) +
         '」 기록 지우기</button></div>';
     } else {
       var c = S.counts || {};
@@ -591,9 +595,10 @@
         ? qrPart + listPart + votePart
         : votePart + listPart + '<details class="ta-fold"><summary>출석 QR 코드 다시 보기</summary>' + qrPart + '</details>');
       h += '<div class="ta-btnrow ta-end">' +
-        (isClerk(me) ? '<button class="btn danger" data-act="delete">QR 코드 지우기</button>' : '') +
+        (isClerk(me) && !voted ? '<button class="btn danger" data-act="delete">QR 코드 지우기</button>' : '') +
         '<button class="btn ghost" data-act="close">노회 마치기</button></div>' +
-        (isClerk(me) ? '<div class="ta-sub" style="text-align:right">「QR 코드 지우기」는 연습으로 만든 노회를 입장 명단·투표·거마비 기록까지 모두 지웁니다.</div>' : '');
+        (isClerk(me) && voted ? '<div class="ta-sub" style="text-align:right">회의에서 표결된 기록이 있어 이 노회의 기록은 영구 보존됩니다. (삭제 불가)</div>' : '') +
+        (isClerk(me) && !voted ? '<div class="ta-sub" style="text-align:right">「QR 코드 지우기」는 연습으로 만든 노회를 입장 명단·투표·거마비 기록까지 모두 지웁니다.</div>' : '');
     }
     paint('ta-clerk', h + '</div>');
   }
