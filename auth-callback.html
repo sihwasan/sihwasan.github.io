@@ -25,7 +25,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261003c"></script>
+<script src="js/main.js?v=20261003d"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var area = document.getElementById('cb-area');
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '현재 등급은 <strong>' + SHS.displayRole(p.role, p.title) + '</strong>' +
         (p.title ? ' (' + e(p.title) + ')' : '') + '입니다.</div>' +
         '<p style="text-align:center"><a class="btn" href="index.html">홈으로</a></p>';
-      setTimeout(function () { location.href = 'index.html'; }, 1200);
+      setTimeout(function () { location.href = window.SHSNext ? SHSNext() : 'index.html'; }, 1200);
       return;
     }
 
@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
           msg.textContent = '등록되었습니다. 노회 명단과 일치하여 ' +
             (r.title ? r.title + '(' + r.roleName + ')' : r.roleName) + ' 등급이 부여되었습니다.';
-          setTimeout(function () { location.href = 'index.html'; }, 1600);
+          setTimeout(function () { location.href = window.SHSNext ? SHSNext() : 'index.html'; }, 1600);
         }
       });
     });

@@ -24,7 +24,7 @@
 <script src="private/resolutions.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261003c"></script>
+<script src="js/main.js?v=20261003d"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/receipts-config.js?v=20260907b"></script>
 <script src="js/ledger.js?v=20260911d"></script>
@@ -46,9 +46,14 @@ document.addEventListener('DOMContentLoaded', function () {
  }
 
  SHS.getUser().then(function (user) {
-  return financeAccess(user).then(function (ok) { return { user: user, canFinance: ok }; });
+  /* 상회비 내역 열람 — 상회비를 내는 시무 교회 담임목사·장로와 관리자·회계·부회계 (main.js SHS.duesAccess).
+   * 부목사·무임목사·원로목사·은퇴목사 등은 임원이더라도 상회비·세례의무금 내역을 보지 못한다. */
+  var duesP = SHS.duesAccess ? SHS.duesAccess(user) : Promise.resolve(true);
+  return Promise.all([financeAccess(user), duesP]).then(function (oks) {
+    return { user: user, canFinance: oks[0], canSeeDues: oks[1] === true };
+  });
  }).then(function (st) {
-  var user = st.user, canFinance = st.canFinance;
+  var user = st.user, canFinance = st.canFinance, canSeeDues = st.canSeeDues;
   var area = document.getElementById('officer-area');
   var e = SHS.esc;
 
@@ -129,12 +134,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 상회비 관리 */
   html += '<h2>상회비 관리</h2>';
-  html += '<div id="dues-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+  if (canSeeDues) {
+    html += '<div id="dues-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
 
-  /* 세례의무금 관리 */
-  html += '<h2>세례의무금 관리</h2>';
-  html += '<p>해마다 한 번 총회에 내는 세례교인헌금입니다. 총회 공문으로 교회별 목표액이 배정 됩니다.</p>';
-  html += '<div id="bap-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+    /* 세례의무금 관리 */
+    html += '<h2>세례의무금 관리</h2>';
+    html += '<p>해마다 한 번 총회에 내는 세례교인헌금입니다. 총회 공문으로 교회별 목표액이 배정 됩니다.</p>';
+    html += '<div id="bap-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
+  } else {
+    /* 상회비를 내지 않는 분 — 상회비·세례의무금 내역 자리를 비우고 안내만 둔다 (dues-area·bap-area 가 없으면 불러오지 않는다) */
+    html += '<div class="notice-banner">' + e(SHS.DUES_NOTICE || '상회비 내역은 볼 수 없습니다.') + '</div>';
+  }
 
   /* 노회 재정부 회계 — 회계·부회계가 적고, 관리자와 감사 기간의 감사부장·서기가 본다 */
   if (canFinance) {
@@ -443,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function () {
           return '<td>' + (v == null ? '-' : Number(v).toLocaleString('ko-KR')) + '</td>';
         }).join('') + '</tr></tbody></table>';
     });
-    if (r.dues_paid) h += '<p style="margin-top:12px"><strong>상회비</strong> ' + e(r.dues_paid) + '</p>';
+    if (r.dues_paid && canSeeDues) h += '<p style="margin-top:12px"><strong>상회비</strong> ' + e(r.dues_paid) + '</p>';
     if (r.note) h += '<p><strong>특기사항</strong><br><span style="white-space:pre-wrap">' + e(r.note) + '</span></p>';
     if (r.file_name) h += '<p style="color:var(--gray-5);font-size:0.85rem">첨부 : ' + e(r.file_name) + '</p>';
     return h + '</div>';

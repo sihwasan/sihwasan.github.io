@@ -48,6 +48,10 @@ var SHSBoard = (function () {
      * 개인 칸은 빼고 노회 전체 정보만 보여 준다. */
     var isSuper = user.role === 'superadmin';
     var hubSicLink = null;   /* 나의 시찰 화면 주소 (drawMine에서 채운다) */
+    /* 상회비 내역을 볼 수 있는가 — 상회비를 내는 시무 교회 담임목사·장로와
+     * 관리자·노회 회계·부회계만 (main.js SHS.duesAccess). 부목사·무임목사·원로목사·
+     * 은퇴목사 등에게는 나의 상회비 카드와 시찰별 납부 현황을 보이지 않는다. */
+    var duesGate = SHS.duesAccess ? SHS.duesAccess(user) : Promise.resolve(true);
 
     /* ---------- 화면 얼개 ----------
      * 전체 대시보드(full)는 카드 허브형 — 항목 카드를 누르면 상세가 열린다.
@@ -96,7 +100,8 @@ var SHSBoard = (function () {
       if (!isSuper) {
         cards += hubCard('church', '나의 교회', '');
         cards += hubCard('sichal', '나의 시찰');
-        cards += hubCard('mydues', '나의 상회비', '상회비 · 세례의무금');
+        /* 상회비를 볼 수 있는 분에게만 연다 (duesGate 가 확인한 뒤 보인다) */
+        cards += hubCard('mydues', '나의 상회비', '상회비 · 세례의무금', { cid: 'hub-card-mydues', hidden: true });
         cards += hubCard('com', '상비부', '');
       }
       cards += hubCard('doc', '서류 발급', '');
@@ -513,8 +518,9 @@ var SHSBoard = (function () {
 
     /* 상회비: 정회원 모두에게 '나의 교회 납부 현황'을,
      * 관리자와 회계·부회계에게는 노회 전체 요약을 함께 보여 준다.
-     * 내 교회는 노회 명단(roster)에서 온다 — my_dues 가 계정→명단→교회로 잇는다. */
-    (function () {
+     * 내 교회는 노회 명단(roster)에서 온다 — my_dues 가 계정→명단→교회로 잇는다.
+     * 상회비를 내지 않는 분(부목사·무임목사·원로·은퇴 등)에게는 불러오지 않는다 (아래 duesGate). */
+    function loadDues() {
       if (!user.cloud) return;
       var canDues = SHSAuth.canManageMembers(user) || user.role === 'officer';
       var duesLink = 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC';
@@ -703,7 +709,33 @@ var SHSBoard = (function () {
         var el = document.getElementById('dash-dues-body');
         if (el) el.innerHTML = '<p class="dash-none">상회비 현황을 불러오지 못했습니다.</p>';
       });
-    })();
+    }
+
+    duesGate.then(function (ok) {
+      if (ok) {
+        var mc = document.getElementById('hub-card-mydues');
+        if (mc) mc.classList.remove('hidden');
+        loadDues();
+        return;
+      }
+      /* 상회비를 내지 않는 분 — 카드는 감춘 채 두고, 주소(#hub-mydues)로 바로 들어와도 안내만 보인다 */
+      if (HUB_TITLES) {
+        HUB_TITLES.sichal = '나의 시찰';
+        var ht = document.getElementById('hub-detail-title');
+        if (ht && location.hash === '#hub-sichal') ht.textContent = HUB_TITLES.sichal;
+      }
+      var mdTabs2 = document.getElementById('md-tabs');
+      if (mdTabs2) mdTabs2.classList.add('hidden');
+      ['dash-mybap', 'dash-dues-sec'].forEach(function (id) {
+        var x = document.getElementById(id);
+        if (x) { x.classList.add('hidden'); x.innerHTML = ''; }
+      });
+      var md = document.getElementById('dash-mydues');
+      if (md) {
+        md.classList.remove('hidden');
+        md.innerHTML = '<p class="dash-none">' + esc(SHS.DUES_NOTICE || '상회비 내역은 볼 수 없습니다.') + '</p>';
+      }
+    });
 
     /* 상비부 부분은 상비부 대시보드를 그대로 쓰되, 내가 맡은 것만 보여 준다.
      * 다른 부서의 일정과 공지까지 여기서 볼 까닭은 없다. */
@@ -812,7 +844,12 @@ var SHSBoard = (function () {
         '<div class="dash-more"><a href="' + link + '#church">시찰 화면으로</a>' +
         ' · <a href="' + link + '#doc">자료실</a>' +
         ' · <a href="' + link + '#minutes">회의록</a></div>';
-      loadSicFin(sic);
+      /* 시찰별 납부 현황은 상회비 내역이다 — 볼 수 있는 분에게만 불러온다 */
+      duesGate.then(function (ok) {
+        if (ok) { loadSicFin(sic); return; }
+        var fb = document.getElementById('dash-sicfin');
+        if (fb) fb.innerHTML = '';
+      });
     }
 
     /* ---------- 시찰별 납부 현황 (상회비 · 세례의무금) ----------

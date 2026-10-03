@@ -24,7 +24,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261003c"></script>
+<script src="js/main.js?v=20261003d"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/name-picker.js?v=20260928a"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
@@ -67,6 +67,10 @@ document.addEventListener('DOMContentLoaded', function () {
   var minOfficers = [];
   var canBirth = false;    /* 생년월일·정년을 볼 수 있는가 — 관리자(노회장·서기·간사·최고관리자)만 */
   var isHead = false;      /* 교역자회 임원을 임명할 수 있는가 — 이 시찰의 시찰장 또는 최고관리자 (94 sql) */
+  /* 상회비 내역(진행률·교회별 상세·시찰회비·교역자회비 납부 현황)을 볼 수 있는가.
+   * 상회비를 내는 시무 교회 담임목사·장로(SHS.duesAccess)와, 그 일을 맡은 시찰 임원·
+   * 시찰 회계·교역자회 임원·감사부 임원만 본다. 부목사·무임목사·원로목사·은퇴목사 등은 못 본다. */
+  var canDuesView = false;
   function minOff(pos) {
     var o = minOfficers.filter(function (x) { return x.position === pos; })[0];
     return o ? o.name + (o.church ? ' (' + o.church + ')' : '') : '-';
@@ -204,7 +208,9 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(function (x) { return x; }, function () { return { data: false }; }),
           /* 생년월일(정년)은 관리자만 — 104 sql */
           c.rpc('roster_births').then(function (x) { return x; }, function () { return { data: [] }; }),
-          c.rpc('church_staff_births').then(function (x) { return x; }, function () { return { data: [] }; })
+          c.rpc('church_staff_births').then(function (x) { return x; }, function () { return { data: [] }; }),
+          /* 상회비를 내는 자리인가 — 명단 분류로 가린다 (main.js) */
+          SHS.duesAccess ? SHS.duesAccess(user) : Promise.resolve(true)
         ]);
       }).then(function (rs) {
         var mine = (rs[0] && rs[0].data) || [];
@@ -251,6 +257,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         bapAll   = (rs[9] && rs[9].data) || [];
         sicFin   = (rs[10] && rs[10].data) || [];
+        canDuesView = rs[18] === true || isOfficer || isTreasurer() || isMinOfficer() || isAuditor;
+        if (!canDuesView) { bapAll = []; sicFin = []; }   /* 진행률 상자도 그리지 않는다 */
         docsAll  = (rs[4] && rs[4].data) || [];
         minutes  = (rs[5] && rs[5].data) || [];
         reports  = (rs[6] && rs[6].data) || [];
@@ -1863,6 +1871,9 @@ document.addEventListener('DOMContentLoaded', function () {
      * 재정보고서는 시찰 회원 누구나 상시로 열람한다. */
     var canBook = isOfficer || isTreasurer() || isAuditor;
     var canMin  = isOfficer || isTreasurer() || isMinOfficer();
+    /* 회비 납부 현황(교회별 시찰회비·교역자회비)은 상회비 내역이므로
+     * 상회비를 내지 않는 분(부목사·무임목사 등)에게는 열지 않는다 */
+    if (!canDuesView && accTab === 'fee') accTab = canBook ? 'ledger' : 'report';
     if (!canBook && accTab === 'ledger') accTab = 'report';
     if (!canMin && accTab === 'ministers') accTab = 'mreport';
     /* 장부를 여는 사람에게는 장부 안의 <재정보고서> 탭이 있으므로 여기 따로 두지 않는다. */
@@ -1873,7 +1884,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     body.innerHTML =
       '<div class="tabs" id="acc-tabs" style="margin-bottom:14px">' +
-      tb('fee', '회비 납부 현황') +
+      (canDuesView ? tb('fee', '회비 납부 현황') : '') +
       (canBook ? tb('ledger', '시찰회 회계장부') : tb('report', '시찰회 재정보고서')) +
       (canMin ? tb('ministers', '교역자회 회계장부') : tb('mreport', '교역자회 재정보고서')) +
       '</div><div id="acc-body"><p style="color:var(--gray-5)">불러오는 중...</p></div>';
@@ -1920,6 +1931,10 @@ document.addEventListener('DOMContentLoaded', function () {
    * 입력·수정: 노회 관리자, 시찰장·서기, 시찰 회계. 교역자회비는 교역자회 임원도 (서버 규칙과 같다) */
   function drawFees() {
     var box = document.getElementById('acc-body');
+    if (!canDuesView) {
+      box.innerHTML = '<div class="notice-banner">' + e(SHS.DUES_NOTICE || '상회비 내역은 볼 수 없습니다.') + '</div>';
+      return;
+    }
     db().then(function (c) {
       return Promise.all([
         c.rpc('sichal_finance_detail', { p_year: fyYear, p_sichal: NAME })

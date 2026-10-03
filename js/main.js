@@ -165,7 +165,7 @@
     else sub.insertBefore(a, sub.firstChild);
   }
 
-  /* 서기에게만 임원방 하위 맨 아래에 <노회 출석 QR 코드 생성>을 붙인다.
+  /* 서기에게만 임원방 하위 맨 아래에 <정기노회 출석코드 생성하기>를 붙인다.
    * (최고관리자는 관리를 위해 함께 본다) 미리 QR을 만들어 두면 노회 날 첫 화면이 「오늘의 노회」로 바뀐다. */
   function addAttendQrMenu() {
     var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
@@ -174,7 +174,7 @@
     if (!sub || sub.querySelector('a[href="today.html#qr"]')) return;
     var a = document.createElement('a');
     a.href = 'today.html#qr';
-    a.textContent = '노회 출석 QR 코드 생성';
+    a.textContent = '정기노회 출석코드 생성하기';
     sub.appendChild(a);   /* 맨 아래 자리 */
   }
 
@@ -398,6 +398,17 @@
       '</div></footer>';
   }
 
+  /* 로그인·가입을 마치고 돌아갈 쪽 — 회원 가입·앱 설치 안내(app.html)처럼
+   * sessionStorage 'shs_next'에 적어 두고 넘어온 경우만. 같은 사이트의 쪽 이름만 받는다. */
+  window.SHSNext = function () {
+    try {
+      var n = sessionStorage.getItem('shs_next');
+      sessionStorage.removeItem('shs_next');
+      if (n && /^[a-z][a-z0-9-]*\.html$/.test(n)) return n;
+    } catch (x) {}
+    return 'index.html';
+  };
+
   /* ---------- 앱 설치(PWA) ---------- */
   var installEvent = null;
 
@@ -535,6 +546,7 @@
           if (lo) lo.addEventListener('click', window.SHSLogout);
           window.__shsUser = p;
           showFinanceMenu(p);
+          hideDuesMenu(p);   /* 부목사·무임목사 등은 상회비 메뉴를 감춘다 */
           loadUnread();
           /* 1분마다 새 알림을 확인해 팝업으로 띄운다 */
           setInterval(loadUnread, 60000);
@@ -1410,6 +1422,76 @@
       '</div>';
   }
 
+  /* ---------- 상회비 열람 자격 ----------
+   * 상회비는 교회가 노회에 내는 돈이다. 그래서 상회비를 내는 시무 교회의
+   * 담임목사(명단 분류 '목사' — 목사·위임목사·시무목사)와 장로만 상회비 내역을 본다.
+   * 부목사·무임목사·원로목사·은퇴목사(그리고 강도사·전도사 등)는 상회비를 내지 않으므로
+   * 상회비·세례의무금 납부 내역과 시찰별 납부 현황을 보지 못한다.
+   * 허용 목록 방식이다 — 명단에 새 분류가 생겨도 여기 적지 않으면 막힌다.
+   * 다만 상회비를 다루는 분(노회장·서기·간사·최고관리자와 노회 회계·부회계)은
+   * 분류와 상관없이 그대로 본다. 시찰 임원 등 화면마다의 예외는 그 화면이 더한다.
+   * 분류(category)는 노회 명단(roster)이 원본이며 my_member() 로 읽는다.
+   * (서버 쪽 같은 규칙: supabase/110_dues_view_scope.sql) */
+  var DUES_PASTOR_CATS = ['목사', '위임목사', '시무목사'];
+  var DUES_PASTOR_POS = ['', '목사', '위임목사', '시무목사', '담임목사'];
+  var DUES_NOTICE = '상회비 내역은 상회비를 내는 시무 교회의 담임목사와 장로만 보실 수 있습니다.';
+
+  /* 명단 한 줄(category·position)로 보아 상회비를 내는 자리인가 */
+  function paysDues(m) {
+    if (!m) return false;
+    var cat = String(m.category || '').trim();
+    var pos = String(m.position || '').trim();
+    if (cat === '장로') return true;
+    if (DUES_PASTOR_CATS.indexOf(cat) !== -1) return DUES_PASTOR_POS.indexOf(pos) !== -1;
+    /* 분류가 비어 있으면(예전 명단) 직분만으로 본다 */
+    if (!cat) return pos === '장로' || (!!pos && DUES_PASTOR_POS.indexOf(pos) !== -1);
+    return false;
+  }
+
+  /* 상회비를 맡아 다루는 분 — 관리자와 노회 회계·부회계 */
+  function managesDues(u) {
+    if (!u) return false;
+    if (['superadmin', 'president', 'clerk', 'staff'].indexOf(u.role) !== -1) return true;
+    var t = String(u.title || '').trim();
+    return u.role === 'officer' && (t === '회계' || t === '부회계');
+  }
+
+  /* 이 분이 상회비 내역을 볼 수 있는가 (Promise<boolean>, 한 화면에서 한 번만 묻는다) */
+  var duesAccessCache = {};
+  function duesAccess(u) {
+    if (!u) return Promise.resolve(false);
+    if (managesDues(u)) return Promise.resolve(true);
+    /* 명단과 이어지지 않은 계정은 가입할 때 적은 직분으로 본다 */
+    var byPos = paysDues({ category: '', position: u.position });
+    var key = String(u.id || u.email || u.name || '');
+    if (duesAccessCache[key]) return duesAccessCache[key];
+    var p;
+    if (window.SHSCloud && SHSCloud.enabled && SHSCloud.enabled()) {
+      p = SHSCloud.init().then(function (c) {
+        if (!c) return byPos;
+        return c.rpc('my_member').then(function (r) {
+          var m = r && !r.error && r.data && r.data[0];
+          return m ? paysDues({ category: m.out_category, position: m.out_position }) : byPos;
+        }, function () { return byPos; });
+      }).catch(function () { return byPos; });
+    } else {
+      p = Promise.resolve(byPos);
+    }
+    duesAccessCache[key] = p;
+    return p;
+  }
+
+  /* 상회비를 볼 수 없는 분에게는 임원방의 <상회비 관리>·<세례의무금 관리> 메뉴를 감춘다 */
+  function hideDuesMenu(u) {
+    duesAccess(u).then(function (ok) {
+      if (ok) return;
+      document.querySelectorAll(
+        '.gnb-sub a[href^="officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84"],' +
+        '.gnb-sub a[href^="officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88"]'
+      ).forEach(function (a) { a.style.display = 'none'; });
+    });
+  }
+
   /* 전역 헬퍼 */
   /* ---------- 파일 넣기 (끌어다 놓기) ----------
    * 파일 선택 칸을 숨기고 그 자리에 넓은 상자를 놓는다.
@@ -1728,6 +1810,10 @@
     membershipIssue: membershipIssue,
     memberGate: memberGate,
     fullMemberGate: fullMemberGate,
+    paysDues: paysDues,
+    managesDues: managesDues,
+    duesAccess: duesAccess,
+    DUES_NOTICE: DUES_NOTICE,
     termLabel: termLabel,
     retireLabel: retireLabel,
     isSimuPastor: isSimuPastor,

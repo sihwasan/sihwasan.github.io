@@ -3,160 +3,172 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>오늘의 노회 이용 안내 - 시화산노회</title>
-<meta name="description" content="시화산노회 정기노회 QR 출석 안내 — 홈페이지 회원가입, 크롬으로 앱 설치, QR 코드로 입장하는 방법.">
+<title>회원 가입 및 어플 설치 안내 (인쇄용) - 시화산노회</title>
+<meta name="description" content="시화산노회 홈페이지 회원 가입 및 어플 설치 안내 — 촬요·게시용 인쇄 안내문 (A4 한 쪽).">
 <link rel="stylesheet" href="css/style.css?v=20261003a">
 <style>
-.tg { max-width: 780px; margin: 0 auto; background: #fff; border: 1px solid var(--gray-3); border-radius: 12px; padding: 34px 32px; line-height: 1.75; }
-.tg-top { text-align: center; border-bottom: 2px solid var(--navy); padding-bottom: 16px; margin-bottom: 8px; }
-.tg-top .k { font-size: 0.85rem; color: var(--gray-5); letter-spacing: 2px; }
-.tg-top h2 { font-family: 'Noto Serif KR', serif; font-size: 1.7rem; margin: 6px 0; }
-.tg-top p { color: var(--gray-5); margin: 0; }
-.tg-lead { margin: 18px 0; padding: 14px 18px; background: var(--gray-1); border-radius: 10px; }
-.tg-step { display: flex; gap: 16px; padding: 18px 0; border-bottom: 1px dashed var(--gray-3); break-inside: avoid; }
-.tg-step:last-of-type { border-bottom: 0; }
-.tg-no { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--navy); color: #fff; font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-.tg-step h3 { margin: 6px 0 6px; font-size: 1.15rem; color: var(--navy); }
-.tg-step ul { margin: 6px 0 0; padding-left: 20px; }
-.tg-step li { margin: 3px 0; }
+@page { size: A4; margin: 0; }
+.tg-actions { max-width: 210mm; margin: 0 auto 14px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
+.tg-actions .lead { margin-right: auto; color: var(--gray-5); font-size: .92rem; }
+.tg-actions .btn { min-height: 44px; }
+
+/* A4 한 쪽 */
+.tg { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.12);
+  padding: 11mm 13mm 9mm; color: #222; font-size: 10.4pt; line-height: 1.55; display: flex; flex-direction: column; }
+.tg * { box-sizing: border-box; }
+.tg-top { text-align: center; border-bottom: 2px solid var(--navy); padding-bottom: 3mm; }
+.tg-top .k { font-size: 9pt; color: #666; letter-spacing: 2px; }
+.tg-top .tg-h { font-weight: 700; font-family: 'Noto Serif KR', serif; font-size: 20pt; margin: 1.2mm 0 0; padding: 0; border: 0; color: var(--navy); line-height: 1.3; }
+
+.tg-intro { display: flex; gap: 6mm; align-items: center; margin: 4mm 0 2mm; }
+.tg-intro .txt { flex: 1; }
+.tg-intro .txt p { margin: 0 0 1.6mm; }
+.tg-intro .big { font-size: 11.6pt; font-weight: 700; color: var(--navy); }
+.tg-qr { flex: none; width: 46mm; text-align: center; border: 1.6px solid var(--navy); border-radius: 3mm; padding: 2.4mm 2mm 2mm; }
+.tg-qr img { width: 36mm; height: 36mm; display: block; margin: 0 auto; image-rendering: pixelated; }
+.tg-qr .u { font-weight: 800; font-size: 11.5pt; letter-spacing: .3px; margin-top: .6mm; }
+.tg-qr .c { font-size: 8.4pt; color: #555; line-height: 1.35; }
+
+.tg-step { display: flex; gap: 3.4mm; padding: 2.6mm 0; border-top: 1px dashed #bbb; break-inside: avoid; }
+.tg-no { flex: none; width: 9mm; height: 9mm; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; font-size: 13pt;
+  display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .tg-body { flex: 1; min-width: 0; }
-.tg-qr { flex: none; text-align: center; font-size: 0.78rem; color: var(--gray-5); }
-.tg-qr img { width: 132px; height: 132px; image-rendering: pixelated; display: block; margin: 0 auto 4px; }
-.tg-key { display: inline-block; padding: 0 8px; border: 1px solid var(--gray-5); border-radius: 6px; background: #fff; font-weight: 700; white-space: nowrap; }
-.tg-note { font-size: 0.88rem; color: var(--gray-5); margin-top: 6px; }
-.tg-warn { margin-top: 8px; padding: 10px 14px; border-left: 4px solid var(--red); background: #fdf3f3; font-size: 0.92rem; }
-.tg-foot { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--navy); text-align: center; font-size: 0.9rem; color: var(--gray-5); }
-.tg-help { margin: 18px 0; padding: 16px; border: 2px solid var(--navy); border-radius: 12px; }
-.tg-help-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px dotted var(--gray-3); }
-.tg-help-row[hidden] { display: none; }
-.tg-help-row:last-of-type { border-bottom: 0; }
-.tg-help-row .btn { min-height: 44px; min-width: 150px; text-align: center; }
-.tg-help-row.done span::after { content: ' ✓ 완료'; color: #1f7a3a; font-weight: 700; }
-.tg-sub { font-size: 0.88rem; color: var(--gray-5); margin-top: 8px; }
-@media print { .tg-help { display: none !important; } }
-.tg-actions { max-width: 780px; margin: 0 auto 14px; display: flex; gap: 8px; justify-content: flex-end; }
-@media (max-width: 560px) {
-  .tg { padding: 22px 16px; }
-  .tg-step { flex-wrap: wrap; }
-  .tg-qr { width: 100%; }
+.tg-body h3 { margin: .6mm 0 .8mm; font-size: 12.4pt; color: var(--navy); }
+.tg-body ul { margin: 0; padding-left: 4.6mm; }
+.tg-body li { margin: .5mm 0; }
+.tg-key { display: inline-block; padding: 0 1.6mm; border: 1px solid #777; border-radius: 1.4mm; font-weight: 700; white-space: nowrap; line-height: 1.35; }
+.tg-chrome { display: inline-block; width: 5.2mm; height: 5.2mm; vertical-align: -1.3mm; }
+
+.tg-row { display: flex; align-items: flex-start; gap: 2mm; margin-top: 1.6mm; }
+.tg-row .lab { flex: none; width: 15mm; font-weight: 800; font-size: 9.6pt; color: var(--navy); padding-top: 12mm; line-height: 1.3; }
+.tg-shots { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
+.tg-shots figure { margin: 0; text-align: center; }
+.tg-shots img { width: 100%; height: 37mm; object-fit: cover; object-position: center 30%; border-radius: 2mm; display: block; }
+.tg-shots figcaption { font-size: 8.4pt; line-height: 1.3; margin-top: .8mm; }
+.tg-shots figcaption b { color: #c62026; }
+
+.tg-day { margin-top: auto; border: 1.4px solid var(--navy); border-radius: 3mm; padding: 2.6mm 4mm; background: #f6f4ef;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.tg-day h4 { margin: 0 0 .8mm; font-size: 11pt; color: var(--navy); }
+.tg-day p { margin: 0; }
+.tg-foot { text-align: center; font-size: 9pt; color: #555; margin-top: 2.4mm; }
+
+@media screen and (max-width: 790px) {
+  .tg { width: 100%; min-height: 0; padding: 18px 14px; font-size: 1rem; }
+  .tg-intro { flex-direction: column; }
+  .tg-shots { grid-template-columns: repeat(2, 1fr); }
+  .tg-shots img { height: auto; }
+  .tg-row { flex-direction: column; }
+  .tg-row .lab { padding-top: 0; width: auto; }
 }
 @media print {
   .topbar, .site-header, .gnb, .page-head, .site-footer, .tg-actions, #noti-toasts { display: none !important; }
-  body { background: #fff; }
-  .page-body { padding: 0 !important; }
-  .tg { border: 0; padding: 0; max-width: none; font-size: 11.5pt; }
-  .tg-no, .tg-top { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { background: #fff !important; }
+  .page-body { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  .tg { box-shadow: none; margin: 0; height: 297mm; overflow: hidden; }
 }
+/* ?paper=1 — 그림 파일(PNG)로 찍을 때: 종이만 보이게 */
+html.tg-paper .topbar, html.tg-paper .site-header, html.tg-paper .gnb, html.tg-paper .page-head,
+html.tg-paper .site-footer, html.tg-paper .tg-actions, html.tg-paper #noti-toasts { display: none !important; }
+html.tg-paper body { background: #fff; margin: 0; }
+html.tg-paper .page-body { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+html.tg-paper .tg { box-shadow: none; margin: 0; height: 297mm; overflow: hidden; }
 </style>
+<script>if (/[?&]paper=1/.test(location.search)) document.documentElement.className += ' tg-paper';</script>
 </head>
 <body>
 
 <div class="page-head">
   <div class="container">
-    <h1>오늘의 노회 이용 안내</h1>
-    <div class="crumb">홈 &gt; 오늘의 노회 &gt; 이용 안내</div>
+    <h1>회원 가입 및 어플 설치 안내 (인쇄용)</h1>
+    <div class="crumb">홈 &gt; 회원 가입 및 어플 설치 안내 &gt; 인쇄용</div>
   </div>
 </div>
 
 <main class="page-body container" id="main">
   <div class="tg-actions">
-    <button class="btn" type="button" onclick="window.print()">안내문 인쇄</button>
-    <a class="btn ghost" href="today.html">오늘의 노회로</a>
+    <span class="lead">촬요 · 게시용 A4 한 쪽</span>
+    <button class="btn" type="button" onclick="window.print()">인쇄</button>
+    <a class="btn" href="images/app-guide/print-a4.pdf" download="시화산노회_회원가입_앱설치_안내.pdf">PDF 내려받기</a>
+    <a class="btn" href="images/app-guide/print-a4.png" download="시화산노회_회원가입_앱설치_안내.png">그림(PNG) 내려받기</a>
+    <a class="btn" href="images/qr-app.png" download="시화산노회_촬요_안내QR.png">QR코드만 내려받기</a>
+    <a class="btn ghost" href="app.html">웹용(카톡) 안내</a>
   </div>
 
   <article class="tg">
     <div class="tg-top">
       <div class="k">대한예수교장로회(합동) 시화산노회</div>
-      <h2>정기노회 QR 출석 안내</h2>
-      <p>이번 정기노회부터 출석 · 거마비 수령 확인 · 표결을 휴대전화로 합니다</p>
+      <div class="tg-h" role="heading" aria-level="2">홈페이지 회원 가입 및 어플 설치 안내</div>
     </div>
 
-    <div class="tg-help" id="tg-help">
-      <div class="tg-help-row" id="tg-h-chrome" hidden>
-        <span>지금 화면은 크롬이 아닙니다</span><button class="btn" type="button" id="tg-b-chrome">① 크롬으로 열기</button></div>
-      <div class="tg-help-row" id="tg-h-sign">
-        <span id="tg-t-sign">홈페이지 회원가입</span><a class="btn" id="tg-b-sign" href="signup.html">② 회원가입</a></div>
-      <div class="tg-help-row" id="tg-h-inst">
-        <span id="tg-t-inst">휴대전화에 앱 설치</span><button class="btn" type="button" id="tg-b-inst">③ 앱 설치하기</button></div>
-      <div class="tg-sub" id="tg-inst-msg"></div>
-    </div>
-
-    <div class="tg-lead">
-      노회 날 회의장에서 <strong>QR 코드를 찍고 「입장하기」</strong>만 누르시면 출석이 됩니다.
-      다만 <strong>홈페이지 회원가입</strong>이 되어 있어야 하므로, 노회 전에 아래 ①~③을 미리 해 두시기 바랍니다. (5분이면 됩니다)
+    <div class="tg-intro">
+      <div class="txt">
+        <p class="big">휴대전화 카메라로 오른쪽 QR 코드를 찍으세요.</p>
+        <p>휴대전화(안드로이드 · 아이폰)에 맞는 안내가 차례로 나옵니다. 화면의 단추를 순서대로 누르시면 <strong>5분</strong>이면 끝납니다.
+          카카오톡으로 받은 링크를 누르셔도 같은 안내가 열립니다.</p>
+        <p>앱을 설치해 두시면 공지 · 자료 · 서류 발급과 <strong>정기노회 출석 · 표결</strong>을 휴대전화로 하실 수 있습니다.</p>
+      </div>
+      <div class="tg-qr">
+        <img src="images/qr-app.png" alt="회원 가입 및 앱 설치 안내 QR 코드">
+        <div class="u">sihwasan.org/app</div>
+        <div class="c">찍으면 설치 안내가<br>열립니다</div>
+      </div>
     </div>
 
     <section class="tg-step">
       <div class="tg-no">1</div>
       <div class="tg-body">
-        <h3>크롬(Chrome)으로 노회 홈페이지에 들어갑니다</h3>
+        <h3>크롬(Chrome) <img class="tg-chrome" src="images/chrome.png" alt="">으로 노회 홈페이지를 엽니다</h3>
         <ul>
-          <li>휴대전화 카메라로 오른쪽 QR 코드를 찍으면 이 안내가 휴대전화에서 열립니다. 아래 단추를 차례로 누르시면 됩니다.</li>
-          <li>크롬은 <span class="tg-key">🔴🟡🟢🔵 동그란 아이콘</span>의 인터넷 앱입니다. 없으면 Play 스토어(아이폰은 App Store)에서 「Chrome」을 설치합니다.</li>
+          <li>카카오톡 · 네이버 앱 안에서 열리면 구글 로그인과 앱 설치가 되지 않습니다. 화면의 <span class="tg-key">크롬으로 열기</span>를 누르세요.</li>
+          <li>크롬이 없으면 Play 스토어에서 「Chrome」을 설치합니다. <strong>아이폰은 사파리(Safari)</strong>로 엽니다.</li>
         </ul>
-        <div class="tg-warn">카카오톡·네이버 앱 안에서 열린 화면에서는 구글 로그인과 앱 설치가 되지 않습니다. 화면에 나오는 <strong>「크롬으로 열기」</strong>를 눌러 주세요.</div>
-        <div class="tg-note">아이폰은 크롬 대신 <strong>사파리(Safari)</strong>를 쓰셔도 됩니다.</div>
       </div>
-      <div class="tg-qr"><span id="tg-qr-home"></span>찍으면<br>이 안내가 열립니다</div>
     </section>
 
     <section class="tg-step">
       <div class="tg-no">2</div>
       <div class="tg-body">
-        <h3>회원가입을 합니다</h3>
+        <h3>회원 가입을 합니다</h3>
         <ul>
-          <li>화면 맨 위의 <span class="tg-key">회원가입</span>을 누릅니다.</li>
-          <li><strong>성명 · 직분 · 소속 교회 · 생년월일</strong>을 적습니다. 소속 교회가 목록에 없으면 「교회명 직접 입력」을 고릅니다.</li>
-          <li><span class="tg-key">구글 계정으로 가입하기</span> 또는 <span class="tg-key">네이버 계정으로 가입하기</span>를 누르면 비밀번호를 따로 만들지 않아도 됩니다. (이메일과 비밀번호로 가입하셔도 됩니다)</li>
-          <li>성명과 소속 교회가 노회 명단과 같으면 <strong>회원 등급이 자동으로</strong> 정해집니다. 화면 오른쪽 위 이름 옆에 (정회원) 등으로 보이면 완료입니다.</li>
+          <li><span class="tg-key">회원 가입</span>을 누르고 <strong>성명 · 직분 · 소속 교회 · 생년월일</strong>을 적습니다.</li>
+          <li><span class="tg-key">구글 계정으로 가입하기</span> 또는 <span class="tg-key">네이버 계정으로 가입하기</span>를 누르면 비밀번호를 따로 만들지 않아도 됩니다.</li>
+          <li>성명과 소속 교회가 노회 명단과 같으면 회원 등급이 자동으로 정해집니다.</li>
         </ul>
-        <div class="tg-warn"><strong>(승인대기)</strong>나 <strong>(일반회원)</strong>으로 보이면 노회에 입장할 수 없습니다. 성명·교회 이름을 다시 확인하시고, 그래도 안 되면 노회 서기나 간사에게 연락해 주세요.</div>
       </div>
     </section>
 
     <section class="tg-step">
       <div class="tg-no">3</div>
       <div class="tg-body">
-        <h3>홈페이지를 앱으로 설치합니다</h3>
-        <ul>
-          <li><strong>안드로이드(갤럭시) 크롬</strong> — 오른쪽 위 <span class="tg-key">⋮</span> 를 누르고 <span class="tg-key">홈 화면에 추가</span>(또는 「앱 설치」) → <span class="tg-key">설치</span>.</li>
-          <li><strong>아이폰 사파리</strong> — 아래쪽 <span class="tg-key">공유 ⬆</span> 를 누르고 <span class="tg-key">홈 화면에 추가</span> → <span class="tg-key">추가</span>.</li>
-          <li>바탕 화면에 <strong>「시화산노회」</strong> 아이콘이 생깁니다. 이 아이콘으로 들어오면 로그인이 유지되어 노회 날 바로 입장할 수 있습니다.</li>
-        </ul>
-        <div class="tg-note">홈페이지 화면에 「앱 설치」 글자가 보이면 그것을 눌러도 됩니다.</div>
+        <h3>휴대전화에 앱을 설치합니다 — 그림의 빨간 곳을 누르세요</h3>
+        <div class="tg-row">
+          <div class="lab">안드로이드<br>(갤럭시)<br>크롬</div>
+          <div class="tg-shots">
+            <figure><img src="images/app-guide/a3_menu.jpg" alt="" style="object-position: center 0%"><figcaption><b>①</b> 오른쪽 위 ⋮</figcaption></figure>
+            <figure><img src="images/app-guide/a4_add.jpg" alt="" style="object-position: center 75%"><figcaption><b>②</b> 홈 화면에 추가<br>(또는 앱 설치)</figcaption></figure>
+            <figure><img src="images/app-guide/a5_install.jpg" alt="" style="object-position: center 50%"><figcaption><b>③</b> 설치</figcaption></figure>
+            <figure><img src="images/app-guide/a6_home.jpg" alt="" style="object-position: center 32%"><figcaption><b>④</b> 바탕 화면 아이콘</figcaption></figure>
+          </div>
+        </div>
+        <div class="tg-row">
+          <div class="lab">아이폰<br>사파리</div>
+          <div class="tg-shots">
+            <figure><img src="images/app-guide/i1_share.jpg" alt="" style="object-position: center 100%"><figcaption><b>①</b> 아래쪽 공유 단추<br>(⋯ 만 보이면 ⋯ → 공유)</figcaption></figure>
+            <figure><img src="images/app-guide/i2_sheet.jpg" alt="" style="object-position: center 85%"><figcaption><b>②</b> 홈 화면에 추가</figcaption></figure>
+            <figure><img src="images/app-guide/i3_add.jpg" alt="" style="object-position: center 0%"><figcaption><b>③</b> 오른쪽 위 추가</figcaption></figure>
+            <figure><img src="images/app-guide/i4_home.jpg" alt="" style="object-position: center 30%"><figcaption><b>④</b> 홈 화면 아이콘</figcaption></figure>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="tg-step">
-      <div class="tg-no">4</div>
-      <div class="tg-body">
-        <h3>노회 날 — QR 코드를 찍고 입장합니다</h3>
-        <ul>
-          <li>바탕 화면의 <strong>시화산노회</strong> 앱(또는 sihwasan.org)을 열고 첫 화면의 <span class="tg-key">오늘의 노회</span>를 누릅니다.</li>
-          <li>내 <strong>이름 · 직분 · 소속 교회 · 회원 구분</strong>을 확인하고 <span class="tg-key">입장하기</span>를 누르면 카메라가 열립니다.</li>
-          <li><strong>회의장</strong>에 있는 출석 QR 코드를 찍으면 출석이 기록됩니다. (휴대전화 기본 카메라로 QR을 찍어 들어가도 됩니다)</li>
-          <li>로그인이 풀려 있으면 로그인 화면이 먼저 나옵니다. 로그인하면 입장 화면으로 돌아옵니다.</li>
-          <li>카메라 사용을 묻는 창이 뜨면 <span class="tg-key">허용</span>을 눌러 주세요.</li>
-        </ul>
-        <div class="tg-note">출석은 노회 당일, 회의장에서 QR을 찍어야 인정됩니다. 정회원 · 언권회원 · 준회원이 입장할 수 있습니다.</div>
-      </div>
-    </section>
-
-    <section class="tg-step">
-      <div class="tg-no">5</div>
-      <div class="tg-body">
-        <h3>회의 중 — 같은 화면에서 합니다</h3>
-        <ul>
-          <li><strong>거마비</strong> — 회계가 지급하면 알림이 뜹니다. 현금을 받으신 뒤 <span class="tg-key">수령 확인</span>을 누르면 영수증으로 처리됩니다.</li>
-          <li><strong>표결</strong> — 서기가 투표를 올리면 화면에 안건이 뜹니다. <span class="tg-key">찬성</span> 또는 <span class="tg-key">반대</span>를 누릅니다. (정회원만, 한 번 누르면 바꿀 수 없습니다)</li>
-          <li>결과는 투표가 끝나고 10초 뒤 모두의 화면에 나옵니다.</li>
-        </ul>
-      </div>
-    </section>
-
-    <div class="tg-foot">
-      문의 : 노회 사무실 031-486-9993 &nbsp;·&nbsp; 홈페이지 sihwasan.org
+    <div class="tg-day">
+      <h4>정기노회 날에는</h4>
+      <p>바탕 화면의 <strong>「시화산노회」</strong> 아이콘 → <span class="tg-key">오늘의 노회</span> → <span class="tg-key">입장하기</span> → 회의장의 <strong>출석 QR</strong>을 찍으면 출석이 됩니다.
+        (아이폰은 아이콘으로 처음 들어갈 때 로그인을 한 번 더 해 주세요)</p>
     </div>
+    <div class="tg-foot">문의 : 노회 사무실 031-486-9993 &nbsp;·&nbsp; 홈페이지 sihwasan.org</div>
   </article>
 </main>
 
@@ -164,69 +176,6 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261003c"></script>
-<script src="js/vendor/qrcode.js"></script>
-<script>
-(function () {
-  try {
-    var q = qrcode(0, 'M');
-    q.addData('https://sihwasan.org/today-guide.html');
-    q.make();
-    document.getElementById('tg-qr-home').innerHTML =
-      '<img src="' + q.createDataURL(6, 2) + '" alt="시화산노회 앱 설치 안내 QR 코드">';
-  } catch (x) {}
-})();
-
-/* 휴대전화에서 누르는 도우미 — ① 크롬으로 열기 ② 회원가입 ③ 앱 설치 */
-(function () {
-  var ua = navigator.userAgent || '';
-  var android = /Android/i.test(ua), ios = /iPhone|iPad|iPod/i.test(ua), kakao = /KAKAOTALK/i.test(ua);
-  var chrome = /Chrome\//.test(ua) && !/SamsungBrowser|EdgA|Whale|OPR\/|; wv\)|KAKAOTALK|NAVER|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\//i.test(ua);
-  var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
-  var msg = document.getElementById('tg-inst-msg');
-  var url = location.origin + location.pathname;
-
-  if (kakao || (android && !chrome)) {
-    document.getElementById('tg-h-chrome').hidden = false;
-    document.getElementById('tg-b-chrome').addEventListener('click', function () {
-      if (kakao) location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
-      else location.href = 'intent://' + url.replace(/^https?:\/\//, '') +
-        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(url) + ';end';
-    });
-  }
-
-  /* 로그인되어 있으면 회원가입은 끝난 것 */
-  var t = setInterval(function () {
-    if (!window.__shsUser) return;
-    clearInterval(t);
-    var u = window.__shsUser;
-    document.getElementById('tg-h-sign').classList.add('done');
-    document.getElementById('tg-t-sign').textContent = (u.name || '') + '님 가입됨';
-    var b = document.getElementById('tg-b-sign');
-    b.textContent = '내 정보 확인'; b.href = 'mypage.html';
-  }, 500);
-  setTimeout(function () { clearInterval(t); }, 15000);
-
-  var ev = null;
-  window.addEventListener('beforeinstallprompt', function (x) { x.preventDefault(); ev = x; });
-  function installed() {
-    document.getElementById('tg-h-inst').classList.add('done');
-    document.getElementById('tg-t-inst').textContent = '앱 설치됨';
-    msg.textContent = '바탕 화면의 「시화산노회」 아이콘으로 들어오시면 됩니다.';
-  }
-  if (standalone) installed();
-  window.addEventListener('appinstalled', installed);
-  document.getElementById('tg-b-inst').addEventListener('click', function () {
-    if (ev) {
-      ev.prompt();
-      ev.userChoice.then(function (r) { if (r.outcome === 'accepted') installed(); ev = null; });
-      return;
-    }
-    if (ios) msg.innerHTML = '아이폰은 <strong>사파리</strong> 아래쪽 <strong>공유 ⬆</strong> 단추 → <strong>홈 화면에 추가</strong> → <strong>추가</strong>를 눌러 주세요.';
-    else if (android && !chrome) msg.innerHTML = '먼저 위의 <strong>① 크롬으로 열기</strong>를 눌러 주세요.';
-    else msg.innerHTML = '크롬 오른쪽 위 <strong>⋮</strong> → <strong>홈 화면에 추가</strong>(또는 앱 설치) → <strong>설치</strong>를 눌러 주세요.';
-  });
-})();
-</script>
+<script src="js/main.js?v=20261003d"></script>
 </body>
 </html>

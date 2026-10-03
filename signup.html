@@ -111,7 +111,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261003c"></script>
+<script src="js/main.js?v=20261003d"></script>
 <script src="js/inapp.js?v=20260911a"></script>
 <script src="js/date-pick.js"></script>
 <script>
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function () {
           msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
             '서기·간사 확인 후 정회원으로 전환됩니다.';
         }
-        setTimeout(function () { location.href = 'index.html'; }, 1800);
+        setTimeout(function () { location.href = window.SHSNext ? SHSNext() : 'index.html'; }, 1800);
       });
     });
   });
