@@ -18,7 +18,7 @@
 --  · 정기노회 날 = 노회 일정 설정(meetings)의 봄·가을 정기노회 날짜.
 --                 그 해 그 정기노회 날짜가 비어 있으면 기준일 규칙
 --                 (site_settings 'ops_dates', 기본 4월·10월 둘째 주 월요일)
---  · 받는 분    = 서기(clerk)와 최고관리자(superadmin)
+--  · 받는 분    = 노회장(president)·서기(clerk)·간사(staff)와 최고관리자(superadmin)
 --  · 한 정기노회에 한 번만 보냅니다 (dedupe_key = 'elder-term-YYYYMMDD').
 --    해당자가 없어도 "해당 없음"으로 한 번 알립니다.
 --
@@ -131,7 +131,7 @@ begin
   -- 이미 모든 받는 분에게 보냈으면 명단을 셈하지 않고 끝낸다
   if not exists (
     select 1 from public.profiles p
-     where p.role in ('clerk', 'superadmin')
+     where p.role in ('president', 'clerk', 'staff', 'superadmin')
        and coalesce(p.suspended, false) = false
        and not exists (select 1 from public.notifications n
                         where n.user_id = p.id and n.dedupe_key = v_key)
@@ -240,7 +240,7 @@ begin
   insert into public.notifications (user_id, kind, title, body, dedupe_key)
   select p.id, '총대 안내', v_title, v_body, v_key
     from public.profiles p
-   where p.role in ('clerk', 'superadmin')
+   where p.role in ('president', 'clerk', 'staff', 'superadmin')
      and coalesce(p.suspended, false) = false
      and not exists (select 1 from public.notifications n
                       where n.user_id = p.id and n.dedupe_key = v_key);

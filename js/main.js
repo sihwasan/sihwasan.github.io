@@ -178,7 +178,7 @@
     sub.appendChild(a);   /* 맨 아래 자리 */
   }
 
-  /* 서기에게만 임원방 하위에 <총대 장로 임기 확인 · 공문>을 붙인다 (최고관리자는 관리를 위해 함께 본다).
+  /* 노회장·서기·간사에게 임원방 하위에 <총대 장로 임기 확인 · 공문>을 붙인다 (최고관리자 포함).
    * 정기노회 4주 전, 남은 임기 1년 미만 장로 총대의 교회에 보낼 공문 시안과 워드 내려받기. */
   function addElderNoticeMenu() {
     var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
@@ -603,6 +603,9 @@
         if (p.role === 'clerk' || p.role === 'superadmin') {
           addProceedMenu();
           addAttendQrMenu();
+        }
+        /* 총대 장로 임기 확인 · 공문 — 노회장·서기·간사 (최고관리자 포함) */
+        if (p.role === 'president' || p.role === 'clerk' || p.role === 'staff' || p.role === 'superadmin') {
           addElderNoticeMenu();
         }
 

@@ -100,8 +100,10 @@ var SHSElderNotice = (function () {
   function remainLabel(birth, base) { return labelOf(remainMonths(birth, base)); }
 
   /* ---------- 권한 ---------- */
-  /* 알림 카드·메뉴는 서기에게 (최고관리자는 관리를 위해 함께 본다) */
-  function isClerk(u) { return !!u && (u.role === 'clerk' || u.role === 'superadmin'); }
+  /* 알림 카드·메뉴는 노회장·서기·간사에게 (최고관리자 포함) */
+  function isClerk(u) {
+    return !!u && (u.role === 'president' || u.role === 'clerk' || u.role === 'staff' || u.role === 'superadmin');
+  }
   /* 화면 자체는 생년월일을 볼 수 있는 관리자(노회장·서기·간사·최고관리자) */
   function canUse(u) {
     return !!u && (u.role === 'president' || u.role === 'clerk' || u.role === 'staff' || u.role === 'superadmin');
