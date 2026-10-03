@@ -4,77 +4,75 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>회원 가입 및 어플 설치 안내 (인쇄용) - 시화산노회</title>
-<meta name="description" content="시화산노회 홈페이지 회원 가입 및 어플 설치 안내 — 촬요·게시용 인쇄 안내문 (A4 한 쪽).">
+<meta name="description" content="시화산노회 홈페이지 회원 가입 및 어플 설치 안내 — 촬요용 인쇄 안내문 (A5 두 쪽).">
 <link rel="stylesheet" href="css/style.css?v=20261003a">
 <style>
-@page { size: A4; margin: 0; }
-.tg-actions { max-width: 210mm; margin: 0 auto 14px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
+/* 촬요는 A5로 찍는다 — 이 안내문도 A5 두 쪽 */
+@page { size: 148mm 210mm; margin: 0; }
+.tg-actions { max-width: 310mm; margin: 0 auto 14px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; }
 .tg-actions .lead { margin-right: auto; color: var(--gray-5); font-size: .92rem; }
 .tg-actions .btn { min-height: 44px; }
+.tg-spread { display: flex; flex-wrap: wrap; gap: 10mm; justify-content: center; }
 
-/* A4 한 쪽 */
-.tg { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.12);
-  padding: 11mm 13mm 9mm; color: #222; font-size: 10.4pt; line-height: 1.55; display: flex; flex-direction: column; }
-.tg * { box-sizing: border-box; }
-.tg-top { text-align: center; border-bottom: 2px solid var(--navy); padding-bottom: 3mm; }
-.tg-top .k { font-size: 9pt; color: #666; letter-spacing: 2px; }
-.tg-top .tg-h { font-weight: 700; font-family: 'Noto Serif KR', serif; font-size: 20pt; margin: 1.2mm 0 0; padding: 0; border: 0; color: var(--navy); line-height: 1.3; }
-
-.tg-intro { display: flex; gap: 6mm; align-items: center; margin: 4mm 0 2mm; }
-.tg-intro .txt { flex: 1; }
-.tg-intro .txt p { margin: 0 0 1.6mm; }
-.tg-intro .big { font-size: 11.6pt; font-weight: 700; color: var(--navy); }
-.tg-qr { flex: none; width: 46mm; text-align: center; border: 1.6px solid var(--navy); border-radius: 3mm; padding: 2.4mm 2mm 2mm; }
-.tg-qr img { width: 36mm; height: 36mm; display: block; margin: 0 auto; image-rendering: pixelated; }
-.tg-qr .u { font-weight: 800; font-size: 11.5pt; letter-spacing: .3px; margin-top: .6mm; }
-.tg-qr .c { font-size: 8.4pt; color: #555; line-height: 1.35; }
-
-.tg-step { display: flex; gap: 3.4mm; padding: 2.6mm 0; border-top: 1px dashed #bbb; break-inside: avoid; }
-.tg-no { flex: none; width: 9mm; height: 9mm; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; font-size: 13pt;
-  display: flex; align-items: center; justify-content: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.tg-body { flex: 1; min-width: 0; }
-.tg-body h3 { margin: .6mm 0 .8mm; font-size: 12.4pt; color: var(--navy); }
-.tg-body ul { margin: 0; padding-left: 4.6mm; }
-.tg-body li { margin: .5mm 0; }
-.tg-key { display: inline-block; padding: 0 1.6mm; border: 1px solid #777; border-radius: 1.4mm; font-weight: 700; white-space: nowrap; line-height: 1.35; }
-.tg-chrome { display: inline-block; width: 5.2mm; height: 5.2mm; vertical-align: -1.3mm; }
-
-.tg-row { display: flex; align-items: flex-start; gap: 2mm; margin-top: 1.6mm; }
-.tg-row .lab { flex: none; width: 15mm; font-weight: 800; font-size: 9.6pt; color: var(--navy); padding-top: 12mm; line-height: 1.3; }
-.tg-shots { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
-.tg-shots figure { margin: 0; text-align: center; }
-.tg-shots img { width: 100%; height: 37mm; object-fit: cover; object-position: center 30%; border-radius: 2mm; display: block; }
-.tg-shots figcaption { font-size: 8.4pt; line-height: 1.3; margin-top: .8mm; }
-.tg-shots figcaption b { color: #c62026; }
-
-.tg-day { margin-top: auto; border: 1.4px solid var(--navy); border-radius: 3mm; padding: 2.6mm 4mm; background: #f6f4ef;
+.pg { width: 148mm; height: 210mm; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,.12); position: relative; overflow: hidden;
+  padding: 10mm 10mm 8mm; display: flex; flex-direction: column; font-size: 9.6pt; line-height: 1.58; color: #222;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.tg-day h4 { margin: 0 0 .8mm; font-size: 11pt; color: var(--navy); }
-.tg-day p { margin: 0; }
-.tg-foot { text-align: center; font-size: 9pt; color: #555; margin-top: 2.4mm; }
+.pg * { box-sizing: border-box; }
+.pg .top { text-align: center; border-bottom: 1.5px solid var(--navy); padding-bottom: 2.4mm; }
+.pg .top .k { font-size: 7.4pt; color: #777; letter-spacing: 2px; }
+.pg .top .h { font-family: 'Noto Serif KR', serif; font-weight: 700; font-size: 15pt; color: var(--navy); margin-top: .8mm; line-height: 1.3; }
+.pg .intro { display: flex; gap: 4mm; align-items: center; margin: 3.4mm 0 1mm; }
+.pg .intro .t { flex: 1; }
+.pg .intro .t p { margin: 0 0 1.2mm; }
+.pg .intro .big { font-weight: 700; font-size: 10pt; color: var(--navy); }
+.pg .qr { flex: none; width: 34mm; text-align: center; border: 1.3px solid var(--navy); border-radius: 2.4mm; padding: 1.8mm 1.4mm 1.6mm; }
+.pg .qr img { width: 27mm; height: 27mm; display: block; margin: 0 auto; image-rendering: pixelated; }
+.pg .qr .u { font-weight: 800; font-size: 8.8pt; margin-top: .4mm; }
+.pg .qr .c { font-size: 6.8pt; color: #555; line-height: 1.3; }
+.pg .st { display: flex; gap: 2.6mm; padding: 2.8mm 0; border-top: 1px dashed #bbb; }
+.pg .no { flex: none; width: 7mm; height: 7mm; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; font-size: 10pt; display: flex; align-items: center; justify-content: center; }
+.pg .st h3 { font-size: 11pt; color: var(--navy); margin: .3mm 0 .6mm; }
+.pg .st ul { margin: 0; padding-left: 3.6mm; }
+.pg .st li { margin: .3mm 0; }
+.pg .key { display: inline-block; padding: 0 1.2mm; border: 1px solid #777; border-radius: 1.2mm; font-weight: 700; white-space: nowrap; line-height: 1.35; }
+.pg .ch { display: inline-block; width: 4.2mm; height: 4.2mm; vertical-align: -1mm; }
+.pg .day { margin-top: auto; border: 1.2px solid var(--navy); border-radius: 2.4mm; padding: 2.2mm 3mm; background: #f6f4ef; }
+.pg .day b.h { display: block; color: var(--navy); font-size: 9.6pt; margin-bottom: .4mm; }
+.pg .foot { text-align: center; font-size: 7.4pt; color: #666; margin-top: 2mm; }
+.pg .p2h { font-size: 11pt; color: var(--navy); font-weight: 700; display: flex; align-items: center; gap: 2.6mm; }
+.pg .row { margin-top: 5mm; }
+.pg .row .lab { font-weight: 800; color: var(--navy); font-size: 9.2pt; margin-bottom: 1.4mm; border-left: 3px solid #a8854a; padding-left: 2mm; }
+.pg .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2mm; }
+.pg .shots figure { margin: 0; text-align: center; }
+.pg .shots img { width: 100%; height: auto; display: block; border-radius: 1.6mm; }
+.pg .shots figcaption { font-size: 7.8pt; line-height: 1.3; margin-top: .8mm; }
+.pg .shots figcaption b { color: #c62026; }
+.pg .tip { margin-top: auto; font-size: 8.8pt; color: #555; background: #f6f4ef; border-radius: 2mm; padding: 2mm 3mm; }
 
-@media screen and (max-width: 790px) {
-  .tg { width: 100%; min-height: 0; padding: 18px 14px; font-size: 1rem; }
-  .tg-intro { flex-direction: column; }
-  .tg-shots { grid-template-columns: repeat(2, 1fr); }
-  .tg-shots img { height: auto; }
-  .tg-row { flex-direction: column; }
-  .tg-row .lab { padding-top: 0; width: auto; }
+@media screen and (max-width: 640px) {
+  html:not(.tg-paper) .tg-spread { gap: 16px; }
+  html:not(.tg-paper) .pg { width: 100%; height: auto; min-height: 0; padding: 18px 14px; font-size: 1rem; }
+  html:not(.tg-paper) .pg .intro { flex-direction: column; }
+  html:not(.tg-paper) .pg .shots { grid-template-columns: repeat(2, 1fr); }
 }
 @media print {
   .topbar, .site-header, .gnb, .page-head, .site-footer, .tg-actions, #noti-toasts { display: none !important; }
   html, body { background: #fff !important; }
   .page-body { padding: 0 !important; margin: 0 !important; max-width: none !important; }
-  .tg { box-shadow: none; margin: 0; height: 297mm; overflow: hidden; }
+  .tg-spread { display: block; }
+  .pg { box-shadow: none; margin: 0; break-after: page; }
+  .pg:last-child { break-after: auto; }
 }
-/* ?paper=1 — 그림 파일(PNG)로 찍을 때: 종이만 보이게 */
+/* ?paper=1 / ?paper=2 — 그 쪽만 그림(PNG)으로 찍을 때 */
 html.tg-paper .topbar, html.tg-paper .site-header, html.tg-paper .gnb, html.tg-paper .page-head,
 html.tg-paper .site-footer, html.tg-paper .tg-actions, html.tg-paper #noti-toasts { display: none !important; }
 html.tg-paper body { background: #fff; margin: 0; }
 html.tg-paper .page-body { padding: 0 !important; margin: 0 !important; max-width: none !important; }
-html.tg-paper .tg { box-shadow: none; margin: 0; height: 297mm; overflow: hidden; }
+html.tg-paper .tg-spread { display: block; }
+html.tg-paper .pg { box-shadow: none; display: none; }
+html.tg-paper.p1 .pg.p1, html.tg-paper.p2 .pg.p2 { display: flex; }
 </style>
-<script>if (/[?&]paper=1/.test(location.search)) document.documentElement.className += ' tg-paper';</script>
+<script>(function () { var m = location.search.match(/[?&]paper=([12])/); if (m) document.documentElement.className += ' tg-paper p' + m[1]; })();</script>
 </head>
 <body>
 
@@ -87,89 +85,75 @@ html.tg-paper .tg { box-shadow: none; margin: 0; height: 297mm; overflow: hidden
 
 <main class="page-body container" id="main">
   <div class="tg-actions">
-    <span class="lead">촬요 · 게시용 A4 한 쪽</span>
+    <span class="lead">촬요용 A5 두 쪽</span>
     <button class="btn" type="button" onclick="window.print()">인쇄</button>
-    <a class="btn" href="images/app-guide/print-a4.pdf" download="시화산노회_회원가입_앱설치_안내.pdf">PDF 내려받기</a>
-    <a class="btn" href="images/app-guide/print-a4.png" download="시화산노회_회원가입_앱설치_안내.png">그림(PNG) 내려받기</a>
-    <a class="btn" href="images/qr-app.png" download="시화산노회_촬요_안내QR.png">QR코드만 내려받기</a>
+    <a class="btn" href="images/app-guide/print-a5.pdf" download="시화산노회_회원가입_앱설치_안내_A5.pdf">PDF 내려받기</a>
+    <a class="btn" href="images/app-guide/print-a5-1.png" download="시화산노회_회원가입_앱설치_안내_1쪽.png">1쪽 그림(PNG)</a>
+    <a class="btn" href="images/app-guide/print-a5-2.png" download="시화산노회_회원가입_앱설치_안내_2쪽.png">2쪽 그림(PNG)</a>
+    <a class="btn" href="images/qr-app.png" download="시화산노회_촬요_안내QR.png">QR코드만</a>
+    <a class="btn ghost" href="images/app-guide/print-a4.pdf" download="시화산노회_회원가입_앱설치_안내_A4게시용.pdf">A4 한 장(게시용)</a>
     <a class="btn ghost" href="app.html">웹용(카톡) 안내</a>
   </div>
 
-  <article class="tg">
-    <div class="tg-top">
-      <div class="k">대한예수교장로회(합동) 시화산노회</div>
-      <div class="tg-h" role="heading" aria-level="2">홈페이지 회원 가입 및 어플 설치 안내</div>
-    </div>
-
-    <div class="tg-intro">
-      <div class="txt">
-        <p class="big">휴대전화 카메라로 오른쪽 QR 코드를 찍으세요.</p>
-        <p>휴대전화(안드로이드 · 아이폰)에 맞는 안내가 차례로 나옵니다. 화면의 단추를 순서대로 누르시면 <strong>5분</strong>이면 끝납니다.
-          카카오톡으로 받은 링크를 누르셔도 같은 안내가 열립니다.</p>
-        <p>앱을 설치해 두시면 공지 · 자료 · 서류 발급과 <strong>정기노회 출석 · 표결</strong>을 휴대전화로 하실 수 있습니다.</p>
+  <div class="tg-spread">
+    <article class="pg p1">
+      <div class="top">
+        <div class="k">대한예수교장로회(합동) 시화산노회</div>
+        <div class="h" role="heading" aria-level="2">홈페이지 회원 가입 및 어플 설치 안내</div>
       </div>
-      <div class="tg-qr">
-        <img src="images/qr-app.png" alt="회원 가입 및 앱 설치 안내 QR 코드">
-        <div class="u">sihwasan.org/app</div>
-        <div class="c">찍으면 설치 안내가<br>열립니다</div>
+      <div class="intro">
+        <div class="t">
+          <p class="big">휴대전화 카메라로 오른쪽 QR 코드를 찍으세요.</p>
+          <p>휴대전화(안드로이드 · 아이폰)에 맞는 안내가 차례로 나옵니다. 화면의 단추를 순서대로 누르시면 <b>5분</b>이면 끝납니다. 카카오톡으로 받은 링크를 누르셔도 같은 안내가 열립니다.</p>
+          <p>앱을 설치해 두시면 공지 · 자료 · 서류 발급과 <b>정기노회 출석 · 표결</b>을 휴대전화로 하실 수 있습니다.</p>
+        </div>
+        <div class="qr"><img src="images/qr-app.png" alt="회원 가입 및 앱 설치 안내 QR 코드"><div class="u">sihwasan.org/app</div><div class="c">찍으면 설치 안내가<br>열립니다</div></div>
       </div>
-    </div>
-
-    <section class="tg-step">
-      <div class="tg-no">1</div>
-      <div class="tg-body">
-        <h3>크롬(Chrome) <img class="tg-chrome" src="images/chrome.png" alt="">으로 노회 홈페이지를 엽니다</h3>
-        <ul>
-          <li>카카오톡 · 네이버 앱 안에서 열리면 구글 로그인과 앱 설치가 되지 않습니다. 화면의 <span class="tg-key">크롬으로 열기</span>를 누르세요.</li>
-          <li>크롬이 없으면 Play 스토어에서 「Chrome」을 설치합니다. <strong>아이폰은 사파리(Safari)</strong>로 엽니다.</li>
-        </ul>
-      </div>
-    </section>
-
-    <section class="tg-step">
-      <div class="tg-no">2</div>
-      <div class="tg-body">
+      <div class="st"><div class="no">1</div><div>
+        <h3>크롬(Chrome) <img class="ch" src="images/chrome.png" alt="">으로 노회 홈페이지를 엽니다</h3>
+        <ul><li>카카오톡 · 네이버 앱 안에서 열리면 구글 로그인과 앱 설치가 되지 않습니다. 화면의 <span class="key">크롬으로 열기</span>를 누르세요.</li>
+        <li>크롬이 없으면 Play 스토어에서 「Chrome」을 설치합니다. <b>아이폰은 사파리(Safari)</b>로 엽니다.</li></ul>
+      </div></div>
+      <div class="st"><div class="no">2</div><div>
         <h3>회원 가입을 합니다</h3>
-        <ul>
-          <li><span class="tg-key">회원 가입</span>을 누르고 <strong>성명 · 직분 · 소속 교회 · 생년월일</strong>을 적습니다.</li>
-          <li><span class="tg-key">구글 계정으로 가입하기</span> 또는 <span class="tg-key">네이버 계정으로 가입하기</span>를 누르면 비밀번호를 따로 만들지 않아도 됩니다.</li>
-          <li>성명과 소속 교회가 노회 명단과 같으면 회원 등급이 자동으로 정해집니다.</li>
-        </ul>
+        <ul><li><span class="key">회원 가입</span>을 누르고 <b>성명 · 직분 · 소속 교회 · 생년월일</b>을 적습니다.</li>
+        <li><span class="key">구글 계정으로 가입하기</span> 또는 <span class="key">네이버 계정으로 가입하기</span>를 누르면 비밀번호를 따로 만들지 않아도 됩니다.</li>
+        <li>성명과 소속 교회가 노회 명단과 같으면 회원 등급이 자동으로 정해집니다.</li></ul>
+      </div></div>
+      <div class="st"><div class="no">3</div><div>
+        <h3>휴대전화에 앱을 설치합니다</h3>
+        <ul><li>다음 쪽 그림의 <b style="color:#c62026">빨간 곳</b>을 차례로 누르세요. 바탕 화면에 「시화산노회」 아이콘이 생기면 끝입니다.</li></ul>
+      </div></div>
+      <div class="day">
+        <b class="h">정기노회 날에는</b>
+        바탕 화면의 <b>「시화산노회」</b> 아이콘 → <span class="key">오늘의 노회</span> → <span class="key">입장하기</span> → 회의장의 <b>출석 QR</b>을 찍으면 출석이 됩니다. (아이폰은 아이콘으로 처음 들어갈 때 로그인을 한 번 더 해 주세요)
       </div>
-    </section>
+      <div class="foot">문의 : 노회 사무실 031-486-9993 · 홈페이지 sihwasan.org</div>
+    </article>
 
-    <section class="tg-step">
-      <div class="tg-no">3</div>
-      <div class="tg-body">
-        <h3>휴대전화에 앱을 설치합니다 — 그림의 빨간 곳을 누르세요</h3>
-        <div class="tg-row">
-          <div class="lab">안드로이드<br>(갤럭시)<br>크롬</div>
-          <div class="tg-shots">
-            <figure><img src="images/app-guide/a3_menu.jpg" alt="" style="object-position: center 0%"><figcaption><b>①</b> 오른쪽 위 ⋮</figcaption></figure>
-            <figure><img src="images/app-guide/a4_add.jpg" alt="" style="object-position: center 75%"><figcaption><b>②</b> 홈 화면에 추가<br>(또는 앱 설치)</figcaption></figure>
-            <figure><img src="images/app-guide/a5_install.jpg" alt="" style="object-position: center 50%"><figcaption><b>③</b> 설치</figcaption></figure>
-            <figure><img src="images/app-guide/a6_home.jpg" alt="" style="object-position: center 32%"><figcaption><b>④</b> 바탕 화면 아이콘</figcaption></figure>
-          </div>
-        </div>
-        <div class="tg-row">
-          <div class="lab">아이폰<br>사파리</div>
-          <div class="tg-shots">
-            <figure><img src="images/app-guide/i1_share.jpg" alt="" style="object-position: center 100%"><figcaption><b>①</b> 아래쪽 공유 단추<br>(⋯ 만 보이면 ⋯ → 공유)</figcaption></figure>
-            <figure><img src="images/app-guide/i2_sheet.jpg" alt="" style="object-position: center 85%"><figcaption><b>②</b> 홈 화면에 추가</figcaption></figure>
-            <figure><img src="images/app-guide/i3_add.jpg" alt="" style="object-position: center 0%"><figcaption><b>③</b> 오른쪽 위 추가</figcaption></figure>
-            <figure><img src="images/app-guide/i4_home.jpg" alt="" style="object-position: center 30%"><figcaption><b>④</b> 홈 화면 아이콘</figcaption></figure>
-          </div>
+    <article class="pg p2">
+      <div class="p2h"><div class="no">3</div>휴대전화에 앱 설치 — 그림의 빨간 곳을 누르세요</div>
+      <div class="row">
+        <div class="lab">안드로이드(갤럭시) · 크롬</div>
+        <div class="shots">
+          <figure><img src="images/app-guide/a3_menu.jpg" alt="크롬 오른쪽 위 점 세 개 단추"><figcaption><b>①</b> 오른쪽 위 ⋮</figcaption></figure>
+          <figure><img src="images/app-guide/a4_add.jpg" alt="메뉴의 홈 화면에 추가"><figcaption><b>②</b> 홈 화면에 추가<br>(또는 앱 설치)</figcaption></figure>
+          <figure><img src="images/app-guide/a5_install.jpg" alt="앱 설치 창의 설치 단추"><figcaption><b>③</b> 설치</figcaption></figure>
+          <figure><img src="images/app-guide/a6_home.jpg" alt="바탕 화면의 시화산노회 아이콘"><figcaption><b>④</b> 바탕 화면 아이콘</figcaption></figure>
         </div>
       </div>
-    </section>
-
-    <div class="tg-day">
-      <h4>정기노회 날에는</h4>
-      <p>바탕 화면의 <strong>「시화산노회」</strong> 아이콘 → <span class="tg-key">오늘의 노회</span> → <span class="tg-key">입장하기</span> → 회의장의 <strong>출석 QR</strong>을 찍으면 출석이 됩니다.
-        (아이폰은 아이콘으로 처음 들어갈 때 로그인을 한 번 더 해 주세요)</p>
-    </div>
-    <div class="tg-foot">문의 : 노회 사무실 031-486-9993 &nbsp;·&nbsp; 홈페이지 sihwasan.org</div>
-  </article>
+      <div class="row">
+        <div class="lab">아이폰 · 사파리</div>
+        <div class="shots">
+          <figure><img src="images/app-guide/i1_share.jpg" alt="사파리 아래쪽 공유 단추"><figcaption><b>①</b> 아래쪽 공유 단추<br>(⋯ 만 보이면 ⋯ → 공유)</figcaption></figure>
+          <figure><img src="images/app-guide/i2_sheet.jpg" alt="공유 목록의 홈 화면에 추가"><figcaption><b>②</b> 홈 화면에 추가</figcaption></figure>
+          <figure><img src="images/app-guide/i3_add.jpg" alt="오른쪽 위 추가"><figcaption><b>③</b> 오른쪽 위 추가</figcaption></figure>
+          <figure><img src="images/app-guide/i4_home.jpg" alt="홈 화면의 시화산노회 아이콘"><figcaption><b>④</b> 홈 화면 아이콘</figcaption></figure>
+        </div>
+      </div>
+      <div class="tip">안드로이드는 안내 화면의 <span class="key">앱 설치하기</span> 단추를 누르면 ③ 설치 창이 바로 뜹니다. 막히시면 노회 사무실(031-486-9993)로 연락 주세요.</div>
+    </article>
+  </div>
 </main>
 
 <script src="js/auth.js?v=20260921j"></script>
