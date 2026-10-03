@@ -56,6 +56,14 @@
 .ta-grade.non { background: #fdf3f3; border-color: var(--red); color: var(--red); }
 .ta-gradeinfo { margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: var(--gray-1); font-size: 0.9rem; text-align: left; }
 .ta-gradeinfo.non { background: #fdf3f3; color: var(--red); }
+/* 증경부노회장 장로님 — 예우 참관 */
+.ta-honor { border-color: #e2d3a4; background: #fffdf7; }
+.ta-honor-mark { display: inline-block; padding: 3px 14px; border-radius: 99px; background: #f6edd2; color: #7a5a00; font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 10px; }
+.ta-card.ta-honor h3 { font-family: 'Noto Serif KR', serif; line-height: 1.5; }
+.ta-honor-msg { max-width: 540px; margin: 12px auto 4px; text-align: left; }
+.ta-center .ta-honor-msg p { margin: 0 0 10px; line-height: 1.85; color: var(--gray-7, #444); }
+.ta-honorbox { margin-top: 14px; padding: 16px 18px; border-radius: 10px; background: #fffaf0; border: 1px solid #e8d9a8; line-height: 1.8; }
+.ta-honorbox p { margin: 8px 0 0; color: var(--gray-7, #444); }
 .ta-chromebar { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 16px; border: 1px solid #e0c97a; background: #fff9e3; border-radius: 10px; }
 .ta-chromebar .btn { min-height: 44px; }
 .ta-codeform.ta-slim { margin-top: 10px; padding-top: 0; border-top: 0; }
@@ -138,6 +146,9 @@
 .ta-box-st { margin-top: 8px; }
 .ta-back { margin-bottom: 12px; }
 .ta-guidebox { margin: 14px 0 18px; padding: 14px 16px; border: 1px dashed var(--navy); border-radius: 10px; background: #fff; }
+.ta-guideqr { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+.ta-guideqr img { flex: none; width: 96px; height: 96px; image-rendering: pixelated; border: 1px solid var(--gray-3); }
+.ta-guideqr .ta-btnrow { margin-top: 8px; }
 /* QR 크게 보기 */
 body.ta-qr-open { overflow: hidden; }
 .ta-scanbox { position: relative; width: min(100%, 420px); aspect-ratio: 1; margin: 12px auto; background: #000; border-radius: 12px; overflow: hidden; }
@@ -188,8 +199,8 @@ body.ta-qr-open { overflow: hidden; }
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261003c"></script>
+<script src="js/main.js?v=20261003d"></script>
 <script src="js/vendor/qrcode.js"></script>
-<script src="js/today.js?v=20261003v"></script>
+<script src="js/today.js?v=20261003w"></script>
 </body>
 </html>

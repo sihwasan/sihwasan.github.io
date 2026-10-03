@@ -70,8 +70,9 @@
   /* 회원 구분과 그에 따른 안내 */
   var GRADE_INFO = {
     '정회원': '정회원입니다. 발언과 투표에 모두 참여할 수 있습니다.',
-    '언권회원': '언권회원입니다. 발언은 할 수 있으나 투표에는 참여할 수 없습니다.',
+    '언권회원': '언권회원입니다. 회의에서 발언하실 수 있으며, 표결은 정회원 목사와 총대 장로가 합니다.',
     '준회원': '준회원입니다. 투표에는 참여할 수 없습니다.',
+    '참관': '참관으로 함께하십니다. 회의 중 발언과 표결은 회원께서 하십니다. 함께해 주셔서 감사합니다.',
     '일반회원': '일반회원입니다. 노회 회원이 아니므로 입장할 수 없습니다.',
     '승인대기': '아직 노회 회원으로 확인되지 않은 계정입니다. 회원이 아니므로 입장할 수 없습니다. 서기에게 문의해 주세요.'
   };
@@ -90,6 +91,58 @@
       '<div><dt>회원 구분</dt><dd><span class="ta-grade' + (grade === '정회원' ? ' full' : non ? ' non' : '') + '">' +
       e(grade) + '</span></dd></div></dl>' +
       '<div class="ta-gradeinfo' + (non ? ' non' : '') + '">' + e(GRADE_INFO[grade] || '') + '</div>';
+  }
+
+  /* ---------- 노회 자리 (110_assembly_observer.sql) ----------
+   * 서버가 seat 를 내려 주면 그대로 따른다: vote(표결: 정회원 목사·총대 장로) / speak(언권) / observe(참관).
+   * 서버가 아직 옛 판이라 seat 가 없으면 예전처럼(정회원이면 투표) 동작한다.
+   * 증경부노회장 장로님(veteran)은 서버가 사이트 관리의 증경노회장단 명단(site_settings 'veterans')과
+   * 이름·교회를 맞춰 확인해 준다. 화면은 그분께 예우의 인사와 참관 안내를 드린다. */
+  function mySeat() {
+    if (S.my && S.my.seat) return S.my.seat;
+    return S.me && S.me.seat_known ? (S.me.seat || null) : undefined;
+  }
+  function myVeteran() {
+    return (S.my && S.my.honor) || (S.me && S.me.veteran) || null;
+  }
+  function canVote(me) {
+    var s = mySeat();
+    if (s === undefined) return !!me.full;            /* 옛 서버 */
+    return s === 'vote' && !(S.my && S.my.full_member === false);
+  }
+  function served(v) {
+    var s = (v && v.sessions) || [];
+    return (s.length ? s.map(function (n) { return '제' + Number(n) + '회기'; }).join(', ') + ' ' : '') + '부노회장';
+  }
+  /* 입장 전 — 예우를 갖춘 환영과 참관 안내 */
+  function honorGate(me, v, btn) {
+    return '<div class="ta-card ta-center ta-honor">' +
+      '<div class="ta-honor-mark">증경부노회장</div>' +
+      '<h3>' + e(me.name || '') + ' 장로님, 귀한 걸음 해 주셔서 감사합니다</h3>' +
+      '<div class="ta-honor-msg">' +
+      '<p>' + e(served(v)) + '으로 섬겨 주신 노고를 기억하며, 오늘 노회에 예우를 갖추어 모십니다.</p>' +
+      '<p>장로님께서는 <strong>참관</strong>으로 함께해 주시며, 회의 중 발언과 표결은 총대께서 하시게 됩니다. ' +
+      '기도로 함께해 주시면 큰 힘이 되겠습니다.</p></div>' +
+      '<div class="ta-sub">' + e(String(me.church || '').trim() ? me.church + ' · ' : '') + e(me.name || '') + ' 장로님</div>' +
+      btn + '</div>';
+  }
+  /* 입장 뒤 — 내 정보 자리에 드리는 인사 */
+  function honorBox(name, v) {
+    return '<div class="ta-honorbox"><div class="ta-honor-mark">증경부노회장 · 참관</div>' +
+      '<strong>' + e(name || '') + ' 장로님, 함께해 주셔서 감사합니다.</strong>' +
+      '<p>' + e(served(v)) + '으로 노회를 섬겨 주신 장로님을 예우를 갖추어 모십니다. ' +
+      '오늘 회의는 참관으로 함께해 주시고, 발언과 표결은 총대께서 하시게 됩니다. ' +
+      '장로님의 기도가 노회에 큰 힘이 됩니다.</p></div>';
+  }
+  /* 투표가 진행 중일 때 표결 자리가 아닌 분께 드리는 안내 */
+  function voteNote() {
+    var s = mySeat();
+    if (s === 'observe') {
+      return myVeteran() ? '표결은 총대께서 진행하십니다. 함께 지켜봐 주셔서 감사합니다.'
+                         : '표결은 정회원 목사와 총대 장로께서 진행하십니다. 함께 지켜봐 주셔서 감사합니다.';
+    }
+    if (s === 'speak') return '표결은 정회원 목사와 총대 장로께서 하십니다. 발언으로 함께해 주셔서 감사합니다.';
+    return '투표는 정회원만 참여할 수 있습니다.';
   }
 
   function ruleName(r) { return r === '3분의2' ? '3분의 2 이상' : '과반'; }
@@ -305,12 +358,14 @@
 
   function chips(c, confirmed) {
     var t = confirmed ? c.c_total : c.total, p = confirmed ? c.c_pastor : c.pastor,
-        el = confirmed ? c.c_elder : c.elder, x = confirmed ? c.c_etc : c.etc;
+        el = confirmed ? c.c_elder : c.elder, x = confirmed ? c.c_etc : c.etc,
+        ob = confirmed ? c.c_observer : c.observer;   /* 참관(증경부노회장 등) — 참석 수와 따로 센다 */
     return '<div class="ta-chips">' +
       '<div class="ta-chip big"><span>참석</span><strong>' + t + '</strong>명</div>' +
       '<div class="ta-chip"><span>목사</span><strong>' + p + '</strong>명</div>' +
       '<div class="ta-chip"><span>장로 총대</span><strong>' + el + '</strong>명</div>' +
       (x ? '<div class="ta-chip"><span>그 밖</span><strong>' + x + '</strong>명</div>' : '') +
+      (ob ? '<div class="ta-chip"><span>참관</span><strong>' + ob + '</strong>명</div>' : '') +
       '</div>';
   }
 
@@ -332,11 +387,11 @@
         '<h3>로그인해 주세요</h3>' +
         '<p>노회에 입장하려면 먼저 로그인해야 합니다.<br>로그인하면 이 화면으로 돌아와 <strong>입장하기</strong>를 누를 수 있습니다.</p>' +
         '<a class="btn ta-bigbtn" href="login.html">로그인</a>' +
-        '<p class="ta-sub">계정이 없으시면 <a href="signup.html">회원가입</a> 후 이용해 주세요. · <a href="today-guide.html">이용 안내 보기</a></p></div>';
+        '<p class="ta-sub">계정이 없으시면 <a href="signup.html">회원가입</a> 후 이용해 주세요. · <a href="app.html">회원 가입 · 앱 설치 안내</a></p></div>';
     } else if (!m) {
       h = '<div class="ta-card ta-center"><h3>지금 열려 있는 노회가 없습니다</h3>' +
         '<p>노회 당일, 화면이나 순서지에 있는 <strong>QR 코드</strong>를 휴대전화 카메라로 찍어 주세요.</p>' +
-        '<p class="ta-sub"><a href="today-guide.html">회원가입 · 앱 설치 · 입장 방법 안내 보기</a></p></div>';
+        '<p class="ta-sub"><a href="app.html">회원 가입 · 앱 설치 안내 보기</a></p></div>';
     } else if (!S.entered && m.status !== 'closed') {
       if (!dayOpen) {
         var nd = nextDay && nextDay.meet_date ? String(nextDay.meet_date).split('-') : null;
@@ -345,21 +400,32 @@
           (nd ? '<br>다음 노회 : <strong>' + e(nextDay.kind || '') + ' ' + Number(nd[1]) + '월 ' + Number(nd[2]) + '일</strong>' : '') +
           '<br>당일 회의장의 QR 코드를 찍어 입장해 주세요.</p></div>';
       } else {
-        var g0 = gradeOf(me.role);
-        var can = !(g0 === '승인대기' || g0 === '일반회원');
+        /* 새 서버(110)는 입장 자리(seat)를 미리 알려 준다. 없으면 예전처럼 등급으로 본다. */
+        var known = me.seat_known === true;
+        var g0 = known && me.grade ? me.grade : gradeOf(me.role);
+        var can = known ? !!me.seat : !(g0 === '승인대기' || g0 === '일반회원');
+        var enterBtn = '<p>' + (S.code_ok
+            ? 'QR 코드가 확인되었습니다. 내용이 맞으면 아래 단추를 눌러 주세요.'
+            : '아래 <strong>입장하기</strong>를 누르면 카메라가 열립니다.<br>회의장에 있는 <strong>출석 QR 코드</strong>를 찍어야 출석이 인정됩니다.') +
+          '</p><button class="btn ta-bigbtn" data-act="enter">입장하기</button>';
         if ((me.mgr || me.tre) && !S.code_ok) {
           h = '<div class="ta-card"><h3>본인 출석</h3>' +
             '<div class="ta-sub">서기·회계도 회의장의 QR 코드를 찍어야 출석이 인정됩니다.</div>' +
             '<div class="ta-btnrow"><button class="btn" data-act="enter">입장하기 (QR 찍기)</button></div></div>';
+        } else if (known && me.seat === 'observe' && me.veteran) {
+          /* 증경부노회장을 지내신 장로님 — 예우를 갖춰 맞이하고 참관을 안내한다 */
+          h = honorGate(me, me.veteran, enterBtn);
+        } else if (known && !me.seat && me.kind === '장로' && me.role !== 'pending' && me.role !== 'general') {
+          /* 총대가 아닌 장로님 — 노회에는 총대 장로님이 입장하신다는 것을 정중히 알린다 */
+          h = '<div class="ta-card ta-center">' +
+            '<h3>' + e(me.name || '') + ' 장로님, 찾아 주셔서 감사합니다</h3>' +
+            '<p>노회에는 각 교회 당회에서 <strong>총대로 파송된 장로님</strong>께서 회원으로 입장하십니다.<br>' +
+            '총대로 파송되셨는데 이 안내가 보이시면 서기에게 말씀해 주세요. 바로 확인해 드리겠습니다.</p></div>';
         } else {
           h = '<div class="ta-card ta-center">' +
             '<h3>' + e(me.name || '') + '님, 환영합니다</h3>' +
             idCard(me.name, me.position, me.church, g0) +
-            (!can ? '' :
-              '<p>' + (S.code_ok
-                ? 'QR 코드가 확인되었습니다. 내용이 맞으면 아래 단추를 눌러 주세요.'
-                : '아래 <strong>입장하기</strong>를 누르면 카메라가 열립니다.<br>회의장에 있는 <strong>출석 QR 코드</strong>를 찍어야 출석이 인정됩니다.') +
-              '</p><button class="btn ta-bigbtn" data-act="enter">입장하기</button>') +
+            (!can ? '' : enterBtn) +
             '</div>';
         }
       }
@@ -370,11 +436,12 @@
   function renderMy(m) {
     var a = S.my, h = '';
     if (m && a) {
-      h = '<div class="ta-card"><div class="ta-myrow"><span class="ta-check">✓</span><div>' +
-        '<strong>입장했습니다</strong>' +
+      h = '<div class="ta-card' + (a.honor ? ' ta-honor' : '') + '"><div class="ta-myrow"><span class="ta-check">✓</span><div>' +
+        '<strong>' + (a.honor ? '입장하셨습니다' : '입장했습니다') + '</strong>' +
         '<div class="ta-sub">' + hm(a.entered_at) + ' 입장' +
         (a.confirmed ? ' · 확정 명단에 올랐습니다' : '') + '</div></div></div>' +
-        idCard(a.name, a.position, a.church, a.grade);
+        (a.seat === 'observe' && a.honor ? honorBox(a.name, a.honor)   /* 증경부노회장 장로님 — 예우 참관 */
+                                         : idCard(a.name, a.position, a.church, a.grade));
       if (a.allow_status === '지급') {
         h += '<div class="ta-alarm"><div><span class="ta-badge live">회계 알림</span>' +
           '<div class="ta-amt">거마비 ' + won(a.allow_amount) + '</div>' +
@@ -443,14 +510,14 @@
           h += '<div class="ta-sub">무기명 투표 — 진행 중에는 투표 상황이 공개되지 않으며, 종료 후 결과만 발표됩니다.</div>';
         }
         if (v.voted) h += '<div class="ta-done">투표를 마쳤습니다. 결과는 투표가 종료된 뒤에 나옵니다.</div>';
-        else if (S.entered && me.full) {
+        else if (S.entered && canVote(me)) {   /* 표결은 정회원 목사·총대 장로만 */
           h += '<div class="ta-vbtns">' +
             '<button class="ta-vbtn yes" data-act="cast" data-choice="찬성">찬성</button>' +
             '<button class="ta-vbtn no" data-act="cast" data-choice="반대">반대</button></div>' +
             (v.mode === '기명' ? '<div class="ta-sub">기명 투표입니다 — 누가 어떻게 투표했는지 결과에 표시됩니다.</div>'
                                : '<div class="ta-sub">무기명 투표입니다 — 누가 어떻게 투표했는지 어디에도 기록되지 않으며, 서기도 알 수 없습니다.</div>');
-        } else if (S.entered) h += '<div class="ta-done">투표는 정회원만 참여할 수 있습니다.</div>';
-        else h += '<div class="ta-done">입장한 정회원만 투표할 수 있습니다.</div>';
+        } else if (S.entered) h += '<div class="ta-done">' + e(voteNote()) + '</div>';
+        else h += '<div class="ta-done">입장한 정회원(목사·총대 장로)만 투표할 수 있습니다.</div>';
         if (me.mgr) h += '<button class="btn danger ta-endbtn" data-act="vend" data-id="' + v.id + '">투표 종료하기</button>';
       } else if (v.result) {
         h += resultHtml(v);
@@ -491,16 +558,19 @@
     var d = new Date(now());
     var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     return '<h3>' + heading + '</h3>' +
-      '<p class="ta-sub">노회 회기와 날짜를 정하고 출석 QR 코드를 만듭니다. 출석 QR은 노회 날 회의장에 띄우거나 붙여 둡니다.</p>' +
-      '<div class="ta-guidebox"><strong>촬요용 「앱 설치 안내」 QR</strong>' +
-      '<div class="ta-sub">촬요에는 출석 QR이 아니라 이 QR을 인쇄해 주세요. 찍으면 회원가입 → 크롬으로 앱 설치 → 노회 날 입장 방법 안내가 열려, 노회 전에 미리 준비할 수 있습니다.</div>' +
-      '<div class="ta-btnrow"><button class="btn" type="button" data-act="guidesave">앱 설치 안내 QR 저장 (촬요용)</button>' +
-      '<a class="btn ghost" href="today-guide.html" target="_blank" rel="noopener">안내문 보기 · 인쇄</a></div></div>' +
       '<form class="ta-form" data-form="open">' +
       '<label class="ta-short">노회 회기<input data-keep="osess" id="ta-osess" type="number" min="1" max="999" inputmode="numeric" placeholder="예: 20"></label>' +
       '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
       '<label>날짜<input data-keep="odate" id="ta-odate" type="date" value="' + ds + '"></label>' +
-      '<button class="btn" type="submit">QR 코드 생성</button></form>';
+      '<button class="btn" type="submit">출석코드 생성</button></form>' + guideBox();
+  }
+
+  /* 촬요 인쇄용 안내 QR — 회원 가입·앱 설치 안내(sihwasan.org/app)로 가는 고정 그림. 회기마다 만들 필요 없다 */
+  function guideBox() {
+    return '<div class="ta-guidebox ta-guideqr"><img src="images/qr-app.png" alt="촬요 인쇄용 안내 QR코드" width="96" height="96">' +
+      '<div><strong>촬요 인쇄용 안내 QR코드</strong>' +
+      '<div class="ta-btnrow"><a class="btn" href="images/qr-app.png" download="시화산노회_촬요_안내QR.png">QR코드 내려받기</a>' +
+      '<a class="btn ghost" href="today-guide.html" target="_blank" rel="noopener">안내문 인쇄</a></div></div></div>';
   }
 
   /* 회기 상자 목록 — <노회 출석 QR 코드 생성> 메뉴로 들어오면 먼저 보이는 화면 */
@@ -523,7 +593,7 @@
           '</div></div>';
       }).join('') + '</div>';
     }
-    paint('ta-clerk', h + openForm('새 회기 QR 코드 만들기') + '</div>');
+    paint('ta-clerk', h + openForm('정기노회 출석코드 생성하기') + '</div>');
     fillSession(false);
   }
   function renderClerk(m, me) {
@@ -535,13 +605,12 @@
     if (!m || m.status === 'closed') {
       var d = new Date(now());
       var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-      h += '<h3 id="qr">노회 출석 QR 코드 생성</h3>' +
-        '<p class="ta-sub">노회 회기와 날짜를 정하고 QR 코드를 만들면, 회원들이 QR을 찍어 입장할 수 있습니다. 미리 만들어 순서지에 인쇄해 두셔도 됩니다.</p>' +
+      h += '<h3 id="qr">정기노회 출석코드 생성하기</h3>' +
         '<form class="ta-form" data-form="open">' +
         '<label class="ta-short">노회 회기<input data-keep="osess" id="ta-osess" type="number" min="1" max="999" inputmode="numeric" placeholder="예: 20"></label>' +
         '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
         '<label>날짜<input data-keep="odate" id="ta-odate" type="date" value="' + ds + '"></label>' +
-        '<button class="btn" type="submit">QR 코드 생성</button></form>';
+        '<button class="btn" type="submit">출석코드 생성</button></form>' + guideBox();
       if (m && !voted) h += '<div class="ta-btnrow ta-end"><button class="btn danger sm" data-act="delete">마친 「' + e(m.title) +
         '」 기록 지우기</button></div>';
     } else {
@@ -553,10 +622,7 @@
         '<div class="ta-sub">QR 코드 번호 — 출석은 회의장에서 이 QR을 찍어야 인정됩니다.</div>' +
         '<div class="ta-btnrow"><button class="btn" data-act="qrfull">화면에 크게 띄우기 · 인쇄</button>' +
         '<button class="btn ghost" data-act="qrsave">출석 QR 그림 저장 (회의장 게시용)</button></div>' +
-        '<div class="ta-sub">출석 QR은 노회 날 회의장 화면이나 입구에만 게시해 주세요. 촬요에는 아래 「앱 설치 안내」 QR을 넣습니다.</div>' +
-        '<div class="ta-btnrow"><button class="btn ghost sm" type="button" data-act="guidesave">앱 설치 안내 QR 저장 (촬요용)</button></div>' +
-        '<div class="ta-sub">회원들에게 나눠 줄 <a href="today-guide.html" target="_blank" rel="noopener">이용 안내문(회원가입 · 앱 설치 · 입장 방법)</a>도 함께 인쇄해 넣어 주세요.</div>' +
-        '</div></div>';
+        '</div></div>' + guideBox();
 
       var qrPart = h; h = '';
       /* 명단 */
@@ -614,7 +680,7 @@
       list.map(function (a, i) {
         return '<tr' + (a.confirmed || m.status === 'open' ? '' : ' class="late"') + '><td>' + (i + 1) + '</td>' +
           '<td><strong>' + e(a.name || '') + '</strong> ' + e(a.position || '') + '</td><td>' + e(a.church || '') + '</td>' +
-          '<td>' + e(a.grade || '') + '</td><td>' + hm(a.entered_at) +
+          '<td>' + e(a.grade || '') + (a.honor ? ' <span class="ta-badge">증경부노회장</span>' : '') + '</td><td>' + hm(a.entered_at) +
           (a.confirmed || m.status === 'open' ? '' : ' <span class="ta-badge">확정 뒤</span>') + '</td>' +
           '<td>' + (a.allow_status ? '' : '<button class="btn ghost sm" data-act="remove" data-id="' + a.id +
             '" data-name="' + e(a.name || '') + '">빼기</button>') + '</td></tr>';
@@ -642,7 +708,9 @@
           '<div class="ta-tablewrap"><table class="ta-table"><thead><tr><th>지급</th><th>이름</th><th>교회</th><th>금액(원)</th></tr></thead><tbody>' +
           wait.map(function (a) {
             return '<tr><td><input type="checkbox" class="ta-pick" data-keep="pk' + a.id + '" data-id="' + a.id + '" checked aria-label="' + e(a.name || '') + ' 지급"></td>' +
-              '<td><strong>' + e(a.name || '') + '</strong> ' + e(a.position || '') + '</td><td>' + e(a.church || '') + '</td>' +
+              '<td><strong>' + e(a.name || '') + '</strong> ' + e(a.position || '') +
+              (a.seat === 'observe' ? ' <span class="ta-badge">참관' + (a.honor ? ' · 증경부노회장' : '') + '</span>' : '') +
+              '</td><td>' + e(a.church || '') + '</td>' +
               '<td><input class="ta-amtin" type="number" min="0" step="1000" inputmode="numeric" data-keep="am' + a.id + '" data-id="' + a.id + '" value="30000"></td></tr>';
           }).join('') + '</tbody></table></div>' +
           '<div class="ta-btnrow"><button class="btn ta-bigbtn" data-act="approve">선택한 사람에게 거마비 지급 승인</button></div>' +
@@ -882,7 +950,8 @@
       if (confirm('투표를 종료합니다. 10초 뒤 결과가 발표됩니다.')) run(b, 'assembly_vote_end', { p_vote: id });
     }
     else if (act === 'confirm') {
-      if (confirm('지금 입장한 ' + (S.counts ? S.counts.total : 0) + '명으로 명단을 확정합니다.\n확정 명단은 회계에게 전달됩니다.')) run(b, 'assembly_confirm', { p_meeting: m.id });
+      var cn = S.counts ? S.counts.total : 0, co = (S.counts && S.counts.observer) || 0;
+      if (confirm('지금 입장한 ' + cn + '명' + (co ? '(참관 ' + co + '명 별도)' : '') + '으로 명단을 확정합니다.\n확정 명단은 회계에게 전달됩니다.')) run(b, 'assembly_confirm', { p_meeting: m.id });
     }
     else if (act === 'remove') {
       if (confirm(b.getAttribute('data-name') + ' 님을 명단에서 뺍니다.')) run(b, 'assembly_attendee_remove', { p_id: id });
@@ -904,7 +973,6 @@
     }
     else if (act === 'qrfull') openQr(b);
     else if (act === 'qrsave') saveQr();
-    else if (act === 'guidesave') saveQr('https://sihwasan.org/today-guide.html', '시화산노회_앱설치안내QR.png');
     else if (act === 'vtest') startVote(b.form, b, true);
     else if (act === 'bulk') {
       var val = document.getElementById('ta-bulk').value;
