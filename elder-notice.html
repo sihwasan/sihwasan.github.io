@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>총대 장로 임기 확인 · 공문 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20260921j">
+<style>
+/* 공문 시안 화면 */
+.en-wrap { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 960px) { .en-wrap { grid-template-columns: minmax(0, 1fr); } }
+.en-form { padding: 18px 18px 20px; }
+.en-form .field { margin-bottom: 10px; }
+.en-form label { display: block; font-size: 0.84rem; color: var(--gray-6, #5f5a52); margin-bottom: 3px; font-weight: 600; }
+.en-form input, .en-form select, .en-form textarea { width: 100%; box-sizing: border-box; }
+.en-form textarea { font-size: 0.88rem; line-height: 1.6; resize: vertical; }
+.en-row { display: flex; gap: 8px; }
+.en-row .field { flex: 1 1 0; min-width: 0; }
+.en-hint { font-size: 0.78rem; color: var(--gray-5); margin: -6px 0 10px; }
+.en-preview { min-width: 0; }
+.en-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.en-tabs button { border: 1px solid var(--gray-3, #cfc8bd); background: var(--white, #fff); color: var(--navy);
+  border-radius: 20px; padding: 6px 14px; font-size: 0.88rem; cursor: pointer; min-height: 36px; user-select: none; }
+.en-tabs button.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.en-tabs small { opacity: 0.75; }
+.en-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.en-actions .btn { min-height: 40px; user-select: none; }
+.en-paper-wrap { background: #e7e2da; padding: 18px; border-radius: 10px; }
+/* A4 한 장 (794 × 1123px @96dpi) */
+.en-paper { background: #fff; color: #111; width: 100%; max-width: 794px; min-height: 1123px; margin: 0 auto;
+  box-sizing: border-box; padding: 70px 72px 40px; box-shadow: 0 3px 14px rgba(0,0,0,0.18);
+  font-family: 'Batang', '바탕', 'Nanum Myeongjo', 'Noto Serif KR', serif; font-size: 15px; line-height: 1.8;
+  display: flex; flex-direction: column; word-break: keep-all; }
+.en-paper .en-h1, .en-paper .en-h2, .en-paper .en-meta, .en-paper .en-tbl th, .en-paper .en-sign, .en-paper .en-foot,
+.en-paper .en-org-pre, .en-paper .en-seal { font-family: 'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', sans-serif; }
+.en-h1 { text-align: center; font-size: 24px; font-weight: 700; letter-spacing: 1px; line-height: 1.4; }
+.en-h2 { text-align: center; font-size: 21px; line-height: 1.4; margin-bottom: 28px; }
+.en-meta { font-size: 15px; line-height: 1.65; padding-bottom: 12px; border-bottom: 1px solid #888; margin-bottom: 16px; }
+.en-lab { white-space: pre; }
+.en-p { display: flex; gap: 6px; margin: 2px 0 6px; }
+.en-p .n { flex: 0 0 auto; min-width: 20px; }
+.en-p .t { flex: 1 1 auto; min-width: 0; white-space: pre-wrap; }
+.en-below { text-align: center; margin: 10px 0 8px; white-space: pre; }
+.en-tbl { width: 100%; border-collapse: collapse; margin: 0 0 4px; font-size: 14px; }
+.en-tbl th, .en-tbl td { border: 1px solid #555; padding: 6px 8px; text-align: center; }
+.en-tbl th { background: #efeae2; font-weight: 600; }
+.en-note { font-size: 12.5px; color: #555; margin: 0 0 12px 6px; }
+.en-sign { margin-top: auto; padding-top: 40px; }
+.en-org { display: flex; justify-content: flex-end; align-items: center; gap: 10px; flex-wrap: wrap; }
+.en-org-pre { font-size: 12px; line-height: 1.25; text-align: center; }
+.en-org-name { font-family: 'Batang', '바탕', serif; font-size: 32px; font-weight: 700; letter-spacing: 8px; white-space: nowrap; }
+.en-seal { font-size: 15px; }
+.en-sealbox { width: 64px; height: 64px; border: 1.5px dashed #b03a3a; color: #b03a3a; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 12px; border-radius: 4px; }
+.en-sign-lines { width: max-content; margin: 12px 34px 0 auto; font-size: 16px; line-height: 1.85; }
+.en-foot { margin-top: 30px; border-top: 1px solid #999; padding-top: 8px; font-size: 11.5px; color: #555; text-align: center; line-height: 1.5; }
+@media (max-width: 600px) {
+  .en-paper-wrap { padding: 8px; }
+  .en-paper { padding: 26px 18px 20px; font-size: 13px; min-height: 0; }
+  .en-h1 { font-size: 18px; } .en-h2 { font-size: 16px; margin-bottom: 18px; }
+  .en-meta { font-size: 13px; }
+  .en-tbl { font-size: 12px; } .en-tbl th, .en-tbl td { padding: 4px 3px; }
+  .en-org-name { font-size: 22px; letter-spacing: 3px; }
+  .en-sign-lines { margin-right: 6px; font-size: 14px; }
+  .en-row { flex-wrap: wrap; }
+}
+@media print {
+  @page { size: A4; margin: 0; }
+  body * { visibility: hidden !important; }
+  #en-paper, #en-paper * { visibility: visible !important; }
+  #en-paper { position: absolute; left: 0; top: 0; width: 210mm; max-width: none; min-height: 296mm;
+    padding: 25mm 25mm 18mm; box-shadow: none; margin: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>총대 장로 임기 확인 · 공문</h1>
+    <div class="crumb">홈 &gt; 임원방 &gt; 총대 장로 임기 확인 · 공문</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="en-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261003e"></script>
+<script src="js/elder-notice.js?v=20261003e"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  SHSElderNotice.mountPage(document.getElementById('en-area'));
+});
+</script>
+</body>
+</html>

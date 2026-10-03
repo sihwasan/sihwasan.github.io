@@ -178,6 +178,21 @@
     sub.appendChild(a);   /* 맨 아래 자리 */
   }
 
+  /* 서기에게만 임원방 하위에 <총대 장로 임기 확인 · 공문>을 붙인다 (최고관리자는 관리를 위해 함께 본다).
+   * 정기노회 4주 전, 남은 임기 1년 미만 장로 총대의 교회에 보낼 공문 시안과 워드 내려받기. */
+  function addElderNoticeMenu() {
+    var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
+    if (!links.length) return;
+    var sub = links[0].parentNode.querySelector('.gnb-sub');
+    if (!sub || sub.querySelector('a[href="elder-notice.html"]')) return;
+    var a = document.createElement('a');
+    a.href = 'elder-notice.html';
+    a.textContent = '총대 장로 임기 확인 · 공문';
+    /* 출석코드 바로 위 (그 메뉴가 없으면 맨 아래) */
+    var qr = sub.querySelector('a[href="today.html#qr"]');
+    if (qr) sub.insertBefore(a, qr); else sub.appendChild(a);
+  }
+
   /* 회록서기(부회록서기)에게 임원방 하위에 <회의록 작성 안내>를 붙인다.
    * 총회 표준 회의록 작성 및 보존 규정을 정리한 안내와 샘플이다. */
   function addMinutesWriteMenu() {
@@ -562,7 +577,13 @@
             SHSCloud.init().then(function (c) {
               /* 정년이 지난 분을 언권회원으로 바꾸는 일도 같은 자리에서 한다 */
               c.rpc('apply_retirement').then(function () {}, function () {});
-              return c.rpc('run_reminders');
+              function quiet() {}
+              return Promise.all([
+                c.rpc('run_reminders').then(quiet, quiet),
+                /* 정기노회 4주 전 — 서기에게 총대 장로 임기 확인 알림
+                 * (111_elder_term_notice.sql 을 실행하기 전이면 조용히 건너뛴다) */
+                c.rpc('run_elder_term_notice').then(quiet, quiet)
+              ]);
             }).then(function () {
               loadUnread();
             }, function () {});
@@ -582,6 +603,7 @@
         if (p.role === 'clerk' || p.role === 'superadmin') {
           addProceedMenu();
           addAttendQrMenu();
+          addElderNoticeMenu();
         }
 
         /* 회의록 작성 매니저 — 회록서기만 (부회록서기는 열람만, 최고관리자 포함) */
@@ -682,6 +704,10 @@
     if (n.kind === '운영' && key.indexOf('handover-') === 0) {
       return 'dashboard.html';
     }
+    /* 정기노회 4주 전 총대 장로 임기 확인(111) — 서기의 공문 시안 화면으로 */
+    if (key.indexOf('elder-term-') === 0) {
+      return 'elder-notice.html';
+    }
     if (n.kind === '서류') {
       if (key.indexOf('docissue-') === 0) {
         return 'certificate.html?id=' + key.slice(9);
@@ -767,7 +793,7 @@
         '<strong class="nt-title">' + SHS.esc(n.title || '') + '</strong>' +
         '<span class="nt-body">' + SHS.esc(String(n.body || '').slice(0, 90)) + '</span>' +
         '<span class="nt-go">' +
-        (n.kind === '문의' ? '답장하기' : n.kind === '서류' ? '바로 가기' : '알림함에서 보기') +
+        (n.kind === '문의' ? '답장하기' : (n.kind === '서류' || n.kind === '총대 안내') ? '바로 가기' : '알림함에서 보기') +
         '</span>' +
         '</a>';
       setTimeout(function () { wrap.appendChild(card); }, i * 250);

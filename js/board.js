@@ -115,6 +115,8 @@ var SHSBoard = (function () {
       if (isSuper) cards += hubCard('dues', '상회비 전체', '관리 현황');
 
       box.innerHTML =
+        /* 서기 알림 카드 자리 — 정기노회 4주 전 총대 장로 임기 확인 (js/elder-notice.js) */
+        '<div id="hub-elder"></div>' +
         '<div id="hub-home" class="dash-hub">' +
         '<div class="hub-left">' +
         '<div id="hub-photo" class="hidden" style="margin-bottom:16px"></div>' +
@@ -175,6 +177,8 @@ var SHSBoard = (function () {
         document.querySelectorAll('.home-gallery').forEach(function (g2) {
           g2.classList.toggle('hidden', !!panel);
         });
+        var elderSlot = document.getElementById('hub-elder');
+        if (elderSlot) elderSlot.classList.toggle('hidden', !!panel);
         if (!panel) {
           document.getElementById('hub-detail').classList.add('hidden');
           document.getElementById('hub-home').classList.remove('hidden');
@@ -204,6 +208,9 @@ var SHSBoard = (function () {
           if (allSec) allSec.classList.toggle('hidden', b.dataset.mdt !== 'all');
         });
       });
+
+      /* 서기에게 — 정기노회 4주 전부터 남은 임기 1년 미만 장로 총대와 공문 안내 */
+      if (window.SHSElderNotice) SHSElderNotice.dashCard(document.getElementById('hub-elder'), user);
 
       /* 내 사진: 명단 카드에 올린 사진을 대시보드에도 보여 준다 */
       (function () {
