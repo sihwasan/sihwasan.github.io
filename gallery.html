@@ -21,6 +21,12 @@
 .alb-tools .btn-round.danger { border-color: #c0392b; color: #c0392b; background: #fff; }
 .alb-tools .btn-round.danger:hover { background: #fdf3f3; }
 .alb-tip { flex: 1 1 100%; font-size: 0.8rem; color: var(--gray-5); }
+.alb-form { margin-top: 12px; padding: 14px; border: 1px solid var(--gray-3); border-radius: 10px; background: var(--gray-1, #f7f7f7); }
+.alb-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--gray-5); margin-bottom: 10px; flex: 1 1 180px; }
+.alb-form input { padding: 9px 10px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; font-family: inherit; min-height: 40px; }
+.alb-form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.alb-form-btns { display: flex; gap: 8px; }
+.alb-form-btns .btn-round { padding: 8px 18px; font-size: 0.88rem; }
 .alb-coverbox { margin: 0 0 16px; border-radius: 12px; overflow: hidden; position: relative; background: #000; }
 .alb-coverbox img { display: block; width: 100%; max-height: 420px; object-fit: contain; cursor: zoom-in; }
 .alb-coverbox span { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.6); color: #fff; font-size: 0.75rem; padding: 3px 10px; border-radius: 99px; }
@@ -81,11 +87,23 @@
       <h2 id="alb-title"></h2>
       <div class="d" id="alb-sub"></div>
       <div class="alb-tools hidden" id="alb-tools">
+        <button type="button" class="btn-round" id="alb-edit">앨범 정보 수정</button>
         <button type="button" class="btn-round" id="alb-cover">대표사진 올리기</button>
         <button type="button" class="btn-round danger" id="alb-del">앨범 삭제</button>
         <input type="file" id="alb-cover-file" accept="image/*" class="hidden">
         <div class="alb-tip" id="alb-tip"></div>
       </div>
+      <form class="alb-form hidden" id="alb-form">
+        <label>앨범 이름<input type="text" id="ae-title" maxlength="120" required></label>
+        <div class="alb-form-row">
+          <label>날짜<input type="date" id="ae-date"></label>
+          <label>카테고리<input type="text" id="ae-cat" list="up-cat-list" maxlength="30" autocomplete="off"></label>
+        </div>
+        <div class="alb-form-btns">
+          <button type="submit" class="btn-round solid" id="ae-save">저장</button>
+          <button type="button" class="btn-round" id="ae-cancel">취소</button>
+        </div>
+      </form>
     </div>
     <div class="alb-coverbox hidden" id="alb-coverbox"></div>
     <div class="alb-photos" id="alb-photos"></div>
@@ -464,6 +482,8 @@ document.addEventListener('DOMContentLoaded', function () {
     cb.innerHTML = ex ? '<img src="' + e(ex.image_url) + '" alt="대표사진"><span>대표사진</span>' : '';
     if (ex) cb.querySelector('img').addEventListener('click', function () { openLb([ex], 0); });
     var mine = albumMine(a);
+    document.getElementById('alb-form').classList.add('hidden');
+    document.getElementById('alb-edit').classList.toggle('hidden', mine.length < albumAll(a).length);
     var tools = document.getElementById('alb-tools');
     tools.classList.toggle('hidden', !(canManage || mine.length));
     document.getElementById('alb-tip').textContent = canManage ? '' :
@@ -488,6 +508,60 @@ document.addEventListener('DOMContentLoaded', function () {
   function albumAll(a) { return a.photos.concat(a.extra || []); }
   function albumMine(a) { return albumAll(a).filter(canFix); }
   function busyBtn(b, on, txt) { b.disabled = on; if (txt) b.textContent = txt; }
+
+  /* 앨범 정보 수정 — 앨범은 같은 이름의 사진 묶음이므로 사진 모두의 이름 · 날짜 · 분류를 함께 바꾼다.
+   * 다른 분 사진이 섞여 있으면 반만 바뀌어 앨범이 둘로 갈라지므로 관리자만 고친다. */
+  function editAlbum() {
+    var a = curAlb;
+    if (!a) return;
+    document.getElementById('ae-title').value = a.title;
+    document.getElementById('ae-date').value = /^\d{4}-\d{2}-\d{2}$/.test(a.taken || '') ? a.taken : '';
+    document.getElementById('ae-cat').value = a.category || '';
+    var f = document.getElementById('alb-form');
+    f.classList.remove('hidden');
+    document.getElementById('ae-title').focus();
+  }
+  function saveAlbum(ev) {
+    ev.preventDefault();
+    var a = curAlb;
+    if (!a) return;
+    var all = albumAll(a);
+    if (albumMine(a).length < all.length) { alert('다른 분이 올린 사진이 섞여 있어 관리자만 고칠 수 있습니다.'); return; }
+    var t = document.getElementById('ae-title').value.trim().replace(/\s+/g, ' ');
+    var d = document.getElementById('ae-date').value || a.taken || null;
+    var cat = (document.getElementById('ae-cat').value || '').trim().replace(/\s+/g, ' ').slice(0, 30) || '기타';
+    if (!t) { alert('앨범 이름을 적어 주세요.'); return; }
+    if (t === a.title && d === a.taken && cat === a.category) { document.getElementById('alb-form').classList.add('hidden'); return; }
+    var other = t !== a.title && albums.filter(function (x) { return x.title === t; })[0];
+    if (other && !confirm('「' + t + '」 앨범이 이미 있습니다. 이 앨범의 사진 ' + a.photos.length + '장이 그 앨범으로 합쳐집니다. 합칠까요?')) return;
+    var btn = document.getElementById('ae-save');
+    busyBtn(btn, true, '저장 중...');
+    var ids = all.map(function (p) { return p.id; });
+    var chunks = [];
+    for (var i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+    var patch = { title: t, taken: d, category: cat };
+    SHSCloud.init().then(function (c) {
+      return chunks.reduce(function (pr, ch) {
+        return pr.then(function () {
+          return c.from('gallery_items').update(patch).in('id', ch).then(function (r) { if (r.error) throw r.error; });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      SHSCloud.log('update', '갤러리 앨범 정보 수정', a.title + ' → ' + t);
+      busyBtn(btn, false, '저장');
+      document.getElementById('alb-form').classList.add('hidden');
+      reopenTitle = t;
+      load(true);
+    }).catch(function (err) {
+      busyBtn(btn, false, '저장');
+      alert('저장하지 못했습니다: ' + (err.message || err));
+      load(true);
+    });
+  }
+  var reopenTitle = null;   /* 고친 뒤 새 이름으로 앨범 창을 다시 연다 */
+  document.getElementById('alb-edit').addEventListener('click', editAlbum);
+  document.getElementById('alb-form').addEventListener('submit', saveAlbum);
+  document.getElementById('ae-cancel').addEventListener('click', function () { document.getElementById('alb-form').classList.add('hidden'); });
 
   /* 앨범 삭제 — 지울 수 있는 사진을 모두 지우고 보관소 파일도 함께 지운다 */
   function deleteAlbum() {
@@ -1222,6 +1296,7 @@ document.addEventListener('DOMContentLoaded', function () {
       renderAlbums();
       renderVideos();
       openLinkedPhoto();
+      if (reopenTitle) { var rt = reopenTitle; reopenTitle = null; openAlbum(rt); }
       if (keepFeed && document.getElementById('feed-mdl').classList.contains('open')) renderFeed();
     }).catch(function () {
       items = SHSData.gallery.map(function (g, i) {
