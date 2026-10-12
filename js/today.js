@@ -105,7 +105,10 @@
   function myVeteran() {
     return (S.my && S.my.honor) || (S.me && S.me.veteran) || null;
   }
+  /* 정회 뒤 속회하면 새 QR로 다시 입장해야 현장에 있는 것으로 센다 (112_meeting_admin.sql) */
+  function present() { return !(S.my && S.my.present === false); }
   function canVote(me) {
+    if (!present()) return false;
     var s = mySeat();
     if (s === undefined) return !!me.full;            /* 옛 서버 */
     return s === 'vote' && !(S.my && S.my.full_member === false);
@@ -298,22 +301,89 @@
     }, live ? 3000 : 10000);
   }
 
+  /* 서버 오류를 알기 쉬운 말로 — 새 기능의 서버 파일을 아직 실행하지 않았을 때 */
+  function errText(err) {
+    var t = (err && err.message) || '처리하지 못했습니다.';
+    if (/schema cache|does not exist|Could not find the function/i.test(t)) {
+      return '이 기능은 서버 갱신이 필요합니다.\n관리자가 supabase/112_meeting_admin.sql 을 Supabase SQL Editor에서 실행하면 쓸 수 있습니다.';
+    }
+    return t;
+  }
   /* 단추 하나로 서버 일을 한 번만 시킨다 (중복 제출 막기) */
   function run(btn, fn, args, after) {
-    if (busy) return;
+    if (busy) return Promise.resolve(false);
     busy = true;
     var old = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = '처리 중…'; }
-    C.rpc(fn, args).then(function (r) {
+    return C.rpc(fn, args).then(function (r) {
       busy = false;
       if (btn) { btn.disabled = false; btn.textContent = old; }
-      if (r.error) { alert(r.error.message || '처리하지 못했습니다.'); return; }
+      if (r.error) { alert(errText(r.error)); return false; }
       if (after) after(r.data);
-      return refresh();
+      return refresh().then(function () { return true; });
     }, function () {
       busy = false;
       if (btn) { btn.disabled = false; btn.textContent = old; }
       alert('서버에 연결하지 못했습니다. 잠시 뒤 다시 눌러 주세요.');
+      return false;
+    });
+  }
+
+  /* ---------- 회의 진행 순서지 (js/proceed-panel.js) ----------
+   * 서기는 오늘의 노회 화면에서 순서지를 진행하면서 그 자리에서 전자투표를 올린다.
+   * 순서지의 정회 · 속회는 오늘의 노회의 정회 · 속회(새 QR)와 함께 움직인다. */
+  var proc = null, procKey = null;
+  function mountProc(m, me) {
+    var box = document.getElementById('ta-proc');
+    if (!box) return;
+    var want = !listMode() && m && me && me.mgr && m.status !== 'closed' && window.SHSProceed && window.SHS && SHS.getUser;
+    if (!want) { box.hidden = true; return; }
+    box.hidden = false;
+    var key = m.id + ':' + (m.session_no || '');
+    if (procKey === key) return;
+    procKey = key;
+    box.innerHTML = '<div class="ta-card ta-admin ta-proccard"><div class="ta-role">서기</div>' +
+      '<h3>회의 진행 — 순서지</h3>' +
+      '<div class="ta-sub">순서를 하나씩 완료하며 진행합니다. 안건마다 <strong>투표 올리기</strong>를 누르면 위 전자투표 칸에 주제가 채워집니다. ' +
+      '정회 · 속회를 누르면 출석 QR도 함께 바뀝니다.</div><div id="ta-proc-in"></div></div>';
+    SHS.getUser().then(function (u) {
+      proc = SHSProceed.mount(document.getElementById('ta-proc-in'), u || { name: me.name }, {
+        sessionNo: m.session_no, embed: true,
+        onVote: procVote,
+        onPause: function () { return doRecess(null); },
+        onResume: function () { return doResume(null); }
+      });
+    });
+  }
+  function procVote(title) {
+    if (S.vote && S.vote.status === '진행') { alert('진행 중인 투표가 있습니다. 먼저 종료해 주세요.'); return; }
+    var inp = document.getElementById('ta-vtitle');
+    if (!inp) { alert(S.meeting && S.meeting.recess ? '정회 중에는 투표를 올릴 수 없습니다.' : '지금은 투표를 올릴 수 없습니다.'); return; }
+    inp.value = title;
+    inp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    inp.focus({ preventScroll: true });
+  }
+  /* btn 이 있으면 서기 칸의 단추로 누른 것 — 순서지 상태도 맞춘다.
+   * btn 이 없으면 순서지에서 누른 것 — 순서지가 스스로 상태를 바꾼다. */
+  function doRecess(btn) {
+    var m = S.meeting;
+    if (!m) return Promise.resolve(false);
+    if (!confirm('정회합니다.\n정회 중에는 투표를 올릴 수 없고, 속회할 때 새 출석 QR 코드로 다시 입장을 받습니다.')) return Promise.resolve(false);
+    return run(btn, 'assembly_recess', { p_meeting: m.id }).then(function (ok) {
+      if (ok && proc && btn) proc.setStatus('정회');
+      return ok;
+    });
+  }
+  function doResume(btn) {
+    var m = S.meeting;
+    if (!m) return Promise.resolve(false);
+    if (!confirm('속회합니다.\n출석 QR 코드가 새로 바뀝니다. 회의장에 새 QR을 띄우고, 회원들이 새 QR을 찍어 다시 입장하게 해 주세요.\n(정회 전 QR 코드는 더 이상 쓸 수 없습니다)')) return Promise.resolve(false);
+    return run(btn, 'assembly_resume', { p_meeting: m.id }).then(function (ok) {
+      if (ok) {
+        if (proc && btn) proc.setStatus('진행');
+        openQr(null);
+      }
+      return ok;
     });
   }
 
@@ -323,6 +393,7 @@
     if (listMode()) {
       ['ta-head', 'ta-gate', 'ta-my', 'ta-vote', 'ta-tre', 'ta-hist'].forEach(function (id) { paint(id, ''); });
       renderList();
+      mountProc(null, me);
       return;
     }
     placeOrder(m, me);
@@ -337,6 +408,7 @@
     renderVote(m, me);
     renderClerk(m, me);
     renderTre(m, me);
+    mountProc(m, me);
     tick();
   }
 
@@ -371,7 +443,8 @@
 
   function renderHead(m) {
     if (!m) { paint('ta-head', ''); return; }
-    var st = m.status === 'open' ? '<span class="ta-badge live">입장 중</span>'
+    var st = m.recess && m.status !== 'closed' ? '<span class="ta-badge live">정회 중</span>'
+           : m.status === 'open' ? '<span class="ta-badge live">입장 중</span>'
            : m.status === 'confirmed' ? '<span class="ta-badge on">회의 진행 중 · 명단 확정</span>'
            : '<span class="ta-badge">마친 노회</span>';
     paint('ta-head', '<div class="ta-card ta-headcard">' +
@@ -392,6 +465,15 @@
       h = '<div class="ta-card ta-center"><h3>지금 열려 있는 노회가 없습니다</h3>' +
         '<p>노회 당일, 화면이나 순서지에 있는 <strong>QR 코드</strong>를 휴대전화 카메라로 찍어 주세요.</p>' +
         '<p class="ta-sub"><a href="app.html">회원 가입 · 앱 설치 안내 보기</a></p></div>';
+    } else if (S.entered && m.status !== 'closed' && m.recess) {
+      h = '<div class="ta-card ta-center ta-recess"><h3>정회 중입니다</h3>' +
+        '<p>잠시 쉬었다가 속회합니다.<br>속회하면 회의장에 <strong>새 출석 QR 코드</strong>가 나옵니다.<br>' +
+        '그 QR 코드를 찍어 <strong>다시 입장</strong>해야 투표에 참여할 수 있습니다.</p></div>';
+    } else if (S.entered && m.status !== 'closed' && !present()) {
+      h = '<div class="ta-card ta-center ta-recess"><h3>속회되었습니다 — 다시 입장해 주세요</h3>' +
+        '<p>정회 뒤에는 회의장에 계신 분만 투표할 수 있습니다.<br>' +
+        '아래 <strong>다시 입장하기</strong>를 누르고 회의장의 <strong>새 출석 QR 코드</strong>를 찍어 주세요.</p>' +
+        '<button class="btn ta-bigbtn" data-act="enter">다시 입장하기</button></div>';
     } else if (!S.entered && m.status !== 'closed') {
       if (!dayOpen) {
         var nd = nextDay && nextDay.meet_date ? String(nextDay.meet_date).split('-') : null;
@@ -505,7 +587,7 @@
         /* 무기명은 진행 중 상황(투표 인원)을 누구에게도 보이지 않는다 */
         if (v.mode === '기명' && v.cast != null) {
           h += '<div class="ta-sub">지금까지 ' + v.cast + '명 투표' +
-            (S.counts ? ' / 재석 정회원 ' + S.counts.full + '명' : '') + '</div>';
+            (S.counts ? ' / 재석(현장) 정회원 ' + S.counts.full + '명' : '') + '</div>';
         } else {
           h += '<div class="ta-sub">무기명 투표 — 진행 중에는 투표 상황이 공개되지 않으며, 종료 후 결과만 발표됩니다.</div>';
         }
@@ -516,6 +598,9 @@
             '<button class="ta-vbtn no" data-act="cast" data-choice="반대">반대</button></div>' +
             (v.mode === '기명' ? '<div class="ta-sub">기명 투표입니다 — 누가 어떻게 투표했는지 결과에 표시됩니다.</div>'
                                : '<div class="ta-sub">무기명 투표입니다 — 누가 어떻게 투표했는지 어디에도 기록되지 않으며, 서기도 알 수 없습니다.</div>');
+        } else if (S.entered && !present()) {
+          h += '<div class="ta-done">속회 후 새 QR 코드로 <strong>다시 입장</strong>해야 투표할 수 있습니다.' +
+            '<div class="ta-btnrow" style="justify-content:center"><button class="btn" data-act="enter">다시 입장하기</button></div></div>';
         } else if (S.entered) h += '<div class="ta-done">' + e(voteNote()) + '</div>';
         else h += '<div class="ta-done">입장한 정회원(목사·총대 장로)만 투표할 수 있습니다.</div>';
         if (me.mgr) h += '<button class="btn danger ta-endbtn" data-act="vend" data-id="' + v.id + '">투표 종료하기</button>';
@@ -602,7 +687,9 @@
     if (!me.mgr || ((!m || m.status === 'closed') && !isClerk(me))) { paint('ta-clerk', ''); return; }
     var h = '<div class="ta-card ta-admin"><div class="ta-role">서기</div>' +
       (isClerk(me) ? '<div class="ta-back"><button class="btn ghost sm" data-act="tolist">← 회기 목록</button></div>' : '');
-    if (!m || m.status === 'closed') {
+    if (m && m.status === 'closed') {
+      h += closedPart(m, me, voted);
+    } else if (!m) {
       var d = new Date(now());
       var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
       h += '<h3 id="qr">정기노회 출석코드 생성하기</h3>' +
@@ -611,8 +698,6 @@
         '<label>노회 이름<input data-keep="otitle" id="ta-otitle" placeholder="예: 제20회 정기노회" maxlength="60"></label>' +
         '<label>날짜<input data-keep="odate" id="ta-odate" type="date" value="' + ds + '"></label>' +
         '<button class="btn" type="submit">출석코드 생성</button></form>' + guideBox();
-      if (m && !voted) h += '<div class="ta-btnrow ta-end"><button class="btn danger sm" data-act="delete">마친 「' + e(m.title) +
-        '」 기록 지우기</button></div>';
     } else {
       var c = S.counts || {};
       var base = h; h = '';
@@ -642,9 +727,29 @@
       h += tableHtml(list, m);
 
       var listPart = h; h = '';
+      /* 정회 · 속회 — 속회하면 새 QR 코드로 다시 입장 (현장에 있는 분만 투표) */
+      var rc = '';
+      if (m.status !== 'open' || m.round > 1 || m.recess) {
+        rc += '<h3>정회 · 속회</h3>';
+        if (m.recess) {
+          rc += '<div class="ta-recessbar"><strong>정회 중</strong> · ' + hm(m.recess_at) + '부터' +
+            '<div class="ta-sub">속회를 누르면 출석 QR 코드가 새로 바뀝니다. 회원들은 새 QR을 찍어 다시 입장해야 투표할 수 있습니다.</div>' +
+            '<div class="ta-btnrow"><button class="btn ta-bigbtn" data-act="resume">속회 — 새 QR 코드 만들기</button></div></div>';
+        } else {
+          rc += '<div class="ta-btnrow"><button class="btn ghost" data-act="recess">정회</button></div>' +
+            '<div class="ta-sub">정회하면 투표를 올릴 수 없고, 속회 때 새 QR 코드로 다시 입장을 받습니다.</div>';
+        }
+        if (m.round > 1) {
+          rc += '<div class="ta-sub">속회 ' + (m.round - 1) + '번 · 지금 현장(새 QR로 입장) <strong>' + (c.present || 0) +
+            '</strong>명 · 다시 입장 전 <strong>' + (c.away || 0) + '</strong>명 · 현장 표결 회원 ' + (c.full || 0) + '명</div>';
+        }
+      }
+      var recessPart = rc;
       /* 투표 */
       h += '<h3>전자투표</h3>';
-      if (S.vote && S.vote.status === '진행') {
+      if (m.recess) {
+        h += '<div class="ta-sub">정회 중에는 투표를 올릴 수 없습니다. 속회한 뒤 새 QR로 다시 입장을 받고 투표해 주세요.</div>';
+      } else if (S.vote && S.vote.status === '진행') {
         h += '<div class="ta-sub">「' + e(S.vote.title) + '」 투표가 진행 중입니다. 위 투표 상자의 <strong>투표 종료하기</strong>를 누르면 10초 뒤 결과가 나옵니다.</div>';
       } else {
         h += '<form class="ta-form" data-form="vote">' +
@@ -657,32 +762,59 @@
           '<button class="btn" type="submit">투표하기</button>' +
           '<button class="btn ghost" type="button" data-act="vtest">테스트 투표하기</button></form>' +
           '<div class="ta-sub">「테스트 투표하기」는 본 투표 전에 회원들이 연습해 보는 투표입니다. 주제를 비워 두면 「테스트 투표」로 올라가고, 결과는 기록에 남지 않습니다.</div>' +
-          '<div class="ta-sub">입장한 정회원(' + (c.full || 0) + '명)만 투표할 수 있습니다.</div>';
+          '<div class="ta-sub">지금 현장에 입장해 있는 표결 회원(' + (c.full || 0) + '명)만 투표할 수 있습니다.</div>';
       }
       /* 입장 받는 동안: QR → 명단·확정 → 투표
        * 명단 확정 뒤  : 투표 → 확정 명단 → QR(접어 둠) */
       var votePart = h;
+      /* 속회 직후(정회 뒤 새 QR)는 QR을 맨 위에 펼쳐 둔다 */
+      var freshQr = m.recess || (m.round > 1 && (c.away || 0) > 0);
       h = base + (m.status === 'open'
-        ? qrPart + listPart + votePart
-        : votePart + listPart + '<details class="ta-fold"><summary>출석 QR 코드 다시 보기</summary>' + qrPart + '</details>');
+        ? qrPart + listPart + recessPart + votePart
+        : freshQr
+          ? recessPart + qrPart + votePart + listPart
+          : recessPart + votePart + listPart + '<details class="ta-fold"><summary>출석 QR 코드 다시 보기</summary>' + qrPart + '</details>');
       h += '<div class="ta-btnrow ta-end">' +
         (isClerk(me) && !voted ? '<button class="btn danger" data-act="delete">QR 코드 지우기</button>' : '') +
         '<button class="btn ghost" data-act="close">노회 마치기</button></div>' +
+        (m.status === 'open' ? '<div class="ta-sub" style="text-align:right">노회를 마치려면 먼저 출석자 명단을 확정해야 합니다.</div>' : '') +
         (isClerk(me) && voted ? '<div class="ta-sub" style="text-align:right">회의에서 표결된 기록이 있어 이 노회의 기록은 영구 보존됩니다. (삭제 불가)</div>' : '') +
         (isClerk(me) && !voted ? '<div class="ta-sub" style="text-align:right">「QR 코드 지우기」는 연습으로 만든 노회를 입장 명단·투표·거마비 기록까지 모두 지웁니다.</div>' : '');
     }
     paint('ta-clerk', h + '</div>');
   }
 
-  function tableHtml(list, m) {
+  /* 마친 노회 — 확정 명단을 확인하고, 잘못 마쳤으면 다시 연다 */
+  function closedPart(m, me, voted) {
+    var list = S.attendees || [];
+    var conf = list.filter(function (a) { return a.confirmed; }).length;
+    var h = '<h3>마친 노회 — ' + e(m.title) + '</h3>';
+    if (!m.confirmed_at) {
+      h += '<div class="ta-warn"><strong>출석자 명단이 확정되지 않은 채 마친 노회입니다.</strong>' +
+        '<div class="ta-sub">아래 「다시 열기」를 누른 뒤 「명단 확정하기」를 눌러 주세요. 다시 열어도 입장 기록 ' + list.length + '명은 그대로 있습니다.</div></div>';
+    } else {
+      h += '<div class="ta-sub">' + ymdhm(m.confirmed_at) + ' 명단 확정 · 확정 명단 ' + conf + '명 (입장 ' + list.length + '명)</div>';
+    }
+    if (isClerk(me)) {
+      h += '<div class="ta-btnrow"><button class="btn' + (m.confirmed_at ? ' ghost' : '') + '" data-act="reopen">다시 열기 (노회 마치기 되돌리기)</button>' +
+        '<a class="btn ghost" href="meeting-admin.html?m=' + m.id + '">회의관리에서 보기</a></div>';
+    }
+    h += '<details class="ta-fold"' + (m.confirmed_at ? '' : ' open') + '><summary>출석자 명단 ' + list.length + '명</summary>' + tableHtml(list, m, true) + '</details>';
+    if (!voted && isClerk(me)) h += '<div class="ta-btnrow ta-end"><button class="btn danger sm" data-act="delete">마친 「' + e(m.title) + '」 기록 지우기</button></div>';
+    return h;
+  }
+
+  function tableHtml(list, m, ro) {
     if (!list.length) return '<div class="ta-empty">아직 입장한 사람이 없습니다 — QR 코드를 화면에 띄워 주세요.</div>';
     return '<div class="ta-tablewrap"><table class="ta-table"><thead><tr><th>번호</th><th>이름</th><th>교회</th><th>구분</th><th>입장</th><th></th></tr></thead><tbody>' +
       list.map(function (a, i) {
-        return '<tr' + (a.confirmed || m.status === 'open' ? '' : ' class="late"') + '><td>' + (i + 1) + '</td>' +
+        var lateRow = !a.confirmed && m.status !== 'open' && !!m.confirmed_at;   /* 확정한 뒤에 들어온 분 */
+        return '<tr' + (lateRow ? ' class="late"' : '') + '><td>' + (i + 1) + '</td>' +
           '<td><strong>' + e(a.name || '') + '</strong> ' + e(a.position || '') + '</td><td>' + e(a.church || '') + '</td>' +
           '<td>' + e(a.grade || '') + (a.honor ? ' <span class="ta-badge">증경부노회장</span>' : '') + '</td><td>' + hm(a.entered_at) +
-          (a.confirmed || m.status === 'open' ? '' : ' <span class="ta-badge">확정 뒤</span>') + '</td>' +
-          '<td>' + (a.allow_status ? '' : '<button class="btn ghost sm" data-act="remove" data-id="' + a.id +
+          (a.present === false ? ' <span class="ta-badge live">다시 입장 전</span>' : a.reentered_at ? ' <span class="ta-badge on">재입장 ' + hm(a.reentered_at) + '</span>' : '') +
+          (lateRow ? ' <span class="ta-badge">확정 뒤</span>' : '') + '</td>' +
+          '<td>' + (a.allow_status || ro ? '' : '<button class="btn ghost sm" data-act="remove" data-id="' + a.id +
             '" data-name="' + e(a.name || '') + '">빼기</button>') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
   }
@@ -957,8 +1089,33 @@
       if (confirm(b.getAttribute('data-name') + ' 님을 명단에서 뺍니다.')) run(b, 'assembly_attendee_remove', { p_id: id });
     }
     else if (act === 'close') {
-      if (confirm('노회를 마칩니다. 더 이상 입장·투표를 할 수 없습니다.\n(거마비 수령 확인은 계속할 수 있습니다)')) run(b, 'assembly_close', { p_meeting: m.id });
+      /* 출석자 명단을 확정하지 않고는 마칠 수 없다 (제20회 — 확정 없이 마쳐 명단이 비었던 일) */
+      if (m.status === 'open') {
+        alert('출석자 명단을 아직 확정하지 않았습니다.\n「명단 확정하기」를 먼저 눌러 주세요. 확정한 뒤에 노회를 마칠 수 있습니다.');
+        var cb = document.querySelector('[data-act="confirm"]');
+        if (cb) cb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      var lateN = (S.attendees || []).filter(function (a) { return !a.confirmed; }).length;
+      if (lateN) {
+        alert('확정 뒤에 입장한 ' + lateN + '명이 아직 명단에 들어가지 않았습니다.\n「명단에 넣기」를 먼저 눌러 주세요.');
+        return;
+      }
+      if (S.vote && S.vote.status === '진행') { alert('진행 중인 투표를 먼저 종료해 주세요.'); return; }
+      var cc = S.counts || {};
+      if (confirm('노회를 마칩니다.\n\n확정 명단 ' + (cc.c_total || 0) + '명 (목사 ' + (cc.c_pastor || 0) + ' · 장로 총대 ' + (cc.c_elder || 0) + ')' +
+                  '\n\n마친 뒤에는 입장·투표를 할 수 없습니다. (거마비 수령 확인은 계속할 수 있습니다)\n잘못 마쳤으면 「다시 열기」로 되돌릴 수 있습니다.')) {
+        run(b, 'assembly_close', { p_meeting: m.id });
+      }
     }
+    else if (act === 'reopen') {
+      if (confirm('「' + m.title + '」을(를) 다시 엽니다.\n' + (m.confirmed_at ? '명단 확정 상태로 돌아가 회의를 이어 갈 수 있습니다.'
+                                                         : '입장 받는 상태로 돌아갑니다. 「명단 확정하기」를 눌러 출석자 명단을 확정해 주세요.'))) {
+        run(b, 'assembly_reopen', { p_meeting: m.id }, function () { cache = {}; procKey = null; });
+      }
+    }
+    else if (act === 'recess') doRecess(b);
+    else if (act === 'resume') doResume(b);
     else if (act === 'pick') { setSel(id); cache = {}; refresh(); }
     else if (act === 'tolist') { setSel(null); if (location.hash !== '#qr') history.replaceState(null, '', location.pathname + location.search + '#qr'); cache = {}; refresh(); }
     else if (act === 'delete') {

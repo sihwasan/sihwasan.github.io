@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노회 회의관리 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261003a">
+<style>
+.ma-boxes { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin: 14px 0 22px; }
+.ma-box { background: #fff; border: 1px solid var(--gray-3); border-radius: 12px; padding: 16px; cursor: pointer; text-align: left; font-family: inherit; font-size: 0.9rem; color: inherit; }
+.ma-box:hover, .ma-box:focus-visible { border-color: var(--navy); box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.ma-box.today { border: 2px solid var(--navy); }
+.ma-box-no { font-family: 'Noto Serif KR', serif; font-size: 1.45rem; font-weight: 700; color: var(--navy); }
+.ma-box-t { font-weight: 700; margin: 2px 0 6px; }
+.ma-sub { font-size: 0.84rem; color: var(--gray-5); line-height: 1.6; }
+.ma-badge { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 0.76rem; background: var(--gray-1); color: var(--gray-5); border: 1px solid var(--gray-3); margin: 0 4px 4px 0; white-space: nowrap; }
+.ma-badge.live { background: #fdf3f3; color: var(--red); border-color: var(--red); }
+.ma-badge.on { background: #eef6ee; color: #1f7a3a; border-color: #8cc79d; }
+.ma-badge.warn { background: #fff3cd; color: #7a5a00; border-color: #e0c97a; }
+.ma-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px; }
+.ma-head h2 { font-family: 'Noto Serif KR', serif; margin: 0; font-size: 1.5rem; }
+.ma-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 2px solid var(--gray-3); margin: 16px 0 18px; }
+.ma-tabs button { border: 0; background: none; padding: 10px 16px; font-size: 0.95rem; font-family: inherit; color: var(--gray-5); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; min-height: 44px; }
+.ma-tabs button.on { color: var(--navy); font-weight: 700; border-bottom-color: var(--navy); }
+.ma-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 16px; }
+.ma-card { background: var(--gray-1); border-radius: 10px; padding: 12px 14px; }
+.ma-card span { display: block; font-size: 0.78rem; color: var(--gray-5); }
+.ma-card strong { font-size: 1.5rem; color: var(--navy); }
+.ma-warn { padding: 14px 16px; border: 2px solid var(--red); border-radius: 10px; background: #fdf3f3; color: var(--red); margin: 10px 0; }
+.ma-warn .ma-sub { color: var(--gray-7, #555); }
+.ma-btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.ma-filter { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 8px; }
+.ma-filter button { border: 1px solid var(--gray-3); background: #fff; border-radius: 99px; padding: 5px 12px; font-size: 0.82rem; cursor: pointer; font-family: inherit; min-height: 32px; }
+.ma-filter button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.ma-tblwrap { overflow-x: auto; }
+.ma-tbl { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.ma-tbl th, .ma-tbl td { padding: 7px 6px; border-bottom: 1px solid var(--gray-3); text-align: left; white-space: nowrap; }
+.ma-tbl th { background: var(--gray-1); font-size: 0.78rem; color: var(--gray-5); }
+.ma-tbl tr.late td { background: #fffaf0; }
+.ma-vote { border: 1px solid var(--gray-3); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; background: #fff; }
+.ma-vote.test { border-style: dashed; opacity: .75; }
+.ma-vote h4 { margin: 4px 0 6px; font-size: 1.05rem; }
+.ma-verdict { display: inline-block; font-weight: 700; padding: 2px 12px; border-radius: 8px; color: #fff; }
+.ma-verdict.pass { background: #1f7a3a; } .ma-verdict.fail { background: var(--red); }
+.ma-ro { padding: 8px 12px; border-radius: 8px; background: #eef3fb; color: var(--navy); font-size: 0.88rem; margin-bottom: 12px; }
+@media print {
+  .page-head, .ma-tabs, .ma-btnrow, .ma-filter, .ma-noprint, header, footer, nav { display: none !important; }
+  .ma-tbl th, .ma-tbl td { font-size: 10pt; padding: 3pt 4pt; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>노회 회의관리</h1>
+    <div class="crumb">홈 &gt; 임원방 &gt; 노회 회의관리</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="ma-root"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261013a"></script>
+<script src="js/proceed-panel.js?v=20261013a"></script>
+<script src="js/meeting-admin.js?v=20261013a"></script>
+</body>
+</html>

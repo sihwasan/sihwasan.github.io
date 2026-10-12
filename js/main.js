@@ -165,6 +165,21 @@
     else sub.insertBefore(a, sub.firstChild);
   }
 
+  /* 서기 · 부서기에게 임원방 하위에 <노회 회의관리>를 붙인다.
+   * 회기를 누르면 출결 · 투표 · 회의 진행 · 거마비를 한곳에서 본다 (서기 입력, 부서기 열람). */
+  function addMeetingAdminMenu() {
+    var links = document.querySelectorAll('.gnb-item > a[href="officer.html"]');
+    if (!links.length) return;
+    var sub = links[0].parentNode.querySelector('.gnb-sub');
+    if (!sub || sub.querySelector('a[href="meeting-admin.html"]')) return;
+    var a = document.createElement('a');
+    a.href = 'meeting-admin.html';
+    a.textContent = '노회 회의관리';
+    /* 노회 진행 매니저 바로 앞 (없으면 맨 위) */
+    var proceed = sub.querySelector('a[href="proceed.html"]');
+    if (proceed) sub.insertBefore(a, proceed); else sub.insertBefore(a, sub.firstChild);
+  }
+
   /* 서기에게만 임원방 하위 맨 아래에 <정기노회 출석코드 생성하기>를 붙인다.
    * (최고관리자는 관리를 위해 함께 본다) 미리 QR을 만들어 두면 노회 날 첫 화면이 「오늘의 노회」로 바뀐다. */
   function addAttendQrMenu() {
@@ -603,6 +618,11 @@
         if (p.role === 'clerk' || p.role === 'superadmin') {
           addProceedMenu();
           addAttendQrMenu();
+        }
+        /* 노회 회의관리 — 서기(입력) · 부서기(열람), 최고관리자 포함 */
+        if (p.role === 'clerk' || p.role === 'superadmin' ||
+            (p.role === 'officer' && p.title && p.title.trim() === '부서기')) {
+          addMeetingAdminMenu();
         }
         /* 총대 장로 임기 확인 · 공문 — 노회장·서기·간사 (최고관리자 포함) */
         if (p.role === 'president' || p.role === 'clerk' || p.role === 'staff' || p.role === 'superadmin') {
