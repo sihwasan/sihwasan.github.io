@@ -15,6 +15,9 @@
 <meta property="og:locale" content="ko_KR">
 <link rel="stylesheet" href="css/style.css?v=20260921j">
 <style>
+.vt-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.vt-row .btn-round { padding: 8px 16px; font-size: 0.86rem; min-height: 38px; }
+.vid-thumbbtn { position: absolute; top: 8px; left: 8px; border: none; cursor: pointer; background: rgba(0,0,0,.55); color: #fff; border-radius: 8px; padding: 2px 9px; font-size: 0.74rem; }
 /* 앨범 관리 — 대표사진 · 앨범 삭제 (올린 사람 · 관리자) */
 .alb-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 .alb-tools .btn-round { padding: 8px 16px; font-size: 0.86rem; min-height: 38px; }
@@ -170,8 +173,17 @@
         <label>날짜</label>
         <input type="date" id="up-vdate">
       </div>
+      <div class="field">
+        <label>썸네일 (선택)</label>
+        <div class="vt-row">
+          <button type="button" class="btn-round" id="up-vtpick">썸네일 그림 고르기</button>
+          <button type="button" class="btn-round hidden" id="up-vtclear">유튜브 기본 그림으로</button>
+          <input type="file" id="up-vtfile" accept="image/*" class="hidden">
+        </div>
+        <div class="field-hint">고르지 않으면 유튜브 영상의 기본 그림을 씁니다. 가로로 넓은(16:9) 그림이 잘 맞습니다.</div>
+      </div>
       <div id="up-vprev" class="hidden" style="margin-bottom:14px">
-        <img id="up-vthumb" alt="" style="width:100%;max-width:320px;border-radius:10px;display:block">
+        <img id="up-vthumb" alt="썸네일 미리보기" style="width:100%;max-width:320px;aspect-ratio:16/9;object-fit:cover;border-radius:10px;display:block">
       </div>
     </div>
 
@@ -386,10 +398,21 @@ document.addEventListener('DOMContentLoaded', function () {
           return c.from('gallery_items').delete().eq('id', v.id);
         }).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
+          SHSPhotos.remove(v.image_url); SHSPhotos.remove(v.thumb_url);
           load(true);
         });
       });
       a.appendChild(del);
+      var tb = document.createElement('button');
+      tb.className = 'vid-thumbbtn';
+      tb.type = 'button';
+      tb.textContent = '썸네일 바꾸기';
+      tb.addEventListener('click', function (ev) {
+        ev.preventDefault(); ev.stopPropagation();
+        vtTarget = v;
+        vtEdit.click();
+      });
+      a.appendChild(tb);
     });
   }
 
@@ -994,6 +1017,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('up-link').addEventListener('input', function () {
       var id = ytId(this.value);
       var box = document.getElementById('up-vprev');
+      if (vtFile) return;                 /* 직접 고른 썸네일이 있으면 그대로 */
       if (!id) { box.classList.add('hidden'); return; }
       document.getElementById('up-vthumb').src = ytThumb(id);
       box.classList.remove('hidden');
@@ -1105,6 +1129,52 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  /* ---------- 영상 썸네일 ----------
+   * 유튜브 기본 그림 대신 따로 만든 그림을 영상 겉그림으로 쓴다. 보관소에 사진처럼 올린다. */
+  var vtFile = null;
+  function vtShow() {
+    var box = document.getElementById('up-vprev'), im = document.getElementById('up-vthumb');
+    var id = ytId(document.getElementById('up-link').value);
+    document.getElementById('up-vtclear').classList.toggle('hidden', !vtFile);
+    if (vtFile) { im.src = URL.createObjectURL(vtFile); box.classList.remove('hidden'); }
+    else if (id) { im.src = ytThumb(id); box.classList.remove('hidden'); }
+    else box.classList.add('hidden');
+  }
+  document.getElementById('up-vtpick').addEventListener('click', function () { document.getElementById('up-vtfile').click(); });
+  document.getElementById('up-vtfile').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    this.value = '';
+    if (f && f.type.indexOf('image/') === 0) { vtFile = f; vtShow(); }
+  });
+  document.getElementById('up-vtclear').addEventListener('click', function () { vtFile = null; vtShow(); });
+  function putThumb(file) {
+    return Promise.all([resize(file, 1280, 0.85, 0), resize(file, 640, 0.8, 0)]).then(function (bs) {
+      return SHSPhotos.putPair(bs[0], bs[1]);
+    });
+  }
+  /* 이미 올린 영상의 썸네일 바꾸기 (올린 사람 · 관리자) */
+  var vtTarget = null;
+  var vtEdit = document.createElement('input');
+  vtEdit.type = 'file'; vtEdit.accept = 'image/*'; vtEdit.className = 'hidden';
+  document.body.appendChild(vtEdit);
+  vtEdit.addEventListener('change', function () {
+    var f = this.files && this.files[0], v = vtTarget;
+    this.value = '';
+    if (!f || !v || f.type.indexOf('image/') !== 0) return;
+    putThumb(f).then(function (u) {
+      return SHSCloud.init().then(function (c) {
+        return c.from('gallery_items').update({ image_url: u.full, thumb_url: u.thumb }).eq('id', v.id).then(function (r) {
+          if (r.error) throw r.error;
+          /* 예전에 올린 썸네일 파일은 지운다 (유튜브 기본 그림이면 아무 일도 없다) */
+          return Promise.all([SHSPhotos.remove(v.image_url), SHSPhotos.remove(v.thumb_url)]);
+        });
+      });
+    }).then(function () {
+      SHSCloud.log('update', '갤러리 영상 썸네일', v.title || '');
+      load(true);
+    }).catch(function (err) { alert('썸네일을 바꾸지 못했습니다: ' + (err.message || err)); });
+  });
+
   document.getElementById('up-send').addEventListener('click', function () {
     var msg = document.getElementById('up-msg');
 
@@ -1121,26 +1191,33 @@ document.addEventListener('DOMContentLoaded', function () {
       var vdate = document.getElementById('up-vdate').value || new Date().toISOString().slice(0, 10);
       msg.className = 'form-msg';
       msg.textContent = '올리는 중입니다...';
-      SHSCloud.init().then(function (c) {
-        return c.from('gallery_items').insert({
-          title: vtitle, taken: vdate, category: '영상',
-          caption: document.getElementById('up-caption').value.trim(),
-          link_url: 'https://www.youtube.com/watch?v=' + vid,
-          image_url: ytThumb(vid), thumb_url: ytThumb(vid),
-          author_id: user.id, author_name: user.name, sort: 0
+      var sendBtn = this;
+      sendBtn.disabled = true;
+      (vtFile ? putThumb(vtFile) : Promise.resolve({ full: ytThumb(vid), thumb: ytThumb(vid) })).then(function (u) {
+        return SHSCloud.init().then(function (c) {
+          return c.from('gallery_items').insert({
+            title: vtitle, taken: vdate, category: '영상',
+            caption: document.getElementById('up-caption').value.trim(),
+            link_url: 'https://www.youtube.com/watch?v=' + vid,
+            image_url: u.full, thumb_url: u.thumb,
+            author_id: user.id, author_name: user.name, sort: 0
+          });
         });
       }).then(function (r) {
+        sendBtn.disabled = false;
         if (r.error) throw r.error;
         SHSCloud.log('create', '갤러리 영상 등록', vtitle);
         ['up-link', 'up-vtitle', 'up-caption'].forEach(function (id) {
           document.getElementById(id).value = '';
         });
-        document.getElementById('up-vprev').classList.add('hidden');
+        vtFile = null;
+        vtShow();
         msg.className = 'form-msg ok';
         msg.textContent = '영상을 올렸습니다.';
         closeM('up-mdl');
         load(true);
       }).catch(function (err) {
+        sendBtn.disabled = false;
         msg.className = 'form-msg err';
         msg.textContent = '올리기 실패: ' + err.message;
       });
