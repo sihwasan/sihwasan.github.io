@@ -14,6 +14,18 @@
 <meta property="og:site_name" content="시화산노회">
 <meta property="og:locale" content="ko_KR">
 <link rel="stylesheet" href="css/style.css?v=20260921j">
+<style>
+/* 앨범 관리 — 대표사진 · 앨범 삭제 (올린 사람 · 관리자) */
+.alb-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.alb-tools .btn-round { padding: 8px 16px; font-size: 0.86rem; min-height: 38px; }
+.alb-tools .btn-round.danger { border-color: #c0392b; color: #c0392b; background: #fff; }
+.alb-tools .btn-round.danger:hover { background: #fdf3f3; }
+.alb-tip { flex: 1 1 100%; font-size: 0.8rem; color: var(--gray-5); }
+.alb-coverbox { margin: 0 0 16px; border-radius: 12px; overflow: hidden; position: relative; background: #000; }
+.alb-coverbox img { display: block; width: 100%; max-height: 420px; object-fit: contain; cursor: zoom-in; }
+.alb-coverbox span { position: absolute; left: 12px; top: 12px; background: rgba(0,0,0,.6); color: #fff; font-size: 0.75rem; padding: 3px 10px; border-radius: 99px; }
+.alb-card .alb-badge { position: absolute; right: 10px; top: 10px; background: rgba(0,0,0,.55); color: #fff; font-size: 0.7rem; padding: 2px 8px; border-radius: 99px; }
+</style>
 </head>
 <body>
 
@@ -68,7 +80,14 @@
     <div class="alb-head">
       <h2 id="alb-title"></h2>
       <div class="d" id="alb-sub"></div>
+      <div class="alb-tools hidden" id="alb-tools">
+        <button type="button" class="btn-round" id="alb-cover">대표사진 올리기</button>
+        <button type="button" class="btn-round danger" id="alb-del">앨범 삭제</button>
+        <input type="file" id="alb-cover-file" accept="image/*" class="hidden">
+        <div class="alb-tip" id="alb-tip"></div>
+      </div>
     </div>
+    <div class="alb-coverbox hidden" id="alb-coverbox"></div>
     <div class="alb-photos" id="alb-photos"></div>
   </div>
 </div>
@@ -87,7 +106,7 @@
 <div class="mdl" id="vp-mdl">
   <div class="mdl-box wide">
     <button class="mdl-close" id="vp-close">&times;</button>
-    <div class="feed-vid" id="vp-box"></div>
+    <div id="vp-box"></div>
     <div id="vp-cap" style="margin-top:10px;font-size:0.92rem;color:var(--gray-7)"></div>
   </div>
 </div>
@@ -174,6 +193,7 @@
   <div class="lb-tools hidden" id="lb-tools">
     <button id="lb-rot" title="시계 방향으로 90도 돌리기">&#10227; 회전</button>
     <button id="lb-rotsave" class="hidden">회전 저장</button>
+    <button id="lb-cover" title="이 사진을 앨범 겉그림(대표사진)으로">대표사진으로</button>
     <button id="lb-del" class="danger">삭제</button>
   </div>
 </div>
@@ -353,6 +373,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 회기별 앨범 ---------- */
+  var COVER_TAG = '대표사진';   /* 앨범 겉그림으로 따로 올린 그림의 표시 */
   /* 제목이 같은 사진을 한 권으로 묶는다 (예: 제19회 정기노회) */
   function buildAlbums() {
     /* 영상은 앨범·슬라이드에 섞지 않고 따로 뽑아 둔다 */
@@ -368,6 +389,10 @@ document.addEventListener('DOMContentLoaded', function () {
     albums = Object.keys(by).map(function (k) { return by[k]; });
     albums.forEach(function (a) {
       a.photos.sort(function (x, y) { return (x.sort || 0) - (y.sort || 0) || (x.id > y.id ? 1 : -1); });
+      /* 대표사진 — sort 가 0보다 작은 것. 따로 올린 겉그림(caption '대표사진')은 사진 목록에서 뺀다 */
+      a.cover = a.photos.filter(function (p) { return (p.sort || 0) < 0; })[0] || null;
+      a.extra = a.photos.filter(function (p) { return (p.sort || 0) < 0 && p.caption === COVER_TAG; });
+      if (a.extra.length) a.photos = a.photos.filter(function (p) { return a.extra.indexOf(p) === -1; });
     });
     albums.sort(function (a, b) { return a.taken < b.taken ? 1 : a.taken > b.taken ? -1 : 0; });
   }
@@ -397,6 +422,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     box.innerHTML = list.map(function (a) {
       var cand = a.photos.slice(0, 4).map(function (p) { return p.thumb_url || p.image_url; });
+      if (a.cover) {
+        /* 대표사진은 세로 사진이어도 그대로 쓴다 */
+        return '<button class="alb-card" data-alb="' + e(a.title) + '">' +
+          '<img loading="lazy" src="' + e(a.cover.thumb_url || a.cover.image_url) + '" alt="">' +
+          '<span class="alb-cap"><span class="t">' + e(a.title) + '</span>' +
+          '<span class="d">' + e(dateText(a.taken)) + ' · 사진 ' + a.photos.length + '장</span></span>' +
+          '</button>';
+      }
       return '<button class="alb-card" data-alb="' + e(a.title) + '">' +
         '<img loading="lazy" src="' + e(cand[0]) + '" alt="" data-cand="' + e(cand.join('|')) + '">' +
         '<span class="alb-cap"><span class="t">' + e(a.title) + '</span>' +
@@ -420,9 +453,23 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  var curAlb = null;
   function openAlbum(title) {
     var a = albums.filter(function (x) { return x.title === title; })[0];
     if (!a) return;
+    curAlb = a;
+    var cb = document.getElementById('alb-coverbox');
+    var ex = a.extra && a.extra[0];
+    cb.classList.toggle('hidden', !ex);
+    cb.innerHTML = ex ? '<img src="' + e(ex.image_url) + '" alt="대표사진"><span>대표사진</span>' : '';
+    if (ex) cb.querySelector('img').addEventListener('click', function () { openLb([ex], 0); });
+    var mine = albumMine(a);
+    var tools = document.getElementById('alb-tools');
+    tools.classList.toggle('hidden', !(canManage || mine.length));
+    document.getElementById('alb-tip').textContent = canManage ? '' :
+      (mine.length < a.photos.length + (a.extra || []).length
+        ? '내가 올린 사진 ' + mine.length + '장만 지울 수 있습니다. 다른 분이 올린 사진은 그분이나 관리자가 지웁니다.'
+        : '큰 사진 보기에서 「대표사진으로」를 누르면 그 사진이 앨범 겉그림이 됩니다.');
     document.getElementById('alb-title').textContent = a.title;
     document.getElementById('alb-sub').textContent =
       dateText(a.taken) + (a.category ? ' · ' + a.category : '') + ' · 사진 ' + a.photos.length + '장';
@@ -435,6 +482,125 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     openM('alb-mdl');
   }
+
+  /* ---------- 앨범 관리 (올린 사람 · 관리자) ----------
+   * 서버 규칙(08): 사진은 올린 본인이 지우고 고칠 수 있고, 관리자(노회장·서기·간사)는 모두 할 수 있다. */
+  function albumAll(a) { return a.photos.concat(a.extra || []); }
+  function albumMine(a) { return albumAll(a).filter(canFix); }
+  function busyBtn(b, on, txt) { b.disabled = on; if (txt) b.textContent = txt; }
+
+  /* 앨범 삭제 — 지울 수 있는 사진을 모두 지우고 보관소 파일도 함께 지운다 */
+  function deleteAlbum() {
+    var a = curAlb;
+    if (!a) return;
+    var all = albumAll(a), mine = albumMine(a);
+    if (!mine.length) { alert('이 앨범에서 지울 수 있는 사진이 없습니다.'); return; }
+    var part = mine.length < all.length;
+    if (!confirm('「' + a.title + '」 앨범' + (part ? '에서 내가 올린 사진 ' + mine.length + '장을' : '의 사진 ' + all.length + '장을 모두') +
+        ' 삭제합니다.\n되돌릴 수 없습니다.')) return;
+    if (!confirm('정말 삭제하시겠습니까? (사진 ' + mine.length + '장)')) return;
+    var btn = document.getElementById('alb-del');
+    busyBtn(btn, true, '삭제하는 중...');
+    var ids = mine.map(function (p) { return p.id; });
+    var chunks = [];
+    for (var i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100));
+    SHSCloud.init().then(function (c) {
+      return chunks.reduce(function (pr, ch) {
+        return pr.then(function () {
+          return c.from('gallery_items').delete().in('id', ch).then(function (r) { if (r.error) throw r.error; });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      /* 보관소 파일은 여섯 개씩 나누어 지운다 (실패해도 목록은 이미 지워졌다) */
+      var urls = [];
+      mine.forEach(function (p) { urls.push(p.image_url, p.thumb_url); });
+      var k = 0;
+      function next() {
+        if (k >= urls.length) return Promise.resolve();
+        var batch = urls.slice(k, k + 6); k += 6;
+        btn.textContent = '파일 정리 중... ' + Math.min(100, Math.round(k * 100 / urls.length)) + '%';
+        return Promise.all(batch.map(function (u) { return SHSPhotos.remove(u); })).then(next);
+      }
+      return next();
+    }).then(function () {
+      SHSCloud.log('delete', '갤러리 앨범 삭제', a.title + ' (' + mine.length + '장)');
+      busyBtn(btn, false, '앨범 삭제');
+      closeM('alb-mdl');
+      load(true);
+      alert(part ? '내가 올린 사진 ' + mine.length + '장을 삭제했습니다.' : '「' + a.title + '」 앨범을 삭제했습니다.');
+    }).catch(function (err) {
+      busyBtn(btn, false, '앨범 삭제');
+      alert('삭제하지 못했습니다: ' + (err.message || err));
+      load(true);
+    });
+  }
+
+  /* 대표사진을 바꾸기 전에 예전 대표사진을 내려놓는다.
+   * 따로 올린 겉그림은 지우고, 앨범 사진이었던 것은 순서 0 으로 돌려 둔다. */
+  function dropOldCovers(c, a, keepId) {
+    var olds = albumAll(a).filter(function (p) { return (p.sort || 0) < 0 && p.id !== keepId && canFix(p); });
+    return Promise.all(olds.map(function (p) {
+      if (p.caption === COVER_TAG) {
+        return c.from('gallery_items').delete().eq('id', p.id).then(function () {
+          return Promise.all([SHSPhotos.remove(p.image_url), SHSPhotos.remove(p.thumb_url)]);
+        });
+      }
+      return c.from('gallery_items').update({ sort: 0 }).eq('id', p.id);
+    }));
+  }
+  /* 앨범 사진 하나를 대표사진으로 */
+  function setCover(p) {
+    var a = albums.filter(function (x) { return x.title === p.title; })[0];
+    if (!a || !canFix(p)) return;
+    var btn = document.getElementById('lb-cover');
+    busyBtn(btn, true, '바꾸는 중...');
+    SHSCloud.init().then(function (c) {
+      return c.from('gallery_items').update({ sort: -1 }).eq('id', p.id).then(function (r) {
+        if (r.error) throw r.error;
+        return dropOldCovers(c, a, p.id);
+      });
+    }).then(function () {
+      SHSCloud.log('update', '갤러리 대표사진', a.title);
+      busyBtn(btn, false, '대표사진으로');
+      p.sort = -1;
+      btn.classList.add('hidden');
+      load(true);
+      alert('「' + a.title + '」 앨범의 대표사진으로 정했습니다.');
+    }).catch(function (err) { busyBtn(btn, false, '대표사진으로'); alert('바꾸지 못했습니다: ' + (err.message || err)); });
+  }
+  /* 썸네일처럼 따로 만든 그림을 대표사진으로 올린다 (앨범 사진 목록에는 넣지 않는다) */
+  function uploadCover(file) {
+    var a = curAlb;
+    if (!a || !file) return;
+    var btn = document.getElementById('alb-cover');
+    busyBtn(btn, true, '올리는 중...');
+    Promise.all([resize(file, 1600, 0.85, 0), resize(file, 800, 0.8, 0)]).then(function (bs) {
+      return SHSPhotos.putPair(bs[0], bs[1]);
+    }).then(function (u) {
+      return SHSCloud.init().then(function (c) {
+        return c.from('gallery_items').insert({
+          title: a.title, taken: a.taken || null, category: a.category || '기타', caption: COVER_TAG,
+          image_url: u.full, thumb_url: u.thumb, author_id: user.id, author_name: user.name, sort: -1
+        }).select('id').then(function (r) {
+          if (r.error) throw r.error;
+          var nid = r.data && r.data[0] && r.data[0].id;
+          return dropOldCovers(c, a, nid);
+        });
+      });
+    }).then(function () {
+      SHSCloud.log('create', '갤러리 대표사진 올림', a.title);
+      busyBtn(btn, false, '대표사진 올리기');
+      closeM('alb-mdl');
+      load(true);
+    }).catch(function (err) { busyBtn(btn, false, '대표사진 올리기'); alert('올리지 못했습니다: ' + (err.message || err)); });
+  }
+  document.getElementById('alb-del').addEventListener('click', deleteAlbum);
+  document.getElementById('alb-cover').addEventListener('click', function () { document.getElementById('alb-cover-file').click(); });
+  document.getElementById('alb-cover-file').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    this.value = '';
+    if (f && f.type.indexOf('image/') === 0) uploadCover(f);
+  });
 
   /* ---------- 큰 사진 보기 ---------- */
   var lbList = [], lbIdx = 0, lbRot = 0;
@@ -459,6 +625,7 @@ document.addEventListener('DOMContentLoaded', function () {
       (p.title || '') + ' · ' + (lbIdx + 1) + ' / ' + lbList.length;
     document.getElementById('lb-tools').classList.toggle('hidden', !canFix(p));
     document.getElementById('lb-rotsave').classList.add('hidden');
+    document.getElementById('lb-cover').classList.toggle('hidden', !canFix(p) || (p.sort || 0) < 0 || isVideo(p));
   }
 
   /* 돌려 보기: 화면에서만 돌아가고, '회전 저장'을 눌러야 사진이 바뀐다 */
@@ -568,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 피드에는 사진과 영상을 함께, 올린 순서대로 보여 준다 */
   function feedItems() {
-    var all = items.concat(videos);
+    var all = items.filter(function (it) { return !((it.sort || 0) < 0 && it.caption === COVER_TAG); }).concat(videos);
     all.sort(function (a, b) {
       var x = String(a.created_at || a.taken || ''), y = String(b.created_at || b.taken || '');
       return x < y ? 1 : x > y ? -1 : 0;
@@ -763,6 +930,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
   document.getElementById('lb-rotsave').addEventListener('click', lbRotSave);
   document.getElementById('lb-del').addEventListener('click', lbDelete);
+  document.getElementById('lb-cover').addEventListener('click', function () { setCover(lbList[lbIdx]); });
   lb.addEventListener('click', function (ev) { if (ev.target === lb) lb.classList.remove('open'); });
 
   /* 손가락으로 옆으로 쓸어 넘기기 (모바일).
