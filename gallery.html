@@ -23,6 +23,7 @@
 .alb-tip { flex: 1 1 100%; font-size: 0.8rem; color: var(--gray-5); }
 .alb-form { margin-top: 12px; padding: 14px; border: 1px solid var(--gray-3); border-radius: 10px; background: var(--gray-1, #f7f7f7); }
 .alb-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--gray-5); margin-bottom: 10px; flex: 1 1 180px; }
+.alb-form select { padding: 9px 10px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; font-family: inherit; min-height: 40px; background: #fff; }
 .alb-form input { padding: 9px 10px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; font-family: inherit; min-height: 40px; }
 .alb-form-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .alb-form-btns { display: flex; gap: 8px; }
@@ -97,7 +98,8 @@
         <label>앨범 이름<input type="text" id="ae-title" maxlength="120" required></label>
         <div class="alb-form-row">
           <label>날짜<input type="date" id="ae-date"></label>
-          <label>카테고리<input type="text" id="ae-cat" list="up-cat-list" maxlength="30" autocomplete="off"></label>
+          <label>카테고리<select id="ae-catsel" data-cat-for="ae-cat"></select></label>
+          <label class="hidden" id="ae-cat-l">새 카테고리<input type="text" id="ae-cat" maxlength="30" autocomplete="off" placeholder="새 카테고리 이름"></label>
         </div>
         <div class="alb-form-btns">
           <button type="submit" class="btn-round solid" id="ae-save">저장</button>
@@ -188,7 +190,8 @@
       <div class="inline-form" style="margin-bottom:16px">
         <div class="field"><label>날짜</label><input type="date" id="up-date"></div>
         <div class="field"><label>카테고리</label>
-          <input type="text" id="up-cat" list="up-cat-list" placeholder="고르거나 직접 입력" autocomplete="off" maxlength="30">
+          <select id="up-catsel" data-cat-for="up-cat"></select>
+          <input type="text" id="up-cat" class="hidden" placeholder="새 카테고리 이름" autocomplete="off" maxlength="30" style="margin-top:6px">
           <datalist id="up-cat-list"></datalist>
         </div>
       </div>
@@ -516,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!a) return;
     document.getElementById('ae-title').value = a.title;
     document.getElementById('ae-date').value = /^\d{4}-\d{2}-\d{2}$/.test(a.taken || '') ? a.taken : '';
-    document.getElementById('ae-cat').value = a.category || '';
+    fillCatSelect('ae-catsel', a.category || '기타');
     var f = document.getElementById('alb-form');
     f.classList.remove('hidden');
     document.getElementById('ae-title').focus();
@@ -529,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (albumMine(a).length < all.length) { alert('다른 분이 올린 사진이 섞여 있어 관리자만 고칠 수 있습니다.'); return; }
     var t = document.getElementById('ae-title').value.trim().replace(/\s+/g, ' ');
     var d = document.getElementById('ae-date').value || a.taken || null;
-    var cat = (document.getElementById('ae-cat').value || '').trim().replace(/\s+/g, ' ').slice(0, 30) || '기타';
+    var cat = catValue('ae-catsel').slice(0, 30) || '기타';
     if (!t) { alert('앨범 이름을 적어 주세요.'); return; }
     if (t === a.title && d === a.taken && cat === a.category) { document.getElementById('alb-form').classList.add('hidden'); return; }
     var other = t !== a.title && albums.filter(function (x) { return x.title === t; })[0];
@@ -935,6 +938,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('up-date').value = td;
     if (!document.getElementById('up-vdate').value) document.getElementById('up-vdate').value = td;
     fillAlbumPicker();
+    var us = document.getElementById('up-catsel');
+    fillCatSelect('up-catsel', us.value && us.value !== NEW_CAT ? us.value : '기타');
     openM('up-mdl');
   });
 
@@ -1147,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', function () {
     })[0];
     var title = document.getElementById('up-title').value.trim();
     var taken = document.getElementById('up-date').value;
-    var cat = (document.getElementById('up-cat').value || '').trim().replace(/\s+/g, ' ');
+    var cat = catValue('up-catsel');
     if (!cat) cat = '기타';
     if (cat.length > 30) cat = cat.slice(0, 30);
     /* 이미 있는 앨범을 골랐으면 이름·날짜·분류를 그 앨범 것으로 맞춘다 */
@@ -1223,6 +1228,42 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  /* ---------- 카테고리 고르기 ----------
+   * 입력칸+목록(datalist)은 이미 적힌 글자와 맞는 것만 보여 줘서, 값이 들어 있으면 목록이 펼쳐지지 않았다.
+   * 그래서 고르기 상자(select)로 모든 카테고리를 보여 주고, 맨 아래 「직접 입력」을 고르면 새 이름을 적는다. */
+  var NEW_CAT = '__new__';
+  function catNames() {
+    var seen = {}, out = [];
+    [].forEach.call(document.querySelectorAll('#up-cat-list option'), function (o) { add(o.value); });
+    albums.forEach(function (a) { add(a.category); });
+    function add(n) { n = (n || '').trim(); if (!n || n === '영상' || seen[n]) return; seen[n] = 1; out.push(n); }
+    return out;
+  }
+  function fillCatSelect(id, cur) {
+    var sel = document.getElementById(id), names = catNames();
+    cur = (cur || '').trim();
+    if (cur && names.indexOf(cur) === -1) names.unshift(cur);
+    sel.innerHTML = names.map(function (n) { return '<option value="' + e(n) + '">' + e(n) + '</option>'; }).join('') +
+      '<option value="' + NEW_CAT + '">+ 직접 입력</option>';
+    sel.value = cur || names[0] || NEW_CAT;
+    syncCat(sel);
+  }
+  function syncCat(sel) {
+    var inp = document.getElementById(sel.getAttribute('data-cat-for'));
+    var wrap = inp.id === 'ae-cat' ? document.getElementById('ae-cat-l') : inp;
+    var isNew = sel.value === NEW_CAT;
+    wrap.classList.toggle('hidden', !isNew);
+    if (isNew) { inp.value = ''; inp.focus(); }
+  }
+  function catValue(selId) {
+    var sel = document.getElementById(selId);
+    var v = sel.value === NEW_CAT ? document.getElementById(sel.getAttribute('data-cat-for')).value : sel.value;
+    return (v || '').trim().replace(/\s+/g, ' ');
+  }
+  ['ae-catsel', 'up-catsel'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', function () { syncCat(this); });
+  });
+
   /* ---------- 카테고리 ---------- */
   /* 고를 수도 있고 직접 적을 수도 있다.
    * 고를 거리는 미리 정해 둔 목록 + 지금까지 실제로 쓰인 값을 합쳐서 만든다.
@@ -1241,7 +1282,7 @@ document.addEventListener('DOMContentLoaded', function () {
       dl.innerHTML = out.map(function (n) { return '<option value="' + e(n) + '"></option>'; }).join('');
     }
     fill(fallback);
-    if (!inp.value) inp.value = '기타';
+    if (!inp) return;
     if (!(window.SHSCloud && SHSCloud.enabled())) return;
     SHSCloud.init().then(function (c) {
       return Promise.all([
