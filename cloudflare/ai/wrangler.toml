@@ -22,7 +22,7 @@ SITE_URL = "https://sihwasan.org"
 # 처음 한 번:  npx wrangler kv namespace create AI_KV   → 나온 id 를 아래에 적는다 (배포.bat 이 대신 해 준다)
 [[kv_namespaces]]
 binding = "AI_KV"
-id = "KV_ID_HERE"
+id = "77675b962eff474e868e94211f460704"
 
 # Claude API 는 일부 지역(접속 지점)에서 오는 요청을 거절한다.
 # 스마트 배치를 켜면 api.anthropic.com 에 가까운 곳에서 실행되어 그런 거절을 피한다.
