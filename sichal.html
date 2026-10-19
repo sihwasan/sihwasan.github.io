@@ -6,6 +6,14 @@
 <title>시찰회 - 시화산노회</title>
 <meta name="robots" content="noindex">
 <link rel="stylesheet" href="css/style.css?v=20260921j">
+<style>
+/* 사진첩의 영상 칸 — 노회 갤러리 영상 카드와 같은 모양 */
+.vid-thumbbtn { position: absolute; top: 8px; left: 8px; border: none; cursor: pointer; background: rgba(0,0,0,.55); color: #fff; border-radius: 8px; padding: 2px 9px; font-size: 0.74rem; }
+.rv-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.rv-acts:empty { display: none; }
+.rv-acts .btn.sm { padding: 3px 10px; font-size: 0.76rem; }
+.rv-pub { background: var(--navy); color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 3px; }
+</style>
 </head>
 <body>
 
@@ -33,7 +41,7 @@
 <script src="js/ledger.js?v=20260911d"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
-<script src="js/sichal-room.js?v=20260917a"></script>
+<script src="js/sichal-room.js?v=20261019a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -408,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function () {
       (myOwnSichal
         ? '<button class="' + (tab === 'board'   ? 'active' : '') + '" data-t="board">게시판 (' +
           (room ? room.postCount() : 0) + ')</button>' +
-          '<button class="' + (tab === 'photo'   ? 'active' : '') + '" data-t="photo">사진첩 (' +
+          '<button class="' + (tab === 'photo'   ? 'active' : '') + '" data-t="photo">사진·영상 (' +
           (room ? room.photoCount() : 0) + ')</button>' +
           '<button class="' + (tab === 'doc'     ? 'active' : '') + '" data-t="doc">자료실 (' + docs.length + ')</button>' +
           '<button class="' + (tab === 'pass'    ? 'active' : '') + '" data-t="pass">청원서류 (' +

@@ -7,6 +7,12 @@
  * 사진첩에서 고른 사진은 「노회 홈페이지에 게시하기」로 노회 갤러리에 그대로 실린다.
  * 사진을 다시 올리지 않고 같은 주소를 함께 쓰므로 보관 용량이 두 배로 늘지 않는다.
  *
+ * 사진첩의 영상 칸 — 노회 갤러리의 영상 칸과 같은 모양이다.
+ * 표를 새로 만들지 않고 sichal_photos 에 함께 담는다.
+ *   image_url = 유튜브 주소 (사진이면 큰 사진 자리 — 이 주소로 영상인지 가린다)
+ *   thumb_url = 썸네일 (따로 올린 그림, 없으면 유튜브 기본 그림)
+ *   album     = 영상 제목
+ *
  * 쓰는 법 (sichal.html)
  *   var room = SHSRoom.create({ sichal: NAME, user: user, isOfficer: isOfficer });
  *   room.load().then(function () { room.drawBoard(box); });
@@ -29,6 +35,14 @@ var SHSRoom = (function () {
     return '<div class="feed-vid"><iframe src="https://www.youtube.com/embed/' + e(id) +
       '" title="영상" allow="accelerometer; clipboard-write; encrypted-media; picture-in-picture" ' +
       'allowfullscreen loading="lazy"></iframe></div>';
+  }
+  /* 사진첩 줄 가운데 영상인 것 (image_url 자리에 유튜브 주소가 있다) */
+  function isVid(row) { return !!ytId(row && row.image_url); }
+  /* 영상 칸에서 누른 영상을 창에 띄워 바로 재생한다 */
+  function playEmbed(id) {
+    return '<div class="feed-vid"><iframe src="https://www.youtube.com/embed/' + e(id) +
+      '?autoplay=1&playsinline=1&rel=0" title="유튜브 영상" ' +
+      'allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>';
   }
 
   function when(ts) {
@@ -95,6 +109,80 @@ var SHSRoom = (function () {
     return chain.then(function () { return out; });
   }
 
+  /* 영상 썸네일 — 한 장만 올려 thumb_url 에 적는다.
+   * 보관소(R2)가 설정되지 않았으면 예전처럼 Supabase에 한 쌍으로 올린다. */
+  var VTHUMB_W = 960, VTHUMB_Q = 0.82;
+  function putThumb(file) {
+    return shrink(file, VTHUMB_W, VTHUMB_Q).then(function (b) {
+      if (SHSPhotos.enabled()) return SHSPhotos.upload(b, SHSPhotos.newKey('thumb'));
+      return SHSPhotos.putPair(b, b).then(function (u) { return u.thumb; });
+    });
+  }
+
+  /* ---------- 영상 보기 창 ----------
+   * 배경을 눌렀다 뗄 때(끌다 놓은 것 말고)·Esc·× 로 닫히고,
+   * 열린 동안 뒤 화면은 움직이지 않으며, 닫으면 초점이 누른 자리로 돌아간다. */
+  var vp = null, vpBack = null, vpOverflow = '';
+  function player() {
+    if (vp) return vp;
+    vp = document.createElement('div');
+    vp.className = 'mdl';
+    vp.setAttribute('role', 'dialog');
+    vp.setAttribute('aria-modal', 'true');
+    vp.setAttribute('aria-label', '영상 보기');
+    vp.innerHTML =
+      '<div class="mdl-box wide" style="overscroll-behavior:contain">' +
+      '<button type="button" class="mdl-close" aria-label="닫기">&times;</button>' +
+      '<div class="rv-play" style="margin-top:22px"></div>' +
+      '<div class="rv-cap" style="margin-top:10px;font-size:0.92rem;color:var(--gray-7)"></div>' +
+      '<div class="rv-desc" style="margin-top:6px;font-size:0.86rem;color:var(--gray-5);white-space:pre-wrap"></div>' +
+      '</div>';
+    document.body.appendChild(vp);
+    vp.querySelector('.mdl-close').addEventListener('click', closePlayer);
+    var down = false;
+    vp.addEventListener('mousedown', function (ev) { down = (ev.target === vp); });
+    vp.addEventListener('click', function (ev) {
+      if (down && ev.target === vp) closePlayer();
+      down = false;
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (!vp.classList.contains('open')) return;
+      if (ev.key === 'Escape') { ev.preventDefault(); closePlayer(); return; }
+      if (ev.key !== 'Tab') return;
+      /* 열린 동안 Tab 은 창 안에서만 돈다 */
+      var fs = Array.prototype.filter.call(
+        vp.querySelectorAll('button, iframe, a[href]'), function (x) { return x.offsetParent !== null; });
+      if (!fs.length) return;
+      var first = fs[0], last = fs[fs.length - 1];
+      if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+      else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+      else if (!vp.contains(document.activeElement)) { ev.preventDefault(); first.focus(); }
+    });
+    return vp;
+  }
+  function openPlayer(v) {
+    var id = ytId(v.image_url);
+    if (!id) return;
+    var m = player();
+    vpBack = document.activeElement;
+    m.querySelector('.rv-play').innerHTML = playEmbed(id);
+    m.querySelector('.rv-cap').textContent =
+      (v.album || '시찰 영상') + (dateText(v.taken) ? ' · ' + dateText(v.taken) : '');
+    m.querySelector('.rv-desc').textContent = v.caption || '';
+    vpOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    m.classList.add('open');
+    m.querySelector('.mdl-close').focus();
+  }
+  function closePlayer() {
+    if (!vp || !vp.classList.contains('open')) return;
+    vp.querySelector('.rv-play').innerHTML = '';     /* 소리가 남지 않게 재생기를 걷어 낸다 */
+    vp.classList.remove('open');
+    document.body.style.overflow = vpOverflow;
+    if (vpBack && vpBack.focus && document.contains(vpBack)) vpBack.focus();
+    vpBack = null;
+  }
+
   /* ---------- 사진 크게 보기 ---------- */
   var lb = null, lbList = [], lbIdx = 0;
   function lightbox() {
@@ -148,7 +236,11 @@ var SHSRoom = (function () {
     var isOfficer = !!o.isOfficer;                 /* 시찰장·서기·노회 관리자 */
     var canManage = !!(window.SHSAuth && SHSAuth.canManageMembers && SHSAuth.canManageMembers(user));
 
-    var posts = [], comments = [], photos = [], galCats = [];
+    var posts = [], comments = [], photos = [], videos = [], galCats = [];
+    var upKind = 'photo';     /* 올리기 칸: photo(사진) / video(유튜브 영상) */
+    var vtFile = null;        /* 새 영상에 붙일 썸네일 그림 */
+    var vtTarget = null;      /* 썸네일을 바꾸는 중인 영상 */
+    var vtEdit = null;        /* 썸네일 바꾸기에 쓰는 숨은 파일 고르기 */
     var boardCat = '전체';
     var openId = null;        /* 펼쳐 본 게시글 */
     var editId = null;        /* 고쳐 쓰는 중인 게시글 */
@@ -180,7 +272,13 @@ var SHSRoom = (function () {
       }).then(function (rs) {
         posts = ((rs[0] && rs[0].data) || []).filter(function (p) { return !p.deleted_at; });
         comments = (rs[1] && rs[1].data) || [];
-        photos = (rs[2] && rs[2].data) || [];
+        var rows = (rs[2] && rs[2].data) || [];
+        photos = rows.filter(function (p) { return !isVid(p); });
+        /* 영상은 앨범에 섞지 않고 따로 — 날짜가 늦은 것부터 */
+        videos = rows.filter(isVid).sort(function (a, b) {
+          var ta = a.taken || '', tb = b.taken || '';
+          return ta < tb ? 1 : ta > tb ? -1 : (b.id - a.id);
+        });
         galCats = ((rs[3] && rs[3].data) || []).map(function (x) { return x.name; });
       }, function () { /* 95 sql 을 아직 실행하지 않았어도 화면은 열린다 */ });
     }
@@ -497,17 +595,57 @@ var SHSRoom = (function () {
       var h = '';
 
       h += '<div class="notice-banner" style="margin-bottom:16px">' +
-        '<strong>' + e(NAME) + ' 사진첩</strong>입니다. 우리 시찰 사진을 행사별 앨범으로 모아 둡니다. ' +
+        '<strong>' + e(NAME) + ' 사진·영상</strong>입니다. 우리 시찰 사진은 행사별 앨범으로, ' +
+        '유튜브 영상은 <strong>영상</strong> 칸에 따로 모아 둡니다. ' +
         '사진은 끌어다 놓으면 웹 크기로 줄여 올라갑니다. ' +
-        '마음에 드는 사진을 골라 <strong>노회 홈페이지에 게시하기</strong>를 누르시면 ' +
+        '마음에 드는 사진·영상을 골라 <strong>노회 홈페이지에 게시하기</strong>를 누르시면 ' +
         '노회 갤러리에도 함께 실립니다.</div>';
 
       if (album && albumOf(album)) h += albumView(albumOf(album));
-      else h += albumGrid();
+      else {
+        h += videoGrid();
+        h += (videos.length ? '<section class="alb-sec"><h2>앨범</h2>' : '<section>') +
+          albumGrid() + '</section>';
+      }
 
       if (o.canWrite !== false) h += photoForm();
       box.innerHTML = h;
       bindPhotos(box);
+    }
+
+    /* 영상 칸 — 노회 갤러리의 영상 칸과 같은 카드 */
+    function videoGrid() {
+      if (!videos.length) return '';
+      return '<section class="alb-sec" id="rv-sec"><h2>영상</h2><div class="vid-grid">' +
+        videos.map(function (v) {
+          var id = ytId(v.image_url);
+          var pub = !!v.gallery_item_id;
+          return '<div class="vid-card">' +
+            '<a class="vid-thumb" href="' + e(v.image_url) + '" target="_blank" rel="noopener" ' +
+            'data-rvplay="' + v.id + '" aria-label="' + e((v.album || '영상') + ' 보기') + '">' +
+            '<img loading="lazy" src="' + e(v.thumb_url || ytThumb(id)) + '" alt="" ' +
+            'data-rvfb="' + e(ytThumb(id)) + '">' +
+            '<span class="vid-play">&#9654;</span></a>' +
+            '<span class="vid-cap"><span class="t">' + e(v.album || '시찰 영상') + '</span>' +
+            '<span class="d">' + e(dateText(v.taken)) +
+            (v.author_name ? ' · ' + e(v.author_name) : '') + '</span>' +
+            '<span class="rv-acts">' +
+            (pub ? '<span class="rv-pub">노회 게시</span>' : '') +
+            /* 게시 표시(gallery_item_id)를 적을 수 있는 사람만 — 그래야 두 번 실리지 않는다 */
+            (!pub && canEdit(v)
+              ? '<button type="button" class="btn ghost sm" data-rvpub="' + v.id + '">' +
+                '노회 홈페이지에 게시하기</button>'
+              : '') +
+            (pub && (mine(v) || canManage)
+              ? '<button type="button" class="btn ghost sm" data-phunpub="' + v.id + '">노회 게시 취소</button>'
+              : '') +
+            '</span></span>' +
+            (canEdit(v)
+              ? '<button type="button" class="vid-thumbbtn" data-rvthumb="' + v.id + '">썸네일 바꾸기</button>' +
+                '<button type="button" class="vid-del" data-phdel="' + v.id + '">삭제</button>'
+              : '') +
+            '</div>';
+        }).join('') + '</div></section>';
     }
 
     function albumGrid() {
@@ -595,8 +733,15 @@ var SHSRoom = (function () {
 
     function photoForm() {
       var names = albumList().map(function (a) { return a.title; });
+      var vid = upKind === 'video';
       return '<div class="admin-card" style="margin-top:22px" id="ph-form">' +
-        '<h3 style="margin-top:0">사진 올리기</h3>' +
+        '<h3 style="margin-top:0">사진 · 유튜브 올리기</h3>' +
+        '<div class="tabs sub-tabs" id="ph-kind" style="margin-bottom:14px">' +
+        '<button type="button" class="' + (vid ? '' : 'active') + '" data-uk="photo">사진</button>' +
+        '<button type="button" class="' + (vid ? 'active' : '') + '" data-uk="video">유튜브 영상</button>' +
+        '</div>' +
+        videoForm(vid) +
+        '<div id="ph-photobox"' + (vid ? ' style="display:none"' : '') + '>' +
         '<div class="inline-form">' +
         '<div class="field"><label>앨범</label><select id="ph-album">' +
         '<option value="">+ 새 앨범 만들기</option>' +
@@ -613,7 +758,35 @@ var SHSRoom = (function () {
         '<div class="field"><label>사진 (여러 장 가능)</label>' +
         '<input type="file" id="ph-files" accept="image/*" multiple></div>' +
         '<button class="btn" id="ph-send">올리기</button>' +
-        '<div class="form-msg" id="ph-msg"></div></div>';
+        '<div class="form-msg" id="ph-msg"></div></div></div>';
+    }
+
+    /* 유튜브 영상 올리기 — 사진 앨범과 따로 영상 칸에 모인다 */
+    function videoForm(vid) {
+      return '<div id="rv-form"' + (vid ? '' : ' style="display:none"') + '>' +
+        '<div class="field"><label>유튜브 주소</label>' +
+        '<input type="url" id="rv-link" placeholder="유튜브 영상 주소를 붙여 넣으세요"></div>' +
+        '<div class="inline-form">' +
+        '<div class="field"><label>영상 제목</label>' +
+        '<input type="text" id="rv-title" maxlength="120" placeholder="영상 제목을 적으세요"></div>' +
+        '<div class="field" style="flex:0 0 160px"><label>날짜</label>' +
+        '<input type="date" id="rv-date" value="' + today() + '"></div>' +
+        '</div>' +
+        '<div class="field"><label>영상 설명 (선택)</label>' +
+        '<input type="text" id="rv-cap" maxlength="200"></div>' +
+        '<div class="field"><label>썸네일 (선택)</label>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button type="button" class="btn ghost sm" id="rv-tpick">썸네일 그림 고르기</button>' +
+        '<button type="button" class="btn ghost sm" id="rv-tclear"' + (vtFile ? '' : ' style="display:none"') +
+        '>유튜브 기본 그림으로</button>' +
+        '<input type="file" id="rv-tfile" accept="image/*" style="display:none"></div>' +
+        '<p style="font-size:0.82rem;color:var(--gray-5);margin:6px 0 0">' +
+        '고르지 않으면 유튜브 영상의 기본 그림을 씁니다. 가로로 넓은(16:9) 그림이 잘 맞습니다.</p></div>' +
+        '<div id="rv-prev" style="display:none;margin-bottom:14px">' +
+        '<img id="rv-thumb" alt="썸네일 미리보기" style="width:100%;max-width:320px;aspect-ratio:16/9;' +
+        'object-fit:cover;border-radius:10px;display:block"></div>' +
+        '<button type="button" class="btn" id="rv-send">영상 올리기</button>' +
+        '<div class="form-msg" id="rv-msg"></div></div>';
     }
 
     function bindPhotos(box) {
@@ -670,6 +843,35 @@ var SHSRoom = (function () {
         b.addEventListener('click', function () { unpublish(b.dataset.phunpub, box); });
       });
 
+      /* ----- 영상 칸 ----- */
+      box.querySelectorAll('a[data-rvplay]').forEach(function (a) {
+        a.addEventListener('click', function (ev) {
+          var v = rowOf(a.dataset.rvplay);
+          if (!v) return;
+          ev.preventDefault();
+          openPlayer(v);
+        });
+      });
+      /* 따로 올린 썸네일이 사라졌으면 유튜브 기본 그림으로 */
+      box.querySelectorAll('img[data-rvfb]').forEach(function (im) {
+        im.addEventListener('error', function () {
+          if (im.src !== im.dataset.rvfb) im.src = im.dataset.rvfb;
+        }, { once: true });
+      });
+      box.querySelectorAll('button[data-rvthumb]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          vtTarget = rowOf(b.dataset.rvthumb);
+          if (!vtTarget) return;
+          thumbPicker().click();
+        });
+      });
+      box.querySelectorAll('button[data-rvpub]').forEach(function (b) {
+        b.addEventListener('click', function () { publishVideo(rowOf(b.dataset.rvpub), b, box); });
+      });
+
+      bindKind(box);
+      bindVideoForm(box);
+
       var send = document.getElementById('ph-send');
       if (!send) return;
       SHS.dropZone(document.getElementById('ph-files'), { what: '사진', accept: 'image' });
@@ -718,6 +920,191 @@ var SHSRoom = (function () {
           msg.className = 'form-msg err';
           msg.textContent = '올리지 못했습니다: ' + ((x && x.message) || x);
         }).then(function () { send.disabled = false; });
+      });
+    }
+
+    /* 사진첩 줄 하나 (사진이든 영상이든) */
+    function rowOf(id) {
+      return photos.concat(videos).filter(function (x) { return String(x.id) === String(id); })[0];
+    }
+
+    /* 올리기 칸의 사진 / 유튜브 영상 — 다시 그리지 않고 보이기만 바꾼다 (적던 내용이 남는다) */
+    function bindKind(box) {
+      var bar = box.querySelector('#ph-kind');
+      if (!bar) return;
+      bar.querySelectorAll('button[data-uk]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          upKind = b.dataset.uk;
+          bar.querySelectorAll('button').forEach(function (x) { x.classList.toggle('active', x === b); });
+          var vid = upKind === 'video';
+          box.querySelector('#rv-form').style.display = vid ? '' : 'none';
+          box.querySelector('#ph-photobox').style.display = vid ? 'none' : '';
+        });
+      });
+    }
+
+    /* ----- 유튜브 영상 올리기 ----- */
+    function bindVideoForm(box) {
+      var go = box.querySelector('#rv-send');
+      if (!go) return;
+      var link = box.querySelector('#rv-link');
+      var prev = box.querySelector('#rv-prev');
+      var im = box.querySelector('#rv-thumb');
+      var clr = box.querySelector('#rv-tclear');
+      var tfile = box.querySelector('#rv-tfile');
+      var objUrl = null;
+      /* 고른 썸네일이 있으면 그것을, 없으면 유튜브 기본 그림을 미리 보여 준다 */
+      function preview() {
+        var id = ytId(link.value);
+        clr.style.display = vtFile ? '' : 'none';
+        if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
+        if (vtFile) { objUrl = URL.createObjectURL(vtFile); im.src = objUrl; prev.style.display = ''; }
+        else if (id) { im.src = ytThumb(id); prev.style.display = ''; }
+        else prev.style.display = 'none';
+      }
+      preview();
+      link.addEventListener('input', preview);
+      box.querySelector('#rv-tpick').addEventListener('click', function () { tfile.click(); });
+      tfile.addEventListener('change', function () {
+        var f = tfile.files && tfile.files[0];
+        tfile.value = '';
+        if (f && f.type.indexOf('image/') === 0) { vtFile = f; preview(); }
+      });
+      clr.addEventListener('click', function () { vtFile = null; preview(); });
+
+      go.addEventListener('click', function () {
+        if (go.disabled) return;
+        var msg = box.querySelector('#rv-msg');
+        var id = ytId(link.value);
+        if (!id) {
+          msg.className = 'form-msg err'; msg.textContent = '유튜브 주소를 확인해 주세요.'; return;
+        }
+        var title = box.querySelector('#rv-title').value.trim() || '시찰 영상';
+        var taken = box.querySelector('#rv-date').value || today();
+        var cap = box.querySelector('#rv-cap').value.trim() || null;
+        var made = null;   /* 새로 올린 썸네일 — 저장하지 못하면 도로 지운다 */
+
+        go.disabled = true;
+        go.textContent = '올리는 중...';
+        msg.className = 'form-msg';
+        msg.textContent = '올리는 중입니다...';
+        (vtFile
+          ? putThumb(vtFile).then(function (u) { made = u; return u; })
+          : Promise.resolve(ytThumb(id))
+        ).then(function (thumb) {
+          return db().then(function (c) {
+            return c.from('sichal_photos').insert({
+              sichal: NAME, album: title, taken: taken, caption: cap,
+              image_url: 'https://www.youtube.com/watch?v=' + id, thumb_url: thumb,
+              sort: 0, author_id: user.id, author_name: user.name
+            }).select();
+          });
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          if (!(r.data && r.data.length)) throw new Error('권한을 확인해 주세요.');
+          SHS.logAction('create', '시찰 영상 등록', NAME + ' / ' + title);
+          vtFile = null; album = null;
+          reload(function () {
+            drawPhotos(box);
+            var s = document.getElementById('rv-sec');
+            if (s) s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        }).catch(function (x) {
+          if (made) SHSPhotos.remove(made);
+          msg.className = 'form-msg err';
+          msg.textContent = '올리지 못했습니다: ' + ((x && x.message) || x);
+          go.disabled = false;
+          go.textContent = '영상 올리기';
+        });
+      });
+    }
+
+    /* ----- 이미 올린 영상의 썸네일 바꾸기 (올린 사람 · 시찰 임원) ----- */
+    var thumbBusy = false;
+    function thumbPicker() {
+      if (vtEdit) return vtEdit;
+      vtEdit = document.createElement('input');
+      vtEdit.type = 'file';
+      vtEdit.accept = 'image/*';
+      vtEdit.style.display = 'none';
+      document.body.appendChild(vtEdit);
+      vtEdit.addEventListener('change', function () {
+        var f = vtEdit.files && vtEdit.files[0];
+        vtEdit.value = '';
+        if (f && f.type.indexOf('image/') === 0) changeThumb(vtTarget, f);
+      });
+      return vtEdit;
+    }
+    function changeThumb(v, file) {
+      if (thumbBusy || !v) return;
+      thumbBusy = true;
+      var btn = photoEl && photoEl.querySelector('button[data-rvthumb="' + v.id + '"]');
+      if (btn) { btn.disabled = true; btn.textContent = '올리는 중...'; }
+      var old = v.thumb_url;
+      var made = null;
+      putThumb(file).then(function (url) {
+        made = url;
+        return db().then(function (c) {
+          return c.from('sichal_photos').update({ thumb_url: url }).eq('id', v.id).select('id').then(function (r) {
+            if (r.error) throw r.error;
+            if (!(r.data && r.data.length)) throw new Error('올린 분이나 시찰 임원만 바꿀 수 있습니다.');
+            made = null;          /* 이제 이 그림을 쓰고 있다 */
+            if (!v.gallery_item_id) return true;
+            /* 노회 갤러리에 실린 영상이면 그쪽 겉그림도 함께 바꾼다 */
+            return c.from('gallery_items').update({ image_url: url, thumb_url: url })
+              .eq('id', v.gallery_item_id).select('id')
+              .then(function (g) { return !g.error && !!(g.data && g.data.length); }, function () { return false; });
+          });
+        });
+      }).then(function (free) {
+        /* 노회 갤러리가 아직 옛 그림을 쓰면 지우지 않는다 (유튜브 기본 그림이면 아무 일도 없다) */
+        if (free) SHSPhotos.remove(old);
+        SHS.logAction('update', '시찰 영상 썸네일', NAME + ' / ' + (v.album || ''));
+        reload(function () { drawPhotos(photoEl); });
+      }).catch(function (x) {
+        if (made) SHSPhotos.remove(made);
+        if (btn) { btn.disabled = false; btn.textContent = '썸네일 바꾸기'; }
+        alert('썸네일을 바꾸지 못했습니다: ' + ((x && x.message) || x));
+      }).then(function () { thumbBusy = false; });
+    }
+
+    /* ----- 영상을 노회 갤러리 영상 칸에도 싣는다 ----- */
+    function publishVideo(v, btn, box) {
+      if (!v || v.gallery_item_id || btn.disabled) return;
+      var title = v.album || '시찰 영상';
+      if (!confirm('「' + title + '」 영상을 노회 갤러리 영상 칸에도 올립니다. ' +
+                   '시찰 사진첩에도 그대로 남습니다. 계속하시겠습니까?')) return;
+      var id = ytId(v.image_url);
+      var thumb = v.thumb_url || ytThumb(id);
+      btn.disabled = true;
+      btn.textContent = '올리는 중...';
+      db().then(function (c) {
+        return c.from('gallery_items').insert({
+          title: title, taken: v.taken || today(), category: '영상',
+          caption: v.caption || null,
+          link_url: 'https://www.youtube.com/watch?v=' + id,
+          image_url: thumb, thumb_url: thumb, sort: 0,
+          author_id: user.id, author_name: user.name
+        }).select();
+      }).then(function (r) {
+        if (r.error) throw r.error;
+        var g = r.data && r.data[0];
+        if (!g) throw new Error('권한을 확인해 주세요.');
+        return db().then(function (c) {
+          return c.from('sichal_photos').update({
+            gallery_item_id: g.id, published_at: new Date().toISOString(), published_by: user.name
+          }).eq('id', v.id);
+        });
+      }).then(function () {
+        SHS.logAction('create', '시찰 영상 노회 게시', NAME + ' / ' + title);
+        reload(function () {
+          drawPhotos(box);
+          alert('「' + title + '」 영상을 노회 갤러리에 올렸습니다.\n갤러리 화면의 영상 칸에서 보실 수 있습니다.');
+        });
+      }).catch(function (x) {
+        btn.disabled = false;
+        btn.textContent = '노회 홈페이지에 게시하기';
+        fail(x);
       });
     }
 
@@ -780,9 +1167,10 @@ var SHSRoom = (function () {
     }
 
     function unpublish(id, box) {
-      var p = photos.filter(function (x) { return String(x.id) === String(id); })[0];
+      var p = rowOf(id);
       if (!p || !p.gallery_item_id) return;
-      if (!confirm('이 사진을 노회 갤러리에서 내립니다. 시찰 사진첩에는 그대로 남습니다. 계속하시겠습니까?')) return;
+      var what = isVid(p) ? '영상' : '사진';
+      if (!confirm('이 ' + what + '을 노회 갤러리에서 내립니다. 시찰 사진첩에는 그대로 남습니다. 계속하시겠습니까?')) return;
       db().then(function (c) {
         return c.from('gallery_items').delete().eq('id', p.gallery_item_id).select('id');
       }).then(function (r) {
@@ -794,22 +1182,26 @@ var SHSRoom = (function () {
           }).eq('id', p.id);
         });
       }).then(function () {
-        SHS.logAction('delete', '시찰 사진 노회 게시 취소', NAME + ' / ' + (p.album || ''));
+        SHS.logAction('delete', '시찰 ' + what + ' 노회 게시 취소', NAME + ' / ' + (p.album || ''));
         reload(function () { drawPhotos(box); });
       }).catch(fail);
     }
 
     function removePhoto(id, box) {
-      var p = photos.filter(function (x) { return String(x.id) === String(id); })[0];
+      var p = rowOf(id);
       if (!p) return;
+      var what = isVid(p) ? '영상' : '사진';
       var warn = p.gallery_item_id
-        ? '이 사진은 노회 갤러리에도 실려 있습니다. 지우면 노회 갤러리에서도 함께 사라집니다.\n\n계속하시겠습니까?'
-        : '이 사진을 지웁니다. 되돌릴 수 없습니다. 계속하시겠습니까?';
+        ? '이 ' + what + '은 노회 갤러리에도 실려 있습니다. 지우면 노회 갤러리에서도 함께 사라집니다.\n\n계속하시겠습니까?'
+        : '이 ' + what + '을 지웁니다. 되돌릴 수 없습니다. 계속하시겠습니까?';
       if (!confirm(warn)) return;
 
+      var freed = true;   /* 노회 갤러리가 더는 이 파일을 쓰지 않는가 */
       db().then(function (c) {
         var pre = p.gallery_item_id
-          ? c.from('gallery_items').delete().eq('id', p.gallery_item_id).then(function () {}, function () {})
+          ? c.from('gallery_items').delete().eq('id', p.gallery_item_id).select('id').then(function (g) {
+              freed = !g.error && !!(g.data && g.data.length);
+            }, function () { freed = false; })
           : Promise.resolve();
         return pre.then(function () {
           return c.from('sichal_photos').delete().eq('id', p.id).select('id');
@@ -817,11 +1209,14 @@ var SHSRoom = (function () {
       }).then(function (r) {
         if (r.error) throw r.error;
         if (!(r.data && r.data.length)) throw new Error('지우지 못했습니다. 권한을 확인해 주세요.');
+        /* 노회 갤러리에서 내리지 못했으면 그쪽에서 계속 보이도록 파일은 남겨 둔다.
+         * 영상의 유튜브 주소·기본 그림은 보관소 파일이 아니므로 아무 일도 없다. */
+        if (!freed) return;
         return SHSPhotos.remove(p.image_url)
           .then(function () { return SHSPhotos.remove(p.thumb_url); })
           .catch(function () {});
       }).then(function () {
-        SHS.logAction('delete', '시찰 사진 삭제', NAME + ' / ' + (p.album || ''));
+        SHS.logAction('delete', '시찰 ' + what + ' 삭제', NAME + ' / ' + (p.album || ''));
         delete picked[p.id];
         reload(function () { drawPhotos(box); });
       }).catch(fail);
@@ -830,7 +1225,7 @@ var SHSRoom = (function () {
     return {
       load: load,
       postCount: function () { return posts.length; },
-      photoCount: function () { return photos.length; },
+      photoCount: function () { return photos.length + videos.length; },
       drawBoard: drawBoard,
       drawPhotos: drawPhotos
     };
