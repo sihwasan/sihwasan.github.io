@@ -1,6 +1,8 @@
 name = "sihwasan-audio"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
+# 노회 Cloudflare 계정 (Sihwasan_presbytery@naver.com) — 다른 계정으로 로그인되어 있어도 이 계정에만 배포한다
+account_id = "0c1cf1f4bfdcd3e33660b6d07e66378f"
 
 # 회의 녹음 파일을 담아 둘 R2 보관함 (공개 접근 꺼짐)
 [[r2_buckets]]
