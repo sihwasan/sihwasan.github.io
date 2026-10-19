@@ -727,6 +727,10 @@
     if (n.kind === '운영' && key.indexOf('handover-') === 0) {
       return 'dashboard.html';
     }
+    /* 회의 녹음 열람 허용(113) — 회의 녹음 듣기 화면으로 */
+    if (key.indexOf('maudio-') === 0) {
+      return 'minutes-audio.html';
+    }
     /* 정기노회 4주 전 총대 장로 임기 확인(111) — 서기의 공문 시안 화면으로 */
     if (key.indexOf('elder-term-') === 0) {
       return 'elder-notice.html';

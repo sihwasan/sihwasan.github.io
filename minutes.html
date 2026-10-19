@@ -34,7 +34,8 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261013a"></script>
+<script src="js/main.js?v=20261019a"></script>
+<script src="js/minutes-audio.js?v=20261019a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -58,6 +59,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   var canEdit = SHSAuth.canManageMembers(user);
   var docs = [];   /* {id, title, meeting_date, html, body} */
+  var audioCount = {};   /* 회의록 번호 → 내가 들을 수 있는 녹음 수 */
 
   gate.innerHTML =
     '<div class="notice-banner">본 회의록은 <strong>노회 임원만</strong> 열람할 수 있는 자료입니다. 외부 유출을 금합니다.</div>';
@@ -89,7 +91,8 @@ document.addEventListener('DOMContentLoaded', function () {
         (canEdit ? '<th style="width:130px">관리</th>' : '') + '</tr></thead><tbody>';
       docs.forEach(function (d, i) {
         html += '<tr><td>' + (docs.length - i) + '</td>' +
-          '<td class="left"><a href="#" data-mbview="' + i + '" style="color:var(--navy);text-decoration:underline">' + e(d.title) + '</a></td>' +
+          '<td class="left"><a href="#" data-mbview="' + i + '" style="color:var(--navy);text-decoration:underline">' + e(d.title) + '</a>' +
+          (audioCount[d.id] ? '<span class="ma-badge">녹음 ' + audioCount[d.id] + '</span>' : '') + '</td>' +
           '<td>' + e(d.meeting_date || '-') + '</td>';
         if (canEdit) {
           html += '<td>' +
@@ -116,9 +119,12 @@ document.addEventListener('DOMContentLoaded', function () {
       '<p><button class="btn ghost sm" id="mb-back">목록으로</button></p>' +
       '<h2>' + e(d.title) + '</h2>' +
       (d.meeting_date ? '<p style="color:var(--gray-5);font-size:0.9rem">회의 날짜: ' + e(d.meeting_date) + '</p>' : '') +
+      '<div id="mb-audio" style="margin-top:14px"></div>' +
       '<div style="margin-top:16px">' + content + '</div>' +
       '<p style="margin-top:24px"><button class="btn ghost sm" id="mb-back2">목록으로</button></p>';
     viewBox.classList.remove('hidden');
+    /* 회의 녹음 — 서기·회록서기가 올리고, 서기·회록서기·노회장·간사가 듣는다 (113 sql) */
+    if (window.SHSAudio) SHSAudio.mountMinutes(document.getElementById('mb-audio'), user, d);
     window.scrollTo({ top: 0 });
     ['mb-back', 'mb-back2'].forEach(function (id) {
       var b = document.getElementById(id);
@@ -217,7 +223,15 @@ document.addEventListener('DOMContentLoaded', function () {
           return;
         }
         docs = r.data || [];
-        renderList();
+        /* 녹음이 붙은 회의록에 표시 (113 sql 을 실행하기 전이면 그냥 넘어간다) */
+        return SHSCloud.init().then(function (c) {
+          return c.from('minutes_audio').select('minutes_id');
+        }).then(function (a) {
+          audioCount = {};
+          ((a && !a.error && a.data) || []).forEach(function (x) {
+            audioCount[x.minutes_id] = (audioCount[x.minutes_id] || 0) + 1;
+          });
+        }, function () {}).then(renderList);
       });
       return;
     }

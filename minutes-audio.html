@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>회의 녹음 듣기 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20260921j">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>회의 녹음 듣기</h1>
+    <div class="crumb">홈 &gt; 회의 녹음 듣기</div>
+  </div>
+</div>
+
+<main class="page-body container" style="max-width:900px" id="main">
+  <div id="ma-gate"></div>
+  <div id="ma-list"></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261019a"></script>
+<script src="js/minutes-audio.js?v=20261019a"></script>
+<script>
+/* 회의 녹음 듣기 — 서기·노회장이 기간을 정해 열어 준 녹음을 듣는 곳 (113 sql)
+ * 서기·회록서기·노회장·간사는 모든 녹음이 보인다. */
+document.addEventListener('DOMContentLoaded', function () {
+  SHS.getUser().then(function (user) {
+    var gate = document.getElementById('ma-gate');
+    if (!user) {
+      try { sessionStorage.setItem('shs_next', 'minutes-audio.html'); } catch (x) {}
+      gate.innerHTML = '<div class="notice-banner">회의 녹음은 로그인한 회원만 들을 수 있습니다. ' +
+        '<a class="btn sm" style="margin-left:10px" href="login.html">로그인</a></div>';
+      return;
+    }
+    if (!(user.cloud && window.SHSCloud && SHSCloud.enabled())) {
+      gate.innerHTML = '<div class="notice-banner">회의 녹음은 서버 계정(구글 또는 이메일)으로 로그인해야 들을 수 있습니다.</div>';
+      return;
+    }
+    gate.innerHTML = '<div class="notice-banner" style="margin-bottom:16px">서기·노회장이 기간을 정해 열어 준 회의 녹음입니다. ' +
+      '기간이 끝나면 목록에서 사라집니다. 녹음은 노회 안에서만 들어 주시고 밖으로 옮기지 말아 주세요.</div>';
+    SHSAudio.mountMine(document.getElementById('ma-list'), user);
+  });
+});
+</script>
+</body>
+</html>
