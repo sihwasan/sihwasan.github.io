@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 홈 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261020a">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>관리자 홈</h1>
+    <div class="crumb">홈 &gt; 관리자</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="ah-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261020a"></script>
+<script src="js/ai-chat.js?v=20261020a"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('ah-area');
+  var e = SHS.esc;
+
+  if (!user || !SHSAuth.canManageMembers(user)) {
+    area.innerHTML =
+      '<div class="notice-banner">관리자 홈은 <strong>관리자 등급</strong>이 이용할 수 있습니다.' +
+      (user ? ' 현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 이용할 수 없습니다.'
+            : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') + '</div>';
+    return;
+  }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  function tile(id, label, href, hint) {
+    return '<a class="ah-tile" href="' + href + '"><span class="ah-label">' + label + '</span>' +
+      '<span class="ah-num" id="' + id + '">…</span><span class="ah-hint">' + hint + '</span></a>';
+  }
+  area.innerHTML =
+    '<div class="notice-banner"><strong>' + e(SHS.honorific(user)) + '</strong>, 관리자 모드입니다. ' +
+    '왼쪽 메뉴에서 홈페이지·회원·회무·설정을 관리합니다. 아래는 지금 손볼 일입니다.</div>' +
+    '<div class="ah-grid">' +
+    tile('ah-pending', '승인 대기 회원', 'admin.html', '가입했지만 아직 승인하지 않은 분') +
+    tile('ah-docs', '서류 신청 대기', 'documents.html#requests', '발급을 기다리는 신청') +
+    tile('ah-reports', '보고서 접수 대기', 'report-intake.html', '시찰을 거쳐 올라온 교회상황 보고서') +
+    tile('ah-ai', 'AI 검색 오늘 사용', 'admin-ai.html', '노회 전체 질문 수') +
+    '</div>' +
+    '<div class="ah-cols">' +
+    '<section class="admin-card"><h3 style="margin-top:0">다가오는 일정 <a class="more" href="schedule.html" style="font-size:0.8rem;font-weight:400">일정 관리</a></h3><div id="ah-sched">불러오는 중…</div></section>' +
+    '<section class="admin-card"><h3 style="margin-top:0">최근 공지 <a class="more" href="manage.html#mg-notice" style="font-size:0.8rem;font-weight:400">공지 관리</a></h3><div id="ah-notice">불러오는 중…</div></section>' +
+    '<section class="admin-card"><h3 style="margin-top:0">최근 활동 기록 <a class="more" href="ops.html#ops-audit" style="font-size:0.8rem;font-weight:400">전체 보기</a></h3><div id="ah-audit">불러오는 중…</div></section>' +
+    '</section></div>' +
+    '<h2>바로 가기</h2>' +
+    '<div class="ah-links">' +
+    [['manage.html#mg-hero', '메인 화면 문구'], ['schedule.html', '노회 일정 등록'], ['manage.html#mg-notice', '공지 쓰기'],
+     ['admin.html', '회원 승인·명단'], ['documents.html', '서류 발급'], ['meeting-admin.html', '노회 회의관리'],
+     ['minutes.html', '회의록'], ['admin-ai.html', 'AI 검색·API'], ['settings.html', '직인·도장'], ['archive-edit.html', '자료실·회칙']]
+      .map(function (l) { return '<a class="btn ghost sm" href="' + l[0] + '">' + l[1] + '</a>'; }).join(' ') +
+    '</div>';
+
+  function num(id, v, warn) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = v;
+    if (warn && Number(v) > 0) el.classList.add('warn');
+  }
+
+  SHSCloud.init().then(function (c) {
+    c.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'pending')
+      .then(function (r) { num('ah-pending', r.count == null ? '-' : r.count, true); }, function () { num('ah-pending', '-'); });
+    c.from('doc_requests').select('id', { count: 'exact', head: true }).eq('status', '신청')
+      .then(function (r) { num('ah-docs', r.count == null ? '-' : r.count, true); }, function () { num('ah-docs', '-'); });
+    c.from('church_reports').select('id', { count: 'exact', head: true }).not('presbytery_sent_at', 'is', null).is('approved_at', null)
+      .then(function (r) { num('ah-reports', r.count == null ? '-' : r.count, true); }, function () { num('ah-reports', '-'); });
+
+    c.from('site_schedule').select('id,title,kind,event_date,end_date').gte('event_date', today).order('event_date').limit(6)
+      .then(function (r) {
+        var rows = (r && r.data) || [];
+        document.getElementById('ah-sched').innerHTML = rows.length
+          ? '<ul class="ah-list">' + rows.map(function (s) {
+              return '<li><span class="ah-d">' + e(s.event_date.slice(5).replace('-', '.')) + (s.end_date ? '~' : '') + '</span>' +
+                '<span class="ah-k">' + e(s.kind || '') + '</span> ' + e(s.title) + '</li>';
+            }).join('') + '</ul>'
+          : '<p style="color:var(--gray-5);margin:0">앞으로 등록된 일정이 없습니다. <a href="schedule.html">일정을 등록</a>하면 공지에도 함께 올라갑니다.</p>';
+      });
+    c.from('site_notices').select('id,cat,title,date,schedule_id').order('date', { ascending: false }).order('id', { ascending: false }).limit(6)
+      .then(function (r) {
+        var rows = (r && r.data) || [];
+        document.getElementById('ah-notice').innerHTML = rows.length
+          ? '<ul class="ah-list">' + rows.map(function (n) {
+              return '<li><span class="ah-d">' + e(String(n.date).slice(5).replace('-', '.')) + '</span><span class="ah-k">' + e(n.cat) + '</span> ' + e(n.title) +
+                (n.schedule_id ? ' <small style="color:var(--gray-5)">(일정에서 자동)</small>' : '') + '</li>';
+            }).join('') + '</ul>'
+          : '<p style="color:var(--gray-5);margin:0">공지가 없습니다.</p>';
+      }, function () { document.getElementById('ah-notice').textContent = '-'; });
+    c.from('audit_logs').select('created_at,user_name,action,detail').order('created_at', { ascending: false }).limit(8)
+      .then(function (r) {
+        var rows = (r && r.data) || [];
+        document.getElementById('ah-audit').innerHTML = rows.length
+          ? '<ul class="ah-list">' + rows.map(function (a) {
+              return '<li><span class="ah-d">' + e(String(a.created_at).replace('T', ' ').slice(5, 16)) + '</span>' +
+                '<strong>' + e(a.user_name || '') + '</strong> ' + e(a.action) + ' <small style="color:var(--gray-5)">' + e(String(a.detail || '').slice(0, 40)) + '</small></li>';
+            }).join('') + '</ul>'
+          : '<p style="color:var(--gray-5);margin:0">기록이 없습니다.</p>';
+      }, function () { document.getElementById('ah-audit').textContent = '-'; });
+  });
+
+  /* AI 창구 */
+  SHSCloud.init().then(function (c) { return c.auth.getSession(); }).then(function (r) {
+    var tk = r && r.data && r.data.session && r.data.session.access_token;
+    if (!tk) return;
+    return fetch(SHSAI.url + '/settings', { headers: { Authorization: 'Bearer ' + tk } }).then(function (x) { return x.json(); })
+      .then(function (s) {
+        var el = document.getElementById('ah-ai');
+        if (!el) return;
+        if (s.error) { el.textContent = '연결 안 됨'; el.classList.add('warn'); return; }
+        el.textContent = (s.usage ? s.usage.total : 0) + ' / ' + s.daily_total;
+        if (!s.has_key || !s.enabled) { el.textContent = s.has_key ? '꺼짐' : '열쇠 없음'; el.classList.add('warn'); }
+      }).catch(function () { var el = document.getElementById('ah-ai'); if (el) { el.textContent = '창구 미배포'; el.classList.add('warn'); } });
+  });
+ });
+});
+</script>
+</body>
+</html>

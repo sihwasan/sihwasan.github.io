@@ -43,9 +43,28 @@ var AsmLib = (function () {
 
     var books = [], current = null;
 
-    function bookNoFromHash() {
-      var m = (location.hash || '').match(/^#b(\d+)/);
-      return m ? parseInt(m[1], 10) : null;
+    /* #b5 (책) · #b5-s3 (장) · #b5-s3-a35 (장 안의 제35조) — AI 검색의 근거 링크가 쓴다 */
+    function hashTarget() {
+      var m = (location.hash || '').match(/^#b(\d+)(?:-s(\d+))?(?:-a(\d+))?/);
+      return m ? { n: parseInt(m[1], 10), s: m[2] != null ? parseInt(m[2], 10) : null, a: m[3] != null ? parseInt(m[3], 10) : null } : null;
+    }
+    function bookNoFromHash() { var t = hashTarget(); return t ? t.n : null; }
+    /* 장(섹션)과 조문으로 옮겨 가 표시한다 */
+    function jumpTo(t) {
+      if (!t || t.s == null) return;
+      var sec = document.getElementById('lib-sec-' + t.s);
+      if (!sec) return;
+      var target = sec;
+      if (t.a != null) {
+        var re = new RegExp('^\\s*제\\s*' + t.a + '\\s*조(?!\\d)');
+        var heads = sec.querySelectorAll('h5, .tit_dept_2, h4, h3');
+        for (var i = 0; i < heads.length; i++) {
+          if (re.test(heads[i].textContent || '')) { target = heads[i]; break; }
+        }
+      }
+      document.querySelectorAll('.lib-hit').forEach(function (x) { x.classList.remove('lib-hit'); });
+      target.classList.add('lib-hit');
+      [60, 500, 1500].forEach(function (ms) { setTimeout(function () { target.scrollIntoView({ block: 'start' }); }, ms); });
     }
 
     function renderTabs() {
@@ -95,13 +114,16 @@ var AsmLib = (function () {
       if (srchEl) srchEl.value = '';
       sideEl.innerHTML = '<div class="lib-side-empty">불러오는 중…</div>';
       docEl.innerHTML = '<div class="lib-loading">본문을 불러오는 중입니다…</div>';
-      if (history.replaceState) history.replaceState(null, '', '#b' + b.n);
+      var t = hashTarget();
+      var deep = t && t.n === b.n && t.s != null ? t : null;
+      if (history.replaceState) history.replaceState(null, '', deep ? location.hash : '#b' + b.n);
       getJson(cfg.itemUrl(b.n)).then(function (doc) {
         if (current !== b) return;
         b.doc = doc;
         renderSide(doc, '');
         renderDoc(doc);
-        if (!keepScroll) window.scrollTo(0, 0);
+        if (deep) jumpTo(deep);
+        else if (!keepScroll) window.scrollTo(0, 0);
       }).catch(function () { fail(docEl); });
     }
 
@@ -130,8 +152,10 @@ var AsmLib = (function () {
     }).catch(function () { fail(docEl); });
 
     window.addEventListener('hashchange', function () {
-      var n = bookNoFromHash();
-      if (n && (!current || current.n !== n)) select(n);
+      var t = hashTarget();
+      if (!t) return;
+      if (!current || current.n !== t.n) select(t.n);
+      else jumpTo(t);
     });
   }
 
@@ -147,6 +171,26 @@ var AsmLib = (function () {
     function sessFromHash() {
       var m = (location.hash || '').match(/^#s(\d+)/);
       return m ? parseInt(m[1], 10) : null;
+    }
+    /* #s110-i3 → 그 회기 본문의 4번째 ■ 항목 (AI 검색의 근거 링크) */
+    function itemFromHash() {
+      var m = (location.hash || '').match(/^#s\d+-i(\d+)/);
+      return m ? parseInt(m[1], 10) : null;
+    }
+    function jumpToItem(i) {
+      var cont = viewEl.querySelector('.lib-res-cont');
+      if (!cont || i == null) return;
+      var walker = document.createTreeWalker(cont, NodeFilter.SHOW_TEXT);
+      var n, k = -1, hit = null;
+      while ((n = walker.nextNode())) {
+        if (n.nodeValue.indexOf('■') === -1) continue;
+        k++;
+        if (k === i) { hit = n.parentNode; break; }
+      }
+      if (!hit) return;
+      document.querySelectorAll('.lib-hit').forEach(function (x) { x.classList.remove('lib-hit'); });
+      hit.classList.add('lib-hit');
+      [60, 500, 1500].forEach(function (ms) { setTimeout(function () { hit.scrollIntoView({ block: 'start' }); }, ms); });
     }
 
     function renderList(filter) {
@@ -180,7 +224,8 @@ var AsmLib = (function () {
       listEl.classList.add('hidden');
       viewEl.classList.remove('hidden');
       viewEl.innerHTML = '<div class="lib-loading">불러오는 중입니다…</div>';
-      if (history.replaceState) history.replaceState(null, '', '#s' + s);
+      var item = sessFromHash() === s ? itemFromHash() : null;
+      if (history.replaceState) history.replaceState(null, '', item != null ? location.hash : '#s' + s);
       getJson('data/assembly/resolution-' + s + '.json').then(function (r) {
         viewEl.innerHTML =
           '<button type="button" class="btn ghost" id="res-back">&larr; 목록으로</button>' +
@@ -195,7 +240,7 @@ var AsmLib = (function () {
         viewEl.querySelector('.lib-res-cont').innerHTML = r.cont || '<p>등록된 내용이 없습니다.</p>';
         var back = document.getElementById('res-back');
         if (back) back.addEventListener('click', function () { showList(); });
-        window.scrollTo(0, 0);
+        if (item != null) jumpToItem(item); else window.scrollTo(0, 0);
       }).catch(function () { fail(viewEl); });
     }
 

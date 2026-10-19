@@ -4,10 +4,8 @@ title 시화산노회 서버 자동 실행 등록
 setlocal
 
 echo.
-echo   컴퓨터를 켤 때 아래 두 가지가 저절로 돌아가도록 등록합니다.
-echo.
-echo     1. 자료 검색 서버   (총회자료실 검색)
-echo     2. 관리자 알림 봇   (텔레그램)
+echo   컴퓨터를 켤 때 관리자 알림 봇(텔레그램)이 저절로 돌아가도록 등록합니다.
+echo   (AI 자료 검색은 2026-10 부터 Cloudflare 창구(cloudflare/ai)가 맡아 이 컴퓨터가 필요 없습니다)
 echo.
 echo   창은 뜨지 않고 조용히 돌아갑니다.
 echo.
@@ -19,8 +17,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "  'Dim sh, fso'," ^
   "  'Set sh = CreateObject(\"WScript.Shell\")'," ^
   "  'Set fso = CreateObject(\"Scripting.FileSystemObject\")'," ^
-  "  ('sh.CurrentDirectory = \"' + $tools + '\ai-search\"')," ^
-  "  'sh.Run \"cmd /c node server.js >> server.log 2>&1\", 0, False'," ^
   "  ('If fso.FileExists(\"' + $tools + '\telegram-bot\config.json\") Then')," ^
   "  ('  sh.CurrentDirectory = \"' + $tools + '\telegram-bot\"')," ^
   "  '  sh.Run \"cmd /c node bot.js >> bot.log 2>&1\", 0, False'," ^
@@ -36,6 +32,6 @@ pause > nul
 wscript "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\시화산노회 서버.vbs"
 
 echo.
-echo   실행했습니다. 잠시 뒤 홈페이지 총회자료실에서 확인해 보세요.
+echo   실행했습니다.
 echo.
 pause

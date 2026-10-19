@@ -1,6 +1,9 @@
 /* 시화산노회 홈페이지 - 공통 레이아웃 및 유틸 */
 
 (function () {
+  /* AI 검색 근거 서랍처럼 다른 화면 안에 끼워 보일 때는 머리글·메뉴·발자국을 감춘다 */
+  if (/[?&]embed=1(?:&|$)/.test(location.search)) document.documentElement.classList.add('embed');
+
   /* 서버 인증을 사용하는 환경에서는 예전 '이 컴퓨터 전용' 로그인 기록을 정리한다.
    * 이것이 남아 있으면 서버 자료를 읽지 못하는 상태로 로그인된 것처럼 보인다. */
   if (window.SHS_SUPABASE && SHS_SUPABASE.ready && SHS_SUPABASE.ready()) {
@@ -98,15 +101,30 @@
    *   · 노회 운영·감독(감사 기록) → 사이트 관리 안의 탭
    *   · 직인·도장       → 따로 세운 항목 (예전 '홈페이지 설정' 화면)
    * 서류 발급은 관리자 일이므로 여기로 들여왔다. */
-  var ADMIN_NAV = { title: '관리자', href: 'manage.html', sub: [
+  var ADMIN_NAV = { title: '관리자', href: 'admin-home.html', sub: [
+    { t: '관리자 홈', h: 'admin-home.html' },
     { t: '사이트 관리', h: 'manage.html' },
     { t: '회원 관리', h: 'admin.html' },
     { t: '상비부 관리', h: 'admin.html?view=com' },
     { t: '교회상황 보고서 접수', h: 'report-intake.html' },
     { t: '서류 발급', h: 'documents.html' },
     { t: '자료·회칙 관리', h: 'archive-edit.html' },
-    { t: '직인·도장', h: 'settings.html' }
+    { t: '직인·도장', h: 'settings.html' },
+    { t: 'AI 검색·API 설정', h: 'admin-ai.html' }
   ]};
+
+  /* 관리자 모드(왼쪽 메뉴)를 씌울 관리 화면들 — js/admin-shell.js 가 맡는다 */
+  var ADMIN_PAGES = ['admin-home.html', 'admin-ai.html', 'manage.html', 'admin.html', 'schedule.html', 'archive-edit.html',
+    'elder-notice.html', 'meeting-admin.html', 'proceed.html', 'documents.html', 'report-intake.html',
+    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html'];
+  function loadAdminShell() {
+    var pg = location.pathname.split('/').pop() || 'index.html';
+    if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
+    if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
+    var sc = document.createElement('script');
+    sc.src = 'js/admin-shell.js?v=20261020a';
+    document.body.appendChild(sc);
+  }
 
   /* 로그인한 정회원에게 상단 메뉴 맨 앞에 <대시보드>를 보여 준다.
    * 공지·일정·내 상비부·서류·교회상황 보고서를 한자리에서 본다. */
@@ -612,6 +630,7 @@
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) {
           addAdminMenu();
           addScheduleMenu();
+          loadAdminShell();
         }
 
         /* 노회 진행 매니저 — 서기만 (최고관리자는 관리를 위해 함께 본다) */
@@ -831,7 +850,7 @@
       setTimeout(function () {
         card.classList.add('out');
         setTimeout(function () { card.remove(); }, 500);
-      }, 12000 + i * 250);
+      }, 5000 + i * 250);   /* 5초 뒤 위로 서서히 사라진다 */
     });
   }
 

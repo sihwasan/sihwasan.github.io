@@ -13,7 +13,7 @@
 <meta property="og:description" content="시화산노회 정기노회 회의록입니다. 회기별 회의 내용과 결의사항을 볼 수 있습니다.">
 <meta property="og:url" content="https://sihwasan.org/minutes.html">
 <meta property="og:image" content="https://sihwasan.org/images/og-cover.png">
-<link rel="stylesheet" href="css/style.css?v=20260921j">
+<link rel="stylesheet" href="css/style.css?v=20261020a">
 </head>
 <body>
 
@@ -34,7 +34,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261019a"></script>
+<script src="js/main.js?v=20261020a"></script>
 <script src="js/minutes-audio.js?v=20261019a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -131,6 +131,26 @@ document.addEventListener('DOMContentLoaded', function () {
       if (b) b.addEventListener('click', renderList);
     });
     SHS.logAction('view', '회의록 열람', d.title);
+  }
+
+  /* 본문에서 낱말을 찾아 표시하고 첫 자리로 옮겨 간다 */
+  function highlight(root, q) {
+    q = String(q || '').trim();
+    if (!q || !root) return;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    var nodes = [], n;
+    while ((n = walker.nextNode())) if (n.nodeValue.indexOf(q) !== -1) nodes.push(n);
+    var first = null;
+    nodes.slice(0, 60).forEach(function (t) {
+      var parts = t.nodeValue.split(q);
+      var frag = document.createDocumentFragment();
+      parts.forEach(function (ptxt, i) {
+        frag.appendChild(document.createTextNode(ptxt));
+        if (i < parts.length - 1) { var m = document.createElement('mark'); m.className = 'ai-hl'; m.textContent = q; frag.appendChild(m); if (!first) first = m; }
+      });
+      t.parentNode.replaceChild(frag, t);
+    });
+    if (first) setTimeout(function () { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 80);
   }
 
   function bindList() {
@@ -231,7 +251,14 @@ document.addEventListener('DOMContentLoaded', function () {
           ((a && !a.error && a.data) || []).forEach(function (x) {
             audioCount[x.minutes_id] = (audioCount[x.minutes_id] || 0) + 1;
           });
-        }, function () {}).then(renderList);
+        }, function () {}).then(function () {
+          renderList();
+          /* AI 검색 근거 링크(minutes.html?id=N&q=낱말): 그 회의록을 바로 열고 낱말을 표시한다 */
+          var qs = new URLSearchParams(location.search);
+          var pid = qs.get('id');
+          var d0 = pid && docs.filter(function (x) { return String(x.id) === pid; })[0];
+          if (d0) { renderView(d0); highlight(viewBox, qs.get('q')); }
+        });
       });
       return;
     }

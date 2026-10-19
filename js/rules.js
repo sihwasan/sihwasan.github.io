@@ -39,6 +39,32 @@ var SHSRules = (function () {
     return '<ol>' + lines.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ol>';
   }
 
+  /* 조문 꼬리표: rule-main-a12 (노회규칙 제12조) — AI 검색의 근거 링크가 쓴다 */
+  function artId(docKey, title) {
+    var m = String(title || '').match(/제\s*(\d+)\s*조/);
+    return m ? docKey + '-a' + m[1] : '';
+  }
+  /* 주소의 #rule-main-a12 로 그 탭을 켜고 조문으로 옮겨 간다.
+   * 서버 조문이든 화면에 미리 실린 조문이든 똑같이 동작한다. */
+  function applyHash(container) {
+    var m = (location.hash || '').match(/^#(rule-[a-z]+)(?:-a(\d+))?$/);
+    if (!m || !container) return;
+    var btn = container.querySelector('.tabs button[data-tab="' + m[1] + '"]');
+    if (btn && !btn.classList.contains('active')) btn.click();
+    if (!m[2]) return;
+    var panel = document.getElementById(m[1]);
+    if (!panel) return;
+    /* 미리 실린 조문에는 꼬리표가 없으니 제목을 보고 붙인다 */
+    panel.querySelectorAll('.rule-article').forEach(function (a) {
+      if (!a.id) { var h4 = a.querySelector('h4'); var id = h4 ? artId(m[1], h4.textContent) : ''; if (id) a.id = id; }
+    });
+    var el = document.getElementById(m[1] + '-a' + m[2]);
+    if (!el) return;
+    container.querySelectorAll('.rule-article.ai-target').forEach(function (x) { x.classList.remove('ai-target'); });
+    el.classList.add('ai-target');
+    setTimeout(function () { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80);
+  }
+
   function docHtml(doc, arts) {
     var h = '';
     if (doc.intro) {
@@ -51,7 +77,8 @@ var SHSRules = (function () {
         chapter = a.chapter;
         h += '<div class="rule-chapter">' + esc(a.chapter) + '</div>';
       }
-      h += '<div class="rule-article">' +
+      var id = artId(doc.key, a.title);
+      h += '<div class="rule-article"' + (id ? ' id="' + id + '"' : '') + '>' +
         (a.title ? '<h4>' + esc(a.title) + '</h4>' : '') +
         bodyHtml(a.body) + '</div>';
     });
@@ -65,7 +92,7 @@ var SHSRules = (function () {
   function render(book, container, user) {
     if (!container) return Promise.resolve(false);
     return load(book).then(function (d) {
-      if (!d) return false;
+      if (!d) { applyHash(container); window.addEventListener('hashchange', function () { applyHash(container); }); return false; }
 
       var byDoc = {};
       d.articles.forEach(function (a) {
@@ -109,9 +136,11 @@ var SHSRules = (function () {
         bar.innerHTML = '<a class="btn sm" href="archive-edit.html#tab-rules">회칙 개정 반영하기</a>';
         tabs.parentNode.insertBefore(bar, tabs);
       }
+      applyHash(container);
+      window.addEventListener('hashchange', function () { applyHash(container); });
       return true;
     });
   }
 
-  return { load: load, render: render, bodyHtml: bodyHtml, esc: esc };
+  return { load: load, render: render, bodyHtml: bodyHtml, esc: esc, applyHash: applyHash };
 })();

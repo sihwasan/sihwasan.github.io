@@ -1,0 +1,33 @@
+name = "sihwasan-ai"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+# 늘 시화산노회 계정(Sihwasan_presbytery@naver.com)에 올린다.
+# 다른 계정으로 로그인한 채 deploy 하면 여기서 막혀 엉뚱한 곳에 올라가지 않는다.
+account_id = "0c1cf1f4bfdcd3e33660b6d07e66378f"
+
+# AI 자료 검색 창구 (Claude API)
+#
+# 열쇠(ANTHROPIC API 키)와 모델·한도 설정은 이 파일이 아니라 KV(AI_KV)에 둔다.
+# 관리자가 홈페이지 「관리자 → AI 검색·API 설정」에서 넣고 바꾼다.
+#
+# 부르는 사람이 누구인지 확인할 때 쓰는 주소.
+# anon 키는 홈페이지에 이미 공개되어 있는 값이므로 비밀이 아니다.
+[vars]
+SUPABASE_URL = "https://ltbhgwozkffenahqdzfj.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Ymhnd296a2ZmZW5haHFkemZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDk0MDYsImV4cCI6MjEwMTkyNTQwNn0.nSptHsi7nTCWTiyTe_Kl9xpxyHJ3pkhRGoZLI1BdsnI"
+# 총회 자료 색인(data/ai/index.json)을 받아 올 홈페이지 주소
+SITE_URL = "https://sihwasan.org"
+
+# 설정·열쇠·오늘 사용량을 담는 KV.
+# 처음 한 번:  npx wrangler kv namespace create AI_KV   → 나온 id 를 아래에 적는다 (배포.bat 이 대신 해 준다)
+[[kv_namespaces]]
+binding = "AI_KV"
+id = "KV_ID_HERE"
+
+# Claude API 는 일부 지역(접속 지점)에서 오는 요청을 거절한다.
+# 스마트 배치를 켜면 api.anthropic.com 에 가까운 곳에서 실행되어 그런 거절을 피한다.
+[placement]
+mode = "smart"
+
+[observability]
+enabled = true
