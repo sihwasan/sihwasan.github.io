@@ -222,6 +222,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (r.error) { el.textContent = /function|does not exist|schema cache|PGRST20/.test(r.error.message || '') ? '보고서 표가 아직 없습니다 (supabase/128_officer_reports.sql 실행 필요).' : '마지막 실행을 읽지 못했습니다: ' + r.error.message; return; }
       var x = r.data;
       if (!x) { el.textContent = '아직 실행 기록이 없습니다. 매일 아침 6시에 저절로 만들어지며, 보고서 화면의 「지금 다시 만들기」로 바로 만들 수도 있습니다.'; return; }
+      if (x.running) { el.textContent = '지금 보고서를 만드는 중입니다 (' + when(x.started_at) + ' 시작 · 임원 ' + (x.officers || 0) + '명).'; return; }
       el.textContent = '마지막 실행: ' + when(x.finished_at || x.started_at) + ' · ' + (x.trigger === 'cron' ? '아침 예약' : '수동' + (x.by ? ' (' + x.by + ')' : '')) +
         ' · 보고서 ' + (x.reports || 0) + '건' + (x.new_tasks ? ' · 새 할 일 ' + x.new_tasks + '건' : '') +
         (x.usage ? ' · 토큰 입력 ' + Number(x.usage.input || 0).toLocaleString() + ' / 출력 ' + Number(x.usage.output || 0).toLocaleString() : '') +

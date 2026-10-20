@@ -179,7 +179,8 @@ var SHSOReport = (function () {
     if (reader) {
       var lr = S.lastRun;
       h += '<div class="or-run"><div class="or-run-t">' +
-        (lr ? '마지막 실행: ' + esc(when(lr.finished_at || lr.started_at)) + ' · ' + (lr.trigger === 'cron' ? '매일 아침 예약' : '수동' + (lr.by ? ' (' + esc(lr.by) + ')' : '')) +
+        (lr && lr.running ? '지금 보고서를 만드는 중입니다 (' + esc(when(lr.started_at)) + ' 시작 · 임원 ' + (lr.officers || 0) + '명). 다 쓴 보고서부터 차례로 나타납니다.' :
+         lr ? '마지막 실행: ' + esc(when(lr.finished_at || lr.started_at)) + ' · ' + (lr.trigger === 'cron' ? '매일 아침 예약' : '수동' + (lr.by ? ' (' + esc(lr.by) + ')' : '')) +
           ' · 보고서 ' + (lr.reports || 0) + '건' + (lr.new_tasks ? ' · 새 할 일 ' + lr.new_tasks + '건' : '') +
           (lr.errors && lr.errors.length ? ' · <span class="or-bad">오류 ' + lr.errors.length + '건</span>' : '')
           : '아직 실행 기록이 없습니다. 매일 아침 6시에 저절로 만들어집니다.') + '</div>' +

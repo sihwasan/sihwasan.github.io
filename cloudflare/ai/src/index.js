@@ -625,7 +625,8 @@ async function reportsCron(env) {
   const busy = await reportLock(env, '예약 실행');
   if (busy) return;
   try {
-    await runReports(env, reportDeps(s), { trigger: 'cron' });
+    /* 예약 실행은 Cloudflare 가 15분에서 끊으므로 13분이 지나면 새 보고서를 시작하지 않는다 */
+    await runReports(env, reportDeps(s), { trigger: 'cron', deadline: Date.now() + 13 * 60 * 1000 });
   } catch (e) {
     await saveRunError(env, 'cron', null, (e && e.message) || e);
   } finally {

@@ -338,23 +338,31 @@ export async function runReports(env, deps, opts, log) {
   }
   if (fresh.length) b = await rpc(env, 'ai_report_bundle', { p_key: env.REPORT_KEY });
 
-  /* 2) 임원마다 보고서 — 첫 번째가 캐시를 만들고 나머지는 셋씩 함께 */
+  /* 2) 임원마다 보고서 — 첫 번째가 캐시를 만들고 나머지는 여럿이 함께.
+   *    예약 실행은 15분 안에 끝나야 하므로(Cloudflare 한도) 다 쓴 보고서는 그때그때 저장하고,
+   *    시한(deadline)이 지나면 남은 분은 시작하지 않고 기록에 남긴다. */
   let officers = arr(b.officers);
   if (opts.only) officers = officers.filter(function (o) { return o.id === opts.only; });
-  const rows = [];
+  const deadline = opts.deadline || (Date.parse(started) + 25 * 60 * 1000);
+  const base = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, date: b.today, model: model, officers: officers.length, new_tasks: newTasks };
+  await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: Object.assign({ running: true }, base) } }).catch(function () {});
+  let saved = 0, skipped = 0;
   async function one(o) {
+    if (Date.now() > deadline) { skipped++; return; }
     log((o.title || DUTY_NAME[dutyOf(o)]) + ' ' + o.name + ' 보고서를 쓰는 중');
     try {
       const x = await writeReport(deps, b, o, system, model, effort);
-      add(x.usage); rows.push(x.row);
+      add(x.usage);
+      await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { reports: [x.row] } });
+      saved++;
     } catch (e) { errors.push(o.name + ': ' + String(e.message || e)); }
   }
   if (officers.length) await one(officers[0]);
-  await pool(officers.slice(1), 3, one);
+  await pool(officers.slice(1), deps.parallel || 6, one);
+  if (skipped) errors.push('시간이 모자라 ' + skipped + '분의 보고서는 만들지 못했습니다 (다음 실행 때 다시 만듭니다).');
 
-  const run = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, finished_at: new Date().toISOString(),
-    date: b.today, model: model, reports: rows.length, officers: officers.length, new_tasks: newTasks, usage: usage, errors: errors.slice(0, 20) };
+  const run = Object.assign({}, base, { finished_at: new Date().toISOString(), reports: saved, usage: usage, errors: errors.slice(0, 20) });
   log('저장하는 중');
-  await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { reports: rows, run: run } });
+  await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: run } });
   return run;
 }

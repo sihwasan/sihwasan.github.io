@@ -151,8 +151,11 @@ ok(/노회장 보고서/.test(JSON.stringify(reps.find((c) => /박노회/.test(J
    /회계 보고서/.test(JSON.stringify(reps.find((c) => /김회계/.test(JSON.stringify(c.messages))).messages)), '직책별 지시 (노회장·회계)');
 ok(reps[0].model === 'claude-sonnet-5-5' && reps[0].output_config.effort === 'medium', '고른 모델·답변 깊이');
 const last = saves[saves.length - 1];
-ok(last.reports.length === 3 && last.run.reports === 3 && last.run.new_tasks === 1 && last.run.trigger === 'manual' && last.run.by === '권서기', '보고서 3건과 실행 기록 저장');
-const r0 = last.reports.find((r) => r.name === '김회계');
+const allReps = saves.flatMap((x) => x.reports || []);
+ok(allReps.length === 3 && saves.filter((x) => (x.reports || []).length === 1).length === 3, '보고서는 한 분씩 다 쓰는 대로 저장 (3번)');
+ok(saves.some((x) => x.run && x.run.running) && last.run.reports === 3 && !last.run.running && last.run.new_tasks === 1 && last.run.trigger === 'manual' && last.run.by === '권서기',
+  '시작할 때 「만드는 중」, 끝나면 실행 기록 (보고서 3건)');
+const r0 = allReps.find((r) => r.name === '김회계');
 ok(r0.duty === 'treasurer' && r0.report_date === '2026-10-21' && r0.headline === '김회계 오늘 할 일' && r0.content.todos[0].task_id === 101 && r0.content.todos[1].task_id === 0,
   '보고서 줄: 갈래·날짜·요약, 모르는 task_id(999)는 0');
 ok(last.run.usage.cache_read > 0 && last.run.usage.cache_write > 0 && last.run.usage.output === 1200, '토큰 사용량 (캐시 쓰기·읽기 포함)');
@@ -161,11 +164,15 @@ ok(logs[0] === '노회 자료를 받는 중' && logs.some((l) => /회의록에�
 console.log('\n[한 분 실패]');
 resetCalls(); tasksSaved = true; failFor = '박노회';
 const run2 = await runReports(env, { claudeCall: claudeCallLike, key: 'sk', model: 'm', effort: 'low' }, { trigger: 'cron' }, null);
-ok(run2.reports === 2 && run2.errors.length === 1 && /박노회/.test(run2.errors[0]) && saves[saves.length - 1].reports.length === 2, '실패한 한 분만 빠지고 오류가 기록됨');
+ok(run2.reports === 2 && run2.errors.length === 1 && /박노회/.test(run2.errors[0]) && saves.flatMap((x) => x.reports || []).length === 2, '실패한 한 분만 빠지고 오류가 기록됨');
 ok(!calls.some((c) => c.output_config.format.schema.required[0] === 'tasks'), '이미 읽은 회의록은 다시 뽑지 않음');
 resetCalls(); tasksSaved = true;
 await runReports(env, { claudeCall: claudeCallLike, key: 'sk', model: 'm' }, { only: OFF[2].id }, null);
-ok(calls.length === 1 && saves[0].reports.length === 1 && saves[0].reports[0].name === '김회계', '한 분 것만 다시 만들기');
+const only = saves.flatMap((x) => x.reports || []);
+ok(calls.length === 1 && only.length === 1 && only[0].name === '김회계', '한 분 것만 다시 만들기');
+resetCalls(); tasksSaved = true;
+const run3 = await runReports(env, { claudeCall: claudeCallLike, key: 'sk', model: 'm' }, { trigger: 'cron', deadline: Date.now() - 1 }, null);
+ok(calls.length === 0 && run3.reports === 0 && /시간이 모자라 3분/.test(run3.errors.join()), '시한이 지나면 새 보고서를 시작하지 않고 기록에 남김');
 
 console.log('\n[POST /reports/run]');
 const waits = [];
