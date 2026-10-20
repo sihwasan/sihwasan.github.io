@@ -143,33 +143,24 @@ document.addEventListener('DOMContentLoaded', function () {
     return t;
   }
   /* AI 가 받아 적은 글을 문서답게 그린다.
-   *  · "ㄱ | ㄴ | ㄷ" 줄이 잇따르면 표 (첫 줄이 짧은 낱말들이면 머리글)
+   *  · 마크다운 표("| 칸 | 칸 |", 구분줄 "|---|") 또는 "ㄱ | ㄴ | ㄷ" 줄이 잇따르면 표 (첫 줄이 짧은 낱말들이면 머리글)
    *  · "## 제목", "1. 항목", "가. 항목", "■ 항목" 은 작은 제목
    *  · "묵 도 ------ 다 같 이" 처럼 점선으로 이어진 줄은 양끝 맞춤
+   *  · 줄바꿈 없이 " | "로만 이어진 글(예전 읽기 결과)은 " | "를 줄바꿈으로 본다
    *  · 그 밖은 문단 */
-  function renderDoc(text, q) {
-    var lines = String(text || '').replace(/\r/g, '').split('\n');
-    var html = '', table = null;
-    function flushTable() {
-      if (!table) return;
-      var head = table.length > 1 && table[0].every(function (c) { return c.length <= 10 && !/\d{2,}/.test(c); }) && table[0].filter(Boolean).length >= 2;
-      html += '<table class="pr-tbl">' + table.map(function (cells, i) {
-        var tag = head && i === 0 ? 'th' : 'td';
-        return '<tr>' + cells.map(function (c) { return '<' + tag + '>' + hl(c, q) + '</' + tag + '>'; }).join('') + '</tr>';
-      }).join('') + '</table>';
-      table = null;
-    }
-    lines.forEach(function (ln) {
-      var t = ln.trim();
-      if (!t) { flushTable(); return; }
-      if (/^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(t)) return;        /* 마크다운 표 구분줄 */
-      if ((t.match(/\|/g) || []).length >= 2) {
-        var cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
-        table = table || []; table.push(cells); return;
-      }
-      flushTable();
+  function renderDoc(text, q, heading) {
+    var src = String(text || '').replace(/\r/g, '');
+    if (src.indexOf('\n') === -1 && (src.match(/ \| /g) || []).length >= 2) src = src.replace(/ \| /g, '\n');
+    var lines = src.split('\n');
+    var html = '', table = null, headDone = false;
+    function sig(c) { return String(c || '').replace(/\d+/g, '0').replace(/[가-힣]+/g, '가').replace(/[A-Za-z]+/g, 'a').replace(/\s+/g, ''); }
+    function line(t) {
       var m = t.match(/^#{1,4}\s+(.*)$/);
-      if (m) { html += '<h4 class="pr-h">' + hl(m[1], q) + '</h4>'; return; }
+      if (m) {
+        var h = m[1].trim();
+        if (!headDone && heading && h.replace(/\s+/g, '') === String(heading).replace(/\s+/g, '')) { headDone = true; return; }  /* 쪽 제목과 같으면 한 번만 */
+        html += '<h4 class="pr-h">' + hl(h, q) + '</h4>'; return;
+      }
       if (/[-]{4,}|…{2,}|·{4,}|\.{5,}/.test(t)) {
         var parts = t.split(/([-]{4,}|…{2,}|·{4,}|\.{5,})/);
         html += '<div class="pr-line">' + parts.map(function (x, i) {
@@ -181,6 +172,36 @@ document.addEventListener('DOMContentLoaded', function () {
         html += '<p class="pr-sub">' + hl(t, q) + '</p>'; return;
       }
       html += '<p>' + hl(t, q) + '</p>';
+    }
+    function flushTable() {
+      if (!table) return;
+      var rows = table; table = null;
+      if (rows.length === 1) { rows[0].forEach(function (c) { if (c) line(c); }); return; }   /* 한 줄뿐이면 표가 아니라 줄 나눔 */
+      var cols = Math.max.apply(null, rows.map(function (r) { return r.length; }));
+      var full = rows.filter(function (r) { return r.length === cols; });
+      rows = rows.map(function (r) {
+        if (r.length >= cols) return r;
+        /* 칸이 모자라면: 첫 칸이 온전한 행의 둘째 칸과 닮았으면 앞 칸이 비었던 것, 아니면 뒤를 채운다 */
+        var front = full.some(function (f) { return sig(f[1]) === sig(r[0]) && sig(f[0]) !== sig(r[0]); });
+        var pad = []; for (var i = r.length; i < cols; i++) pad.push('');
+        return front ? pad.concat(r) : r.concat(pad);
+      });
+      var head = rows[0].every(function (c) { return c.length <= 12 && !/\d{2,}/.test(c); }) && rows[0].filter(Boolean).length >= 2;
+      html += '<table class="pr-tbl">' + rows.map(function (cells, i) {
+        var tag = head && i === 0 ? 'th' : 'td';
+        return '<tr>' + cells.map(function (c) { return '<' + tag + '>' + hl(c, q) + '</' + tag + '>'; }).join('') + '</tr>';
+      }).join('') + '</table>';
+    }
+    lines.forEach(function (ln) {
+      var t = ln.trim();
+      if (!t) { flushTable(); return; }
+      if (/^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(t)) return;        /* 마크다운 표 구분줄 */
+      if (t.indexOf('|') !== -1 && ((t.match(/\|/g) || []).length >= 2 || / \| /.test(t))) {
+        var cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+        table = table || []; table.push(cells); return;
+      }
+      flushTable();
+      line(t);
     });
     flushTable();
     return html || '<p style="color:var(--gray-5)">(빈 면)</p>';
@@ -206,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function () {
       (prev != null ? '<button class="btn ghost sm" data-go="' + prev + '">&larr; ' + prev + '쪽</button> ' : '') +
       (next != null ? '<button class="btn ghost sm" data-go="' + next + '">' + next + '쪽 &rarr;</button> ' : '') +
       (cur.file_path ? '<button class="btn sm" id="pr-pdf-page">PDF 원본 ' + p.pdf_page + '쪽</button>' : '') + '</div></div>' +
-      '<div class="pr-text">' + renderDoc(p.text || '', q) + '</div>' +
+      '<div class="pr-text">' + renderDoc(p.text || '', q, p.heading) + '</div>' +
       (canEdit ? '<div style="margin-top:12px;text-align:right"><button class="btn ghost sm" id="pr-edit-page">이 쪽 글 고치기</button></div>' : '');
     box.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { showPage(parseInt(b.dataset.go, 10), ''); }); });
     var pb = box.querySelector('#pr-pdf-page'); if (pb) pb.addEventListener('click', function () { openPdf(p.pdf_page); });
@@ -327,7 +348,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>제목</label><input type="text" id="up-title" placeholder="예: 제20회 정기노회 회의자료 (' + y + ' 가을)"></div></div>' +
       '<div class="field"><label>PDF 파일</label><input type="file" id="up-file" accept="application/pdf"></div>' +
       '<button class="btn" id="up-go">올리고 읽기 시작</button> ' +
-      '<button class="btn ghost" id="up-resume">이어서 읽기 (이미 올린 책자)</button>' +
+      '<button class="btn ghost" id="up-resume">이어서 읽기 (이미 올린 책자)</button> ' +
+      '<button class="btn ghost" id="up-redo">이 책자 전부 다시 읽기 (저장된 PDF 로)</button>' +
       '<div class="form-msg" id="up-msg"></div><div class="pr-progress hidden" id="up-prog"><div class="pr-bar"><span id="up-bar"></span></div><div id="up-prog-t"></div></div></div>';
     document.getElementById('up-session').addEventListener('change', function () {
       var t = document.getElementById('up-title');
@@ -340,6 +362,32 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!f) { msg('up-msg', false, '같은 PDF 파일을 골라 주세요 (그림으로 바꾸는 데 필요합니다).'); return; }
       readAll(cur, f);
     });
+    /* 다시 읽기: 두 번 눌러야 실행 (읽어 둔 글을 모두 지우고 저장된 PDF 로 새로 읽는다) */
+    var redoArmed = false, redoLabel = '이 책자 전부 다시 읽기 (저장된 PDF 로)';
+    document.getElementById('up-redo').addEventListener('click', function () {
+      if (!cur) { msg('up-msg', false, '먼저 위 목록에서 다시 읽을 책자를 고르세요.'); return; }
+      if (!cur.file_path) { msg('up-msg', false, '이 책자는 저장된 PDF 가 없습니다. 같은 PDF 를 골라 「이어서 읽기」를 쓰세요.'); return; }
+      if (!redoArmed) { redoArmed = true; this.textContent = '정말 다시 읽기 — 읽어 둔 글을 모두 지우고 새로 읽습니다 (AI 비용 발생)'; this.classList.add('danger'); return; }
+      redoArmed = false; this.textContent = redoLabel; this.classList.remove('danger');
+      redoAll(cur);
+    });
+  }
+  /* 저장된 PDF 를 내려받아 모든 쪽을 새로 읽는다 */
+  function redoAll(rep) {
+    msg('up-msg', true, '저장된 PDF 를 내려받는 중…');
+    return db.storage.from('archive-files').createSignedUrl(rep.file_path, 600).then(function (r) {
+      if (r.error) throw r.error;
+      return fetch(r.data.signedUrl).then(function (x) { if (!x.ok) throw new Error('PDF 내려받기 실패 (HTTP ' + x.status + ')'); return x.arrayBuffer(); });
+    }).then(function (buf) {
+      return db.from('presbytery_report_pages').delete().eq('report_id', rep.id).then(function (r) {
+        if (r.error) throw r.error;
+        pages = [];
+        return db.from('presbytery_reports').update({ status: '읽는 중', toc: [] }).eq('id', rep.id);
+      }).then(function () {
+        SHSCloud.log('update', '노회 보고서 다시 읽기', rep.title);
+        return readAll(rep, buf);
+      });
+    }).catch(function (x) { msg('up-msg', false, (x && x.message) || String(x)); });
   }
   function msg(id, ok, t) { var m = document.getElementById(id); m.className = 'form-msg ' + (ok ? 'ok' : 'err'); m.textContent = t; }
   function prog(done, total, t) {
@@ -374,7 +422,8 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 쪽마다: 그림 → /ocr → 표 (이미 읽은 쪽은 건너뛴다) */
   function readAll(rep, file) {
     var done = 0, total = 0, tocAll = [], failed = [];
-    return Promise.all([loadPdfjs(), file.arrayBuffer(), db.from('presbytery_report_pages').select('pdf_page').eq('report_id', rep.id)])
+    var bufP = file && typeof file.arrayBuffer === 'function' ? file.arrayBuffer() : Promise.resolve(file);   /* File 또는 ArrayBuffer */
+    return Promise.all([loadPdfjs(), bufP, db.from('presbytery_report_pages').select('pdf_page').eq('report_id', rep.id)])
       .then(function (rs) {
         var pdfjs = rs[0], buf = rs[1], have = {};
         ((rs[2] && rs[2].data) || []).forEach(function (x) { have[x.pdf_page] = 1; });

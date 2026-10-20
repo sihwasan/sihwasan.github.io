@@ -704,7 +704,7 @@ const OCR_SCHEMA = {
       properties: {
         no: { type: ['integer', 'null'], description: '그 면에 인쇄된 쪽 번호. 없으면 null' },
         heading: { type: ['string', 'null'], description: '그 면의 큰 제목 (예: 서기 사무보고, 재정부 보고). 없으면 null' },
-        text: { type: 'string', description: '그 면의 글 전부. 줄은 그대로 바꾸고, 표는 줄마다 칸을 " | "로 나눈다. 빈 면이면 빈 글' }
+        text: { type: 'string', description: '그 면의 글 전부. 줄마다 줄바꿈 문자로 나눈다. 제목은 "## 제목", 표는 마크다운 표(| 칸 | 칸 |)로 적는다. 빈 면이면 빈 글' }
       }, required: ['no', 'heading', 'text'] } },
     toc: { type: 'array', description: '이 면이 차례(목차)면 그 항목들. 아니면 빈 배열', items: { type: 'object', additionalProperties: false,
       properties: { title: { type: 'string' }, page: { type: 'integer' }, level: { type: 'integer', description: '1=큰 항목, 2=작은 항목' } },
@@ -716,9 +716,13 @@ const OCR_PROMPT =
   '이 그림은 대한예수교장로회 시화산노회 정기노회 회의자료 책자의 한 쪽을 스캔한 것입니다. 보통 왼쪽 면과 오른쪽 면이 함께 보입니다(펼침면). ' +
   '면마다 따로, 인쇄된 쪽 번호(보통 아래 가운데 동그라미 안 숫자), 그 면의 큰 제목, 그리고 글 전부를 받아 적어 주세요. ' +
   '글자를 바꾸거나 요약하지 말고 보이는 그대로 적습니다. 이름·교회 이름·숫자·날짜·금액은 특히 정확하게 적습니다. ' +
-  '큰 제목은 "## 제목" 꼴로 한 줄에 따로 적고, 번호 항목(1. / 가. / 1) )은 줄을 나누어 적습니다. ' +
-  '표는 줄마다 칸을 " | "로 나누어 적되 첫 줄은 머리글(칸 이름)로 하고, 한 줄에 한 행만 적습니다. 표가 아닌 글을 " | "로 잇지 않습니다. ' +
-  '점선(……·----)으로 이어진 차례·순서 줄은 "항목 …… 쪽" 꼴로 점선을 남겨 적습니다. ' +
+  '적는 법: ' +
+  '(1) 줄과 줄은 반드시 줄바꿈 문자로 나눕니다. 줄을 " | " 나 다른 기호로 잇지 않습니다. ' +
+  '(2) 큰 제목·작은 제목은 "## 제목" 꼴로 한 줄에 따로 적습니다. 번호 항목(1. / 가. / 1) / ◈ / ※)은 한 항목이 한 줄입니다. ' +
+  '(3) 표는 마크다운 표로 적습니다: 첫 줄이 머리글 "| 역대 | 년도 | 회기 |", 둘째 줄이 "|---|---|---|", 그다음은 줄마다 한 행. ' +
+  '모든 행의 칸 수를 머리글과 똑같이 맞추고 빈 칸은 빈 채로 둡니다("|  |"). 한 칸에 이름이 둘 이상 겹쳐 있으면 그 한 칸 안에 "·"로 이어 적습니다(예: "김종택·이성팔"). ' +
+  '표 밖의 합계·비고 줄(예: "부목사 8명중( 명 참석)")은 표 다음에 따로 한 줄로 적습니다. 나란히 놓인 두 표는 따로따로 적습니다. ' +
+  '(4) 점선(……·----)으로 이어진 차례·순서 줄은 "항목 …… 쪽" 꼴로 점선을 남기고 한 줄에 하나씩 적습니다. ' +
   '빈 면이나 그림만 있는 면은 text 를 빈 글로 두고 no 는 null 로 둡니다. 차례(목차) 면이면 toc 에 항목과 쪽 번호를 적습니다. 왼쪽 면을 먼저, 오른쪽 면을 다음에 둡니다.';
 
 async function ocrPage(request, env, origin) {
@@ -734,7 +738,7 @@ async function ocrPage(request, env, origin) {
   const req = {
     model: s.model,
     max_tokens: 8000,
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: OCR_SCHEMA } },
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: OCR_SCHEMA } },
     messages: [{ role: 'user', content: [
       { type: 'image', source: { type: 'base64', media_type: mt, data: String(body.image) } },
       { type: 'text', text: OCR_PROMPT + (body.hint ? ' (책자: ' + String(body.hint).slice(0, 80) + ', PDF ' + (body.pdf_page || '?') + '쪽)' : '') }
