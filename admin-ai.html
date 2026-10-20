@@ -372,7 +372,9 @@ document.addEventListener('DOMContentLoaded', function () {
       ((init.sources || []).length ? '<div class="aiv-ed-src">' + init.sources.map(function (s, i) {
         return '<label><input type="checkbox" class="ed-src" data-i="' + i + '"' + (s.on ? ' checked' : '') + '> <span>' + e(s.title) +
           (s.kind ? ' <small>(' + e(s.kind) + ')</small>' : '') + '</span></label>';
-      }).join('') + '</div>' : '<p class="aiv-note" style="margin:0">근거 목록이 없습니다. 답 안에 조문 이름(예: 권징조례 제35조)을 적어 주시면 AI 가 그것으로 찾습니다.</p>') + '</div>' +
+      }).join('') + '</div>' : '') +
+      '<label for="ed-src-add" style="margin-top:8px">원문 근거 더 적기 <small>(한 줄에 하나 — 예: 권징조례 제35조, 예배모범 제17장)</small></label>' +
+      '<textarea id="ed-src-add" rows="2" maxlength="1000" style="min-height:0"></textarea></div>' +
       '<div class="field" style="max-width:280px"><label for="ed-lv">누가 볼 수 있나</label><select id="ed-lv">' +
       LEVELS.map(function (l) { return '<option value="' + l[0] + '"' + (init.level === l[0] ? ' selected' : '') + '>' + l[1] + '</option>'; }).join('') +
       '</select></div>' +
@@ -402,6 +404,12 @@ document.addEventListener('DOMContentLoaded', function () {
           return { title: s.title, url: s.url || '', kind: s.kind || '' };
         })
       };
+      /* 직접 적은 원문 근거 (같은 이름은 한 번만) */
+      form.querySelector('#ed-src-add').value.split(/\n/).forEach(function (t) {
+        t = t.replace(/\s+/g, ' ').trim().slice(0, 120);
+        if (t && !payload.sources.some(function (x) { return x.title === t; })) payload.sources.push({ title: t, url: '', kind: '' });
+      });
+      payload.sources = payload.sources.slice(0, 20);
       if (isNew && init.from_log) payload.from_log = init.from_log;
       var btn = form.querySelector('#ed-save');
       ED.busy = true; btn.disabled = true; btn.textContent = '저장하는 중…';
