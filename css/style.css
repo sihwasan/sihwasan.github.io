@@ -2518,3 +2518,10 @@ body.adm-mode .adm-wrap { display: grid; grid-template-columns: 236px minmax(0, 
 .ai-model-d { font-size: 0.82rem; color: var(--gray-7); }
 .ai-model-p { font-size: 0.82rem; color: var(--gray-5); }
 .ai-model-p small { display: block; font-size: 0.72rem; }
+
+/* AI 검색 근거: 답의 핵심 구절은 원문에서 밑줄·형광, 구절을 못 찾으면 문단에 띠 */
+mark.aih-key {
+  background: #ffe9a8; color: inherit; font-weight: 700; padding: 0 1px;
+  text-decoration: underline; text-decoration-color: #a8813a; text-decoration-thickness: 2px; text-underline-offset: 3px;
+}
+.aih-key-block { border-left: 4px solid #a8813a; background: #fff6dd; padding-left: 10px; }

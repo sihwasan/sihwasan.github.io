@@ -24,7 +24,12 @@ var SHSAdminShell = (function () {
       { t: '노회 진행 매니저', h: 'proceed.html', icon: '▶', who: 'clerk' },
       { t: '노회 회의록', h: 'minutes.html', icon: '≡' },
       { t: '서류 발급', h: 'documents.html', icon: '✓' },
-      { t: '교회상황 보고서 접수', h: 'report-intake.html', icon: '▥' },
+      { t: '교회상황 보고서 접수', h: 'report-intake.html', icon: '▥' }
+    ] },
+    { title: '재정', items: [
+      { t: '상회비 납부 관리', h: 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC', icon: '₩' },
+      { t: '세례의무금 관리', h: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC', icon: '✚' },
+      { t: '재정부 회계 장부', h: 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84', icon: '▤' },
       { t: '감사 결과 보고서', h: 'audit-report.html', icon: '☑' }
     ] },
     { title: '설정', items: [
@@ -61,6 +66,12 @@ var SHSAdminShell = (function () {
         if (curPage === 'admin.html' && cur.indexOf('view=com') !== -1) on = it.h.indexOf('view=com') !== -1;
         else if (curPage === 'admin.html') on = it.h === 'admin.html';
         if (pageOf(it.h) === 'manage.html' && curPage === 'manage.html') on = it.h.indexOf('#mg-ops') === -1 ? location.hash !== '#mg-ops' : location.hash === '#mg-ops';
+        if (pageOf(it.h) === 'officer.html' && curPage === 'officer.html') {
+          var want = it.h.split('#')[1] || '';
+          var have = location.hash.slice(1);
+          try { want = decodeURIComponent(want); have = decodeURIComponent(have); } catch (x) {}
+          on = want ? have === want : !have;
+        }
         html += '<a class="adm-link' + (on ? ' on' : '') + '" href="' + esc(it.h) + '"><span class="adm-ic">' + (it.icon || '·') + '</span>' + esc(it.t) + '</a>';
         if (on && it.sub) {
           html += '<div class="adm-sub">' + it.sub.map(function (s) {

@@ -246,6 +246,7 @@ function systemPrompt(me, built) {
     '답하는 법',
     '- 한국 장로교 목회자에게 보고하듯 정중한 존댓말로, 결론부터 간결하게 씁니다. 인사말·서론은 쓰지 않습니다.',
     '- 근거로 삼은 자료는 해당 문장 끝에 근거 번호를 [R3] 처럼 적습니다. 번호는 도구가 돌려준 ref 그대로 씁니다. 근거 없는 문장은 쓰지 않습니다.',
+    '- 근거 번호 바로 뒤에는 그 자료에서 답의 핵심이 되는 원문 구절(8~60자)을 이중 중괄호로 붙입니다: [R3]{{해벌은 그 회개 여부에 의하여 행하거나}}. 구절은 자료 글과 글자 하나까지 같아야 합니다(요약·바꿔 쓰기 금지, 띄어쓰기는 상관없음). 홈페이지는 이 구절을 원문에서 찾아 밑줄을 긋고, 독자에게는 구절을 보여 주지 않습니다. 같은 번호를 여러 번 쓰면 매번 그 문장에 맞는 구절을 붙입니다.',
     '- 헌법·규정·회칙을 인용할 때는 조문 번호(예: 권징조례 제35조, 정치 제10장 제3조, 노회규칙 제12조)를 함께 적고, 총회 결의는 회기(예: 제110회 총회)를 적습니다.',
     '- 권징(치리·시벌·해벌·재판)이나 총회 결의에 관한 답은 조문·결의 원문을 짧게 인용한 뒤 풀이합니다.',
     '- 자료에 없는 것을 지어내지 않습니다. 확인되지 않으면 "자료에서 확인되지 않습니다"라고 씁니다.',
@@ -356,9 +357,11 @@ async function answer(request, env, ctx, origin) {
       if (!finalText) {
         await out.send('delta', { n: 200, text: '자료를 여러 번 찾았지만 답을 정리하지 못했습니다. 질문을 조금 바꾸어 다시 물어봐 주세요.' });
       }
-      const cited = {};
+      const cited = {}, quotes = {};
       (finalText.match(/\[R\d+\]/g) || []).forEach(function (m) { cited[m.slice(1, -1)] = true; });
-      await out.send('sources', { list: cites.list.map(function (c) { return Object.assign({ cited: !!cited[c.ref] }, c); }) });
+      /* [R3]{{원문 구절}} — 서랍에서 밑줄 칠 구절 */
+      finalText.replace(/\[(R\d+)\]\{\{([^{}]{2,160})\}\}/g, function (m, r, q) { (quotes[r] = quotes[r] || []).push(q.trim()); return m; });
+      await out.send('sources', { list: cites.list.map(function (c) { return Object.assign({ cited: !!cited[c.ref], quotes: quotes[c.ref] || [] }, c); }) });
       await out.send('usage', { model: model, input_tokens: inTok, output_tokens: outTok, ms: Date.now() - started, tools: toolsUsed });
       await out.send('done', {});
     } catch (e) {

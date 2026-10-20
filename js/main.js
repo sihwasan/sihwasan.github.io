@@ -116,13 +116,13 @@
   /* 관리자 모드(왼쪽 메뉴)를 씌울 관리 화면들 — js/admin-shell.js 가 맡는다 */
   var ADMIN_PAGES = ['admin-home.html', 'admin-ai.html', 'manage.html', 'admin.html', 'schedule.html', 'archive-edit.html',
     'elder-notice.html', 'meeting-admin.html', 'proceed.html', 'documents.html', 'report-intake.html',
-    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html'];
+    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html'];
   function loadAdminShell() {
     var pg = location.pathname.split('/').pop() || 'index.html';
     if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
     if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
     var sc = document.createElement('script');
-    sc.src = 'js/admin-shell.js?v=20261020a';
+    sc.src = 'js/admin-shell.js?v=20261020b';
     document.body.appendChild(sc);
   }
 

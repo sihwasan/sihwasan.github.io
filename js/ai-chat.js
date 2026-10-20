@@ -21,6 +21,7 @@ var SHSAI = (function () {
   ];
 
   var box = null, user = null, convo = [], busy = false, drawer = null;
+  var quotesOf = {};   /* 근거 번호 → AI 가 적어 준 원문 구절들 (답에서 뽑아 둔다) */
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -39,6 +40,13 @@ var SHSAI = (function () {
 
   /* ---------- 답 글을 화면 글로 ---------- */
   function inline(s) {
+    /* [R3]{{원문 구절}} — 구절은 밑줄용으로 챙겨 두고 화면에는 번호만 */
+    s = s.replace(/\[(R\d+)\]\{\{([^{}]*)\}\}/g, function (m, r, q) {
+      q = q.trim();
+      if (q) { quotesOf[r] = quotesOf[r] || []; if (quotesOf[r].indexOf(q) === -1) quotesOf[r].push(q); }
+      return '[' + r + ']';
+    });
+    s = s.replace(/\{\{[^{}]*\}\}/g, '').replace(/\{\{[^}]*$/, '');   /* 흘러오는 중의 반쪽 구절은 감춘다 */
     s = esc(s);
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/\[(R\d+)\]/g, function (m, r) {
@@ -261,11 +269,134 @@ var SHSAI = (function () {
       (s.snippet ? '<div class="aih-dr-snip">' + esc(s.snippet) + '</div>' : '') +
       (s.url && !ext ? '<iframe class="aih-dr-frame" src="' + esc(embedUrl(s.url)) + '" title="' + esc(s.title) + '"></iframe>'
         : (s.url ? '<p class="aih-dr-ext">총회 원본 파일은 <a href="' + esc(s.url) + '" target="_blank" rel="noopener">새 창</a>에서 열립니다.</p>' : ''));
+    /* 핵심 구절 밑줄: 원문 조각에는 바로, 아래 화면에는 그 화면이 다 그려진 뒤에 */
+    var quotes = (s.quotes || []).concat(quotesOf[ref] || []).filter(function (q, i, a) { return q && a.indexOf(q) === i; });
+    var toks = tokensOf(quotes.join(' ') + ' ' + sentenceFor(ref));
+    var snip = drawer.querySelector('.aih-dr-snip');
+    if (snip) underline(snip, null, quotes, toks);
+    var fr = drawer.querySelector('iframe');
+    if (fr) fr.addEventListener('load', function () { whenReady(fr, function (doc, start, root) { underline(root, start, quotes, toks); }); });
     drawer.classList.add('open');
     document.body.classList.add('aih-drawer-open');
     box.querySelectorAll('.aih-ref.on, .aih-src.on').forEach(function (b) { b.classList.remove('on'); });
     box.querySelectorAll('[data-ref="' + ref + '"]').forEach(function (b) { b.classList.add('on'); });
   }
+  /* ---------- 핵심 구절 밑줄 ---------- */
+  function norm(t) { return String(t || '').replace(/\s+/g, ''); }
+  function tokensOf(t) {
+    var out = [], seen = {};
+    String(t || '').toLowerCase().replace(/[^0-9a-z가-힣]+/g, ' ').split(' ').forEach(function (w) {
+      var m = w.match(/^(.+?)(으로부터|에서는|에게는|으로는|으로서|으로써|이라는|라는|에서|에게|으로|로서|로써|까지|부터|처럼|마다|조차|마저|보다|이란|이든|이나|하고|과는|와는|은|는|이|가|을|를|의|에|와|과|도|로|만)$/);
+      if (m && m[1].length >= 2) w = m[1];
+      if (w.length >= 2 && !seen[w]) { seen[w] = 1; out.push(w); }
+    });
+    return out;
+  }
+  /* 답에서 그 근거 번호가 달린 문장 (구절이 없을 때 낱말 겹침으로 찾는 데 쓴다) */
+  function sentenceFor(ref) {
+    for (var i = convo.length - 1; i >= 0; i--) {
+      var parts = String(convo[i].text() || '').split(/\n|(?<=[.!?。])\s+/);
+      var hit = parts.filter(function (p) { return p.indexOf('[' + ref + ']') !== -1; });
+      if (hit.length) return hit.join(' ').replace(/\[R\d+\](\{\{[^{}]*\}\})?/g, ' ').replace(/\*\*/g, '');
+    }
+    return '';
+  }
+  /* 시작점부터 다음 항목(다음 조문 제목·다음 ■)까지의 글 마디들 */
+  function textNodesFrom(root, startEl, limit) {
+    var doc = root.ownerDocument;
+    var walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    var nodes = [], started = !startEl, n;
+    var startIsItem = startEl && startEl.textContent.indexOf('■') !== -1;
+    var startIsHead = startEl && /^H[2-6]$/.test(startEl.tagName);
+    while ((n = walker.nextNode())) {
+      if (!started) {
+        if (startEl.contains(n) || (startEl.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)) started = true; else continue;
+      }
+      if (!n.nodeValue.trim()) continue;
+      var p = n.parentNode;
+      if (!p || p.tagName === 'SCRIPT' || p.tagName === 'STYLE') continue;
+      if (nodes.length && startEl && !startEl.contains(n)) {
+        if (startIsItem && n.nodeValue.indexOf('■') !== -1) break;
+        if (startIsHead && /^H[2-6]$/.test(p.tagName)) break;
+        if (p.className && /tit_dept_2/.test(p.className)) break;
+      }
+      nodes.push(n);
+      if (nodes.length >= limit) break;
+    }
+    return nodes;
+  }
+  /* 띄어쓰기를 무시하고 구절을 찾아 <mark> 로 감싼다. 첫 표시 요소를 돌려준다. */
+  function markExact(nodes, quote, doc) {
+    var q = norm(quote).toLowerCase();
+    if (q.length < 4) return null;
+    var map = [], str = '';
+    nodes.forEach(function (n, ni) {
+      var t = n.nodeValue;
+      for (var i = 0; i < t.length; i++) { if (/\s/.test(t[i])) continue; map.push([ni, i]); str += t[i].toLowerCase(); }
+    });
+    var at = str.indexOf(q);
+    if (at === -1) return null;
+    var sPos = map[at], ePos = map[at + q.length - 1], first = null;
+    for (var ni = sPos[0]; ni <= ePos[0]; ni++) {
+      var n = nodes[ni], t = n.nodeValue;
+      var from = ni === sPos[0] ? sPos[1] : 0, to = ni === ePos[0] ? ePos[1] + 1 : t.length;
+      if (!t.slice(from, to).trim()) continue;
+      var mark = doc.createElement('mark'); mark.className = 'aih-key'; mark.textContent = t.slice(from, to);
+      var frag = doc.createDocumentFragment();
+      if (from > 0) frag.appendChild(doc.createTextNode(t.slice(0, from)));
+      frag.appendChild(mark);
+      if (to < t.length) frag.appendChild(doc.createTextNode(t.slice(to)));
+      n.parentNode.replaceChild(frag, n);
+      if (!first) first = mark;
+    }
+    return first;
+  }
+  /* 구절을 못 찾으면 낱말이 가장 많이 겹치는 문단에 띠를 두른다 */
+  function markBlock(nodes, tokens) {
+    if (tokens.length < 2) return null;
+    var seen = [], best = null, bestScore = 0;
+    nodes.forEach(function (n) {
+      var el = n.parentNode;
+      while (el && !/^(P|LI|DIV|TD|TH|H[1-6]|SECTION|BLOCKQUOTE|ARTICLE)$/.test(el.tagName)) el = el.parentNode;
+      if (!el || seen.indexOf(el) !== -1) return;
+      seen.push(el);
+      var t = norm(el.textContent).toLowerCase();
+      if (t.length < 6 || t.length > 1200) return;
+      var sc = 0;
+      tokens.forEach(function (w) { if (t.indexOf(norm(w)) !== -1) sc++; });
+      if (sc > bestScore) { bestScore = sc; best = el; }
+    });
+    if (best && bestScore >= Math.max(2, Math.ceil(tokens.length * 0.3))) { best.classList.add('aih-key-block'); return best; }
+    return null;
+  }
+  function underline(root, startEl, quotes, tokens) {
+    if (!root) return;
+    var doc = root.ownerDocument, first = null;
+    (quotes || []).forEach(function (q) {
+      var m = markExact(textNodesFrom(root, startEl, 1500), q, doc);
+      if (m && !first) first = m;
+    });
+    if (!first) first = markBlock(textNodesFrom(root, startEl, 1500), tokens || []);
+    if (first && root !== drawer && root.ownerDocument !== document) {
+      setTimeout(function () { try { first.scrollIntoView({ block: 'center' }); } catch (e) {} }, 120);
+    }
+  }
+  /* 서랍 속 화면이 자료를 다 그릴 때까지 기다렸다가 (조문·결의 항목·회의록 낱말 표시가 나타나면) 부른다 */
+  function whenReady(fr, cb) {
+    var tries = 0;
+    (function poll() {
+      var doc = null;
+      try { doc = fr.contentDocument; } catch (e) { return; }
+      if (!doc || !doc.body) { if (tries++ < 30) setTimeout(poll, 300); return; }
+      var t = doc.querySelector('.ai-target') || doc.querySelector('.lib-hit') || doc.querySelector('mark.ai-hl');
+      if (!t) { if (tries++ < 30) { setTimeout(poll, 300); return; } cb(doc, null, doc.querySelector('main') || doc.body); return; }
+      var root = t.classList.contains('ai-target') ? t
+        : (t.closest('.lib-sec-body, .lib-res-cont, .rule-article, #minutes-view') || t.parentNode);
+      var start = t.classList.contains('ai-target') ? null : (t.tagName === 'MARK' ? null : t);
+      cb(doc, start, root);
+    })();
+  }
+
   function closeDrawer() {
     if (!drawer) return;
     drawer.classList.remove('open');
