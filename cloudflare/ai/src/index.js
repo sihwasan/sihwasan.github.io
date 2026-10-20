@@ -170,10 +170,11 @@ async function historyApi(request, env, origin, path) {
 /* ---------- 색인 (홈페이지에서 받아 둔다) ---------- */
 let INDEX = null, INDEX_AT = 0, INDEX_BUILT = '';
 async function getIndex(env) {
-  if (INDEX && Date.now() - INDEX_AT < 3600 * 1000) return INDEX;
-  /* 한 시간마다 새 색인을 받는다 (주소 뒤의 시각이 바뀌면 Cloudflare 캐시도 새로 받는다) */
-  const hour = Math.floor(Date.now() / 3600000);
-  const r = await fetch((env.SITE_URL || 'https://sihwasan.org') + '/data/ai/index.json?h=' + hour, { cf: { cacheTtl: 3600, cacheEverything: true } });
+  if (INDEX && Date.now() - INDEX_AT < 15 * 60 * 1000) return INDEX;
+  /* 15분마다 새 색인을 받는다 (주소 뒤의 15분 단위 번호가 바뀌면 Cloudflare 캐시도 새로 받는다).
+   * 색인(index.json)을 새로 올리면 늦어도 30분 안에 AI 검색에 반영된다. */
+  const slot = Math.floor(Date.now() / (15 * 60 * 1000));
+  const r = await fetch((env.SITE_URL || 'https://sihwasan.org') + '/data/ai/index.json?q=' + slot, { cf: { cacheTtl: 900, cacheEverything: true } });
   if (!r.ok) {
     if (INDEX) return INDEX;
     throw new Error('총회 자료 색인을 받지 못했습니다 (HTTP ' + r.status + ')');

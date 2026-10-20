@@ -20,7 +20,7 @@ node tools/ai-index/build.js
 - 「X. 노회 상황 보고」처럼 차례에 한 줄뿐인 큰 갈래는 안의 「1. 강동노회」 같은 번호 줄로 다시 나눕니다.
 - 끝나면 보고서 수·글자 수·빈 항목이 보입니다. 빈 항목은 대개 표지(갈래 머리) 쪽이거나 보고를 내지 않은 노회입니다.
 - 쪽 글은 `tools/assembly-report/cache/pages-112.json` 에 남아 다시 돌릴 때 빠릅니다(저장소에는 올라가지 않음). PDF 를 바꿨으면 이 파일을 지우세요.
-- 그런 다음 `git add data/assembly data/ai` → 커밋·푸시. AI 검색 창구는 한 시간 안에 새 색인을 받습니다.
+- 그런 다음 `git add data/assembly data/ai` → 커밋·푸시. AI 검색 창구는 30분 안에 새 색인을 받습니다.
 
 ## 옛 회기(총회전자자료실의 낱개 PDF)
 
