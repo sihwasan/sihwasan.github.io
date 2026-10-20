@@ -2478,8 +2478,10 @@ td[data-duch]:hover { background: #eef2f8; }
 }
 @media (max-width: 900px) {
   .aih-form { flex-wrap: wrap; padding: 8px; }
-  .aih-tag { display: none; }
-  .aih-form input { flex: 1 1 100%; }
+  /* 좁은 화면: 첫 줄에 「검색」 꼬리표 + 입력칸, 둘째 줄에 마이크 + 묻기 */
+  .aih-tag { flex: 0 0 auto; margin-left: 4px; }
+  .aih-tag-ai { display: none; }
+  .aih-form input { flex: 1 1 calc(100% - 80px); }
   .aih-go { flex: 1 1 100%; }
   .aih-panel { padding: 16px 14px; }
   .aih-foot { flex-direction: column; align-items: flex-start; }

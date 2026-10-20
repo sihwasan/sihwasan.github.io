@@ -120,7 +120,7 @@ var SHSAI = (function () {
       '</div></aside>' +
       '<div class="aih-main">' +
       '<form class="aih-form" id="aih-form" autocomplete="off">' +
-      '<span class="aih-tag">AI 검색</span>' +
+      '<span class="aih-tag"><span class="aih-tag-ai">AI </span>검색</span>' +
       '<input type="text" id="aih-q" maxlength="1500" placeholder="노회·총회 자료에 대해 물어보세요 (예: 권징조례에서 해벌 절차는?)">' +
       (SR ? '<button type="button" class="aih-mic" id="aih-mic" title="음성으로 묻기 (누르고 말씀하세요)" aria-label="음성으로 묻기">' + MIC_SVG + '</button>' : '') +
       '<button type="submit" class="aih-go" id="aih-go">묻기</button></form>' +
