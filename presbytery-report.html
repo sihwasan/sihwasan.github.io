@@ -6,7 +6,7 @@
 <title>노회 보고서 - 시화산노회</title>
 <meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021h">
+<link rel="stylesheet" href="css/style.css?v=20261021i">
 </head>
 <body>
 
@@ -52,16 +52,14 @@ document.addEventListener('DOMContentLoaded', function () {
   area.innerHTML =
     '<div class="notice-banner">정기노회 회의자료(책자)를 쪽 단위로 찾아봅니다. 낱말로 찾거나 차례에서 고르면 그 쪽의 글이 보이고, ' +
     '<strong>PDF 원본</strong>으로도 바로 갈 수 있습니다. 첫 화면의 AI 검색도 이 자료를 함께 찾습니다.</div>' +
-    '<div class="pr-top"><div class="pr-tabs" id="pr-tabs"></div>' +
-    (canEdit ? '<button class="btn sm" id="pr-upload-btn">보고서 올리기</button>' : '') + '</div>' +
     '<div id="pr-upload" class="hidden"></div>' +
     '<form class="pr-search" id="pr-search"><input type="search" id="pr-q" placeholder="낱말로 찾기 (예: 상회비, 손병민, 재정부)"><button class="btn" type="submit">찾기</button></form>' +
     '<div id="pr-results" class="hidden"></div>' +
-    '<div class="pr-wrap"><aside class="pr-side" id="pr-side"></aside><div class="pr-page" id="pr-page"></div></div>';
+    '<div class="pr-wrap"><aside class="pr-side" id="pr-side"><div id="pr-books"></div><div id="pr-toc"></div></aside><div class="pr-page" id="pr-page"></div></div>';
 
   /* ---------- 목록 ---------- */
   function loadReports() {
-    return db.from('presbytery_reports').select('*').order('meet_on', { ascending: false }).order('id', { ascending: false })
+    return db.from('presbytery_reports').select('*').order('meet_on', { ascending: false, nullsFirst: false }).order('id', { ascending: false })
       .then(function (r) {
         if (r.error) {
           area.insertAdjacentHTML('afterbegin', '<div class="notice-banner">보고서 표가 아직 없습니다. <code>supabase/131_presbytery_reports.sql</code> 을 실행해 주세요. <small>(' + e(r.error.message) + ')</small></div>');
@@ -71,20 +69,29 @@ document.addEventListener('DOMContentLoaded', function () {
         reports = r.data || [];
       });
   }
-  function drawTabs() {
-    var t = document.getElementById('pr-tabs');
-    if (!reports.length) { t.innerHTML = '<span style="color:var(--gray-5)">아직 올린 보고서가 없습니다.</span>'; return; }
-    t.innerHTML = reports.map(function (r) {
-      return '<button type="button" class="pr-tab' + (cur && cur.id === r.id ? ' on' : '') + '" data-r="' + r.id + '">' +
-        e(r.title) + (r.status !== '완료' ? ' <small>(' + e(r.status) + ')</small>' : '') + '</button>';
-    }).join('');
-    t.querySelectorAll('.pr-tab').forEach(function (b) {
-      b.addEventListener('click', function () { openReport(Number(b.dataset.r)); });
+  /* 왼쪽 기둥 위: 올린 책자 목록 (해마다 묶어, 새것이 위) */
+  function drawBooks() {
+    var box = document.getElementById('pr-books');
+    var h = '<div class="pr-side-h pr-books-h"><span>회의자료 책자</span>' +
+      (canEdit ? '<button type="button" class="pr-mini" id="pr-upload-btn">+ 올리기</button>' : '') + '</div>';
+    if (!reports.length) h += '<div style="color:var(--gray-5);font-size:0.86rem">아직 올린 보고서가 없습니다.</div>';
+    var year = null;
+    reports.forEach(function (r) {
+      var y = (r.meet_on || '').slice(0, 4) || '날짜 미정';
+      if (y !== year) { year = y; h += '<div class="pr-year">' + e(y) + '</div>'; }
+      h += '<a href="#" class="pr-book' + (cur && cur.id === r.id ? ' on' : '') + '" data-r="' + r.id + '">' + e(r.title) +
+        '<small>' + e((r.meet_on || '') + (r.status && r.status !== '완료' ? ' · ' + r.status : '')) + '</small></a>';
     });
+    box.innerHTML = h;
+    box.querySelectorAll('.pr-book').forEach(function (b) {
+      b.addEventListener('click', function (ev) { ev.preventDefault(); openReport(Number(b.dataset.r)); });
+    });
+    var up = box.querySelector('#pr-upload-btn');
+    if (up) up.addEventListener('click', uploadForm);
   }
   function openReport(id, pageNo, q) {
     cur = reports.filter(function (r) { return r.id === id; })[0] || null;
-    drawTabs();
+    drawBooks();
     if (!cur) return;
     db.from('presbytery_report_pages').select('id,pdf_page,page_no,heading,text').eq('report_id', id)
       .order('pdf_page').order('page_no', { nullsFirst: true })
@@ -101,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return p ? p.page_no : (pages[0] ? pages[0].pdf_page : 1);
   }
   function drawSide() {
-    var side = document.getElementById('pr-side');
+    var side = document.getElementById('pr-toc');
     var toc = Array.isArray(cur.toc) ? cur.toc : [];
     var h = '<div class="pr-side-h">차례</div>';
     if (toc.length) {
@@ -413,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }).then(function (r) {
       if (r.error) throw r.error;
       var rep = r.data;
-      reports.unshift(rep); cur = rep; drawTabs();
+      reports.unshift(rep); cur = rep; drawBooks();
       /* 자료실 > 회의자료에도 보이게 */
       db.from('archive_items').insert({ section: '회의자료', title: title, description: '정기노회 회의자료 책자 (노회 보고서에서 쪽 단위로 찾아볼 수 있습니다)', doc_date: date, access: 'member', file_path: key, file_name: f.name, updated_by: user.name }).then(function () {}, function () {});
       SHSCloud.log('create', '노회 보고서 올리기', title);
@@ -514,11 +521,9 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ---------- 시작 ---------- */
   SHSCloud.init().then(function (c) {
     db = c;
-    var up = document.getElementById('pr-upload-btn');
-    if (up) up.addEventListener('click', uploadForm);
     return loadReports();
   }).then(function () {
-    drawTabs();
+    drawBooks();
     var rid = parseInt(qs.get('r'), 10), pn = parseInt(qs.get('p'), 10), q = qs.get('q') || '';
     if (q) document.getElementById('pr-q').value = q;
     if (rid && reports.some(function (r) { return r.id === rid; })) openReport(rid, isNaN(pn) ? null : pn, q);

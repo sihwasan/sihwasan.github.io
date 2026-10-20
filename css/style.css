@@ -2771,10 +2771,17 @@ mark.aih-key {
 @media (max-width: 900px) { .aih-mic { order: 0; } .aih-form .aih-go { flex: 1 1 auto; } }
 
 /* ---------- 노회 보고서 (회의자료 책자) ---------- */
-.pr-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.pr-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
-.pr-tab { border: 1px solid var(--gray-3); background: #fff; border-radius: 99px; padding: 7px 14px; font-size: 0.9rem; cursor: pointer; color: var(--gray-7); }
-.pr-tab.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.pr-books-h { display: flex; justify-content: space-between; align-items: center; }
+.pr-mini { border: 1px solid var(--gray-3); background: #fff; border-radius: 6px; padding: 2px 8px; font-size: 0.78rem; cursor: pointer; color: var(--navy); letter-spacing: 0; }
+.pr-mini:hover { border-color: var(--navy); }
+.pr-year { font-size: 0.78rem; font-weight: 700; color: var(--accent); margin: 8px 0 2px; }
+.pr-book { display: block; padding: 6px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 0.88rem; line-height: 1.35; }
+.pr-book small { display: block; color: var(--gray-5); font-size: 0.76rem; }
+.pr-book:hover { background: #fff; }
+.pr-book.on { background: var(--navy); color: #fff; }
+.pr-book.on small { color: rgba(255,255,255,0.75); }
+#pr-toc { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--gray-2); }
+@media (max-width: 760px) { .pr-wrap { grid-template-columns: 1fr; } .pr-side { position: static; max-height: none; } }
 .pr-search { display: flex; gap: 8px; margin: 0 0 16px; }
 .pr-search input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; }
 .pr-wrap { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
