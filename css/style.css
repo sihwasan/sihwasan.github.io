@@ -2525,3 +2525,6 @@ mark.aih-key {
   text-decoration: underline; text-decoration-color: #a8813a; text-decoration-thickness: 2px; text-underline-offset: 3px;
 }
 .aih-key-block { border-left: 4px solid #a8813a; background: #fff6dd; padding-left: 10px; }
+
+/* 시스템 알림 띠의 숨김 단추들 */
+.ops-hide-btns { display: inline-flex; flex-wrap: wrap; gap: 6px; vertical-align: middle; }

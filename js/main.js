@@ -1105,6 +1105,24 @@
    * 규칙의 대상(명부 연동)과 관리자에게 보인다 (서버 my_ops_notices 가 고른다).
    * 알림마다 <완료> 단추가 있어 누르면 이번 회기에는 다시 보이지 않고(서버에 남아
    * 어느 기기에서든 같다), <나중에 보기>는 이 창에서만 잠시 숨긴다. */
+  /* 시스템 알림을 이 기기에서 숨긴 기록: { "알림id_회기": 만료시각(ms) 또는 'never' } */
+  var OPS_HIDE_KEY = 'shs_ops_hide_v1';
+  function opsHidden() {
+    try { return JSON.parse(localStorage.getItem(OPS_HIDE_KEY) || '{}') || {}; } catch (x) { return {}; }
+  }
+  function opsHide(rows, days) {
+    var map = opsHidden();
+    var until = days ? Date.now() + days * 86400000 : 'never';
+    rows.forEach(function (n) { map[n.id + '_' + n.period_key] = until; });
+    /* 지난 기록은 정리 */
+    Object.keys(map).forEach(function (k) { if (map[k] !== 'never' && map[k] < Date.now()) delete map[k]; });
+    try { localStorage.setItem(OPS_HIDE_KEY, JSON.stringify(map)); } catch (x) {}
+  }
+  function opsIsHidden(n) {
+    var v = opsHidden()[n.id + '_' + n.period_key];
+    return v === 'never' || (typeof v === 'number' && v > Date.now());
+  }
+
   function meetingReminder(u) {
     if (!u) return;
     var esc = SHS_esc;
@@ -1112,6 +1130,7 @@
     function show(rows) {
       rows = (rows || []).filter(function (n) {
         if (n.acked) return false;
+        if (opsIsHidden(n)) return false;
         try { if (sessionStorage.getItem('shs_ops_later_' + n.id + '_' + n.period_key)) return false; } catch (x) {}
         return true;
       });
@@ -1136,7 +1155,12 @@
             '</li>';
         }).join('') + '</ul>' +
         (isAdmin ? '<a class="btn ghost sm" href="manage.html#mg-ops">알림 규칙 관리</a> ' : '') +
-        '<button class="btn ghost sm" id="ops-later-btn">나중에 보기</button>' +
+        '<span class="ops-hide-btns">' +
+        '<button class="btn ghost sm" id="ops-later-btn">이번만 닫기</button> ' +
+        '<button class="btn ghost sm" id="ops-7d-btn">7일간 보지 않기</button> ' +
+        '<button class="btn ghost sm" id="ops-never-btn">다시 보지 않기</button></span>' +
+        '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:6px">「완료」는 서버에 남아 어느 기기에서든 이번 회기에는 다시 보이지 않고, ' +
+        '「7일간」·「다시 보지 않기」는 이 기기에서만 숨깁니다. 숨긴 알림도 알림 규칙 관리에서 볼 수 있습니다.</div>' +
         '</div>';
       var gnb = document.querySelector('.gnb');
       if (gnb) gnb.insertAdjacentElement('afterend', bar);
@@ -1168,6 +1192,20 @@
         rows.forEach(function (n) {
           try { sessionStorage.setItem('shs_ops_later_' + n.id + '_' + n.period_key, '1'); } catch (x) {}
         });
+        bar.remove();
+      });
+      var d7 = bar.querySelector('#ops-7d-btn');
+      if (d7) d7.addEventListener('click', function () {
+        /* 남아 있는(완료하지 않은) 알림만 7일간 숨긴다 */
+        var left = rows.filter(function (n) { return bar.querySelector('button[data-opsack="' + n.id + '"]'); });
+        opsHide(left.length ? left : rows, 7);
+        bar.remove();
+      });
+      var never = bar.querySelector('#ops-never-btn');
+      if (never) never.addEventListener('click', function () {
+        if (!confirm('이 알림들을 이 기기에서 다시 보지 않습니다. (알림 규칙 관리에서는 계속 볼 수 있습니다)')) return;
+        var left = rows.filter(function (n) { return bar.querySelector('button[data-opsack="' + n.id + '"]'); });
+        opsHide(left.length ? left : rows, 0);
         bar.remove();
       });
     }
