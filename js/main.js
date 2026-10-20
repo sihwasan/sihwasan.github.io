@@ -734,6 +734,46 @@
    * 새 알림은 화면 오른쪽 위에 팝업 카드로 한 번 띄운다.
    * 한 번 띄운 알림은 이 기기에서 다시 띄우지 않는다 (알림함에는 그대로 남는다). */
   var TOAST_SEEN_KEY = 'shs_toast_seen_v1';
+
+  /* ---------- 기간이 지난 알림 ----------
+   * 날짜가 걸린 안내(노회 일정·접수 서류 준비·청원 안내 등)는 그날이 지나면 알림 개수·
+   * 알림 띠·첫 화면·알림함에서 저절로 빠진다. 알림 자체는 지우지 않는다(알림함 맨 아래 「지난 알림 보기」).
+   * 행사일은 본문 「일시 : 2026년 10월 12일」(기간이면 「~ 13일」의 끝 날)을 먼저 보고,
+   * 없으면 제목의 「(N일 전)」「(D-N)」을 알림을 보낸 날에 더해 셈한다. 날짜가 없는 알림은 그대로 둔다. */
+  function notiEventDate(n) {
+    if (!n) return null;
+    var made = n.created_at ? new Date(n.created_at) : null;
+    if (made && isNaN(made)) made = null;
+    var line = (String(n.body || '').match(/(?:^|\n)\s*일\s*시\s*[:：][^\n]*/) || [])[0];
+    if (line) {
+      var y, mo, d, at;
+      var m = line.match(/(\d{4})\s*[년.\-\/]\s*(\d{1,2})\s*[월.\-\/]\s*(\d{1,2})/);
+      if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; at = line.indexOf(m[0]) + m[0].length; }
+      else if (made && (m = line.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/))) {
+        y = made.getFullYear(); mo = +m[1]; d = +m[2]; at = line.indexOf(m[0]) + m[0].length;
+        if (new Date(y, mo - 1, d) < new Date(made.getFullYear(), made.getMonth(), made.getDate() - 60)) y++;   /* 연말에 보낸 이듬해 일정 */
+      }
+      if (y) {
+        var r = line.slice(at).match(/[~～]\s*(?:(\d{4})\s*년\s*)?(?:(\d{1,2})\s*월\s*)?(\d{1,2})\s*일/);
+        if (r) { if (r[1]) y = +r[1]; if (r[2]) mo = +r[2]; d = +r[3]; }
+        return new Date(y, mo - 1, d);
+      }
+    }
+    var k = String(n.title || '').match(/\((\d{1,3})\s*일\s*전\)|\(D-(\d{1,3})\)/);
+    if (k && made) return new Date(made.getFullYear(), made.getMonth(), made.getDate() + parseInt(k[1] || k[2], 10));
+    return null;
+  }
+  function notiExpired(n) {
+    var d = notiEventDate(n);
+    if (!d || isNaN(d)) return false;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return d < today;   /* 행사 당일까지는 보이고, 다음 날부터 빠진다 */
+  }
+  function notiLive(rows) {
+    return (rows || []).filter(function (n) { return !notiExpired(n); });
+  }
+
   /* 알림 하나가 가리키는 화면.
    * 문의는 그 글로, 서류는 그 신청·증명서로 곧장 데려간다.
    * 서류는 보는 사람에 따라 갈 곳이 다르다 —
@@ -871,7 +911,8 @@
       return c.from('notifications').select('*').is('read_at', null)
         .order('created_at', { ascending: false });
     }).then(function (r) {
-      var rows = (r && !r.error && r.data) ? r.data : [];
+      /* 기간이 지난 안내는 세지도 띄우지도 않는다 */
+      var rows = notiLive((r && !r.error && r.data) ? r.data : []);
 
       /* 상단 알림함에 확인하지 않은 개수를 달아 준다 */
       var dot = document.getElementById('noti-count');
@@ -1909,6 +1950,8 @@
     withBirths: withBirths,
     notiLinkOf: notiLinkOf,
     notiTargetOf: notiTargetOf,
+    notiExpired: notiExpired,
+    notiLive: notiLive,
     user: user,
     getUser: getUser,
     sectionize: sectionize,

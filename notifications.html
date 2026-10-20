@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>알림 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20261020u">
+<link rel="stylesheet" href="css/style.css?v=20261020v">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261020c"></script>
+<script src="js/main.js?v=20261020v"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -121,6 +121,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  var showOld = false;   /* 기간이 지난 알림을 펼쳐 볼 때 */
   function load() {
     SHSCloud.init().then(function (c) {
       return c.from('notifications').select('*').order('created_at', { ascending: false }).limit(100);
@@ -130,7 +131,10 @@ document.addEventListener('DOMContentLoaded', function () {
           ' (11 알림함 등록이 필요할 수 있습니다)</div>';
         return;
       }
-      var rows = r.data || [];
+      /* 기간이 지난 안내(행사일이 지난 일정·서류·청원 안내)는 맨 아래 「지난 알림 보기」로 접어 둔다 */
+      var got = r.data || [];
+      var old = got.filter(function (n) { return SHS.notiExpired && SHS.notiExpired(n); });
+      var rows = got.filter(function (n) { return old.indexOf(n) === -1; });
       var unread = rows.filter(function (n) { return !n.read_at; });
 
       var html = sendBox();
@@ -146,11 +150,19 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!rows.length) {
         html += '<p style="color:var(--gray-5)">받은 알림이 없습니다.</p>';
       } else {
-        rows.forEach(function (n) {
+        rows.forEach(function (n) { html += itemHtml(n, false); });
+      }
+      if (old.length) {
+        html += '<div class="noti-old-bar"><button class="btn ghost sm" id="nt-old">' +
+          (showOld ? '지난 알림 접기' : '기간이 지난 알림 ' + old.length + '건 보기') + '</button></div>';
+        if (showOld) old.forEach(function (n) { html += itemHtml(n, true); });
+      }
+      function itemHtml(n, isOld) {
           /* 알림마다 갈 곳이 있으면 <바로 가기>(문의는 <답장하기>)를 붙인다 */
           var goTo = SHS.notiTargetOf ? SHS.notiTargetOf(n, user) : null;
-          html += '<div class="noti-item' + (n.read_at ? '' : ' unread') + '">' +
+          return '<div class="noti-item' + (isOld ? ' old' : (n.read_at ? '' : ' unread')) + '">' +
             '<div class="n-head"><span class="n-kind">' + e(n.kind) + '</span>' +
+            (isOld ? '<span class="n-past">기간 지남</span>' : '') +
             '<span class="n-title">' + e(n.title) + '</span>' +
             '<span class="n-date">' + e(String(n.created_at).replace('T', ' ').slice(0, 16)) + '</span></div>' +
             (n.sent_by_name
@@ -164,9 +176,10 @@ document.addEventListener('DOMContentLoaded', function () {
             '<button class="btn danger sm" data-ntdel="' + n.id + '">삭제</button>' +
             '</p>' +
             '</div>';
-        });
       }
       area.innerHTML = html;
+      var oldBtn = document.getElementById('nt-old');
+      if (oldBtn) oldBtn.addEventListener('click', function () { showOld = !showOld; load(); });
       bindSend();
 
       function markRead(ids) {

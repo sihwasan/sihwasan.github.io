@@ -775,7 +775,8 @@ var SHSBoard = (function () {
               .eq('category', '총회 활동').order('id', { ascending: false }).limit(8))
       ]);
     }).then(function (rs) {
-      drawNoti((rs[0] && rs[0].data) || []);
+      /* 기간이 지난 안내는 빼고 보인다 (SHS.notiLive) */
+      drawNoti(SHS.notiLive ? SHS.notiLive((rs[0] && rs[0].data) || []) : ((rs[0] && rs[0].data) || []));
       drawNotices((rs[1] && rs[1].data) || []);
       drawSchedule((rs[2] && rs[2].data) || []);
       drawDocs((rs[3] && rs[3].data) || [], (rs[4] && rs[4].data) || []);

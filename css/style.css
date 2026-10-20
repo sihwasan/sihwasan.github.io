@@ -99,6 +99,10 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .noti-item .n-kind {
   font-size: 0.72rem; border: 1px solid var(--accent); color: var(--accent); padding: 1px 7px;
 }
+/* 기간이 지난 알림 — 맨 아래에 접어 두고, 펼치면 흐리게 */
+.noti-old-bar { margin: 18px 0 12px; padding-top: 14px; border-top: 1px dashed var(--gray-3); }
+.noti-item.old { opacity: 0.6; background: var(--gray-1); }
+.noti-item .n-past { font-size: 0.72rem; color: var(--gray-5); border: 1px solid var(--gray-3); padding: 1px 7px; }
 
 /* ---------- header ---------- */
 .site-header {
