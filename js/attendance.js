@@ -273,7 +273,7 @@ var SHSAttend = (function () {
       });
       var h = '<div class="ma-noprint" style="margin-bottom:12px"><button class="btn ghost sm" data-sact="back">&#8592; 회기 목록</button></div>' +
         '<h2 style="font-family:\'Noto Serif KR\',serif;margin:0 0 6px">결석 관리 — 누적 출결</h2>' +
-        '<p class="ma-sub">출석부 ' + S.sheets.length + '회분을 모았습니다 (' + S.sheets.map(function (s) { return esc(s.title); }).join(' · ') + '). ' +
+        '<p class="ma-sub">출석부 ' + S.sheets.length + '회분을 모았습니다' + (S.sheets.length ? ' (' + S.sheets.map(function (s) { return esc(s.title); }).join(' · ') + ')' : '') + '. ' +
         '<strong>결석</strong>은 불참 이유서 없이 빠진 경우만 셉니다. 이름을 누르면 회기별 출결과 이유서를 봅니다.</p>' +
         '<div class="ma-filter">' + F.map(function (f) { return '<button type="button" class="' + (S.filt === f[0] ? 'on' : '') + '" data-sf="' + f[0] + '">' + f[1] + '</button>'; }).join('') + '</div>' +
         '<div class="ma-btnrow"><button type="button" class="btn ghost sm" data-sact="csv">엑셀(CSV) 내려받기</button></div>';
