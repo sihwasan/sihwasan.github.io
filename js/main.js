@@ -129,7 +129,7 @@
     if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
     if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
     var sc = document.createElement('script');
-    sc.src = 'js/admin-shell.js?v=20261021e';
+    sc.src = 'js/admin-shell.js?v=20261021b';
     document.body.appendChild(sc);
   }
 
@@ -549,6 +549,15 @@
     setupInstall();
 
     document.body.insertAdjacentHTML('afterbegin', buildTopbar() + buildHeader() + buildGnb());
+    /* 상단 메뉴의 하위 항목을 왼쪽 세로 메뉴로도 보여 준다 (js/section-nav.js) */
+    (function () {
+      var pg = location.pathname.split('/').pop() || 'index.html';
+      if (pg === 'index.html' || /[?&]embed=1(?:&|$)/.test(location.search)) return;
+      if (document.querySelector('script[src^="js/section-nav.js"]')) return;
+      var sc = document.createElement('script');
+      sc.src = 'js/section-nav.js?v=20261021a';
+      document.body.appendChild(sc);
+    })();
     /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.
      * (검색로봇은 자바스크립트를 돌리지 않으므로, 적어 둔 것이 있어야 읽는다) */
     if (!document.querySelector('footer.site-footer')) {

@@ -92,8 +92,6 @@ var SHSAdminShell = (function () {
     var main = document.querySelector('main#main') || document.querySelector('main');
     if (!main) return;
 
-    var wrap = document.createElement('div');
-    wrap.className = 'adm-wrap';
     var side = document.createElement('aside');
     side.className = 'adm-side'; side.id = 'adm-side';
     side.innerHTML =
@@ -102,20 +100,25 @@ var SHSAdminShell = (function () {
       '<div class="adm-menu" id="adm-menu"><div class="adm-head"><span class="adm-badge">관리자 모드</span>' +
       '<span class="adm-who">' + esc(SHS.honorific(u)) + '</span></div>' + menuHtml(u) +
       '<a class="adm-exit" href="index.html">← 홈페이지로</a></div>';
-    var body = document.createElement('div');
-    body.className = 'adm-body';
-
-    main.parentNode.insertBefore(wrap, head || main);
-    wrap.appendChild(side);
-    wrap.appendChild(body);
-    if (head) body.appendChild(head);
-    body.appendChild(main);
-    document.body.classList.add('adm-mode');
-
-    side.querySelector('#adm-toggle').addEventListener('click', function () {
-      var open = side.classList.toggle('open');
-      this.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
+    /* 일반 왼쪽 메뉴(js/section-nav.js)가 이미 서 있으면 그 자리를 관리자 메뉴로 바꾼다 */
+    if (window.SHSSide && SHSSide.setAside) {
+      if (!SHSSide.setAside(side)) return;
+    } else {
+      var wrap = document.createElement('div');
+      wrap.className = 'adm-wrap';
+      var body = document.createElement('div');
+      body.className = 'adm-body';
+      main.parentNode.insertBefore(wrap, head || main);
+      wrap.appendChild(side);
+      wrap.appendChild(body);
+      if (head) body.appendChild(head);
+      body.appendChild(main);
+      document.body.classList.add('adm-mode');
+      side.querySelector('#adm-toggle').addEventListener('click', function () {
+        var open = side.classList.toggle('open');
+        this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    }
     /* 같은 쪽 안의 탭(#mg-hero 등)으로 옮기면 그 탭을 켠다 */
     side.querySelectorAll('.adm-sub a, .adm-link').forEach(function (a) {
       a.addEventListener('click', function () {

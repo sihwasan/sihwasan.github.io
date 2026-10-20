@@ -2809,3 +2809,16 @@ mark.aih-key {
   .pr-wrap { grid-template-columns: 1fr; }
   .pr-side { position: static; max-height: none; }
 }
+
+/* ---------- 상단 메뉴의 왼쪽 세로 메뉴 (js/section-nav.js) — 관리자 메뉴보다 밝은 색 ---------- */
+.adm-side.sec { background: var(--cream, #fbf8f2); border-right: 1px solid var(--gray-2); color: var(--ink); }
+.adm-side.sec .adm-badge { color: var(--accent); font-size: 0.74rem; }
+.adm-side.sec .adm-link { color: var(--gray-7); }
+.adm-side.sec .adm-link:hover { background: #fff; color: var(--navy); }
+.adm-side.sec .adm-link.on { background: var(--navy); color: #fff; font-weight: 700; }
+.adm-side.sec .adm-exit { color: var(--gray-5); }
+.adm-side.sec .adm-exit:hover { color: var(--navy); }
+@media (max-width: 900px) {
+  .adm-side.sec .adm-toggle { background: var(--cream, #fbf8f2); color: var(--ink); border-bottom: 1px solid var(--gray-2); }
+  .adm-side.sec .adm-toggle-c { color: var(--gray-5); }
+}
