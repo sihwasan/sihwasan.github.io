@@ -6,7 +6,7 @@
 <title>노회 보고서 - 시화산노회</title>
 <meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021i">
+<link rel="stylesheet" href="css/style.css?v=20261021j">
 </head>
 <body>
 
@@ -107,22 +107,55 @@ document.addEventListener('DOMContentLoaded', function () {
     var p = pages.filter(function (x) { return x.page_no != null; })[0];
     return p ? p.page_no : (pages[0] ? pages[0].pdf_page : 1);
   }
-  function drawSide() {
-    var side = document.getElementById('pr-toc');
-    var toc = Array.isArray(cur.toc) ? cur.toc : [];
-    var h = '<div class="pr-side-h">차례</div>';
-    if (toc.length) {
-      h += toc.map(function (t) {
-        return '<a href="#" data-p="' + e(String(t.page)) + '" class="pr-toc' + (t.level > 1 ? ' lv2' : '') + '">' + e(t.title) +
-          '<span>' + e(String(t.page)) + '</span></a>';
-      }).join('');
-    } else {
-      /* 차례가 없으면 제목이 있는 쪽을 차례로 삼는다 */
+  /* 차례 나무: 책자의 차례(1단계)에, 그 구간 쪽들의 제목을 2단계로 붙인다.
+   * (예: "노회 주소록 102" 아래 원로목사 102 · 북부시찰 103 · 상록시찰 105 · 남부시찰 107 …) */
+  function norm(t) { return String(t || '').replace(/\s+/g, '').replace(/^\d+[.)]/, ''); }
+  function tocTree() {
+    var toc = (Array.isArray(cur.toc) ? cur.toc : []).map(function (t) {
+      return { title: String(t.title || '').trim(), page: parseInt(t.page, 10), level: t.level > 1 ? 2 : 1 };
+    }).filter(function (t) { return t.title && t.page; });
+    /* 쪽 제목에서 뽑은 항목 (잇따라 같은 제목은 하나로, 차례에 이미 있는 것은 뺀다) */
+    var derived = [], last = null;
+    pages.forEach(function (pg) {
+      if (pg.page_no == null) return;
+      var hd = String(pg.heading || '').replace(/\s+/g, ' ').trim();
+      if (!hd) return;
+      if (norm(hd) === last) return;
+      last = norm(hd);
+      if (toc.some(function (t) { return t.page === pg.page_no && norm(t.title) === norm(hd); })) return;
+      derived.push({ title: hd, page: pg.page_no, level: 2 });
+    });
+    if (!toc.length) return derived.map(function (d) { d.level = 1; d.end = 9999; d.kids = []; return d; });
+    var tops = toc.filter(function (t) { return t.level === 1; });
+    if (!tops.length) tops = toc.slice();
+    tops.sort(function (x, y) { return x.page - y.page; });
+    var subs = toc.filter(function (t) { return tops.indexOf(t) === -1; }).concat(derived);
+    tops.forEach(function (t, i) {
+      t.end = i < tops.length - 1 ? tops[i + 1].page - 1 : 9999;
       var seen = {};
-      h += pages.filter(function (p) { return p.heading && p.page_no != null && !seen[p.heading] && (seen[p.heading] = 1); })
-        .map(function (p) { return '<a href="#" data-p="' + p.page_no + '" class="pr-toc">' + e(p.heading) + '<span>' + p.page_no + '</span></a>'; }).join('') ||
-        '<div style="color:var(--gray-5);font-size:0.86rem">차례가 없습니다</div>';
-    }
+      t.kids = subs.filter(function (k) { return k.page >= t.page && k.page <= t.end && !(k.page === t.page && norm(k.title) === norm(t.title)); })
+        .sort(function (x, y) { return x.page - y.page; })
+        .filter(function (k) { var key = k.page + '|' + norm(k.title); return !seen[key] && (seen[key] = 1); });
+    });
+    return tops;
+  }
+  function drawSide(curNo) {
+    var side = document.getElementById('pr-toc');
+    var tree = tocTree();
+    var h = '<div class="pr-side-h">차례</div>';
+    if (!tree.length) h += '<div style="color:var(--gray-5);font-size:0.86rem">차례가 없습니다</div>';
+    h += tree.map(function (t) {
+      var open = curNo != null && curNo >= t.page && curNo <= t.end;
+      var kidOn = null;
+      if (open) t.kids.forEach(function (k) { if (k.page <= curNo) kidOn = k; });
+      var s = '<a href="#" data-p="' + t.page + '" class="pr-toc' + (t.kids.length ? ' sec' : '') + (open && !kidOn ? ' on' : '') + '">' + e(t.title) + '<span>' + t.page + '</span></a>';
+      if (open && t.kids.length) {
+        s += '<div class="pr-kids">' + t.kids.map(function (k) {
+          return '<a href="#" data-p="' + k.page + '" class="pr-toc lv2' + (kidOn === k ? ' on' : '') + '">' + e(k.title) + '<span>' + k.page + '</span></a>';
+        }).join('') + '</div>';
+      }
+      return s;
+    }).join('');
     h += '<div class="pr-side-h" style="margin-top:14px">쪽으로 가기</div>' +
       '<div class="pr-jump"><input type="number" id="pr-jump" min="1" placeholder="쪽"><button class="btn ghost sm" id="pr-jump-go">이동</button></div>' +
       (cur.file_path ? '<button class="btn ghost sm" id="pr-pdf" style="margin-top:10px;width:100%">PDF 원본 열기</button>' : '');
@@ -240,7 +273,7 @@ document.addEventListener('DOMContentLoaded', function () {
     box.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { showPage(parseInt(b.dataset.go, 10), ''); }); });
     var pb = box.querySelector('#pr-pdf-page'); if (pb) pb.addEventListener('click', function () { openPdf(p.pdf_page); });
     var ed = box.querySelector('#pr-edit-page'); if (ed) ed.addEventListener('click', function () { editPage(p); });
-    document.getElementById('pr-side').querySelectorAll('.pr-toc').forEach(function (a) { a.classList.toggle('on', parseInt(a.dataset.p, 10) === p.page_no); });
+    drawSide(p.page_no);
     if (history.replaceState) history.replaceState(null, '', 'presbytery-report.html?r=' + cur.id + '&p=' + (p.page_no != null ? p.page_no : p.pdf_page) + (q ? '&q=' + encodeURIComponent(q) : ''));
     var first = box.querySelector('mark.ai-hl');
     if (first) setTimeout(function () { first.scrollIntoView({ block: 'center' }); }, 60);
