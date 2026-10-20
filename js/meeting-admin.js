@@ -95,7 +95,7 @@
       '<div class="ma-sub">' + e(String((m && m.meet_date) || (s && s.meet_on) || '').replace(/-/g, '.')) +
       (s && s.place ? ' · ' + e(s.place) : '') + '</div></div><div>' + stBadge(sel.meeting) + '</div></div>';
 
-    var tabs = [['sum', '개요'], ['att', '출결'], ['vote', '투표'], ['proc', '회의 진행'], ['allow', '거마비']];
+    var tabs = [['sum', '개요'], ['att', '출결'], ['reg', '출석부'], ['vote', '투표'], ['proc', '회의 진행'], ['allow', '거마비']];
     h += '<div class="ma-tabs" role="tablist">' + tabs.map(function (t) {
       return '<button type="button" role="tab" aria-selected="' + (tab === t[0]) + '" class="' + (tab === t[0] ? 'on' : '') + '" data-tab="' + t[0] + '">' + t[1] + '</button>';
     }).join('') + '</div><div id="ma-pane"></div>';
@@ -107,13 +107,20 @@
         (canEdit ? ' <a href="today.html#qr">출석 QR 코드 만들기</a>' : '') + '</div>';
       return;
     }
+    /* 출석부 — 회원 명단 전체의 출석·불참(이유서)·결석 (js/attendance.js, 130 sql) */
+    if (tab === 'reg') {
+      if (window.SHSAttend) SHSAttend.mountSheet(pane, { meeting: m, canEdit: canEdit });
+      else pane.innerHTML = '<div class="notice-banner">출석부 화면을 불러오지 못했습니다. 새로 고침해 주세요.</div>';
+      return;
+    }
     pane.innerHTML = tab === 'att' ? attHtml() : tab === 'vote' ? voteHtml() : tab === 'allow' ? allowHtml() : sumHtml();
   }
 
   function drawList() {
     var gs = groups();
-    var h = '<p class="ma-sub">회기를 누르면 그 노회의 출결 · 투표 · 회의 진행 · 거마비를 한 화면에서 봅니다. ' +
-      (canEdit ? '서기는 이곳에서 명단 확정 · 노회 마치기 · 다시 열기를 할 수 있습니다.' : '부서기는 열람만 합니다.') + '</p>';
+    var h = '<p class="ma-sub">회기를 누르면 그 노회의 출결 · 출석부 · 투표 · 회의 진행 · 거마비를 한 화면에서 봅니다. ' +
+      (canEdit ? '서기는 이곳에서 명단 확정 · 노회 마치기 · 다시 열기를 할 수 있습니다.' : '부서기는 열람만 합니다.') + '</p>' +
+      (window.SHSAttend ? '<div class="ma-btnrow"><button type="button" class="btn ghost sm" data-act="summary">결석 관리 — 회원별 누적 출결</button></div>' : '');
     if (!gs.length) {
       h += '<div class="notice-banner">아직 기록된 노회가 없습니다.' + (canEdit ? ' <a href="today.html#qr">출석 QR 코드 만들기</a> · <a href="proceed.html">순서지 만들기</a>' : '') + '</div>';
     } else {
@@ -321,6 +328,10 @@
     if (t.hasAttribute('data-filt')) { filt = t.getAttribute('data-filt'); draw(); return; }
     var act = t.getAttribute('data-act'), m = data && data.meeting;
     if (act === 'back') { sel = null; history.replaceState(null, '', 'meeting-admin.html'); drawList(); return; }
+    if (act === 'summary' && window.SHSAttend) {
+      SHSAttend.mountSummary(root, { canEdit: canEdit, onBack: function () { root.onclick = null; drawList(); } });
+      return;
+    }
     if (act === 'tests') { showTest = !showTest; draw(); return; }
     if (act === 'print') { window.print(); return; }
     if (act === 'csv') { csv(); return; }

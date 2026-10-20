@@ -28,6 +28,7 @@
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/officers-panel.js?v=20260902b"></script>
+<script src="js/attendance.js?v=20261021b"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -2519,6 +2520,9 @@ document.addEventListener('DOMContentLoaded', function () {
               '청빙 이력</td><td class="left"></td></tr>';
           })() +
           (term ? viewRow('장로 총대 자격', term) : '') +
+          /* 노회 출결 — 출석부(130 sql)에서 회기별 출석·불참(이유서)·결석을 모아 보여 준다 (js/attendance.js) */
+          '<tr id="rv-att" class="hidden"><td style="width:130px;color:var(--gray-6);font-size:0.88rem">' +
+          '노회 출결</td><td class="left"></td></tr>' +
           viewRow('연락처', e(m.phone || '')) +
           viewRow('주소', e([m.address, m.postcode ? '(' + m.postcode + ')' : '']
             .filter(Boolean).join(' '))) +
@@ -2530,6 +2534,7 @@ document.addEventListener('DOMContentLoaded', function () {
           mo.close();
           openRosterEdit(m);
         });
+        if (window.SHSAttend) SHSAttend.profileRow(mo.ov.querySelector('#rv-att td:last-child'), m.id);
         /* 교회 노회 가입일 — 교회 명부(sichal_churches)에서 소속 교회를 찾아 적는다.
          * 회원의 노회 살림은 그 교회가 노회에 들어온 날부터 시작되기 때문이다. */
         (function () {
