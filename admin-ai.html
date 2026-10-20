@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
       var rows = r.data || [];
-      if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-5)">아직 질문 기록이 없습니다.</p>'; return; }
+      if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-5)">아직 질문 기록이 없습니다. (최고관리자의 질문은 기록하지 않습니다)</p>'; return; }
       var tot = rows.reduce(function (a, x) { return a + (x.input_tokens || 0) * 0 + 1; }, 0);
       var h = '<table class="tbl"><thead><tr><th style="width:130px">때</th><th style="width:120px">누가</th><th>질문</th>' +
         '<th style="width:90px">토큰</th><th style="width:60px">초</th></tr></thead><tbody>';
@@ -251,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><small>' + (x.input_tokens || 0).toLocaleString() + ' / ' + (x.output_tokens || 0).toLocaleString() + '</small></td>' +
           '<td>' + (x.ms ? Math.round(x.ms / 100) / 10 : '-') + '</td></tr>';
       });
-      box.innerHTML = '<p style="font-size:0.84rem;color:var(--gray-5)">최근 ' + tot + '건 · 토큰은 입력 / 출력</p>' + h + '</tbody></table>';
+      box.innerHTML = '<p style="font-size:0.84rem;color:var(--gray-5)">최근 ' + tot + '건 · 토큰은 입력 / 출력 · 최고관리자의 질문은 기록하지 않습니다</p>' + h + '</tbody></table>';
     });
   }
 

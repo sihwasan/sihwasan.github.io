@@ -170,6 +170,14 @@ export const TOOL_DEFS = {
       sichal: { type: 'string', description: '시찰 이름' }
     }, ['keyword'])
   },
+  search_dues: {
+    description: '노회 상회비(교회가 노회에 다달이 내는 회비) 납부 현황: 교회별 월 상회비, 낸 달, 안 낸 달, 미납액, 회기 마감 여부. 회기는 4월에 시작해 이듬해 3월에 끝난다(year 2026 = 2026년 4월 ~ 2027년 3월). year 를 비우면 이번 회기. "미납 교회", "○○교회 상회비 냈나", "상회비 얼마 걷혔나" 같은 질문에 쓴다. 세례의무금(총회에 내는 세례교인헌금) 현황도 함께 돌려준다.',
+    input_schema: S({
+      year: { type: 'integer', description: '회기 시작 연도 (비우면 이번 회기)' },
+      church: { type: 'string', description: '교회 이름 (일부만 적어도 된다)' },
+      only_unpaid: { type: 'boolean', description: 'true 면 미납이 있는 교회만' }
+    })
+  },
   search_committee: {
     description: '상비부(감사헌의부·정치부·고시규칙부·재정부·교육친교부·전도선교부·사회복지부·미래교회자립위원회)의 일정·공지 기록을 찾는다. 부서 조직(부장·서기·부원)은 get_organization 에 있다.',
     input_schema: S({
@@ -185,7 +193,7 @@ export function toolsFor(role) {
   const names = ['search_assembly', 'get_assembly_article', 'search_presbytery_rules', 'get_organization',
     'search_members', 'search_churches', 'search_schedule', 'search_notices', 'search_presbytery_resolutions',
     'search_sichal', 'search_committee'];
-  if (officer) names.push('search_minutes', 'search_officer_docs');
+  if (officer) names.push('search_minutes', 'search_officer_docs', 'search_dues');
   return names.map(function (n) {
     return { name: n, description: TOOL_DEFS[n].description, input_schema: TOOL_DEFS[n].input_schema };
   });
@@ -205,7 +213,8 @@ export const TOOL_STATUS = {
   search_minutes: '회의록을 찾는 중',
   search_officer_docs: '임원 자료실을 찾는 중',
   search_sichal: '시찰 자료를 찾는 중',
-  search_committee: '상비부 기록을 찾는 중'
+  search_committee: '상비부 기록을 찾는 중',
+  search_dues: '상회비 납부 현황을 확인하는 중'
 };
 
 /* ---------- 도구 실행 ---------- */
@@ -451,6 +460,64 @@ const RUN = {
     });
     if (!items.length) return { items: [], note: '시찰 자료에서 찾지 못했습니다. (질문한 분이 볼 수 있는 시찰 자료만 찾습니다)' };
     return { items: items };
+  },
+  async search_dues(input, ctx) {
+    /* 회기: 4월 ~ 이듬해 3월. 이번 회기 시작 연도 */
+    const now = new Date(Date.now() + 9 * 3600 * 1000);
+    const curM = now.getUTCMonth() + 1, curY = now.getUTCFullYear();
+    const fiscalNow = curM >= 4 ? curY : curY - 1;
+    const year = parseInt(input.year, 10) || fiscalNow;
+    const [rates, pays, closings, baps] = await Promise.all([
+      sbGet(ctx.env, ctx.auth, 'dues_rates?select=id,sichal,church,pastor,monthly_amount,sort&year=eq.' + year + '&order=sort,id'),
+      sbGet(ctx.env, ctx.auth, 'dues_payments?select=church,month,paid_on,amount&year=eq.' + year + '&order=paid_on'),
+      sbGet(ctx.env, ctx.auth, 'dues_closings?select=year,closed_by,created_at&year=eq.' + year),
+      sbGet(ctx.env, ctx.auth, 'bapdues?select=church,pastor,members,target,paid,paid_on,memo&year=eq.' + curY + '&order=sort')
+    ]);
+    if (rates.error) return { error: /HTTP 4/.test(rates.error) ? '상회비 내역은 열람 권한이 없습니다 (관리자·회계·부회계와 상회비를 내는 담임목사·장로만 봅니다).' : rates.error };
+    if (!rates.length) return { items: [], note: year + '년 회기 상회비 설정이 아직 없습니다. 임원방 > 상회비 관리 > 상회비 설정에서 교회별 월 상회비를 정해야 납부 현황이 생깁니다.', year: year };
+    /* 이번 회기면 4월부터 이번 달까지가 내야 할 달, 지난 회기면 열두 달 모두 */
+    const order = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+    const elapsed = year === fiscalNow ? (curM >= 4 ? curM - 3 : curM + 9) : (year < fiscalNow ? 12 : 0);
+    const due = order.slice(0, elapsed);
+    const byChurch = {};
+    (pays.error ? [] : pays).forEach(function (p) {
+      (byChurch[p.church] = byChurch[p.church] || []).push(p);
+    });
+    const q = input.church ? clean(input.church) : '';
+    let items = rates.filter(function (r) { return !q || (r.church || '').indexOf(q) !== -1; }).map(function (r) {
+      const rate = Number(r.monthly_amount || 0);
+      const ps = byChurch[r.church] || [];
+      const paidMonths = ps.map(function (p) { return p.month; }).filter(function (m, i, a) { return a.indexOf(m) === i; });
+      const unpaid = due.filter(function (m) { return paidMonths.indexOf(m) === -1; });
+      const paidTotal = ps.reduce(function (a, p) { return a + (p.amount == null ? rate : Number(p.amount)); }, 0);
+      const last = ps.length ? ps.map(function (p) { return p.paid_on; }).sort().slice(-1)[0] : null;
+      return { church: r.church, sichal: r.sichal, pastor: r.pastor, monthly_manwon: rate,
+        paid_months: order.filter(function (m) { return paidMonths.indexOf(m) !== -1; }),
+        unpaid_months: rate ? unpaid : [], arrears_manwon: rate ? unpaid.length * rate : 0,
+        paid_total_manwon: paidTotal, last_paid_on: last || undefined, exempt: rate ? undefined : true };
+    });
+    if (input.only_unpaid) items = items.filter(function (x) { return x.unpaid_months.length > 0; });
+    const totalArrears = items.reduce(function (a, x) { return a + x.arrears_manwon; }, 0);
+    const summary = { year: year, period: year + '년 4월 ~ ' + (year + 1) + '년 3월', months_due_so_far: due.length,
+      churches: rates.length, churches_with_arrears: rates.filter(function (r) {
+        const ps = byChurch[r.church] || []; const pm = ps.map(function (p) { return p.month; });
+        return Number(r.monthly_amount || 0) > 0 && due.some(function (m) { return pm.indexOf(m) === -1; });
+      }).length,
+      closed: !closings.error && closings.length ? ('마감됨 (' + (closings[0].closed_by || '') + ')') : '마감 전',
+      unit: '만원' };
+    const ref = ctx.cites.add({ title: year + '년 회기 상회비 납부 현황', url: 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC', kind: '상회비 관리 (임원방)',
+      snippet: summary.period + ' · 내야 할 달 ' + due.length + '개월 · 교회 ' + rates.length + '곳 · 미납 있는 교회 ' + summary.churches_with_arrears + '곳' +
+        (items.length ? '\n' + items.slice(0, 40).map(function (x) { return x.church + ' 월 ' + x.monthly_manwon + '만원 · 미납 ' + x.unpaid_months.length + '개월' + (x.arrears_manwon ? ' (' + x.arrears_manwon + '만원)' : ''); }).join('\n') : '') });
+    const out = { ref: ref, summary: summary, selected_arrears_manwon: totalArrears, items: items.slice(0, 60) };
+    if (!baps.error && baps.length) {
+      const bl = baps.filter(function (b) { return !q || (b.church || '').indexOf(q) !== -1; });
+      const refB = ctx.cites.add({ title: curY + '년 세례의무금 납부 현황', url: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC', kind: '세례의무금 관리 (임원방)',
+        snippet: bl.slice(0, 40).map(function (b) { return b.church + ' 목표 ' + Number(b.target || 0).toLocaleString() + '원 · 납입 ' + Number(b.paid || 0).toLocaleString() + '원' + (b.paid_on ? ' (' + b.paid_on + ')' : ''); }).join('\n') });
+      out.bapdues = { ref: refB, year: curY, unit: '원', items: bl.slice(0, 60).map(function (b) {
+        return { church: b.church, pastor: b.pastor, members: b.members, target: b.target, paid: b.paid, paid_on: b.paid_on || undefined, unpaid: Number(b.paid || 0) < Number(b.target || 0) ? Number(b.target || 0) - Number(b.paid || 0) : 0 };
+      }) };
+    }
+    return out;
   },
   async search_committee(input, ctx) {
     const ws = words(input.keyword || '');

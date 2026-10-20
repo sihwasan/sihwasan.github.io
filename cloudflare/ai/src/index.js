@@ -370,8 +370,9 @@ async function answer(request, env, ctx, origin) {
       await out.close();
       try {
         await bump(env, me.id);
-        /* 질문 기록 (114 sql 의 ai_logs — 없으면 조용히 넘어간다) */
-        await fetch(env.SUPABASE_URL + '/rest/v1/ai_logs', {
+        /* 질문 기록 (114 sql 의 ai_logs — 없으면 조용히 넘어간다).
+         * 최고관리자는 홈페이지를 유지·보수하는 운영자 계정이라 그 활동은 기록하지 않는다 (감사 기록과 같은 규칙). */
+        if (me.role !== 'superadmin') await fetch(env.SUPABASE_URL + '/rest/v1/ai_logs', {
           method: 'POST',
           headers: { Authorization: me.auth, apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
           body: JSON.stringify({ user_id: me.id, user_name: me.name, role: me.role, question: question.slice(0, 1500), answer_chars: finalText.length,
