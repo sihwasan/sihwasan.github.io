@@ -18,11 +18,12 @@ SUPABASE_URL = "https://ltbhgwozkffenahqdzfj.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Ymhnd296a2ZmZW5haHFkemZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDk0MDYsImV4cCI6MjEwMTkyNTQwNn0.nSptHsi7nTCWTiyTe_Kl9xpxyHJ3pkhRGoZLI1BdsnI"
 ANTHROPIC_MODEL = "claude-opus-5"
 
-# Claude API 는 일부 지역(접속 지점)에서 오는 요청을 "Request not allowed"(403)로 거절한다.
-# 스마트 배치를 켜면 Cloudflare 가 이 워커를 api.anthropic.com 에 가까운 곳(미국)에서 실행해
-# 그런 거절을 피한다. 홈페이지와의 거리는 조금 멀어지지만 사진 읽기 시간이 대부분이라 상관없다.
+# Claude API 는 홍콩 등 지원하지 않는 지역에서 오는 요청을 "Request not allowed"(403)로 거절한다.
+# 한국 접속은 Cloudflare 무료 요금제에서 대개 홍콩(HKG) 데이터센터로 들어가고,
+# 스마트 배치(mode = "smart")는 이 워커를 옮기지 않았다(cf-placement: local-HKG, 2026-10-20 확인).
+# 그래서 실행 위치를 도쿄(aws:ap-northeast-1)로 못 박는다 — 한국과 가깝고 Claude API 지원 지역이다.
 [placement]
-mode = "smart"
+region = "aws:ap-northeast-1"
 
 [observability]
 enabled = true
