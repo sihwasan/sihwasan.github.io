@@ -377,7 +377,8 @@ document.addEventListener('DOMContentLoaded', function () {
     /* 차례 면의 글에서 "4. 서기 사무 보고 ----- 22" / "북부시찰 ----- 35" 같은 줄을 읽는다 */
     function tocFromText(text) {
       var out = [];
-      String(text || '').split('\n').forEach(function (ln) {
+      /* 차례 면은 줄바꿈 또는 표 구분(' | ')으로 항목이 나뉜다 */
+      String(text || '').split(/\n|\s\|\s/).forEach(function (ln) {
         var m = ln.trim().match(/^(\d+\s*[.)]\s*)?([^\d\-·…|]{2,60}?)\s*[-·…\.|~ ]{3,}\s*(\d{1,3})(?:\s*[~\-]\s*\d{1,3})?\s*$/);
         if (!m) return;
         var title = m[2].replace(/\s+/g, ' ').trim();
