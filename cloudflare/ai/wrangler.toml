@@ -35,6 +35,12 @@ region = "aws:ap-northeast-1"
 [observability]
 enabled = true
 
+# 예약 실행(cron)은 위의 실행 위치 고정이 먹지 않아 홍콩에서 돌면 Claude 가 403 으로 거절한다 (2026-10-21 확인).
+# 보고서의 Claude 호출은 도쿄에 고정된 내부 중계 워커(cloudflare/claude-proxy, 인터넷 주소 없음)를 거친다.
+[[services]]
+binding = "CLAUDE"
+service = "sihwasan-claude"
+
 # 임원 업무 보고서 — 매일 21:00 UTC = 한국 아침 6시 (src/reports.js, supabase/128_officer_reports.sql)
 # 자료를 여는 비밀 열쇠는 시크릿 REPORT_KEY 에 둔다:  npx wrangler secret put REPORT_KEY
 [triggers]

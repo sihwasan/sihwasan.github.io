@@ -201,19 +201,20 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div style="font-size:1.05rem;margin:6px 0 2px">' + big + '</div><div style="font-size:0.82rem;color:var(--gray-5)">' + small + '</div></div>';
   }
   function modelName(id) { var m = (S.models || []).filter(function (x) { return x.id === id; })[0]; return m ? m.name : id; }
-  /* 보고서 하루 비용 어림: 임원 13명 · 노회 자료 약 5만 토큰은 캐시(첫 번째만 1.25배, 나머지 0.1배),
-   * 사람마다 할 일·지시 약 5천 토큰과 답(생각 포함) 약 3천 토큰 */
+  /* 보고서 하루 비용 어림 — 2026-10-21 실제 실행(Opus 5.5, 답변 깊이 보통, 임원 13명)의 토큰으로 맞춤:
+   * 노회 자료 약 2만 6천 토큰은 캐시(첫 번째만 1.25배, 나머지 0.1배), 사람마다 할 일·지시 약 4천 2백 토큰,
+   * 답(생각 포함) 약 8천 2백 토큰 — 비용의 대부분은 답(출력)이다 */
   function reportCost() {
     var el = document.getElementById('rp-cost');
     if (!el) return;
     var id = document.getElementById('rp-model').value || S.model;
     var m = (S.models || []).filter(function (x) { return x.id === id; })[0];
     if (!m) { el.textContent = ''; return; }
-    var n = 13, ctx = 50000;
-    var inTok = ctx * 1.25 + (n - 1) * ctx * 0.1 + n * 5000, outTok = n * 3000;
+    var n = 13, ctx = 25600;
+    var inTok = ctx * 1.25 + (n - 1) * ctx * 0.1 + n * 4200, outTok = n * 8200;
     var day = Math.round((inTok / 1e6 * m.input + outTok / 1e6 * m.output) * WON);
     el.textContent = '비용 어림 (' + m.name + '): 하루 약 ' + day.toLocaleString() + '원 · 한 달 약 ' + (Math.round(day * 30 / 100) * 100).toLocaleString() +
-      '원 (임원 ' + n + '명 기준, 새 회의록을 읽는 날은 조금 더). 실제 비용은 Anthropic 콘솔 Usage 에서 확인하세요.';
+      '원 (임원 ' + n + '명, 답변 깊이 보통 기준 — 「빠르게」면 줄고 「꼼꼼하게」면 늚, 새 회의록을 읽는 날은 수백 원 더). 실제 비용은 Anthropic 콘솔 Usage 에서 확인하세요.';
   }
   function loadReportRun() {
     var el = document.getElementById('rp-last');

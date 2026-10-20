@@ -216,10 +216,11 @@ function explain(status, data, raw) {
 }
 
 /* 스트리밍으로 한 번 부르고, 글자는 onText 로 흘려보내며, 다 받은 내용 블록을 돌려준다 */
-async function claudeStream(key, body, beta, onText) {
+/* fetcher: 기본은 그냥 fetch. 보고서는 내부 중계 워커(서비스 바인딩 CLAUDE, 도쿄 고정)를 거친다 — reportDeps 참고 */
+async function claudeStream(key, body, beta, onText, fetcher) {
   const headers = { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
   if (beta) headers['anthropic-beta'] = beta;
-  const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: headers, body: JSON.stringify(Object.assign({ stream: true }, body)) });
+  const r = await (fetcher || fetch)('https://api.anthropic.com/v1/messages', { method: 'POST', headers: headers, body: JSON.stringify(Object.assign({ stream: true }, body)) });
   if (!r.ok) {
     const raw = await r.text().catch(function () { return ''; });
     let data = null; try { data = JSON.parse(raw); } catch (e) {}
@@ -280,13 +281,13 @@ async function claudeStream(key, body, beta, onText) {
 }
 
 /* 한 번 부르되, 잠깐 장애면 조금 쉬고 다시 부르고, 대체(fallbacks) 거절이면 대체 없이 부른다 */
-async function claudeCall(key, body, onText) {
+async function claudeCall(key, body, onText, fetcher) {
   let withFb = true;
   for (let i = 0; i < 3; i++) {
     try {
       const b = Object.assign({}, body);
       if (withFb) b.fallbacks = 'default';
-      return await claudeStream(key, b, withFb ? 'server-side-fallback-2026-07-01' : '', onText);
+      return await claudeStream(key, b, withFb ? 'server-side-fallback-2026-07-01' : '', onText, fetcher);
     } catch (e) {
       const st = e.status || 0;
       if (st === 400 && withFb && /fallback|beta/i.test(e.raw || '')) { withFb = false; continue; }
@@ -560,8 +561,12 @@ async function feedback(request, env, origin) {
 }
 
 /* ---------- 임원 업무 보고서 (reports.js, 128 sql) ---------- */
-function reportDeps(s) {
-  return { claudeCall: claudeCall, key: s.api_key, model: s.report_model || s.model, effort: s.report_effort || 'medium' };
+/* 예약 실행(cron)은 실행 위치 고정이 먹지 않아 홍콩에서 돌면 Claude 가 403 으로 거절한다 (2026-10-21).
+ * 그래서 보고서의 Claude 호출은 도쿄에 고정된 내부 중계 워커 sihwasan-claude(서비스 바인딩 CLAUDE)를 거친다. */
+function reportDeps(s, env) {
+  const via = env && env.CLAUDE ? function (u, init) { return env.CLAUDE.fetch(u, init); } : null;
+  return { claudeCall: function (key, body, onText) { return claudeCall(key, body, onText, via); },
+    key: s.api_key, model: s.report_model || s.model, effort: s.report_effort || 'medium' };
 }
 /* 실패도 마지막 실행 기록에 남긴다 (관리자 화면에서 보이게) */
 async function saveRunError(env, trigger, by, message) {
@@ -602,7 +607,7 @@ async function reportsRun(request, env, ctx, origin) {
     /* 오래 걸리는 동안 연결이 끊기지 않게 15초마다 신호 */
     const hb = setInterval(function () { out.send('ping', {}); }, 15000);
     try {
-      const run = await runReports(env, reportDeps(s), { trigger: 'manual', only: only, by: me.name }, function (t) { out.send('progress', { text: t }); });
+      const run = await runReports(env, reportDeps(s, env), { trigger: 'manual', only: only, by: me.name }, function (t) { out.send('progress', { text: t }); });
       await out.send('done', run);
     } catch (e) {
       await saveRunError(env, 'manual', me.name, (e && e.message) || e);
@@ -626,7 +631,7 @@ async function reportsCron(env) {
   if (busy) return;
   try {
     /* 예약 실행은 Cloudflare 가 15분에서 끊으므로 13분이 지나면 새 보고서를 시작하지 않는다 */
-    await runReports(env, reportDeps(s), { trigger: 'cron', deadline: Date.now() + 13 * 60 * 1000 });
+    await runReports(env, reportDeps(s, env), { trigger: 'cron', deadline: Date.now() + 13 * 60 * 1000 });
   } catch (e) {
     await saveRunError(env, 'cron', null, (e && e.message) || e);
   } finally {

@@ -210,6 +210,12 @@ KV.set('settings', JSON.stringify({ api_key: 'sk-ant-test', model: 'claude-haiku
 resetCalls(); tasksSaved = true; w2 = [];
 await worker.scheduled({}, env, { waitUntil: (p) => w2.push(p) }); await Promise.all(w2);
 ok(calls.length === 3 && calls[0].model === 'claude-haiku-5-5', '보고서 모델을 비우면 검색과 같은 모델');
+/* 보고서의 Claude 호출은 도쿄 고정 내부 중계(서비스 바인딩 CLAUDE)를 거친다 */
+resetCalls(); tasksSaved = true; w2 = [];
+let via = [];
+const envVia = Object.assign({}, env, { CLAUDE: { fetch: (u, init) => { via.push(String(u)); return globalThis.fetch(u, init); } } });
+await worker.scheduled({}, envVia, { waitUntil: (p) => w2.push(p) }); await Promise.all(w2);
+ok(via.length === 3 && via.every((u) => u === 'https://api.anthropic.com/v1/messages') && calls.length === 3, '예약 실행의 Claude 호출 3번 모두 내부 중계(CLAUDE)를 거침');
 resetCalls();
 const envNoKey = Object.assign({}, env, { REPORT_KEY: '' });
 w2 = [];
