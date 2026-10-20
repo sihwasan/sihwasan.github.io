@@ -9,7 +9,8 @@
  */
 var SHSSide = (function () {
   var SKIP = ['index.html', 'login.html', 'signup.html', 'auth-callback.html', 'reset-password.html',
-    'certificate.html', 'today.html', 'app.html', 'mfa.html'];
+    'certificate.html', 'today.html', 'app.html', 'mfa.html',
+    'presbytery-report.html'];   /* 책자 목록·차례가 왼쪽 기둥을 쓴다 */
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function pageOf(h) { return String(h || '').split('#')[0].split('?')[0]; }

@@ -6,7 +6,7 @@
 <title>노회 보고서 - 시화산노회</title>
 <meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021j">
+<link rel="stylesheet" href="css/style.css?v=20261021k">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261021i"></script>
+<script src="js/main.js?v=20261021j"></script>
 <script src="js/ai-chat.js?v=20261020d"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div id="pr-upload" class="hidden"></div>' +
     '<form class="pr-search" id="pr-search"><input type="search" id="pr-q" placeholder="낱말로 찾기 (예: 상회비, 손병민, 재정부)"><button class="btn" type="submit">찾기</button></form>' +
     '<div id="pr-results" class="hidden"></div>' +
-    '<div class="pr-wrap"><aside class="pr-side" id="pr-side"><div id="pr-books"></div><div id="pr-toc"></div></aside><div class="pr-page" id="pr-page"></div></div>';
+    '<div class="pr-wrap"><aside class="pr-side pr-books" id="pr-books"></aside><aside class="pr-side" id="pr-toc"></aside><div class="pr-page" id="pr-page"></div></div>';
 
   /* ---------- 목록 ---------- */
   function loadReports() {

@@ -124,8 +124,26 @@
   var ADMIN_PAGES = ['admin-home.html', 'admin-ai.html', 'manage.html', 'admin.html', 'schedule.html', 'archive-edit.html',
     'elder-notice.html', 'meeting-admin.html', 'proceed.html', 'documents.html', 'report-intake.html',
     'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html', 'presbytery-report.html'];
+  /* 관리자 모드(왼쪽 관리자 메뉴)는 상단 <관리자>를 눌러 들어왔을 때만 켜진다.
+   * 다른 상단 메뉴를 누르면 꺼지고, 관리자 메뉴 안에서 오가는 동안은 켜진 채로 있다. (이 탭 안에서만 기억) */
+  var ADMIN_ENTRY = ['admin-home.html', 'admin-ai.html'];
+  function adminMode(v) {
+    try {
+      if (v != null) sessionStorage.setItem('shs_admin_mode', v ? '1' : '0');
+      return sessionStorage.getItem('shs_admin_mode') === '1';
+    } catch (x) { return false; }
+  }
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+    if (!a) return;
+    if (a.closest('#adm-side')) { adminMode(!a.classList.contains('adm-exit')); return; }
+    if (a.closest('#gnb-admin')) { adminMode(true); return; }
+    if (a.closest('.gnb') || a.closest('.topbar') || a.closest('.site-header')) adminMode(false);
+  }, true);
   function loadAdminShell() {
     var pg = location.pathname.split('/').pop() || 'index.html';
+    if (ADMIN_ENTRY.indexOf(pg) !== -1) adminMode(true);
+    if (!adminMode()) return;
     if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
     if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
     var sc = document.createElement('script');
@@ -555,7 +573,7 @@
       if (pg === 'index.html' || /[?&]embed=1(?:&|$)/.test(location.search)) return;
       if (document.querySelector('script[src^="js/section-nav.js"]')) return;
       var sc = document.createElement('script');
-      sc.src = 'js/section-nav.js?v=20261021a';
+      sc.src = 'js/section-nav.js?v=20261021b';
       document.body.appendChild(sc);
     })();
     /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.
