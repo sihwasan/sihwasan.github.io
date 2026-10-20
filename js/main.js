@@ -57,7 +57,7 @@
       { t: '자료실 (공문·회계·파일)', h: 'archive.html' }
     ]},
     { title: '총회', href: 'assembly-constitution.html', sub: [
-      { t: '총회 활동현황', h: 'dashboard.html#hub-assembly' },
+      { t: '총대 총회 활동 현황', h: 'dashboard.html#hub-assembly' },
       { t: '총회 헌법', h: 'assembly-constitution.html' },
       { t: '총회 규정', h: 'assembly-rules.html' },
       { t: '총회 회의결의', h: 'assembly-resolution.html' },
