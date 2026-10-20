@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>임원 업무 보고서 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261020fb">
+<style>
+/* 임원 업무 보고서 — 이 화면에서만 쓰는 모양 */
+.or-lead { font-size: 0.9rem; color: var(--gray-7); line-height: 1.75; margin: 0 0 14px; }
+.or-muted { color: var(--gray-5); }
+.or-empty { color: var(--gray-5); padding: 16px 2px; line-height: 1.7; }
+.or-n { display: inline-block; min-width: 20px; margin-left: 5px; padding: 0 6px; border-radius: 999px; background: #b03a3a; color: #fff;
+  font-size: 0.72rem; font-weight: 700; line-height: 20px; text-align: center; }
+.or-n:empty { display: none; }
+.or-run { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px;
+  background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 10px; margin-bottom: 10px; font-size: 0.86rem; color: var(--gray-7); }
+.or-bad { color: #b03a3a; font-weight: 700; }
+.or-progress { font-size: 0.86rem; padding: 8px 12px; border-radius: 8px; background: #f5f7fb; color: var(--navy); margin-bottom: 10px; }
+.or-progress.ok { background: #f2faf5; color: #1a6d3a; }
+.or-progress.bad { background: #fdf3f3; color: #b03a3a; }
+.or-errs { font-size: 0.82rem; color: #b03a3a; margin-bottom: 10px; }
+.or-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.or-chips button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--gray-2); background: #fff;
+  color: var(--gray-7); font-size: 0.86rem; cursor: pointer; user-select: none; }
+.or-chips button:hover { border-color: var(--navy); color: var(--navy); }
+.or-chips button.on { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 700; }
+.or-people button.on { background: var(--accent); border-color: var(--accent); }
+.or-report { background: #fff; border: 1px solid var(--gray-2); border-radius: 12px; padding: 18px 20px; margin-top: 6px; }
+.or-who { font-size: 0.84rem; color: var(--gray-5); }
+.or-hl { font-size: 1.2rem; color: var(--ink); margin: 6px 0 4px; line-height: 1.5; word-break: keep-all; }
+.or-meta { font-size: 0.78rem; color: var(--gray-5); }
+.or-link { background: none; border: none; padding: 0; color: var(--navy); text-decoration: underline; cursor: pointer; font-size: 0.78rem; }
+.or-sec { margin-top: 18px; }
+.or-sec h3 { font-size: 0.98rem; color: var(--navy); margin: 0 0 6px; }
+.or-sec h3 small { font-weight: 400; color: var(--gray-5); }
+.or-sec ul { margin: 0; padding-left: 20px; line-height: 1.8; color: var(--gray-7); font-size: 0.92rem; }
+.or-checks { background: #fbf3ea; border-radius: 10px; padding: 10px 14px; }
+.or-checks h3 { color: #8a5a2b; }
+.or-todo, .or-task { border: 1px solid var(--gray-2); border-radius: 10px; padding: 12px 14px; margin: 8px 0; background: #fff; }
+.or-todo-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.or-todo-t { color: var(--ink); line-height: 1.5; word-break: break-word; }
+.or-todo-m { font-size: 0.82rem; color: var(--gray-5); margin-top: 4px; word-break: break-word; }
+.or-todo-d { font-size: 0.88rem; color: var(--gray-7); line-height: 1.7; margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; }
+.or-note { font-size: 0.8rem; color: var(--gray-5); margin: 6px 0 0; word-break: break-word; }
+.or-pri, .or-st, .or-due { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; border: 1px solid var(--gray-2); background: var(--gray-1); color: var(--gray-7); }
+.or-pri-hi { background: #fdf3f3; color: #b03a3a; border-color: #e0a9a9; }
+.or-pri-lo { color: var(--gray-5); }
+.or-due { background: #f5f7fb; color: var(--navy); border-color: #b9c3d6; }
+.or-due.late { background: #b03a3a; color: #fff; border-color: #b03a3a; }
+.or-st-doing { background: #f5f7fb; color: var(--navy); border-color: #b9c3d6; }
+.or-st-sent { background: #fbf3ea; color: #8a5a2b; border-color: #e3c9a8; }
+.or-st-done { background: #f2faf5; color: #1a6d3a; border-color: #9fcdb0; }
+.or-st-na { color: var(--gray-5); }
+.or-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.or-acts .btn, .or-acts select { min-height: 40px; user-select: none; }
+.or-acts select { padding: 6px 10px; border: 1px solid var(--gray-2); border-radius: 8px; background: #fff; }
+.or-contact, .or-add { margin-top: 10px; padding: 12px 14px; border: 1px solid #b9c3d6; background: #f8f9fc; border-radius: 10px; }
+.or-add { border-color: #9fcdb0; background: #f7fbf8; margin-bottom: 12px; }
+.or-contact .field, .or-add .field { margin-bottom: 8px; }
+.or-contact input, .or-contact textarea, .or-add input, .or-add textarea, .or-add select { width: 100%; box-sizing: border-box; }
+.or-contact label small, .or-add label small { font-weight: 400; color: var(--gray-5); }
+.or-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.or-row .field { flex: 1 1 160px; min-width: 0; }
+.or-phone { display: flex; flex-direction: column; gap: 2px; font-size: 0.84rem; color: var(--gray-7); margin: -2px 0 8px; }
+.or-phone a { color: var(--navy); font-weight: 700; }
+.or-hint { font-size: 0.78rem; color: var(--gray-5); margin: 8px 0 0; }
+.or-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.or-bar .or-chips { margin-bottom: 0; }
+.or-bar select { min-height: 40px; padding: 6px 10px; border: 1px solid var(--gray-2); border-radius: 8px; background: #fff; }
+.or-g { font-size: 0.95rem; color: var(--navy); margin: 18px 0 4px; }
+.or-g small { font-weight: 400; color: var(--gray-5); }
+.or-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 0.86rem; color: #b03a3a; }
+@media (max-width: 600px) { .or-report { padding: 14px 12px; } .or-hl { font-size: 1.08rem; } }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>임원 업무 보고서</h1>
+    <div class="crumb">홈 &gt; 대시보드 &gt; 임원 업무 보고서</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="or-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js?v=20261020za"></script>
+<script src="js/main.js?v=20261020y"></script>
+<script src="js/officer-report.js?v=20261021r"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  SHS.getUser().then(function (user) { SHSOReport.mount(document.getElementById('or-area'), user); });
+});
+</script>
+</body>
+</html>

@@ -77,7 +77,8 @@ var SHSBoard = (function () {
       me: hicon('<circle cx="24" cy="17" r="8"/><path d="M9 41a15 15 0 0 1 30 0"/>'),
       schedmgr: hicon('<rect x="8" y="12" width="32" height="28" rx="3"/><path d="M8 20h32M16 8v8M32 8v8"/><path d="M24 26v8M20 30h8"/>'),
       assembly: hicon('<path d="M6 18 24 8l18 10"/><path d="M11 22v14M19 22v14M29 22v14M37 22v14"/><path d="M6 40h36"/><path d="M8 18h32"/>'),
-      audit: hicon('<path d="M13 8h22v32H13z"/><path d="M19 8V5h10v3"/><path d="M19 18h10M19 24h10M19 30h6"/><path d="M28 34l3 3 6-7"/>')
+      audit: hicon('<path d="M13 8h22v32H13z"/><path d="M19 8V5h10v3"/><path d="M19 18h10M19 24h10M19 30h6"/><path d="M28 34l3 3 6-7"/>'),
+      oreport: hicon('<rect x="10" y="7" width="28" height="34" rx="3"/><path d="M16 16h16M16 22h16M16 28h9"/><path d="M28 33l3 3 6-7"/>')
     };
 
     function hubCard(id, title, sub, extra) {
@@ -94,6 +95,8 @@ var SHSBoard = (function () {
     {
       var cards = '';
       cards += hubCard('noti', '나의 알림', '', { badge: 'hub-badge-noti' });
+      /* 임원에게 — 매일 아침 6시 AI 가 쓰는 직책별 업무 보고서 (officer-report.html, 128 sql) */
+      if (SHSAuth.isOfficer(user)) cards += hubCard('oreport', '업무 보고서', '매일 아침 6시', { cid: 'hub-card-oreport' });
       /* 공지와 일정은 한 카드에서 함께 본다 */
       cards += hubCard('notice', '노회 공지·일정', '');
       cards += hubCard('assembly', '총회 활동 현황', '총대 · 파송 이사');
@@ -211,6 +214,24 @@ var SHSBoard = (function () {
 
       /* 서기에게 — 정기노회 4주 전부터 남은 임기 1년 미만 장로 총대와 공문 안내 */
       if (window.SHSElderNotice) SHSElderNotice.dashCard(document.getElementById('hub-elder'), user);
+
+      /* 업무 보고서 카드: 오늘 보고서가 있으면 그 요약을 부제로 */
+      (function () {
+        var card = document.getElementById('hub-card-oreport');
+        if (!card || !(window.SHSCloud && SHSCloud.enabled())) return;
+        SHSCloud.init().then(function (c) {
+          return c.from('ai_reports').select('headline,report_date').eq('user_id', user.id)
+            .order('report_date', { ascending: false }).limit(1);
+        }).then(function (r) {
+          var x = r && !r.error && r.data && r.data[0];
+          var d = new Date(), today = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+          var sub = card.querySelector('.hc-s');
+          if (x && sub && x.report_date === today && x.headline) {
+            sub.textContent = '오늘: ' + (x.headline.length > 34 ? x.headline.slice(0, 34) + '…' : x.headline);
+            card.classList.add('hub-card-new');
+          }
+        }).catch(function () {});
+      })();
 
       /* 내 사진: 명단 카드에 올린 사진을 대시보드에도 보여 준다 */
       (function () {
@@ -331,6 +352,8 @@ var SHSBoard = (function () {
           if (b.dataset.hub === 'doc') { location.href = 'request.html'; return; }
           /* 교회상황 보고서는 보고서 작성·열람 화면으로 바로 간다 */
           if (b.dataset.hub === 'report') { location.href = 'report.html'; return; }
+          /* 임원 업무 보고서는 보고서 화면으로 바로 간다 */
+          if (b.dataset.hub === 'oreport') { location.href = 'officer-report.html'; return; }
           /* 내 정보는 내 정보 화면으로 바로 간다 */
           if (b.dataset.hub === 'me') { location.href = 'mypage.html'; return; }
           /* 나의 시찰은 그 시찰 화면으로 바로 간다 */

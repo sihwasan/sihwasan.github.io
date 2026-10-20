@@ -12,6 +12,8 @@
  *   GET  /settings        (관리자) 모델·한도·허용 등급·열쇠 등록 여부·오늘 사용량
  *   POST /settings        (관리자) 설정 저장 — api_key 를 주면 열쇠를 바꾼다
  *   POST /settings/test   (관리자) 열쇠로 모델 목록을 받아 보고, 고른 모델로 아주 짧은 인사를 시켜 본다
+ *   POST /reports/run     (노회장·서기·최고관리자) 임원 업무 보고서를 지금 다시 만든다 — SSE (progress / done / error)
+ *   (예약) 매일 21:00 UTC = 한국 아침 6시에 임원 업무 보고서를 만든다 (wrangler.toml [triggers], 128 sql)
  *   GET  /history         내 질문 내역 (대화별 요약: 제목·질문 수·마지막 답 앞부분)
  *   GET  /history/<id>    대화 하나 (문답 전부 — 다시 보기·이어 묻기)
  *   DELETE /history/<id>  대화 하나 지우기,  DELETE /history  내 내역 모두 지우기
@@ -33,6 +35,7 @@
  */
 import { Index } from './search.js';
 import { Cites, toolsFor, runTool, TOOL_STATUS } from './tools.js';
+import { runReports } from './reports.js';
 
 const ALLOW_ORIGINS = [
   'https://sihwasan.org',
@@ -49,7 +52,10 @@ const DEFAULTS = {
   daily_user: 30,
   daily_total: 300,
   roles: ['superadmin', 'president', 'clerk', 'staff', 'officer', 'member'],
-  enabled: true
+  enabled: true,
+  report_enabled: true,   /* 임원 업무 보고서 (매일 아침 6시) */
+  report_model: '',       /* 비우면 검색과 같은 모델 */
+  report_effort: 'medium'
 };
 /* 관리자 화면의 모델 고르기에 보여 줄 목록 (값: 1백만 토큰당 미화) */
 export const MODELS = [
@@ -104,6 +110,7 @@ async function getSettings(env) {
 function publicSettings(s, extra) {
   return Object.assign({
     model: s.model, effort: s.effort, daily_user: s.daily_user, daily_total: s.daily_total, roles: s.roles, enabled: s.enabled,
+    report_enabled: s.report_enabled !== false, report_model: s.report_model || '', report_effort: s.report_effort || 'medium',
     has_key: !!s.api_key, key_tail: s.api_key ? String(s.api_key).slice(-4) : '',
     updated_at: s.updated_at || null, updated_by: s.updated_by || null, models: MODELS
   }, extra || {});
@@ -552,6 +559,80 @@ async function feedback(request, env, origin) {
   return reply({ ok: true, id: id, helpful: body.helpful, reason: reason }, 200, origin);
 }
 
+/* ---------- 임원 업무 보고서 (reports.js, 128 sql) ---------- */
+function reportDeps(s) {
+  return { claudeCall: claudeCall, key: s.api_key, model: s.report_model || s.model, effort: s.report_effort || 'medium' };
+}
+/* 실패도 마지막 실행 기록에 남긴다 (관리자 화면에서 보이게) */
+async function saveRunError(env, trigger, by, message) {
+  if (!env.REPORT_KEY) return;
+  await fetch(env.SUPABASE_URL + '/rest/v1/rpc/ai_report_save', {
+    method: 'POST',
+    headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_key: env.REPORT_KEY, p_data: { run: { trigger: trigger, by: by || null, finished_at: new Date().toISOString(), reports: 0, errors: [String(message).slice(0, 300)] } } })
+  }).catch(function () {});
+}
+/* 두 번 겹쳐 돌지 않게 KV 에 잠금 (15분이면 저절로 풀린다) */
+async function reportLock(env, who) {
+  const cur = await env.AI_KV.get('report:lock');
+  if (cur) return cur;
+  await env.AI_KV.put('report:lock', who + ' · ' + new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(11, 16), { expirationTtl: 900 });
+  return null;
+}
+async function reportsRun(request, env, ctx, origin) {
+  const me = await whoIs(request, env);
+  if (!me) return reply({ error: '로그인이 확인되지 않았습니다. 다시 로그인해 주세요.' }, 401, origin);
+  /* 노회장·서기·최고관리자 (2단계 인증까지) — 128 sql 의 ai_report_reader 로 서버가 판정 */
+  const chk = await fetch(env.SUPABASE_URL + '/rest/v1/rpc/ai_report_reader', {
+    method: 'POST', headers: { Authorization: me.auth, apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: '{}'
+  });
+  const allowed = chk.ok && (await chk.json().catch(function () { return false; })) === true;
+  if (!allowed) return reply({ error: '노회장·서기(2단계 인증을 마친 로그인)만 보고서를 다시 만들 수 있습니다.' }, 403, origin);
+  const s = await getSettings(env);
+  if (!s.api_key) return reply({ error: 'AI 열쇠(API 키)가 없습니다. 「AI 검색·API 설정」에서 넣어 주세요.' }, 503, origin);
+  if (!env.REPORT_KEY) return reply({ error: '창구에 보고서 열쇠(REPORT_KEY)가 설정되지 않았습니다.' }, 503, origin);
+  const body = await request.json().catch(function () { return {}; });
+  const only = /^[0-9a-f-]{36}$/.test(String(body.only || '')) ? String(body.only) : null;
+  const busy = await reportLock(env, me.name || '관리자');
+  if (busy) return reply({ error: '지금 보고서를 만들고 있습니다 (' + busy + ' 시작). 끝난 뒤 다시 눌러 주세요.' }, 409, origin);
+
+  const { readable, writable } = new TransformStream();
+  const out = sse(writable.getWriter());
+  ctx.waitUntil((async function () {
+    /* 오래 걸리는 동안 연결이 끊기지 않게 15초마다 신호 */
+    const hb = setInterval(function () { out.send('ping', {}); }, 15000);
+    try {
+      const run = await runReports(env, reportDeps(s), { trigger: 'manual', only: only, by: me.name }, function (t) { out.send('progress', { text: t }); });
+      await out.send('done', run);
+    } catch (e) {
+      await saveRunError(env, 'manual', me.name, (e && e.message) || e);
+      await out.send('error', { message: (e && e.message) || String(e) });
+    } finally {
+      clearInterval(hb);
+      await env.AI_KV.delete('report:lock').catch(function () {});
+      await out.close();
+    }
+  })());
+  return new Response(readable, {
+    status: 200,
+    headers: Object.assign({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' }, cors(origin))
+  });
+}
+/* 매일 아침 6시 (wrangler.toml 의 crons) */
+async function reportsCron(env) {
+  const s = await getSettings(env);
+  if (s.report_enabled === false || !s.api_key || !env.REPORT_KEY) return;
+  const busy = await reportLock(env, '예약 실행');
+  if (busy) return;
+  try {
+    await runReports(env, reportDeps(s), { trigger: 'cron' });
+  } catch (e) {
+    await saveRunError(env, 'cron', null, (e && e.message) || e);
+  } finally {
+    await env.AI_KV.delete('report:lock').catch(function () {});
+  }
+}
+
 /* ---------- 관리자 설정 ---------- */
 async function settings(request, env, origin, test) {
   const me = await whoIs(request, env);
@@ -598,6 +679,9 @@ async function settings(request, env, origin, test) {
     ADMIN_ROLES.forEach(function (r) { if (next.roles.indexOf(r) === -1) next.roles.push(r); });
   }
   if (typeof body.enabled === 'boolean') next.enabled = body.enabled;
+  if (typeof body.report_enabled === 'boolean') next.report_enabled = body.report_enabled;
+  if (typeof body.report_model === 'string' && (body.report_model === '' || MODELS.some(function (m) { return m.id === body.report_model; }))) next.report_model = body.report_model;
+  if (typeof body.report_effort === 'string' && ['low', 'medium', 'high'].indexOf(body.report_effort) !== -1) next.report_effort = body.report_effort;
   next.updated_at = new Date().toISOString();
   next.updated_by = me.name || me.id;
   await env.AI_KV.put('settings', JSON.stringify(next));
@@ -620,6 +704,7 @@ export default {
       }
       if (path === '/ask' && request.method === 'POST') return await answer(request, env, ctx, origin);
       if (path === '/feedback' && request.method === 'POST') return await feedback(request, env, origin);
+      if (path === '/reports/run' && request.method === 'POST') return await reportsRun(request, env, ctx, origin);
       if (path === '/history' || path.indexOf('/history/') === 0) return await historyApi(request, env, origin, path);
       if (path === '/settings' && (request.method === 'GET' || request.method === 'POST')) return await settings(request, env, origin, false);
       if (path === '/settings/test' && request.method === 'POST') return await settings(request, env, origin, true);
@@ -627,5 +712,8 @@ export default {
     } catch (e) {
       return reply({ error: (e && e.message) || String(e) }, 500, origin);
     }
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(reportsCron(env));
   }
 };

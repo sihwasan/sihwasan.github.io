@@ -154,10 +154,32 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="btn ghost" id="s-try">검색 시험 (짧은 인사)</button></div>' +
       '<div class="form-msg" id="s-msg"></div></div>' +
 
-      '<h2>4. 최근 질문 기록</h2>' +
+      '<h2>4. 임원 업무 보고서</h2>' +
+      '<div class="admin-card" style="max-width:760px;margin-bottom:26px">' +
+      '<p style="margin:0 0 10px;line-height:1.8">매일 아침 6시(한국) AI 가 노회 자료(회의록·결의·노회규칙·일정·상회비·장부·서류)를 살펴 ' +
+      '임원마다(최고관리자 제외) 직책에 맞는 보고서를 씁니다. 노회장·서기는 모든 임원의 보고서를 보고, 다른 임원은 자기 보고서만 봅니다. ' +
+      '<a href="officer-report.html">보고서 화면 열기</a></p>' +
+      '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="rp-enabled"' + (s.report_enabled !== false ? ' checked' : '') + '> ' +
+      '<strong>매일 아침 보고서 만들기</strong></label>' +
+      '<div class="inline-form" style="margin-top:10px">' +
+      '<div class="field" style="flex:1 1 260px"><label>보고서 모델</label><select id="rp-model">' +
+      '<option value=""' + (!s.report_model ? ' selected' : '') + '>검색과 같은 모델 (' + e(modelName(s.model)) + ')</option>' +
+      (s.models || []).map(function (m) {
+        return '<option value="' + e(m.id) + '"' + (s.report_model === m.id ? ' selected' : '') + '>' + e(m.name) + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 200px"><label>답변 깊이</label><select id="rp-effort">' +
+      [['low', '빠르게'], ['medium', '보통 (권장)'], ['high', '꼼꼼하게']].map(function (o) {
+        return '<option value="' + o[0] + '"' + ((s.report_effort || 'medium') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('') + '</select></div></div>' +
+      '<p id="rp-cost" style="font-size:0.84rem;color:var(--gray-5);margin:4px 0 0"></p>' +
+      '<p id="rp-last" style="font-size:0.84rem;color:var(--gray-7);margin:8px 0 0">마지막 실행을 확인하는 중…</p>' +
+      '<div style="margin-top:12px"><button class="btn" id="rp-save">보고서 설정 저장</button></div>' +
+      '<div class="form-msg" id="rp-msg"></div></div>' +
+
+      '<h2>5. 최근 질문 기록</h2>' +
       '<div id="ai-logs"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
 
-      '<h2>5. 창구 정보</h2>' +
+      '<h2>6. 창구 정보</h2>' +
       '<div class="admin-card" style="max-width:760px">' +
       '<p style="font-size:0.9rem;line-height:1.8;margin:0">창구 주소: <code>' + e(WORKER) + '</code><br>' +
       '총회 자료 색인: <span id="w-index">' + (s.index ? '조각 ' + s.index.chunks + '개 · 기준일 ' + e(s.index.built) : '확인 중…') + '</span><br>' +
@@ -166,6 +188,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     bind();
     loadLogs();
+    reportCost();
+    loadReportRun();
     call('/health').then(function (h) {
       var el = document.getElementById('w-index');
       if (el && h && h.index) el.textContent = '조각 ' + h.index.chunks + '개 · 기준일 ' + h.index.built + (h.colo ? ' · 접속 지점 ' + h.colo : '');
@@ -177,6 +201,33 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div style="font-size:1.05rem;margin:6px 0 2px">' + big + '</div><div style="font-size:0.82rem;color:var(--gray-5)">' + small + '</div></div>';
   }
   function modelName(id) { var m = (S.models || []).filter(function (x) { return x.id === id; })[0]; return m ? m.name : id; }
+  /* 보고서 하루 비용 어림: 임원 13명 · 노회 자료 약 5만 토큰은 캐시(첫 번째만 1.25배, 나머지 0.1배),
+   * 사람마다 할 일·지시 약 5천 토큰과 답(생각 포함) 약 3천 토큰 */
+  function reportCost() {
+    var el = document.getElementById('rp-cost');
+    if (!el) return;
+    var id = document.getElementById('rp-model').value || S.model;
+    var m = (S.models || []).filter(function (x) { return x.id === id; })[0];
+    if (!m) { el.textContent = ''; return; }
+    var n = 13, ctx = 50000;
+    var inTok = ctx * 1.25 + (n - 1) * ctx * 0.1 + n * 5000, outTok = n * 3000;
+    var day = Math.round((inTok / 1e6 * m.input + outTok / 1e6 * m.output) * WON);
+    el.textContent = '비용 어림 (' + m.name + '): 하루 약 ' + day.toLocaleString() + '원 · 한 달 약 ' + (Math.round(day * 30 / 100) * 100).toLocaleString() +
+      '원 (임원 ' + n + '명 기준, 새 회의록을 읽는 날은 조금 더). 실제 비용은 Anthropic 콘솔 Usage 에서 확인하세요.';
+  }
+  function loadReportRun() {
+    var el = document.getElementById('rp-last');
+    if (!el) return;
+    SHSCloud.init().then(function (c) { return c.rpc('ai_report_last_run'); }).then(function (r) {
+      if (r.error) { el.textContent = /function|does not exist|schema cache|PGRST20/.test(r.error.message || '') ? '보고서 표가 아직 없습니다 (supabase/128_officer_reports.sql 실행 필요).' : '마지막 실행을 읽지 못했습니다: ' + r.error.message; return; }
+      var x = r.data;
+      if (!x) { el.textContent = '아직 실행 기록이 없습니다. 매일 아침 6시에 저절로 만들어지며, 보고서 화면의 「지금 다시 만들기」로 바로 만들 수도 있습니다.'; return; }
+      el.textContent = '마지막 실행: ' + when(x.finished_at || x.started_at) + ' · ' + (x.trigger === 'cron' ? '아침 예약' : '수동' + (x.by ? ' (' + x.by + ')' : '')) +
+        ' · 보고서 ' + (x.reports || 0) + '건' + (x.new_tasks ? ' · 새 할 일 ' + x.new_tasks + '건' : '') +
+        (x.usage ? ' · 토큰 입력 ' + Number(x.usage.input || 0).toLocaleString() + ' / 출력 ' + Number(x.usage.output || 0).toLocaleString() : '') +
+        (x.errors && x.errors.length ? ' · 오류 ' + x.errors.length + '건: ' + x.errors.slice(0, 2).join(' / ') : '');
+    });
+  }
   function effortName(v) { return { low: '빠르게', medium: '보통', high: '꼼꼼하게' }[v] || v; }
 
   function bind() {
@@ -235,6 +286,24 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
     document.getElementById('m-save').addEventListener('click', function () { saveAll('m-msg'); });
+    document.getElementById('rp-model').addEventListener('change', reportCost);
+    document.getElementById('rp-save').addEventListener('click', function () {
+      var btn = this;
+      if (btn.disabled) return;
+      var body = { report_enabled: document.getElementById('rp-enabled').checked,
+        report_model: document.getElementById('rp-model').value, report_effort: document.getElementById('rp-effort').value };
+      btn.disabled = true;
+      msg('rp-msg', true, '저장하는 중…');
+      call('/settings', 'POST', body).then(function (r) {
+        btn.disabled = false;
+        if (r.error) { msg('rp-msg', false, r.error); return; }
+        S = r;
+        SHSCloud.log('update', '임원 업무 보고서 설정', (body.report_enabled ? '켬' : '끔') + ' / ' + (body.report_model || '검색과 같음') + ' / ' + body.report_effort);
+        draw();
+        msg('rp-msg', true, '저장했습니다. ' + (r.report_enabled ? '매일 아침 6시에 ' + modelName(r.report_model || r.model) + '(으)로 만듭니다.' : '매일 아침 보고서를 만들지 않습니다.'));
+        var el = document.getElementById('rp-msg'); if (el) el.scrollIntoView({ block: 'center' });
+      });
+    });
     document.getElementById('s-save').addEventListener('click', function () { saveAll('s-msg'); });
     document.getElementById('s-try').addEventListener('click', function () {
       msg('s-msg', true, '고른 모델로 짧은 인사를 시켜 보는 중… (토큰을 조금 씁니다)');

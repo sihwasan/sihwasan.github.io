@@ -34,3 +34,8 @@ region = "aws:ap-northeast-1"
 
 [observability]
 enabled = true
+
+# 임원 업무 보고서 — 매일 21:00 UTC = 한국 아침 6시 (src/reports.js, supabase/128_officer_reports.sql)
+# 자료를 여는 비밀 열쇠는 시크릿 REPORT_KEY 에 둔다:  npx wrangler secret put REPORT_KEY
+[triggers]
+crons = ["0 21 * * *"]

@@ -80,3 +80,16 @@ git add data/ai/index.json && git commit -m "AI 색인 갱신" && git push
    (`search_assembly` 결과 맨 앞에도 `verified` 로 붙는다), Claude 는 그것을 우선 쓰되 원문 조문으로 다시 확인한다.
 
 시험: `node test/learning.test.mjs` (Supabase·Claude 는 가짜로 바꿔 흐름 전체를 돌린다)
+
+## 임원 업무 보고서 (128 sql)
+
+매일 아침 6시(한국, `wrangler.toml` 의 `crons = ["0 21 * * *"]`) 임원마다(최고관리자 제외) 직책별 보고서를 쓴다 — `src/reports.js`.
+
+1. `ai_report_bundle(열쇠)` 로 노회 자료(임원·일정·회의록·결의·노회규칙·상비부·시찰·기관·연락처·상회비·장부·서류·할 일)를 받는다.
+   열쇠는 시크릿 `REPORT_KEY` (`npx wrangler secret put REPORT_KEY`), DB 에는 그 SHA-256 지문만 있다.
+2. 새 회의록(120일 안, 아직 안 읽은 것)이 있으면 결의에서 「해야 할 일」을 뽑아 `ai_tasks` 에 넣는다.
+3. 노회 자료는 모두에게 같아 캐시하고(첫 부름이 캐시를 만든다), 직책 지시만 바꿔 보고서(JSON 구조화 출력)를 쓴다.
+4. `ai_report_save(열쇠, …)` 로 저장. 화면은 `officer-report.html` (본인 것, 노회장·서기·최고관리자는 모두), 대시보드 「업무 보고서」 카드.
+
+`POST /reports/run` — 노회장·서기·최고관리자가 「지금 다시 만들기」(SSE). 모델·켜기는 「AI 검색·API 설정 → 4. 임원 업무 보고서」.
+시험: `node test/reports.test.mjs`
