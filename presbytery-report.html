@@ -349,8 +349,17 @@ document.addEventListener('DOMContentLoaded', function () {
               return ocr(b64, n, rep.title);
             }).then(function (o) {
               if (!o || o.error) { failed.push(n + '쪽: ' + ((o && o.error) || '응답 없음')); done++; return next(); }
-              var rows = (o.pages || []).map(function (p) {
-                return { report_id: rep.id, pdf_page: n, page_no: p.no == null ? null : p.no, heading: p.heading || null, text: p.text || '' };
+              var rows = [], byNo = {};
+              (o.pages || []).forEach(function (p) {
+                var no = (p.no == null || isNaN(parseInt(p.no, 10))) ? null : parseInt(p.no, 10);
+                var key = no == null ? 'x' : String(no);
+                if (byNo[key]) {   /* 같은 쪽 번호가 둘이면(또는 번호 없는 면이 둘이면) 글을 이어 붙인다 */
+                  byNo[key].text = [byNo[key].text, p.text || ''].filter(Boolean).join('\n\n');
+                  if (!byNo[key].heading && p.heading) byNo[key].heading = p.heading;
+                  return;
+                }
+                byNo[key] = { report_id: rep.id, pdf_page: n, page_no: no, heading: p.heading || null, text: p.text || '' };
+                rows.push(byNo[key]);
               });
               if (!rows.length) rows = [{ report_id: rep.id, pdf_page: n, page_no: null, heading: null, text: '' }];
               (o.toc || []).forEach(function (t) { tocAll.push(t); });
@@ -365,13 +374,38 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }).then(function () {}).catch(function (x) { msg('up-msg', false, (x && x.message) || String(x)); });
 
+    /* 차례 면의 글에서 "4. 서기 사무 보고 ----- 22" / "북부시찰 ----- 35" 같은 줄을 읽는다 */
+    function tocFromText(text) {
+      var out = [];
+      String(text || '').split('\n').forEach(function (ln) {
+        var m = ln.trim().match(/^(\d+\s*[.)]\s*)?([^\d\-·…|]{2,60}?)\s*[-·…\.|~ ]{3,}\s*(\d{1,3})(?:\s*[~\-]\s*\d{1,3})?\s*$/);
+        if (!m) return;
+        var title = m[2].replace(/\s+/g, ' ').trim();
+        if (!title || /차\s*례|목\s*차/.test(title)) return;
+        out.push({ title: title, page: parseInt(m[3], 10), level: m[1] ? 1 : 2 });
+      });
+      return out;
+    }
     function finish() {
-      /* 차례: 읽은 차례(toc)가 있으면 그것, 없으면 제목 있는 쪽들 */
-      return db.from('presbytery_report_pages').select('page_no,heading').eq('report_id', rep.id).order('page_no').then(function (r) {
-        var toc = tocAll.filter(function (t) { return t && t.title && t.page; }).map(function (t) { return { title: String(t.title).trim(), page: parseInt(t.page, 10) || t.page, level: t.level || 1 }; });
+      return db.from('presbytery_report_pages').select('page_no,heading,text').eq('report_id', rep.id).order('pdf_page').order('page_no').then(function (r) {
+        var all = r.data || [];
+        /* 1순위: 차례 면에서 읽은 것 */
+        var toc = [];
+        all.forEach(function (p) {
+          if (/차\s*례|목\s*차/.test((p.heading || '') + ' ' + String(p.text || '').slice(0, 40))) {
+            var t = tocFromText(p.text);
+            if (t.length > toc.length) toc = t;
+          }
+        });
+        /* 2순위: AI 가 따로 준 차례 */
+        if (toc.length < 3) {
+          var t2 = tocAll.filter(function (t) { return t && t.title && t.page; }).map(function (t) { return { title: String(t.title).trim(), page: parseInt(t.page, 10) || t.page, level: t.level || 1 }; });
+          if (t2.length > toc.length) toc = t2;
+        }
+        /* 3순위: 제목이 있는 쪽들 */
         if (!toc.length) {
           var seen = {};
-          toc = (r.data || []).filter(function (p) { return p.heading && p.page_no != null && !seen[p.heading] && (seen[p.heading] = 1); })
+          toc = all.filter(function (p) { return p.heading && p.page_no != null && !seen[p.heading] && (seen[p.heading] = 1); })
             .map(function (p) { return { title: p.heading, page: p.page_no, level: 1 }; });
         }
         return db.from('presbytery_reports').update({ toc: toc, status: failed.length ? '일부 미읽음' : '완료', updated_at: new Date().toISOString() }).eq('id', rep.id);
