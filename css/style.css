@@ -2781,6 +2781,10 @@ mark.aih-key {
 .pr-book.on { background: var(--navy); color: #fff; }
 .pr-book.on small { color: rgba(255,255,255,0.75); }
 #pr-toc { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--gray-2); }
+.pr-rules { margin: 0 0 12px; font-size: 0.88rem; background: var(--gray-1); border-radius: 8px; padding: 8px 12px; }
+.pr-rules summary { cursor: pointer; font-weight: 700; color: var(--navy); }
+.pr-rules ul { margin: 8px 0 0; padding-left: 18px; }
+.pr-rules li { margin: 3px 0; }
 @media (max-width: 760px) { .pr-wrap { grid-template-columns: 1fr; } .pr-side { position: static; max-height: none; } }
 .pr-search { display: flex; gap: 8px; margin: 0 0 16px; }
 .pr-search input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; }
