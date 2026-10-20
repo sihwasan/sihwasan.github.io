@@ -175,7 +175,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     function flushTable() {
       if (!table) return;
-      var rows = table; table = null;
+      var rows = table.filter(function (r) { return r.some(Boolean); }); table = null;   /* 모두 빈 칸인 행은 뺀다 */
+      if (!rows.length) return;
       if (rows.length === 1) { rows[0].forEach(function (c) { if (c) line(c); }); return; }   /* 한 줄뿐이면 표가 아니라 줄 나눔 */
       var cols = Math.max.apply(null, rows.map(function (r) { return r.length; }));
       var full = rows.filter(function (r) { return r.length === cols; });
