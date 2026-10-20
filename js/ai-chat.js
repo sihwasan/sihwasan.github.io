@@ -119,7 +119,9 @@ var SHSAI = (function () {
 
   function panelHtml() {
     var h = '';
-    convo.forEach(function (c, i) {
+    /* 최신 문답이 맨 위 — 검색창 바로 아래에 새 답이 나오므로 화면을 옮기지 않아도 된다 */
+    convo.map(function (c, i) { return { c: c, i: i }; }).reverse().forEach(function (x) {
+      var c = x.c, i = x.i;
       h += '<div class="aih-item" data-i="' + i + '">' +
         '<div class="aih-q">' + esc(c.q) + '</div>' +
         '<div class="aih-status' + (c.status ? '' : ' hidden') + '" id="aih-st-' + i + '">' + esc(c.status || '') + '</div>' +
@@ -162,7 +164,6 @@ var SHSAI = (function () {
     inp.value = ''; inp.placeholder = '이어서 물어보기';
     busy = true;
     box.querySelector('#aih-go').disabled = true;
-    setTimeout(function () { var it = panel.querySelector('.aih-item[data-i="' + i + '"]'); if (it) it.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
 
     var aEl = function () { return document.getElementById('aih-a-' + i); };
     var stEl = function () { return document.getElementById('aih-st-' + i); };
