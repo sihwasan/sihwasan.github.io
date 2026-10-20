@@ -124,7 +124,9 @@ document.addEventListener('DOMContentLoaded', function () {
       [['low', '빠르게 (간단한 질문에 알맞음)'], ['medium', '보통 (권장)'], ['high', '꼼꼼하게 (느리고 비용이 조금 더 듦)']].map(function (o) {
         return '<option value="' + o[0] + '"' + (s.effort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
       }).join('') + '</select></div>' +
-      '<p style="font-size:0.82rem;color:var(--gray-5);margin:6px 0 0">값은 어림입니다. 실제 비용은 Anthropic 콘솔의 Usage 에서 확인하세요.</p></div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin:6px 0 0">값은 어림입니다. 실제 비용은 Anthropic 콘솔의 Usage 에서 확인하세요.</p>' +
+      '<div style="margin-top:14px"><button class="btn" id="m-save">모델·답변 깊이 저장</button></div>' +
+      '<div class="form-msg" id="m-msg"></div></div>' +
 
       '<h2>3. 누가 얼마나</h2>' +
       '<div class="admin-card" style="max-width:760px;margin-bottom:26px">' +
@@ -202,7 +204,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.ai-model').forEach(function (l) { l.classList.toggle('on', l.querySelector('input').checked); });
       });
     });
-    document.getElementById('s-save').addEventListener('click', function () {
+    /* 모델·답변 깊이·한도·등급·켜기를 한꺼번에 저장한다 (2번 칸과 3번 칸의 단추가 같이 쓴다) */
+    function saveAll(msgId) {
       var body = {
         model: (document.querySelector('input[name="m-model"]:checked') || {}).value,
         effort: document.getElementById('m-effort').value,
@@ -211,14 +214,18 @@ document.addEventListener('DOMContentLoaded', function () {
         roles: [].map.call(document.querySelectorAll('input[name="r-role"]:checked'), function (c) { return c.value; }),
         enabled: document.getElementById('s-enabled').checked
       };
-      msg('s-msg', true, '저장하는 중…');
+      msg(msgId, true, '저장하는 중…');
       call('/settings', 'POST', body).then(function (r) {
-        if (r.error) { msg('s-msg', false, r.error); return; }
+        if (r.error) { msg(msgId, false, r.error); return; }
         S = r;
         SHSCloud.log('update', 'AI 검색 설정', body.model + ' / ' + body.effort + ' / 1인 ' + body.daily_user + ' 전체 ' + body.daily_total + (body.enabled ? '' : ' / 끔'));
-        draw(); msg('s-msg', true, '저장했습니다.');
+        draw();
+        msg(msgId, true, '저장했습니다. 모델: ' + modelName(r.model) + ' · 답변 깊이: ' + effortName(r.effort));
+        var el = document.getElementById(msgId); if (el) el.scrollIntoView({ block: 'center' });
       });
-    });
+    }
+    document.getElementById('m-save').addEventListener('click', function () { saveAll('m-msg'); });
+    document.getElementById('s-save').addEventListener('click', function () { saveAll('s-msg'); });
     document.getElementById('s-try').addEventListener('click', function () {
       msg('s-msg', true, '고른 모델로 짧은 인사를 시켜 보는 중… (토큰을 조금 씁니다)');
       call('/settings/test', 'POST', { full: true, model: (document.querySelector('input[name="m-model"]:checked') || {}).value }).then(function (r) {
