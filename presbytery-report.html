@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return db.from('presbytery_reports').select('*').order('meet_on', { ascending: false }).order('id', { ascending: false })
       .then(function (r) {
         if (r.error) {
-          area.insertAdjacentHTML('afterbegin', '<div class="notice-banner">보고서 표가 아직 없습니다. <code>supabase/123_presbytery_reports.sql</code> 을 실행해 주세요. <small>(' + e(r.error.message) + ')</small></div>');
+          area.insertAdjacentHTML('afterbegin', '<div class="notice-banner">보고서 표가 아직 없습니다. <code>supabase/131_presbytery_reports.sql</code> 을 실행해 주세요. <small>(' + e(r.error.message) + ')</small></div>');
           reports = [];
           return;
         }

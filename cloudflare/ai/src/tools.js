@@ -585,7 +585,7 @@ const RUN = {
     let q = 'presbytery_report_pages?select=id,report_id,pdf_page,page_no,heading,text,presbytery_reports(title,session,meet_on)&' + allWords(['heading', 'text'], ws) + '&order=report_id.desc,page_no&limit=12';
     if (input.session) q += '&presbytery_reports.session=eq.' + parseInt(input.session, 10);
     const rows = await sbGet(ctx.env, ctx.auth, q);
-    if (rows.error) return { error: /HTTP 4/.test(rows.error) ? '노회 보고서는 정회원만 볼 수 있습니다 (또는 123 sql 미실행).' : rows.error };
+    if (rows.error) return { error: /HTTP 4/.test(rows.error) ? '노회 보고서는 정회원만 볼 수 있습니다 (또는 131 sql 미실행).' : rows.error };
     const list = rows.filter(function (r) { return r.presbytery_reports; });
     if (!list.length) return { items: [], note: '회의자료 책자에서 그 낱말을 찾지 못했습니다. 다른 낱말로 다시 찾아 보십시오.' };
     return { items: list.map(function (r) {
