@@ -198,7 +198,11 @@ ok(calls.length === 0 && bundles === 0, '보고서를 끄면 예약 실행도 �
 KV.set('settings', JSON.stringify({ api_key: 'sk-ant-test', model: 'claude-haiku-5-5' }));
 resetCalls(); tasksSaved = true; w2 = [];
 await worker.scheduled({}, env, { waitUntil: (p) => w2.push(p) }); await Promise.all(w2);
-ok(calls.length === 3 && calls[0].model === 'claude-haiku-5-5' && saves[saves.length - 1].run.trigger === 'cron' && !KV.has('report:lock'), '켜면 검색 모델로 돌고 잠금이 풀림');
+ok(calls.length === 3 && calls[0].model === 'claude-opus-5-5' && saves[saves.length - 1].run.trigger === 'cron' && !KV.has('report:lock'), '켜면 돌고(기본 모델 Opus 5.5) 잠금이 풀림');
+KV.set('settings', JSON.stringify({ api_key: 'sk-ant-test', model: 'claude-haiku-5-5', report_model: '' }));
+resetCalls(); tasksSaved = true; w2 = [];
+await worker.scheduled({}, env, { waitUntil: (p) => w2.push(p) }); await Promise.all(w2);
+ok(calls.length === 3 && calls[0].model === 'claude-haiku-5-5', '보고서 모델을 비우면 검색과 같은 모델');
 resetCalls();
 const envNoKey = Object.assign({}, env, { REPORT_KEY: '' });
 w2 = [];

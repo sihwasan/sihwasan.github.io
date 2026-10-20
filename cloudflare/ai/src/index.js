@@ -54,7 +54,7 @@ const DEFAULTS = {
   roles: ['superadmin', 'president', 'clerk', 'staff', 'officer', 'member'],
   enabled: true,
   report_enabled: true,   /* 임원 업무 보고서 (매일 아침 6시) */
-  report_model: '',       /* 비우면 검색과 같은 모델 */
+  report_model: 'claude-opus-5-5',   /* 보고서는 Opus 5.5 로 (2026-10-21 사용자 지시). 비우면 검색과 같은 모델 */
   report_effort: 'medium'
 };
 /* 관리자 화면의 모델 고르기에 보여 줄 목록 (값: 1백만 토큰당 미화) */
