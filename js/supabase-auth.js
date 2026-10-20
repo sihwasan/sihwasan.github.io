@@ -23,6 +23,15 @@ var SHSCloud = (function () {
 
   function roleName(r) { return ROLE_NAMES[r] || r; }
 
+  /* Supabase 라이브러리 — 정확한 버전과 무결성(SRI)으로 고정한다 (2026-10-20, 보안 점검).
+   * 배포처(jsDelivr)에서 파일이 바뀌면 브라우저가 실행하지 않는다. 판을 올릴 때는 아래 두 값을 함께 바꾼다:
+   *   버전: https://data.jsdelivr.com/v1/package/resolve/npm/@supabase/supabase-js@2
+   *   SRI : curl -s <주소> | openssl dgst -sha384 -binary | openssl base64 -A  → 앞에 sha384- */
+  var SUPABASE_JS = {
+    src: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js',
+    integrity: 'sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK'
+  };
+
   /* Supabase 라이브러리를 내려받아 클라이언트를 준비한다. */
   function init() {
     return new Promise(function (resolve) {
@@ -40,7 +49,9 @@ var SHSCloud = (function () {
       if (window.supabase && window.supabase.createClient) { build(); return; }
 
       var s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+      s.src = SUPABASE_JS.src;
+      s.integrity = SUPABASE_JS.integrity;
+      s.crossOrigin = 'anonymous';
       s.onload = build;
       s.onerror = function () { resolve(null); };
       document.head.appendChild(s);
