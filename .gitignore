@@ -7,3 +7,6 @@ private/
 
 # 작업용 도구 설정 (미리보기 서버 등)
 .claude/
+
+# 워커 로컬 시험용 비밀값 (wrangler dev)
+.dev.vars

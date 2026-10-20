@@ -1,11 +1,15 @@
 -- =====================================================================
---  126. 보안 점검 — 매일 스스로 점검하고 최고관리자 알림함으로 보고 (2026-10-20)
+--  126. 보안 점검 — DB 안 점검 + 교회 컴퓨터의 바깥 점검을 합쳐 통합 보고, 최고관리자 알림함으로 (2026-10-20)
 --
---  서버(DB) 안에서 의심스러운 일과 허술한 설정을 찾아 기록하고 알린다.
---    · 매일 오전 7시(한국 시각) 점검 — pg_cron 예약.  예약을 못 하면 홈페이지에 누가 들어올 때
---      하루 한 번 점검한다 (security_check_due, js/main.js).
+--  두 갈래 점검을 하나의 보고(security_reports)로 묶는다.
+--    · 바깥 점검 — 교회 컴퓨터(tools/security-watch, Windows 작업 스케줄러 매일 오전 6시 30분)가
+--      홈페이지·Cloudflare 서버·Supabase 익명 접근·GitHub 저장소를 살피고 security_ingest_external 로 넘긴다.
+--      넘기는 순간 아래 DB 점검과 합쳐 통합 보고를 만든다.
+--    · DB 안 점검 — security_check_run (아래 항목).
+--    · 교회 컴퓨터가 꺼져 있어 바깥 점검이 오지 않으면, 오전 7시 30분(pg_cron) 또는 홈페이지 방문 때
+--      DB 점검만으로 보고하고 「바깥 점검이 오지 않았다」를 주의로 알린다.
 --    · 알림: 「위험」이 나오면 그날 바로, 그리고 매주 월요일에 한 주 요약 (이상이 없어도) — 최고관리자에게.
---    · 결과는 시스템 운영 → 「보안 점검」 탭에서 본다 (지금 점검 단추도 있다).
+--    · 결과는 시스템 운영 → 「보안 점검」 탭에서 본다 (지금 점검 = DB 점검 + 최근 바깥 점검 결과).
 --
 --  점검 항목
 --    [위험] 보호(RLS)가 꺼진 표 — 누구나 읽고 고칠 수 있음
@@ -40,6 +44,25 @@ drop policy if exists security_reports_read on public.security_reports;
 create policy security_reports_read on public.security_reports for select
   using (public.my_role() = 'superadmin');
 
+-- 바깥 점검 결과 (교회 컴퓨터가 넘긴 것)
+create table if not exists public.security_external (
+  id         bigserial primary key,
+  created_at timestamptz not null default now(),
+  items      jsonb not null default '[]'::jsonb,
+  manual     boolean not null default false
+);
+alter table public.security_external enable row level security;
+drop policy if exists security_external_read on public.security_external;
+create policy security_external_read on public.security_external for select
+  using (public.my_role() = 'superadmin');
+
+-- 교회 컴퓨터의 열쇠 지문 (열쇠 자체는 교회 컴퓨터의 tools/security-watch/config.json 에만 있다)
+create table if not exists public.security_config (k text primary key, v text not null);
+alter table public.security_config enable row level security;   -- 규칙이 없으므로 아무도 직접 못 읽는다
+insert into public.security_config (k, v)
+values ('watch_secret_sha256', '9750bd6da39248db7473ec03370bc67f5540095b13ae45aec393f2eecb60c839')
+on conflict (k) do update set v = excluded.v;
+
 -- 2) 점검 본체 — 사람이 직접 부르지 못한다 (예약·아래 두 함수만 부른다)
 create or replace function public.security_check_run(p_trigger text default 'cron')
 returns bigint language plpgsql security definer set search_path = public, pg_catalog as $fn$
@@ -59,6 +82,8 @@ declare
   v_key text;
   v_notify boolean := false;
   v_admin text[] := array['superadmin', 'president', 'clerk', 'staff', 'officer'];
+  v_ext jsonb;
+  v_ext_at timestamptz;
 begin
   -- [위험] 보호(RLS)가 꺼진 표
   select string_agg(c.relname, ', ' order by c.relname), count(*) into t, n
@@ -237,6 +262,21 @@ begin
       'title', '승인 대기 가입자 ' || n || '명', 'detail', '회원 관리에서 아는 분인지 확인한 뒤 승인하거나 지워 주세요.'));
   end if;
 
+  -- 바깥 점검 (교회 컴퓨터) — 26시간 안에 온 마지막 결과를 합친다
+  select e.items, e.created_at into v_ext, v_ext_at
+    from public.security_external e order by e.id desc limit 1;
+  if v_ext_at is null then
+    v_items := v_items || jsonb_build_array(jsonb_build_object('level', '주의',
+      'title', '바깥 점검(홈페이지·Cloudflare·GitHub) 결과가 아직 없습니다',
+      'detail', '교회 컴퓨터에서 tools/security-watch 의 「보안점검 등록.bat」으로 매일 점검을 등록해 주세요.'));
+  elsif v_ext_at < now() - interval '26 hours' then
+    v_items := v_items || jsonb_build_array(jsonb_build_object('level', '주의',
+      'title', '바깥 점검이 ' || to_char(v_ext_at at time zone 'Asia/Seoul', 'MM-DD HH24:MI') || ' 이후로 오지 않았습니다',
+      'detail', '교회 컴퓨터가 꺼져 있었거나 점검 프로그램이 멈췄을 수 있습니다. 교회 컴퓨터의 tools/security-watch/last-run.log 를 확인해 주세요.'));
+  else
+    v_items := v_items || coalesce(v_ext, '[]'::jsonb);
+  end if;
+
   -- 결과 정리
   select count(*) filter (where x ->> 'level' = '위험'), count(*) filter (where x ->> 'level' = '주의')
     into v_danger, v_warn
@@ -249,10 +289,10 @@ begin
   delete from public.security_reports where created_at < now() - interval '180 days';
 
   -- 알림: 위험이면 그날 바로, 월요일에는 한 주 요약, 처음 실행 때는 첫 보고 (지금 점검 단추는 화면으로 본다)
-  if p_trigger in ('cron', 'visit') and v_danger > 0 then
+  if p_trigger in ('cron', 'visit', 'watch') and v_danger > 0 then
     v_notify := true; v_key := 'sec-danger-' || v_today;
   end if;
-  if p_trigger in ('cron', 'visit') and extract(isodow from v_today) = 1 then
+  if p_trigger in ('cron', 'visit', 'watch') and extract(isodow from v_today) = 1 then
     v_notify := true; v_key := 'sec-week-' || v_today;
   end if;
   if p_trigger = 'first' then
@@ -305,7 +345,33 @@ $fn$;
 revoke all on function public.security_check_due() from public, anon;
 grant execute on function public.security_check_due() to authenticated;
 
--- 5) 매일 오전 7시(한국 시각 = 22:00 UTC) 예약 — pg_cron 이 없으면 4) 로 대신한다
+-- 5) 교회 컴퓨터가 넘기는 바깥 점검 — 열쇠 지문이 맞을 때만 받고, 받는 즉시 통합 보고를 만든다
+create or replace function public.security_ingest_external(p_secret text, p_items jsonb, p_manual boolean default false)
+returns bigint language plpgsql security definer set search_path = public, pg_catalog as $fn$
+declare v_hash text;
+begin
+  select v into v_hash from public.security_config where k = 'watch_secret_sha256';
+  if v_hash is null or encode(sha256(convert_to(coalesce(p_secret, ''), 'UTF8')), 'hex') <> v_hash then
+    raise exception '점검 열쇠가 맞지 않습니다.';
+  end if;
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) > 100 or length(p_items::text) > 200000 then
+    raise exception '점검 결과 모양이 올바르지 않습니다.';
+  end if;
+  insert into public.security_external (items, manual)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'level', case when x ->> 'level' in ('위험', '주의', '참고') then x ->> 'level' else '참고' end,
+           'title', left(coalesce(x ->> 'title', ''), 200),
+           'detail', left(coalesce(x ->> 'detail', ''), 1000))), '[]'::jsonb), p_manual
+    from jsonb_array_elements(p_items) x;
+  delete from public.security_external where created_at < now() - interval '60 days';
+  return public.security_check_run(case when p_manual then 'manual' else 'watch' end);
+end
+$fn$;
+revoke all on function public.security_ingest_external(text, jsonb, boolean) from public;
+grant execute on function public.security_ingest_external(text, jsonb, boolean) to anon, authenticated;
+
+-- 6) 교회 컴퓨터가 꺼져 있을 때의 대비 — 오전 7시 30분(한국 시각 = 22:30 UTC)에 그날 보고가 없으면 DB 점검만으로
+--    (pg_cron 이 없으면 4) 홈페이지 방문 때로 대신한다)
 do $do$
 begin
   begin
@@ -314,14 +380,14 @@ begin
     raise notice 'pg_cron 을 켤 수 없습니다 (%). 홈페이지 방문 때 하루 한 번 점검합니다.', sqlerrm;
     return;
   end;
-  perform cron.schedule('shs-security-check', '0 22 * * *', $c$select public.security_check_run('cron')$c$);
-  raise notice '매일 오전 7시(한국 시각)에 보안 점검을 예약했습니다.';
+  perform cron.schedule('shs-security-check', '30 22 * * *', $c$select public.security_check_due()$c$);
+  raise notice '매일 오전 7시 30분(한국 시각)에 대비 점검을 예약했습니다.';
 exception when others then
   raise notice '예약하지 못했습니다 (%). 홈페이지 방문 때 하루 한 번 점검합니다.', sqlerrm;
 end
 $do$;
 
--- 6) 첫 점검 — 최고관리자 알림함에 첫 보고를 보내고, 아래에 결과를 보인다
+-- 7) 첫 점검 — 최고관리자 알림함에 첫 보고를 보내고, 아래에 결과를 보인다
 select public.security_check_run('first') as "점검 번호";
 
 select r.level as "결과", x ->> 'level' as "구분", x ->> 'title' as "항목", x ->> 'detail' as "내용"

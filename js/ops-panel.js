@@ -79,7 +79,7 @@ var SHSOps = (function () {
   }
 
   /* ---------- 보안 점검 (최고관리자, 126 sql) ----------
-   * 서버가 매일 오전 7시에 스스로 점검해 security_reports 에 남기고,
+   * 교회 컴퓨터(tools/security-watch)의 바깥 점검과 서버(DB) 점검을 합친 통합 보고를 security_reports 에 남기고,
    * 위험이 나오면 그날, 월요일에는 한 주 요약을 알림함으로 보낸다. 여기서는 기록을 보고 바로 점검한다. */
   function mountSecurity(box) {
     var LV = { '위험': 'sec-danger', '주의': 'sec-warn', '참고': 'sec-info', '정상': 'sec-ok' };
@@ -104,8 +104,9 @@ var SHSOps = (function () {
         var rows = r.data || [];
         var last = rows[0];
         var h = '<div class="sec-head"><div><h3 style="margin:0">보안 점검</h3>' +
-          '<p class="sec-sub">매일 오전 7시(한국 시각)에 서버가 스스로 점검합니다. 「위험」이 나오면 그날 바로, ' +
-          '월요일에는 한 주 요약을 알림함으로 보내 드립니다.</p></div>' +
+          '<p class="sec-sub">매일 오전 6시 30분 교회 컴퓨터가 홈페이지·Cloudflare 서버·GitHub 저장소를 점검해 보내면, ' +
+          '서버(DB) 점검과 합쳐 하나의 보고로 만듭니다. 「위험」이 나오면 그날 바로, 월요일에는 한 주 요약을 알림함으로 보내 드립니다. ' +
+          '「지금 점검」은 서버 점검을 다시 하고 가장 최근의 바깥 점검 결과를 함께 보여 줍니다 (바깥 점검을 새로 하려면 교회 컴퓨터의 「보안점검 지금」).</p></div>' +
           '<button class="btn" id="sec-run">지금 점검</button></div>' +
           (msg ? '<div class="form-msg ok">' + e(msg) + '</div>' : '');
         if (!last) {
@@ -120,7 +121,7 @@ var SHSOps = (function () {
               rows.slice(1).map(function (x) {
                 return '<tr><td>' + e(when(x.created_at)) + '</td><td><span class="sec-badge ' + (LV[x.level] || '') + '">' + e(x.level) + '</span></td>' +
                   '<td>' + x.danger + '</td><td>' + x.warn + '</td>' +
-                  '<td>' + e({ cron: '예약', visit: '방문 때', manual: '지금 점검', first: '처음' }[x.trigger] || x.trigger || '') + '</td>' +
+                  '<td>' + e({ cron: '예약', visit: '방문 때', manual: '지금 점검', first: '처음', watch: '교회 컴퓨터' }[x.trigger] || x.trigger || '') + '</td>' +
                   '<td><button class="btn ghost sm" data-secopen="' + x.id + '">' + (open[x.id] ? '접기' : '보기') + '</button></td></tr>' +
                   (open[x.id] ? '<tr><td colspan="6">' + itemsHtml(x.items) + '</td></tr>' : '');
               }).join('') + '</tbody></table>';

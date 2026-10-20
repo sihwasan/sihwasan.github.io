@@ -22,7 +22,7 @@
 3. 봇 이름을 물으면 → `시화산노회 알림`
 4. 아이디를 물으면 → `sihwasan_notice_bot` (이미 쓰는 이름이면 다른 이름으로)
 5. BotFather 가 **토큰**을 줍니다. 이렇게 생긴 긴 글자입니다.
-   `8123456789:AAH1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P`
+   `123456789:ABC-이런-모양의-긴-글자`
    → 이 토큰을 복사해 두세요. **다른 사람에게 알려주면 안 됩니다.**
 
 ### 2) Supabase 키 가져오기
@@ -40,7 +40,7 @@
 
 ```json
 {
-  "botToken": "8123456789:AAH1a2B3c4D5e6F7g8H9i0J1k2L3m4N5o6P",
+  "botToken": "123456789:ABC-이런-모양의-긴-글자",
   "chatId": null,
   "supabaseUrl": "https://ltbhgwozkffenahqdzfj.supabase.co",
   "supabaseServiceKey": "여기에 service_role 키",
