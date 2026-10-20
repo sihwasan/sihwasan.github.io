@@ -266,59 +266,224 @@ var AsmLib = (function () {
   }
 
   /* ---------- 보고서 (총회 원본 파일로 연결) ---------- */
+  /* ---------- 총회 보고서 ----------
+   * reports.json 의 회기 목록(갈래 > 보고서 > 소항목)을 보이고, 본문이 있는 회기(sess.text = report-<회기>.json,
+   * tools/assembly-report 가 PDF 에서 뽑은 글)는 누르면 그 자리에서 본문을 읽고(#s111-r12) 제목·본문을 검색한다.
+   * 본문이 없는 항목은 예전처럼 총회 원본 PDF 로 연결한다. AI 검색의 근거 링크도 #s<회기>-r<번호> 를 쓴다. */
   function initReports() {
     var tabsEl = document.getElementById('lib-tabs');
     var treeEl = document.getElementById('rpt-tree');
+    var docEl = document.getElementById('rpt-doc');
+    var srchEl = document.getElementById('rpt-search');
+    var resEl = document.getElementById('rpt-results');
     if (!tabsEl || !treeEl) return;
 
-    var sessions = [], years = {}, current = null;
+    var sessions = [], years = {}, current = null, texts = {}, term = '', timer = null;
 
-    function sessFromHash() {
-      var m = (location.hash || '').match(/^#s(\d+)/);
-      return m ? parseInt(m[1], 10) : null;
+    function parseHash() {
+      var m = (location.hash || '').match(/^#s(\d+)(?:-r(\d+))?/);
+      return m ? { s: parseInt(m[1], 10), r: m[2] ? parseInt(m[2], 10) : null } : { s: null, r: null };
+    }
+    function words() {
+      return term.toLowerCase().split(/\s+/).filter(function (w) { return w.length >= 2 || /^\d+$/.test(w); }).slice(0, 6);
+    }
+    /* 검색어를 노란 밑줄로 (AI 근거 밑줄과 같은 모양) */
+    function hl(html) {
+      var ws = words();
+      if (!ws.length) return html;
+      var re = new RegExp('(' + ws.map(function (w) { return esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'gi');
+      return html.replace(re, '<mark class="ai-hl">$1</mark>');
     }
 
     function renderTabs() {
       tabsEl.innerHTML = sessions.map(function (s) {
-        var y = years[s.s] ? ' (' + years[s.s] + ')' : '';
+        var y = s.year || years[s.s];
         return '<button type="button" class="lib-tab' + (current === s ? ' on' : '') +
-          '" data-s="' + s.s + '">제' + s.s + '회' + y + '</button>';
+          '" data-s="' + s.s + '">제' + s.s + '회' + (y ? ' (' + y + ')' : '') + '</button>';
       }).join('');
     }
 
+    function pdfLink(u, label) {
+      return '<a class="rpt-pdf" href="' + esc(encodeURI(u)) + '" target="_blank" rel="noopener" title="총회 원본 파일(PDF)">' + (label || 'PDF') + '</a>';
+    }
+    /* 본문이 있으면 본문으로, 없으면 PDF 로 */
     function nodeHtml(n) {
-      var link = n.u
-        ? '<a class="rpt-file" href="' + esc(encodeURI(n.u)) + '" target="_blank" rel="noopener">' +
-          esc(n.t) + '<span class="rpt-ext">PDF</span></a>'
-        : '<span class="rpt-name">' + esc(n.t) + '</span>';
-      var kids = (n.k || []).map(nodeHtml).join('');
-      return '<li>' + link + (kids ? '<ul>' + kids + '</ul>' : '') + '</li>';
+      var main;
+      if (n.x) {
+        main = '<a class="rpt-file" href="#s' + current.s + '-r' + n.x + '">' + hl(esc(n.t)) + '<span class="rpt-ext">본문</span></a>' +
+          (n.u ? ' ' + pdfLink(n.u) : '');
+      } else if (n.u) {
+        main = '<a class="rpt-file" href="' + esc(encodeURI(n.u)) + '" target="_blank" rel="noopener">' + hl(esc(n.t)) + '<span class="rpt-ext">PDF</span></a>';
+      } else {
+        main = '<span class="rpt-name">' + hl(esc(n.t)) + '</span>';
+      }
+      var kids = (n.k || []).filter(titleMatch).map(nodeHtml).join('');
+      return '<li>' + main + (kids ? '<ul>' + kids + '</ul>' : '') + '</li>';
+    }
+    /* 검색어가 있을 때 제목 목록 거르기 — 제목이나 아래 항목이 맞으면 남긴다 */
+    function titleMatch(n) {
+      var ws = words();
+      if (!ws.length) return true;
+      var t = String(n.t || '').toLowerCase();
+      if (ws.every(function (w) { return t.indexOf(w) !== -1; })) return true;
+      return (n.k || []).some(titleMatch);
     }
 
     function renderTree() {
       if (!current) return;
-      treeEl.innerHTML = current.groups.map(function (g) {
-        return '<details class="rpt-group" open><summary>' + esc(g.t) +
-          (g.k ? ' <span class="rpt-cnt">' + g.k.length + '</span>' : '') + '</summary>' +
-          '<ul class="rpt-list">' + (g.k || []).map(nodeHtml).join('') +
-          (g.u ? '<li>' + nodeHtml({ t: g.t + ' (전문)', u: g.u }).replace(/^<li>|<\/li>$/g, '') + '</li>' : '') +
-          '</ul></details>';
-      }).join('') || '<div class="lib-side-empty">등록된 보고서가 없습니다.</div>';
+      var groups = (current.groups || []).filter(titleMatch);
+      treeEl.innerHTML = groups.map(function (g) {
+        var kids = (g.k || []).filter(titleMatch);
+        /* 갈래 자체의 글(총대명단·헌의안처럼 하위 항목이 없는 갈래, 또는 갈래 전체 PDF)은 목록 첫 줄에 */
+        var whole = (g.x || g.u) ? nodeHtml({ t: g.t + (kids.length ? ' (전문)' : ''), x: g.x, u: g.u }) : '';
+        return '<details class="rpt-group" open><summary>' + hl(esc(g.t)) +
+          (g.k && g.k.length ? ' <span class="rpt-cnt">' + g.k.length + '</span>' : '') + '</summary>' +
+          '<ul class="rpt-list">' + whole + kids.map(nodeHtml).join('') + '</ul></details>';
+      }).join('') || '<div class="lib-side-empty">' + (term ? '제목에서 찾지 못했습니다.' : '등록된 보고서가 없습니다.') + '</div>';
     }
 
-    function select(s) {
+    /* ----- 본문 ----- */
+    function loadText(sess) {
+      if (!sess.text) return Promise.resolve(null);
+      if (texts[sess.s]) return Promise.resolve(texts[sess.s]);
+      return getJson('data/assembly/' + sess.text).then(function (d) {
+        d.byId = {};
+        (d.entries || []).forEach(function (e) { d.byId[e.i] = e; });
+        texts[sess.s] = d;
+        return d;
+      });
+    }
+    function trailOf(doc, e) {
+      var t = [];
+      for (var i = e.i - 2; i >= 0; i--) {
+        var p = doc.entries[i];
+        if (p.lv < (t.length ? t[0].lv : e.lv)) { t.unshift(p); if (p.lv === 0) break; }
+      }
+      return t.map(function (p) { return p.t; });
+    }
+    function bodyHtml(text) {
+      var marker = /^([①-⑳㉑-㉟]|[가-힣]\.\s|\(?\d{1,3}[.)]\s|\d{1,3}\)|[∙•·■□○●◆◇▶▷]|제\s*\d+\s*[조장절]|[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+\.)/;
+      return String(text || '').split('\n').map(function (l) {
+        l = l.trim();
+        if (!l) return '';
+        return '<p class="ln' + (marker.test(l) ? ' it' : '') + '">' + hl(esc(l)) + '</p>';
+      }).join('');
+    }
+    function showDoc(r) {
+      if (!docEl) return;
+      treeEl.classList.add('hidden');
+      if (resEl) resEl.classList.add('hidden');
+      docEl.classList.remove('hidden');
+      docEl.innerHTML = '<div class="lib-loading">본문을 불러오는 중...</div>';
+      var sess = current;
+      loadText(sess).then(function (doc) {
+        var e = doc && doc.byId[r];
+        if (!e) { fail(docEl, '그 보고서의 본문이 없습니다.'); return; }
+        var trail = trailOf(doc, e);
+        var prev = doc.entries[e.i - 2], next = doc.entries[e.i];
+        while (prev && prev.text.length < 40) prev = doc.entries[prev.i - 2];
+        while (next && next.text.length < 40) next = doc.entries[next.i];
+        var pages = e.p1 > e.p0 ? (e.p0 === 1 ? e.p1 + '쪽' : e.p0 + '~' + e.p1 + '쪽') : (e.p0 === 1 ? '1쪽' : e.p0 + '쪽');
+        docEl.innerHTML =
+          '<button type="button" class="btn ghost sm rpt-back" data-back="1">← 목록으로</button>' +
+          '<div class="lib-res-head"><h2>' + esc(e.t) + '</h2>' +
+          '<div class="lib-res-meta"><span><strong>' + esc(doc.title) + '</strong>' + (doc.year ? ' (' + doc.year + '년)' : '') + '</span>' +
+          (trail.length ? '<span>' + esc(trail.join(' > ')) + '</span>' : '') +
+          '<span>' + pages + '</span>' +
+          (e.u ? '<span>' + pdfLink(e.u, '원본 PDF') + '</span>' : '') + '</div></div>' +
+          '<div class="lib-res-cont rpt-body ai-target" id="rpt-body">' + (e.text.length < 40 ? '<p class="ln">(이 항목은 제목만 있고 본문이 없습니다)</p>' : bodyHtml(e.text)) + '</div>' +
+          '<p class="lib-note">' + esc(sess.note || '본문은 총회 보고서 PDF 에서 글자만 뽑은 것입니다. 표·그림은 원본을 보십시오.') + '</p>' +
+          '<div class="rpt-nav">' +
+          (prev ? '<a href="#s' + sess.s + '-r' + prev.i + '">← ' + esc(prev.t) + '</a>' : '<span></span>') +
+          (next ? '<a href="#s' + sess.s + '-r' + next.i + '">' + esc(next.t) + ' →</a>' : '<span></span>') + '</div>';
+        /* 검색어가 있으면 첫 표시로, 없으면 맨 위로 */
+        var first = docEl.querySelector('mark.ai-hl');
+        if (first) setTimeout(function () { first.scrollIntoView({ block: 'center' }); }, 60);
+        else docEl.scrollIntoView({ block: 'start' });
+      }).catch(function () { fail(docEl); });
+    }
+    function showList() {
+      if (docEl) { docEl.classList.add('hidden'); docEl.innerHTML = ''; }
+      treeEl.classList.remove('hidden');
+      renderTree();
+      runSearch();
+    }
+
+    /* ----- 본문 검색 ----- */
+    function snippet(text, ws) {
+      var low = text.toLowerCase(), at = -1;
+      for (var i = 0; i < ws.length && at === -1; i++) at = low.indexOf(ws[i]);
+      if (at === -1) return '';
+      var a = Math.max(0, at - 70), b = Math.min(text.length, at + 110);
+      return (a > 0 ? '…' : '') + text.slice(a, b).replace(/\n/g, ' ') + (b < text.length ? '…' : '');
+    }
+    function runSearch() {
+      if (!resEl) return;
+      var ws = words();
+      if (!ws.length || !current || !current.text) { resEl.classList.add('hidden'); resEl.innerHTML = ''; return; }
+      var sess = current, my = term;
+      resEl.classList.remove('hidden');
+      resEl.innerHTML = '<div class="lib-loading">본문에서 찾는 중...</div>';
+      loadText(sess).then(function (doc) {
+        if (my !== term || sess !== current) return;
+        var hits = [];
+        doc.entries.forEach(function (e) {
+          if (e.text.length < 40) return;
+          var low = (e.t + '\n' + e.text).toLowerCase(), score = 0;
+          for (var i = 0; i < ws.length; i++) {
+            var n = 0, k = 0;
+            while ((k = low.indexOf(ws[i], k)) !== -1 && n < 200) { n++; k += ws[i].length; }
+            if (!n) { score = 0; break; }
+            score += n;
+          }
+          if (score) hits.push({ e: e, score: score });
+        });
+        hits.sort(function (a, b) { return b.score - a.score; });
+        if (!hits.length) { resEl.innerHTML = '<div class="lib-side-empty">본문에서 「' + esc(term) + '」을(를) 찾지 못했습니다.</div>'; return; }
+        resEl.innerHTML = '<div class="rpt-res-head">본문에서 <strong>' + hits.length + '</strong>개 보고서 찾음' +
+          (hits.length > 60 ? ' (많이 나온 60개만 보입니다)' : '') + '</div>' +
+          hits.slice(0, 60).map(function (h) {
+            var trail = trailOf(doc, h.e);
+            return '<a class="rpt-hit" href="#s' + sess.s + '-r' + h.e.i + '"><span class="rpt-hit-t">' + hl(esc(h.e.t)) +
+              '<small>' + esc(trail.join(' > ')) + ' · ' + h.score + '곳</small></span>' +
+              '<span class="rpt-snip">' + hl(esc(snippet(h.e.text, ws))) + '</span></a>';
+          }).join('');
+      }).catch(function () { fail(resEl); });
+    }
+
+    function select(s, r) {
       current = null;
       sessions.forEach(function (x) { if (x.s === s) current = x; });
       if (!current) current = sessions[0];
       if (!current) return;
       renderTabs();
-      renderTree();
-      if (history.replaceState) history.replaceState(null, '', '#s' + current.s);
+      if (r) showDoc(r); else showList();
+    }
+    function go(s, r) {
+      var h = '#s' + s + (r ? '-r' + r : '');
+      if (location.hash === h) select(s, r);
+      else location.hash = h;   /* hashchange 가 그린다 */
     }
 
     tabsEl.addEventListener('click', function (e) {
       var btn = e.target.closest('.lib-tab');
-      if (btn) select(parseInt(btn.getAttribute('data-s'), 10));
+      if (btn) go(parseInt(btn.getAttribute('data-s'), 10), null);
+    });
+    if (docEl) docEl.addEventListener('click', function (e) {
+      if (e.target.closest('[data-back]')) { e.preventDefault(); go(current.s, null); }
+    });
+    if (srchEl) srchEl.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        term = srchEl.value.trim();
+        if (docEl && !docEl.classList.contains('hidden')) {
+          var h = parseHash();
+          if (h.r) showDoc(h.r);   /* 본문을 보는 중이면 그 안에서 표시만 바꾼다 */
+          return;
+        }
+        renderTree();
+        runSearch();
+      }, 250);
     });
 
     Promise.all([
@@ -329,12 +494,14 @@ var AsmLib = (function () {
       (rs[1].list || []).forEach(function (r) { years[r.s] = r.year; });
       var note = document.getElementById('lib-updated');
       if (note && rs[0].updated) note.textContent = '자료 기준일 ' + rs[0].updated + ' · 출처: 총회전자자료실(gapck.org)';
-      select(sessFromHash() || (sessions[0] && sessions[0].s));
+      var h = parseHash();
+      select(h.s || (sessions[0] && sessions[0].s), h.r);
     }).catch(function () { fail(treeEl); });
 
     window.addEventListener('hashchange', function () {
-      var s = sessFromHash();
-      if (s && (!current || current.s !== s)) select(s);
+      var h = parseHash();
+      if (!h.s) return;
+      select(h.s, h.r);
     });
   }
 

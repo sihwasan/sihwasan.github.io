@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://sihwasan.org/images/og-cover.png">
 <meta property="og:site_name" content="시화산노회">
 <meta property="og:locale" content="ko_KR">
-<link rel="stylesheet" href="css/style.css?v=20261020y">
+<link rel="stylesheet" href="css/style.css?v=20261020ab">
 </head>
 <body>
 
@@ -25,12 +25,15 @@
 </div>
 
 <main class="page-body container" style="max-width:1000px" id="main">
-  <p class="lead">회기별 총회 보고서입니다. 총회·상비부·위원회·연합회·기관사업 보고서 전문을 볼 수 있습니다.</p>
-  <p class="lib-note">보고서 파일(PDF)은 총회 자료실 원본으로 연결되며, 새 창에서 열립니다.</p>
+  <p class="lead">회기별 총회 보고서입니다. 총회·상비부·위원회·연합회·기관사업 보고서와 노회 상황 보고의 본문을 바로 읽고 검색할 수 있습니다.</p>
+  <p class="lib-note">본문은 총회가 펴낸 보고서(PDF)에서 글자만 뽑은 것입니다. 표·그림은 「원본 PDF」에서 확인해 주세요.</p>
   <div class="lib-updated" id="lib-updated"></div>
 
   <div class="lib-tabs" id="lib-tabs"></div>
+  <input type="search" class="lib-search" id="rpt-search" placeholder="보고서 제목·본문 검색 (예: 노회 분립, 은급, 시화산노회)" autocomplete="off" aria-label="보고서 검색">
+  <div class="rpt-results hidden" id="rpt-results"></div>
   <div class="rpt-tree" id="rpt-tree"></div>
+  <div class="rpt-doc hidden" id="rpt-doc"></div>
 </main>
 
 <script src="js/auth.js?v=20260921j"></script>
@@ -38,7 +41,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
 <script src="js/main.js?v=20261020y"></script>
-<script src="js/assembly-lib.js?v=20261020a"></script>
+<script src="js/assembly-lib.js?v=20261020ab"></script>
 <script>AsmLib.initReports();</script>
 </body>
 </html>

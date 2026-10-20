@@ -10,3 +10,6 @@ private/
 
 # 워커 로컬 시험용 비밀값 (wrangler dev)
 .dev.vars
+
+# 총회 보고서 PDF 변환 임시 파일
+tools/assembly-report/cache/

@@ -86,10 +86,10 @@ const S = function (props, required) { return { type: 'object', properties: prop
 
 export const TOOL_DEFS = {
   search_assembly: {
-    description: '총회(대한예수교장로회 합동) 자료를 낱말로 찾는다: 헌법(정치·권징조례·예배모범·신조·요리문답 등), 총회 규정, 역대 총회 회의결의(제1~110회), 총회 보고서 목록. 질문의 핵심 낱말 2~4개로 묻는다. 결과가 엉뚱하면 scope 를 좁히거나 다른 낱말로 다시 찾는다.',
+    description: '총회(대한예수교장로회 합동) 자료를 낱말로 찾는다: 헌법(정치·권징조례·예배모범·신조·요리문답 등), 총회 규정, 역대 총회 회의결의(제1~110회), 총회 보고서 본문(제104~111회 — 총회임원회·상비부·위원회·기관·노회 상황 보고 등). 질문의 핵심 낱말 2~4개로 묻는다. 결과가 엉뚱하면 scope 를 좁히거나 다른 낱말로 다시 찾는다.',
     input_schema: S({
       query: { type: 'string', description: '찾을 낱말들 (예: "면직 해벌 절차")' },
-      scope: { type: 'string', enum: ['all', 'constitution', 'rules', 'resolutions', 'reports'], description: '찾을 범위. constitution=헌법, rules=총회 규정, resolutions=총회 회의결의, reports=보고서 목록' },
+      scope: { type: 'string', enum: ['all', 'constitution', 'rules', 'resolutions', 'reports'], description: '찾을 범위. constitution=헌법, rules=총회 규정, resolutions=총회 회의결의, reports=총회 보고서 본문' },
       session: { type: 'integer', description: '총회 회기 번호 (회의결의를 특정 회기에서만 찾을 때)' },
       k: { type: 'integer', description: '가져올 조각 수 (기본 8, 최대 15)' }
     }, ['query'])

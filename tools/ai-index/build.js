@@ -217,11 +217,35 @@ function loadReports() {
   }
 }
 
+/* ---------- 5. 총회 보고서 본문 (tools/assembly-report 가 PDF 에서 뽑은 글) ----------
+ * report-<회기>.json 의 보고서 하나하나를 조각으로. 인용 제목은 「제111회 총회 보고서 「총회임원회」」,
+ * 주소는 assembly-report.html#s111-r12 (보고서 화면이 그 보고서 본문을 연다). */
+function loadReportTexts() {
+  const files = fs.readdirSync(ASM).filter(function (f) { return /^report-\d+\.json$/.test(f); })
+    .sort(function (a, b) { return parseInt(b.match(/\d+/)[0], 10) - parseInt(a.match(/\d+/)[0], 10); });
+  for (const f of files) {
+    const doc = readJson(path.join(ASM, f));
+    if (!doc || !doc.entries) continue;
+    const s = doc.s;
+    const sess = '제' + s + '회 총회 보고서';
+    const trail = [];   /* 갈래 > 항목 > 소항목 — 조각 제목에 상위 갈래를 붙인다 */
+    for (const e of doc.entries) {
+      trail[e.lv] = e.t; trail.length = e.lv + 1;
+      if (!e.text || e.text.length < 40) continue;
+      const where = trail.filter(Boolean).join(' > ');
+      const label = sess + ' 「' + e.t + '」';
+      add('총회 보고서 > 제' + s + '회', sess + ' · ' + where + (e.p1 > e.p0 ? ' (' + e.p0 + '~' + e.p1 + '쪽)' : ''),
+          'assembly-report.html#s' + s + '-r' + e.i, where + '\n' + e.text, label);
+    }
+  }
+}
+
 /* ---------- 실행 ---------- */
 loadConstitution();
 loadRules();
 loadResolutions();
 loadReports();
+loadReportTexts();
 
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify({

@@ -53,11 +53,15 @@ function count(hay, needle) {
   return n;
 }
 
+/* 조각 본문·제목을 소문자로 — 색인이 커져서(총회 보고서 본문 포함 약 20MB) 소문자 사본을 들고 있지 않고
+ * 찾을 때마다 바꾼다 (한글은 그대로이고 영문 머리글자만 바뀌므로 비용이 작다) */
+function low(s) { return (s || '').toLowerCase(); }
+
 export class Index {
   constructor(chunks) {
     this.chunks = chunks || [];
     this.docs = this.chunks.map(function (c) {
-      return { c: c, text: (c.text || '').toLowerCase(), title: (c.title || '').toLowerCase(), len: (c.text || '').length };
+      return { c: c, len: (c.text || '').length };
     });
     this.N = this.docs.length;
     this.avg = this.docs.reduce(function (a, d) { return a + d.len; }, 0) / Math.max(1, this.N);
@@ -67,7 +71,7 @@ export class Index {
   df(t) {
     if (this.dfCache.has(t)) return this.dfCache.get(t);
     let n = 0;
-    for (const d of this.docs) if (d.text.indexOf(t) !== -1 || d.title.indexOf(t) !== -1) n++;
+    for (const d of this.docs) if (low(d.c.text).indexOf(t) !== -1 || low(d.c.title).indexOf(t) !== -1) n++;
     this.dfCache.set(t, n);
     return n;
   }
@@ -93,10 +97,11 @@ export class Index {
     for (const d of this.docs) {
       if (srcPrefix && d.c.src.indexOf(srcPrefix) !== 0) continue;
       if (sessTag && d.c.title.indexOf(sessTag) !== 0) continue;
+      const text = low(d.c.text), title = low(d.c.title);
       let score = 0, hit = 0;
       for (const t of qt) {
-        const f = count(d.text, t);
-        const ft = count(d.title, t);
+        const f = count(text, t);
+        const ft = count(title, t);
         if (!f && !ft) continue;
         hit++;
         const df = this.df(t) || 1;
