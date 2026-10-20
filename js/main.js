@@ -56,6 +56,14 @@
       { t: '고시 모의고사', h: 'exam.html' },
       { t: '자료실 (공문·회계·파일)', h: 'archive.html' }
     ]},
+    { title: '총회', href: 'assembly-constitution.html', sub: [
+      { t: '총회 활동현황', h: 'dashboard.html#hub-assembly' },
+      { t: '총회 헌법', h: 'assembly-constitution.html' },
+      { t: '총회 규정', h: 'assembly-rules.html' },
+      { t: '총회 회의결의', h: 'assembly-resolution.html' },
+      { t: '총회 보고서', h: 'assembly-report.html' },
+      { t: '총회 회칙 안내', h: 'rules-assembly.html' }
+    ]},
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
       { t: '신청서류 확인', h: 'request.html#list' },
@@ -69,14 +77,6 @@
       { t: '서류 신청 내역', h: 'request.html#list' },
       { t: '알림함', h: 'notifications.html' },
       { t: '내 정보', h: 'mypage.html' }
-    ]},
-    { title: '총회', href: 'assembly-constitution.html', sub: [
-      { t: '총회 활동현황', h: 'dashboard.html#hub-assembly' },
-      { t: '총회 헌법', h: 'assembly-constitution.html' },
-      { t: '총회 규정', h: 'assembly-rules.html' },
-      { t: '총회 회의결의', h: 'assembly-resolution.html' },
-      { t: '총회 보고서', h: 'assembly-report.html' },
-      { t: '총회 회칙 안내', h: 'rules-assembly.html' }
     ]},
     { title: '게시판', href: 'board.html', sub: [
       { t: '공지사항', h: 'board.html#notice' },
