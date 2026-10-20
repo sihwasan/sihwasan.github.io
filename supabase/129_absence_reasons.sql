@@ -13,6 +13,14 @@
 --  실행: Supabase → SQL Editor → 전체 붙여넣고 Run.  여러 번 실행해도 안전합니다.
 -- =====================================================================
 
+-- 2단계 인증 확인 함수 — 124_admin_mfa.sql 과 똑같은 내용. 124 를 아직 실행하지 않은 DB 에서도 돌도록 여기서도 만든다.
+-- (can_manage()·is_officer() 의 서버 잠금은 124 가 건다. 여기서는 건드리지 않는다)
+create or replace function public.mfa_ok()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select coalesce(auth.jwt() ->> 'aal', 'aal1') = 'aal2'
+$fn$;
+grant execute on function public.mfa_ok() to anon, authenticated;
+
 create table if not exists public.absence_reasons (
   id          bigserial primary key,
   meeting_id  bigint not null references public.meetings (id) on delete cascade,
