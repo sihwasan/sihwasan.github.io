@@ -288,24 +288,55 @@ const RUN = {
     }), revisions: (docs[0] && docs[0].revisions) || '' };
   },
   async get_organization(input, ctx) {
-    const [st, coms, sichals, boards] = await Promise.all([
+    const [st, coms, sichals, boards, dels] = await Promise.all([
       sbGet(ctx.env, ctx.auth, 'site_settings?select=key,value&key=in.(officers,delegates,veterans,history_officers,sessions)'),
       sbGet(ctx.env, ctx.auth, 'committees?select=name,duty,head,clerk,treasurer,y1,y2,y3,members&order=sort'),
       sbGet(ctx.env, ctx.auth, 'sichals?select=name,area,head,clerk,treasurer,churches&order=sort'),
-      sbGet(ctx.env, ctx.auth, 'board_members?select=kind,name,position,church,title&active=eq.true&order=sort')
+      sbGet(ctx.env, ctx.auth, 'board_members?select=kind,name,position,church,title&active=eq.true&order=sort'),
+      sbGet(ctx.env, ctx.auth, 'delegates?select=kind,name,church,title&active=eq.true&order=sort')
     ]);
     const out = {};
     const set = {};
     (st.error ? [] : st).forEach(function (r) { set[r.key] = r.value; });
     out.session = set.sessions && set.sessions.current ? set.sessions.current : undefined;
     out.officers = set.officers || [];
-    out.delegates = set.delegates || [];
+    out.delegates = (!dels.error && dels.length) ? dels : (set.delegates || []);
     out.veterans = set.veterans || [];
     out.committees = coms.error ? [] : coms;
     out.sichals = sichals.error ? [] : sichals;
     out.boards = boards.error ? [] : boards;
+    out.note = '노회 임원은 해마다 봄 정기노회에서 뽑아 1년을 섬긴다. 가을 정기노회(회기 번호가 하나 오른다)에서는 임원을 새로 뽑지 않으므로 봄에 뽑힌 임원이 가을 회기에도 그대로 임원이다.';
+    /* 사람 한 줄: 이름 직분 (교회) */
+    function person(x) {
+      if (!x) return '';
+      if (typeof x === 'string') return x;
+      return [x.name, x.position || x.title, x.church ? '(' + x.church + ')' : ''].filter(Boolean).join(' ');
+    }
+    const lines = [];
+    lines.push('노회 임원' + (out.session ? ' (' + out.session + ')' : ''));
+    out.officers.forEach(function (o) { lines.push((o.role || '') + ' ' + person(o)); });
+    if (Array.isArray(out.delegates) && out.delegates.length) {
+      lines.push('', '총회 총대');
+      const byKind = {};
+      out.delegates.forEach(function (d) { const k = d.kind || '총대'; (byKind[k] = byKind[k] || []).push(person(d)); });
+      Object.keys(byKind).forEach(function (k) { lines.push(k + ': ' + byKind[k].join(', ')); });
+    } else if (out.delegates && typeof out.delegates === 'object') {
+      lines.push('', '총회 총대');
+      Object.keys(out.delegates).forEach(function (k) {
+        const v = out.delegates[k];
+        lines.push(({ pastorMain: '목사 정총대', pastorSub: '목사 부총대', elderMain: '장로 정총대', elderSub: '장로 부총대' }[k] || k) + ': ' +
+          (Array.isArray(v) ? v.map(person).join(', ') : person(v)));
+      });
+    }
+    if (Array.isArray(out.veterans) && out.veterans.length) {
+      lines.push('', '증경노회장: ' + out.veterans.map(person).join(', '));
+    }
+    if (out.boards.length) {
+      lines.push('', '이사·실행위원');
+      out.boards.forEach(function (b) { lines.push((b.kind || '') + ' ' + person(b)); });
+    }
     const refO = ctx.cites.add({ title: '노회 임원·총대 (조직)', url: 'organization.html#officers', kind: '노회 조직',
-      snippet: JSON.stringify(out.officers).slice(0, 1200) });
+      snippet: lines.join('\n').slice(0, 1500) });
     const refC = ctx.cites.add({ title: '상비부 조직', url: 'organization.html#committees', kind: '노회 조직',
       snippet: out.committees.map(function (c) { return c.name + ': 부장 ' + (c.head || '') + ' / 서기 ' + (c.clerk || '') + ' / 회계 ' + (c.treasurer || ''); }).join('\n') });
     const refS = ctx.cites.add({ title: '시찰회 조직', url: 'organization.html#sichal', kind: '노회 조직',
