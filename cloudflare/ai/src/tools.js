@@ -300,7 +300,7 @@ const RUN = {
     const hits = matchVerified(list, input.query || '', 3);
     if (!hits.length) return { items: [], note: '이 질문과 맞는 확인된 답이 없습니다. 다른 도구로 찾으십시오.' };
     return { items: verifiedItems(ctx, hits),
-      note: '관리자가 확인한 답입니다. 질문과 맞으면 우선 근거로 쓰되, original_sources 의 원문을 해당 도구로 다시 찾아 확인하고 원문 근거 번호도 함께 다십시오. 원문과 다르면 원문을 따르십시오.' };
+      note: '관리자가 확인한 답입니다. 질문과 맞으면 우선 근거로 쓰고 답 첫 문장에 이 ref 를 다십시오. 그리고 original_sources 의 원문을 해당 도구로 다시 찾아 확인해 원문 근거 번호도 함께 다십시오. 원문과 다르면 원문을 따르십시오.' };
   },
   async search_assembly(input, ctx) {
     const rows = ctx.index.search(input.query, { scope: input.scope || 'all', session: input.session, k: Math.min(15, input.k || 8) });
