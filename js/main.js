@@ -617,7 +617,9 @@
                  * (111_elder_term_notice.sql 을 실행하기 전이면 조용히 건너뛴다) */
                 c.rpc('run_elder_term_notice').then(quiet, quiet),
                 /* 날짜가 지난 임직식을 회원 명단에 반영 (121 sql 을 실행하기 전이면 조용히 건너뛴다) */
-                c.rpc('apply_ordinations').then(quiet, quiet)
+                c.rpc('apply_ordinations').then(quiet, quiet),
+                /* 보안 점검 — 예약(pg_cron)이 안 될 때의 대비, 20시간 안에 했으면 서버가 건너뛴다 (126 sql) */
+                c.rpc('security_check_due').then(quiet, quiet)
               ]);
             }).then(function () {
               loadUnread();
@@ -793,6 +795,10 @@
       var sl = String(n.body || '').match(/schedule\.html[^\s]*/);
       return sl ? sl[0] : 'schedule.html';
     }
+    /* 보안 점검 보고(126) — 시스템 운영의 보안 점검 탭으로 */
+    if (n.kind === '보안') {
+      return 'ops.html#ops-sec';
+    }
     /* 회의 녹음 열람 허용(113) — 회의 녹음 듣기 화면으로 */
     if (key.indexOf('maudio-') === 0) {
       return 'minutes-audio.html';
@@ -886,7 +892,7 @@
         '<strong class="nt-title">' + SHS.esc(n.title || '') + '</strong>' +
         '<span class="nt-body">' + SHS.esc(String(n.body || '').slice(0, 90)) + '</span>' +
         '<span class="nt-go">' +
-        (n.kind === '문의' ? '답장하기' : (n.kind === '서류' || n.kind === '총대 안내' || n.kind === '일정') ? '바로 가기' : '알림함에서 보기') +
+        (n.kind === '문의' ? '답장하기' : (n.kind === '서류' || n.kind === '총대 안내' || n.kind === '일정' || n.kind === '보안') ? '바로 가기' : '알림함에서 보기') +
         '</span>' +
         '</a>';
       setTimeout(function () { wrap.appendChild(card); }, i * 250);

@@ -132,6 +132,28 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .mfa-sub small { font-weight: 400; color: var(--gray-5); font-size: 0.82rem; margin-left: 6px; }
 .linklike { border: 0; background: none; padding: 0; color: var(--navy); text-decoration: underline; cursor: pointer; font: inherit; }
 
+/* 보안 점검 — 시스템 운영 탭 (js/ops-panel.js, 126 sql) */
+.sec-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.sec-sub { font-size: 0.86rem; color: var(--gray-6); margin: 6px 0 0; max-width: 640px; line-height: 1.7; }
+.sec-card { border: 1px solid var(--gray-2); border-left: 4px solid #3f8a5a; border-radius: 8px; background: #fff; padding: 14px 16px; }
+.sec-card.sec-warn { border-left-color: #c48a1d; }
+.sec-card.sec-danger { border-left-color: #b03a3a; }
+.sec-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.sec-card-head span:last-child { font-size: 0.84rem; color: var(--gray-5); }
+.sec-badge { display: inline-block; font-size: 0.76rem; font-weight: 700; padding: 2px 9px; border-radius: 99px; background: #e5f2e9; color: #2f6e46; }
+.sec-badge.sec-warn, .sec-warn > .sec-card-head .sec-badge { background: #fbf0d9; color: #8a5a00; }
+.sec-badge.sec-danger, .sec-danger > .sec-card-head .sec-badge { background: #f8e1e1; color: #9b2c2c; }
+.sec-items { list-style: none; margin: 0; padding: 0; }
+.sec-items li { display: flex; gap: 10px; padding: 9px 0; border-top: 1px dashed var(--gray-2); }
+.sec-items li:first-child { border-top: 0; }
+.sec-items li p { margin: 3px 0 0; font-size: 0.85rem; color: var(--gray-6); line-height: 1.6; word-break: break-all; }
+.sec-tag { flex: 0 0 auto; font-size: 0.72rem; padding: 1px 7px; border-radius: 4px; height: fit-content; border: 1px solid var(--gray-3); color: var(--gray-6); }
+.sec-items li.sec-danger .sec-tag { border-color: #b03a3a; color: #b03a3a; }
+.sec-items li.sec-warn .sec-tag { border-color: #c48a1d; color: #8a5a00; }
+.sec-none { color: #2f6e46; margin: 0; }
+.sec-hist-h { margin: 22px 0 8px; font-size: 0.95rem; color: var(--navy); }
+.sec-hist td { vertical-align: top; }
+
 /* ---------- header ---------- */
 .site-header {
   background: var(--white);

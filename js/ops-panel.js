@@ -44,6 +44,7 @@ var SHSOps = (function () {
     '<button data-tab="ops-manual">운영 매뉴얼</button>' +
     '<button data-tab="ops-aw">감사 기간</button>' +
     (canAudit ? '<button data-tab="ops-audit">감독 (감사 기록)</button>' : '') +
+    (isSuper ? '<button data-tab="ops-sec">보안 점검</button>' : '') +
     /* 노회장 권한 위임은 무게가 다른 일이라 맨 끝에 붉은색으로 둔다 */
     (canHand ? '<button class="tab-danger" data-tab="ops-hand">노회장 권한 위임</button>' : '') +
     '</div>' +
@@ -52,9 +53,10 @@ var SHSOps = (function () {
     '<div class="tab-panel" id="ops-manual"></div>' +
     (canHand ? '<div class="tab-panel" id="ops-hand"></div>' : '') +
     '<div class="tab-panel" id="ops-aw"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
-    (canAudit ? '<div class="tab-panel" id="ops-audit"></div>' : '');
+    (canAudit ? '<div class="tab-panel" id="ops-audit"></div>' : '') +
+    (isSuper ? '<div class="tab-panel" id="ops-sec"></div>' : '');
 
-  var auditReady = false;
+  var auditReady = false, secReady = false;
 
   function showTab(id) {
     var btn = area.querySelector('.tabs button[data-tab="' + id + '"]');
@@ -69,7 +71,77 @@ var SHSOps = (function () {
       auditReady = true;
       SHSAuditView.mount(document.getElementById('ops-audit'), user);
     }
+    if (id === 'ops-sec' && !secReady) {
+      secReady = true;
+      mountSecurity(document.getElementById('ops-sec'));
+    }
     return true;
+  }
+
+  /* ---------- 보안 점검 (최고관리자, 126 sql) ----------
+   * 서버가 매일 오전 7시에 스스로 점검해 security_reports 에 남기고,
+   * 위험이 나오면 그날, 월요일에는 한 주 요약을 알림함으로 보낸다. 여기서는 기록을 보고 바로 점검한다. */
+  function mountSecurity(box) {
+    var LV = { '위험': 'sec-danger', '주의': 'sec-warn', '참고': 'sec-info', '정상': 'sec-ok' };
+    var open = {};
+    function when(iso) { return String(iso || '').replace('T', ' ').slice(0, 16); }
+    function itemsHtml(items) {
+      items = items || [];
+      if (!items.length) return '<p class="sec-none">점검한 항목에서 이상한 점을 찾지 못했습니다.</p>';
+      return '<ul class="sec-items">' + items.map(function (x) {
+        return '<li class="' + (LV[x.level] || '') + '"><span class="sec-tag">' + e(x.level) + '</span>' +
+          '<div><strong>' + e(x.title) + '</strong><p>' + e(x.detail || '') + '</p></div></li>';
+      }).join('') + '</ul>';
+    }
+    function draw(msg) {
+      box.innerHTML = '<p style="color:var(--gray-5)">불러오는 중...</p>';
+      db.from('security_reports').select('*').order('id', { ascending: false }).limit(30).then(function (r) {
+        if (r.error) {
+          box.innerHTML = '<div class="notice-banner">보안 점검은 Supabase 에서 <strong>126_security_check.sql</strong> 을 실행하면 시작됩니다. ' +
+            '(매일 오전 7시 점검, 위험은 그날·월요일엔 주간 요약을 알림함으로 보냅니다)</div>';
+          return;
+        }
+        var rows = r.data || [];
+        var last = rows[0];
+        var h = '<div class="sec-head"><div><h3 style="margin:0">보안 점검</h3>' +
+          '<p class="sec-sub">매일 오전 7시(한국 시각)에 서버가 스스로 점검합니다. 「위험」이 나오면 그날 바로, ' +
+          '월요일에는 한 주 요약을 알림함으로 보내 드립니다.</p></div>' +
+          '<button class="btn" id="sec-run">지금 점검</button></div>' +
+          (msg ? '<div class="form-msg ok">' + e(msg) + '</div>' : '');
+        if (!last) {
+          h += '<p style="color:var(--gray-5)">아직 점검 기록이 없습니다. 「지금 점검」을 눌러 보세요.</p>';
+        } else {
+          h += '<div class="sec-card ' + (LV[last.level] || '') + '"><div class="sec-card-head">' +
+            '<span class="sec-badge">' + e(last.level) + '</span><strong>최근 점검</strong> <span>' + e(when(last.created_at)) +
+            ' · 위험 ' + last.danger + ' · 주의 ' + last.warn + '</span></div>' + itemsHtml(last.items) + '</div>';
+          if (rows.length > 1) {
+            h += '<h4 class="sec-hist-h">지난 점검</h4><table class="tbl sec-hist"><thead><tr><th>점검 시각</th><th>결과</th>' +
+              '<th>위험</th><th>주의</th><th>방법</th><th></th></tr></thead><tbody>' +
+              rows.slice(1).map(function (x) {
+                return '<tr><td>' + e(when(x.created_at)) + '</td><td><span class="sec-badge ' + (LV[x.level] || '') + '">' + e(x.level) + '</span></td>' +
+                  '<td>' + x.danger + '</td><td>' + x.warn + '</td>' +
+                  '<td>' + e({ cron: '예약', visit: '방문 때', manual: '지금 점검', first: '처음' }[x.trigger] || x.trigger || '') + '</td>' +
+                  '<td><button class="btn ghost sm" data-secopen="' + x.id + '">' + (open[x.id] ? '접기' : '보기') + '</button></td></tr>' +
+                  (open[x.id] ? '<tr><td colspan="6">' + itemsHtml(x.items) + '</td></tr>' : '');
+              }).join('') + '</tbody></table>';
+          }
+        }
+        box.innerHTML = h;
+        var run = document.getElementById('sec-run');
+        run.addEventListener('click', function () {
+          if (run.disabled) return;
+          run.disabled = true; run.textContent = '점검하는 중...';
+          db.rpc('run_security_check_now').then(function (x) {
+            if (x.error) { run.disabled = false; run.textContent = '지금 점검'; alert(x.error.message); return; }
+            draw('점검을 마쳤습니다.');
+          });
+        });
+        box.querySelectorAll('button[data-secopen]').forEach(function (b) {
+          b.addEventListener('click', function () { open[b.dataset.secopen] = !open[b.dataset.secopen]; draw(); });
+        });
+      });
+    }
+    if (db) draw(); else SHSCloud.init().then(function (c) { db = c; draw(); });
   }
 
   area.querySelectorAll('.tabs button').forEach(function (b) {
