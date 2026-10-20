@@ -2794,7 +2794,19 @@ mark.aih-key {
 .pr-heading { margin: 2px 0 0; font-size: 1.2rem; border: 0; padding: 0; }
 .pr-heading::after { display: none; }
 .pr-page-btns { display: flex; gap: 6px; flex-wrap: wrap; }
-.pr-text { white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem; color: var(--ink); }
+.pr-text { line-height: 1.8; font-size: 0.95rem; color: var(--ink); }
+.pr-text p { margin: 0 0 8px; }
+.pr-text .pr-sub { font-weight: 700; color: var(--navy); margin: 14px 0 6px; }
+.pr-text .pr-h { font-size: 1.05rem; color: var(--navy); margin: 16px 0 8px; border: 0; padding: 0; }
+.pr-text .pr-h::after { display: none; }
+.pr-line { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
+.pr-line > span:first-child { white-space: nowrap; }
+.pr-lead { flex: 1; min-width: 24px; border-bottom: 1px dotted var(--gray-3); transform: translateY(-5px); }
+.pr-tbl { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 8px 0 16px; }
+.pr-tbl th, .pr-tbl td { border: 1px solid var(--gray-2); padding: 6px 9px; text-align: left; vertical-align: top; line-height: 1.5; }
+.pr-tbl th { background: var(--gray-1); font-weight: 700; color: var(--gray-7); white-space: nowrap; }
+.pr-tbl tr:nth-child(even) td { background: #fdfbf7; }
+@media (max-width: 900px) { .pr-tbl { display: block; overflow-x: auto; } }
 .pr-res-h { font-weight: 700; color: var(--navy); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
 .pr-res { display: block; padding: 10px 12px; border: 1px solid var(--gray-2); border-radius: 8px; background: var(--gray-1); margin-bottom: 6px; color: var(--ink); text-decoration: none; }
 .pr-res:hover { border-color: var(--accent); background: #fff; }

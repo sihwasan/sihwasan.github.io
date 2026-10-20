@@ -6,7 +6,7 @@
 <title>노회 보고서 - 시화산노회</title>
 <meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021g">
+<link rel="stylesheet" href="css/style.css?v=20261021h">
 </head>
 <body>
 
@@ -142,6 +142,49 @@ document.addEventListener('DOMContentLoaded', function () {
     if (q) { var re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'); t = t.replace(re, '<mark class="ai-hl">$&</mark>'); }
     return t;
   }
+  /* AI 가 받아 적은 글을 문서답게 그린다.
+   *  · "ㄱ | ㄴ | ㄷ" 줄이 잇따르면 표 (첫 줄이 짧은 낱말들이면 머리글)
+   *  · "## 제목", "1. 항목", "가. 항목", "■ 항목" 은 작은 제목
+   *  · "묵 도 ------ 다 같 이" 처럼 점선으로 이어진 줄은 양끝 맞춤
+   *  · 그 밖은 문단 */
+  function renderDoc(text, q) {
+    var lines = String(text || '').replace(/\r/g, '').split('\n');
+    var html = '', table = null;
+    function flushTable() {
+      if (!table) return;
+      var head = table.length > 1 && table[0].every(function (c) { return c.length <= 10 && !/\d{2,}/.test(c); }) && table[0].filter(Boolean).length >= 2;
+      html += '<table class="pr-tbl">' + table.map(function (cells, i) {
+        var tag = head && i === 0 ? 'th' : 'td';
+        return '<tr>' + cells.map(function (c) { return '<' + tag + '>' + hl(c, q) + '</' + tag + '>'; }).join('') + '</tr>';
+      }).join('') + '</table>';
+      table = null;
+    }
+    lines.forEach(function (ln) {
+      var t = ln.trim();
+      if (!t) { flushTable(); return; }
+      if (/^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?$/.test(t)) return;        /* 마크다운 표 구분줄 */
+      if ((t.match(/\|/g) || []).length >= 2) {
+        var cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+        table = table || []; table.push(cells); return;
+      }
+      flushTable();
+      var m = t.match(/^#{1,4}\s+(.*)$/);
+      if (m) { html += '<h4 class="pr-h">' + hl(m[1], q) + '</h4>'; return; }
+      if (/[-]{4,}|…{2,}|·{4,}|\.{5,}/.test(t)) {
+        var parts = t.split(/([-]{4,}|…{2,}|·{4,}|\.{5,})/);
+        html += '<div class="pr-line">' + parts.map(function (x, i) {
+          return (i % 2) ? '<span class="pr-lead"></span>' : (x.trim() ? '<span>' + hl(x.trim(), q) + '</span>' : '');
+        }).join('') + '</div>';
+        return;
+      }
+      if (t.length <= 60 && /^(\d{1,2}\s*[.)]|[가-힣]\s*[.)]|[①-⑳]|[■◈●◎□○※◆▶])\s*\S/.test(t) && !/[.。]\s*$/.test(t)) {
+        html += '<p class="pr-sub">' + hl(t, q) + '</p>'; return;
+      }
+      html += '<p>' + hl(t, q) + '</p>';
+    });
+    flushTable();
+    return html || '<p style="color:var(--gray-5)">(빈 면)</p>';
+  }
   function showPage(pageNo, q) {
     var box = document.getElementById('pr-page');
     var hit = pages.filter(function (p) { return p.page_no === pageNo; });
@@ -163,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function () {
       (prev != null ? '<button class="btn ghost sm" data-go="' + prev + '">&larr; ' + prev + '쪽</button> ' : '') +
       (next != null ? '<button class="btn ghost sm" data-go="' + next + '">' + next + '쪽 &rarr;</button> ' : '') +
       (cur.file_path ? '<button class="btn sm" id="pr-pdf-page">PDF 원본 ' + p.pdf_page + '쪽</button>' : '') + '</div></div>' +
-      '<div class="pr-text">' + hl(p.text || '(빈 면)', q) + '</div>' +
+      '<div class="pr-text">' + renderDoc(p.text || '', q) + '</div>' +
       (canEdit ? '<div style="margin-top:12px;text-align:right"><button class="btn ghost sm" id="pr-edit-page">이 쪽 글 고치기</button></div>' : '');
     box.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { showPage(parseInt(b.dataset.go, 10), ''); }); });
     var pb = box.querySelector('#pr-pdf-page'); if (pb) pb.addEventListener('click', function () { openPdf(p.pdf_page); });
