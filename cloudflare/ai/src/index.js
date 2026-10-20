@@ -5,7 +5,9 @@
  * 노회 자료를 찾아 근거를 달아 답하고, 답은 글자가 나오는 대로 홈페이지로 흘려보낸다(SSE).
  *
  * 하는 일
- *   POST /ask             { question, history? }  →  SSE 흐름 (status / delta / retract / sources / usage / done / error)
+ *   POST /ask             { question, history?, thread? }  →  SSE 흐름
+ *                         (status / delta / retract / sources / logged{id} / saved / usage / done / error)
+ *   POST /feedback        { id, helpful, reason? }  본인 답에 「도움이 됐어요 / 아니에요(이유)」 (127 sql 의 ai_feedback)
  *   GET  /health          창구가 살아 있는가, 열쇠가 등록되어 있는가
  *   GET  /settings        (관리자) 모델·한도·허용 등급·열쇠 등록 여부·오늘 사용량
  *   POST /settings        (관리자) 설정 저장 — api_key 를 주면 열쇠를 바꾼다
@@ -19,6 +21,11 @@
  *   KV 'u:<날짜>:<회원id>' / 'u:<날짜>:all' = 오늘 질문 수
  *   KV 'h:<회원id>' = 그분의 질문 내역 { threads: [{ id, title, at, updated, turns: [{ q, a, sources, at }] }] }
  *     본인만 읽고 지운다. 관리자도 남의 내역은 볼 수 없다 (관리자가 보는 사용 기록은 Supabase ai_logs).
+ *
+ * 쓰면 쓸수록 나아지는 구조 (127 sql) — 모델을 다시 가르치지 않고, 사람이 확인한 답만 근거로 쌓는다.
+ *   /ask 가 끝나면 질문·답 본문·근거 목록·「못 찾음」 표시를 ai_logs 에 남기고 그 줄 번호를 'logged' 로 돌려준다.
+ *   회원은 그 번호로 /feedback 평가를 단다. 관리자는 못 찾은 질문·낮은 평가를 보고 「확인된 답」(ai_verified)을 승인한다.
+ *   다음 질문부터 search_verified_answers 도구가 그 답을 (질문한 분 등급에 맞는 것만) 먼저 근거로 내놓는다.
  *
  * 누가 쓸 수 있나
  *   로그인 증표(Bearer)를 Supabase 에 확인하고 profiles.role 이 허용 등급(기본: 정회원 이상)일 때만.
@@ -131,13 +138,14 @@ function histSummary(t) {
   const last = t.turns[t.turns.length - 1] || {};
   return { id: t.id, title: t.title, n: t.turns.length, at: t.at, updated: t.updated, preview: histPreview(last.a) };
 }
-/* 답 하나를 대화에 붙여 저장한다. threadId 가 없거나 지워졌으면 새 대화로. */
+function newThreadId() { return crypto.randomUUID().replace(/-/g, '').slice(0, 16); }
+/* 답 하나를 대화에 붙여 저장한다. 그 번호의 대화가 없으면(새 대화이거나 지워졌으면) 그 번호로 새로 만든다. */
 async function histSave(env, uid, threadId, turn) {
   const h = await histGet(env, uid);
   const now = new Date().toISOString();
   let t = threadId ? h.threads.find(function (x) { return x.id === threadId; }) : null;
   if (t) h.threads = h.threads.filter(function (x) { return x !== t; });
-  else t = { id: crypto.randomUUID().replace(/-/g, '').slice(0, 16), title: turn.q.slice(0, 80), at: now, updated: now, turns: [] };
+  else t = { id: threadId || newThreadId(), title: turn.q.slice(0, 80), at: now, updated: now, turns: [] };
   t.turns.push(turn);
   if (t.turns.length > HIST_TURNS) t.turns = t.turns.slice(-HIST_TURNS);
   t.updated = now;
@@ -301,6 +309,8 @@ function systemPrompt(me, built) {
     '- 총회 헌법(정치·권징조례·예배모범 등)과 총회 규정·결의는 search_assembly / get_assembly_article 로, 노회규칙은 search_presbytery_rules 로 찾습니다.',
     '- 노회 사람·교회·조직·일정·공지·결의·회의록·시찰·상비부는 그에 맞는 search_* / get_organization 도구로 찾습니다.',
     '- 처음 찾은 결과가 질문과 맞지 않으면 낱말을 바꾸거나 범위를 좁혀 두세 번 더 찾습니다. 필요하면 여러 도구를 함께 씁니다.',
+    '- 관리자가 원문을 확인해 승인해 둔 「확인된 답」이 있을 수 있습니다. 처음 자료를 찾을 때 search_verified_answers 를 다른 검색과 함께 부릅니다(search_assembly 결과 맨 앞에 verified 로 붙어 오기도 합니다).',
+    '- 질문과 맞는 확인된 답이 있으면 그것을 우선 근거로 쓰되, 반드시 그 답이 기대는 원문 조문·결의·규칙을 해당 도구로 다시 찾아 확인하고 원문 근거 번호도 함께 답니다. 원문과 다르면 원문을 따르고 그 차이를 짧게 알립니다. 질문과 맞지 않는 확인된 답은 쓰지 않습니다.',
     '- 도구가 "열람할 수 없다"거나 빈 결과를 주면, 그 자료가 없거나 질문한 분의 등급으로는 볼 수 없다고 솔직히 말합니다.' +
       (isOfficer ? '' : ' (회의록·임원 자료실은 임원만 볼 수 있습니다.)'),
     '',
@@ -316,6 +326,13 @@ function systemPrompt(me, built) {
     '- 답 끝에 「근거」 목록을 따로 만들지 않습니다 (홈페이지가 번호를 보고 스스로 만듭니다).',
     '- 질문이 자료 검색과 무관하면(잡담·창작·번역 등) 이 검색창은 노회·총회 자료를 찾는 데 쓰는 것이라고 짧게 안내합니다.'
   ].join('\n');
+}
+
+/* 「자료에서 확인되지 않습니다」류의 답이거나 근거를 하나도 달지 못한 답 — 관리자 화면 「못 찾은 질문」에 오른다 */
+const NO_ANSWER_RE = /확인되지\s*않(습니다|는다|음)|찾지\s*못했|찾을\s*수\s*없|나와\s*있지\s*않|답을\s*드릴\s*수\s*없|정리하지\s*못했/;
+export function isNoAnswer(text, citedCount) {
+  const t = String(text || '');
+  return !t.trim() || t === '(거절)' || !citedCount || NO_ANSWER_RE.test(t);
 }
 
 /* SSE 로 내보내기 */
@@ -358,8 +375,8 @@ async function answer(request, env, ctx, origin) {
     if (t) history.push({ role: h.role, content: t });
   });
   if (history.length && history[history.length - 1].role === 'user') history.pop();
-  /* 내역의 어느 대화에 이어 붙일지 (없으면 새 대화) */
-  const threadId = /^[0-9a-f]{8,32}$/.test(String((body && body.thread) || '')) ? String(body.thread) : '';
+  /* 내역의 어느 대화에 이어 붙일지 (없으면 새 대화 — 번호를 미리 정해 질문 기록에도 같이 적는다) */
+  const threadId = /^[0-9a-f]{8,32}$/.test(String((body && body.thread) || '')) ? String(body.thread) : newThreadId();
 
   const { readable, writable } = new TransformStream();
   const out = sse(writable.getWriter());
@@ -369,6 +386,38 @@ async function answer(request, env, ctx, origin) {
   const started = Date.now();
   const toolsUsed = [];
   let finalText = '', inTok = 0, outTok = 0, model = s.model;
+  let logged = false;
+
+  /* 질문 기록 한 줄 (114·127 sql 의 ai_logs) — 남긴 줄 번호를 돌려준다. 표가 없거나 실패하면 null.
+   * 최고관리자는 홈페이지를 유지·보수하는 운영자 계정이라 그 활동은 기록하지 않는다 (117 sql, 감사 기록과 같은 규칙). */
+  async function logRow(extra) {
+    if (logged || me.role === 'superadmin') return null;
+    logged = true;
+    const row = Object.assign({ user_id: me.id, user_name: me.name, role: me.role, question: question.slice(0, 1500),
+      answer_chars: finalText.length, model: model, input_tokens: inTok, output_tokens: outTok, tools: toolsUsed,
+      ms: Date.now() - started, thread: threadId }, extra || {});
+    const post = function (r) {
+      return fetch(env.SUPABASE_URL + '/rest/v1/ai_logs?select=id', {
+        method: 'POST',
+        headers: { Authorization: me.auth, apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(r)
+      });
+    };
+    try {
+      let r = await post(row);
+      if (!r.ok && r.status === 400) {
+        /* 127 sql 을 아직 실행하지 않아 새 칸이 없으면 옛 칸만으로 남긴다 (평가 단추는 나오지 않는다) */
+        const old = {};
+        ['user_id', 'user_name', 'role', 'question', 'answer_chars', 'model', 'input_tokens', 'output_tokens', 'tools', 'ms']
+          .forEach(function (k) { old[k] = row[k]; });
+        r = await post(old);
+        return null;
+      }
+      if (!r.ok) return null;
+      const j = await r.json().catch(function () { return []; });
+      return (j && j[0] && j[0].id) || null;
+    } catch (e) { return null; }
+  }
 
   ctx.waitUntil((async function () {
     try {
@@ -426,10 +475,20 @@ async function answer(request, env, ctx, origin) {
       finalText.replace(/\[(R\d+)\]\{\{([^{}]{2,160})\}\}/g, function (m, r, q) { (quotes[r] = quotes[r] || []).push(q.trim()); return m; });
       const srcList = cites.list.map(function (c) { return Object.assign({ cited: !!cited[c.ref], quotes: quotes[c.ref] || [] }, c); });
       await out.send('sources', { list: srcList });
+      /* 질문·답·근거를 남기고 그 번호를 화면에 준다 (화면은 이 번호로 평가 단추를 단다) */
+      const logId = await logRow({
+        answer: finalText.slice(0, 20000),
+        sources: srcList.slice(0, 30).map(function (c) {
+          return { ref: c.ref, title: c.title, url: c.url, kind: c.kind, cited: c.cited, quotes: c.quotes.slice(0, 4),
+                   snippet: c.cited ? String(c.snippet || '').slice(0, 600) : undefined };
+        }),
+        no_answer: isNoAnswer(finalText, Object.keys(cited).length)
+      });
+      if (logId) await out.send('logged', { id: logId });
       if (finalText && finalText !== '(거절)') {
         try {
           const t = await histSave(env, me.id, threadId, {
-            q: question, a: finalText.slice(0, 20000), at: new Date().toISOString(),
+            q: question, a: finalText.slice(0, 20000), at: new Date().toISOString(), log: logId || undefined,
             sources: srcList.slice(0, 24).map(function (c) { return Object.assign({}, c, { snippet: String(c.snippet || '').slice(0, c.cited ? 800 : 300) }); })
           });
           await out.send('saved', { thread: t.id, title: t.title, n: t.turns.length, updated: t.updated, preview: histPreview(finalText) });
@@ -443,14 +502,8 @@ async function answer(request, env, ctx, origin) {
       await out.close();
       try {
         await bump(env, me.id);
-        /* 질문 기록 (114 sql 의 ai_logs — 없으면 조용히 넘어간다).
-         * 최고관리자는 홈페이지를 유지·보수하는 운영자 계정이라 그 활동은 기록하지 않는다 (감사 기록과 같은 규칙). */
-        if (me.role !== 'superadmin') await fetch(env.SUPABASE_URL + '/rest/v1/ai_logs', {
-          method: 'POST',
-          headers: { Authorization: me.auth, apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ user_id: me.id, user_name: me.name, role: me.role, question: question.slice(0, 1500), answer_chars: finalText.length,
-            model: model, input_tokens: inTok, output_tokens: outTok, tools: toolsUsed, ms: Date.now() - started })
-        }).catch(function () {});
+        /* 오류로 끝나 아직 남기지 못했으면 여기서 남긴다 */
+        await logRow({ answer: finalText ? finalText.slice(0, 20000) : null, no_answer: true });
       } catch (e) {}
     }
   })());
@@ -459,6 +512,44 @@ async function answer(request, env, ctx, origin) {
     status: 200,
     headers: Object.assign({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' }, cors(origin))
   });
+}
+
+/* ---------- 답 평가 (127 sql 의 ai_feedback) ----------
+ * 질문한 분의 증표로 쓰므로 본인 질문의 답에만, 본인 이름으로만 들어간다 (서버 RLS).
+ * 다시 누르면 평가가 바뀐다. 내 질문 내역(KV)의 그 문답에도 표시해 둔다. */
+async function feedback(request, env, origin) {
+  const me = await whoIs(request, env);
+  if (!me) return reply({ error: '로그인이 확인되지 않았습니다. 다시 로그인해 주세요.' }, 401, origin);
+  const body = await request.json().catch(function () { return null; });
+  const id = body ? Number(body.id) : NaN;
+  if (!Number.isInteger(id) || id <= 0) return reply({ error: '평가할 답을 찾지 못했습니다.' }, 400, origin);
+  if (typeof body.helpful !== 'boolean') return reply({ error: '평가를 골라 주세요.' }, 400, origin);
+  const reason = body.helpful ? null : (String(body.reason || '').replace(/\s+/g, ' ').trim().slice(0, 300) || null);
+  const r = await fetch(env.SUPABASE_URL + '/rest/v1/ai_feedback?on_conflict=log_id', {
+    method: 'POST',
+    headers: { Authorization: me.auth, apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json',
+               Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ log_id: id, user_id: me.id, helpful: body.helpful, reason: reason })
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(function () { return ''; });
+    if (r.status === 404 || /42P01|PGRST205|does not exist|schema cache/.test(t)) {
+      return reply({ error: '평가 기능이 아직 준비되지 않았습니다. (관리자가 supabase/127_ai_learning.sql 을 실행해야 합니다)' }, 503, origin);
+    }
+    if (r.status === 401 || r.status === 403 || /42501|row-level security/.test(t)) {
+      return reply({ error: '본인 질문의 답에만 평가할 수 있습니다.' }, 403, origin);
+    }
+    return reply({ error: '평가를 저장하지 못했습니다 (HTTP ' + r.status + ').' }, 502, origin);
+  }
+  try {
+    const h = await histGet(env, me.id);
+    let hit = false;
+    h.threads.forEach(function (t) {
+      t.turns.forEach(function (u) { if (u.log === id) { u.fb = body.helpful ? 'up' : 'down'; hit = true; } });
+    });
+    if (hit) await env.AI_KV.put(histKey(me.id), JSON.stringify(h));
+  } catch (e) { /* 내역 표시는 못 해도 평가는 저장됐다 */ }
+  return reply({ ok: true, id: id, helpful: body.helpful, reason: reason }, 200, origin);
 }
 
 /* ---------- 관리자 설정 ---------- */
@@ -528,6 +619,7 @@ export default {
                        index: idx ? { chunks: idx.N, built: INDEX_BUILT } : null, colo: (request.cf && request.cf.colo) || null }, 200, origin);
       }
       if (path === '/ask' && request.method === 'POST') return await answer(request, env, ctx, origin);
+      if (path === '/feedback' && request.method === 'POST') return await feedback(request, env, origin);
       if (path === '/history' || path.indexOf('/history/') === 0) return await historyApi(request, env, origin, path);
       if (path === '/settings' && (request.method === 'GET' || request.method === 'POST')) return await settings(request, env, origin, false);
       if (path === '/settings/test' && request.method === 'POST') return await settings(request, env, origin, true);

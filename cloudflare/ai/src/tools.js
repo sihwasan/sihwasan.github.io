@@ -8,8 +8,12 @@
  *
  * 도구가 돌려주는 자료마다 근거 번호(R1, R2 …)와 홈페이지 주소를 붙인다.
  * Claude 는 답에서 [R3] 처럼 적고, 홈페이지는 그것을 눌러 볼 수 있는 링크로 바꾼다.
+ *
+ * 「확인된 답」(127 sql 의 ai_verified) — 관리자가 확인해 승인한 답. 질문한 분의 증표로 읽으므로
+ * 그분 등급에 맞는 것만 읽힌다. search_verified_answers 로 찾고, search_assembly 결과 맨 앞에도
+ * 맞는 것이 있으면 verified 로 먼저 붙인다. Claude 는 이것을 우선 쓰되 원문 조문으로 다시 확인한다.
  */
-import { snippets, stripHtml } from './search.js';
+import { snippets, stripHtml, terms } from './search.js';
 
 /* ---------- Supabase 읽기 (질문한 분의 증표 그대로) ---------- */
 async function sbGet(env, auth, path) {
@@ -85,6 +89,12 @@ export class Cites {
 const S = function (props, required) { return { type: 'object', properties: props, required: required || [], additionalProperties: false }; };
 
 export const TOOL_DEFS = {
+  search_verified_answers: {
+    description: '관리자가 원문을 확인해 승인한 「확인된 답」에서 질문과 맞는 것을 찾는다. 예전에 잘못 답했거나 답하지 못한 질문을 관리자가 바로잡아 둔 것이다. 처음 자료를 찾을 때 다른 검색과 함께 부른다. 찾은 답은 우선 근거로 쓰되, 그 답이 기대는 원문(조문·결의·규칙)을 다른 도구로 다시 찾아 확인한다.',
+    input_schema: S({
+      query: { type: 'string', description: '질문 또는 핵심 낱말 (예: "해벌 절차")' }
+    }, ['query'])
+  },
   search_assembly: {
     description: '총회(대한예수교장로회 합동) 자료를 낱말로 찾는다: 헌법(정치·권징조례·예배모범·신조·요리문답 등), 총회 규정, 역대 총회 회의결의(제1~110회), 총회 보고서 본문(제104~111회 — 총회임원회·상비부·위원회·기관·노회 상황 보고 등). 질문의 핵심 낱말 2~4개로 묻는다. 결과가 엉뚱하면 scope 를 좁히거나 다른 낱말로 다시 찾는다.',
     input_schema: S({
@@ -190,7 +200,7 @@ export const TOOL_DEFS = {
 /* 등급별로 보여 줄 도구 */
 export function toolsFor(role) {
   const officer = ['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(role) !== -1;
-  const names = ['search_assembly', 'get_assembly_article', 'search_presbytery_rules', 'get_organization',
+  const names = ['search_verified_answers', 'search_assembly', 'get_assembly_article', 'search_presbytery_rules', 'get_organization',
     'search_members', 'search_churches', 'search_schedule', 'search_notices', 'search_presbytery_resolutions',
     'search_sichal', 'search_committee'];
   if (officer) names.push('search_minutes', 'search_officer_docs', 'search_dues');
@@ -201,6 +211,7 @@ export function toolsFor(role) {
 
 /* 화면에 보여 줄 "찾는 중…" 글 */
 export const TOOL_STATUS = {
+  search_verified_answers: '확인된 답을 찾는 중',
   search_assembly: '총회 자료를 찾는 중',
   get_assembly_article: '헌법 조문을 가져오는 중',
   search_presbytery_rules: '노회규칙을 찾는 중',
@@ -231,14 +242,82 @@ export async function runTool(name, input, ctx) {
   }
 }
 
+/* ---------- 확인된 답 (관리자 승인) ---------- */
+export const VERIFIED_KIND = '확인된 답(관리자 승인)';
+const LEVEL_NAME = { member: '정회원 이상', officer: '임원 이상', admin: '관리자만' };
+
+/* 질문한 분이 읽을 수 있는 확인된 답 전부 (한 질문에 한 번만 받는다). 표가 아직 없으면 빈 목록. */
+export function loadVerified(ctx) {
+  if (!ctx.verifiedP) {
+    ctx.verifiedP = sbGet(ctx.env, ctx.auth,
+      'ai_verified?select=id,question,keywords,answer,sources,level,updated_at&active=eq.true&order=updated_at.desc&limit=500')
+      .then(function (r) { return Array.isArray(r) ? r : []; }, function () { return []; });
+  }
+  return ctx.verifiedP;
+}
+
+/* 질문 낱말이 확인된 답의 질문·찾는 말에 얼마나 들어 있는가로 고른다 (띄어쓰기는 무시).
+ * 답 본문에만 있는 낱말은 조금만 친다. 질문 쪽에 절반 이상 들어 있어야 맞는 것으로 본다. */
+export function matchVerified(list, query, k) {
+  const qt = terms(query);
+  if (!qt.length) return [];
+  const squash = function (s) { return String(s || '').toLowerCase().replace(/\s+/g, ''); };
+  const out = [];
+  (list || []).forEach(function (v) {
+    const head = squash(v.question + ' ' + (v.keywords || ''));
+    const body = squash(v.answer);
+    let inHead = 0, inBody = 0;
+    qt.forEach(function (t) {
+      if (head.indexOf(t) !== -1) inHead++;
+      else if (body.indexOf(t) !== -1) inBody++;
+    });
+    const headCover = inHead / qt.length;
+    const cover = (inHead + inBody) / qt.length;
+    if (headCover < 0.5 && !(inHead >= 1 && cover >= 0.75)) return;
+    out.push({ v: v, score: Math.round((headCover + 0.3 * (cover - headCover)) * 100) / 100 });
+  });
+  out.sort(function (a, b) { return b.score - a.score || String(b.v.updated_at).localeCompare(String(a.v.updated_at)); });
+  return out.slice(0, k || 3);
+}
+
+function verifiedItems(ctx, hits) {
+  return hits.map(function (h) {
+    const v = h.v;
+    const srcs = (Array.isArray(v.sources) ? v.sources : []).map(function (s) { return s && s.title; }).filter(Boolean).slice(0, 12);
+    const ref = ctx.cites.add({ title: '확인된 답: ' + v.question, url: '', kind: VERIFIED_KIND,
+      snippet: 'Q. ' + v.question + '\n' + v.answer + (srcs.length ? '\n\n원문 근거: ' + srcs.join(', ') : '') });
+    ctx.verifiedShown = ctx.verifiedShown || {};
+    ctx.verifiedShown[v.id] = true;
+    return { ref: ref, kind: VERIFIED_KIND, question: v.question, answer: v.answer, original_sources: srcs,
+      level: LEVEL_NAME[v.level] || v.level, approved: String(v.updated_at || '').slice(0, 10), match: h.score };
+  });
+}
+
 const RUN = {
+  async search_verified_answers(input, ctx) {
+    const list = await loadVerified(ctx);
+    if (!list.length) return { items: [], note: '확인된 답이 아직 없습니다. 다른 도구로 찾으십시오.' };
+    const hits = matchVerified(list, input.query || '', 3);
+    if (!hits.length) return { items: [], note: '이 질문과 맞는 확인된 답이 없습니다. 다른 도구로 찾으십시오.' };
+    return { items: verifiedItems(ctx, hits),
+      note: '관리자가 확인한 답입니다. 질문과 맞으면 우선 근거로 쓰되, original_sources 의 원문을 해당 도구로 다시 찾아 확인하고 원문 근거 번호도 함께 다십시오. 원문과 다르면 원문을 따르십시오.' };
+  },
   async search_assembly(input, ctx) {
     const rows = ctx.index.search(input.query, { scope: input.scope || 'all', session: input.session, k: Math.min(15, input.k || 8) });
-    if (!rows.length) return { items: [], note: '찾은 자료가 없습니다. 다른 낱말이나 범위로 다시 찾아 보십시오.' };
-    return { items: rows.map(function (c) {
+    /* 맞는 확인된 답이 있으면(이번 질문에서 아직 보여 주지 않은 것) 결과 맨 앞에 먼저 붙인다 */
+    const out = {};
+    const vlist = await loadVerified(ctx);
+    const vhits = matchVerified(vlist, input.query || '', 2).filter(function (h) { return !(ctx.verifiedShown && ctx.verifiedShown[h.v.id]); });
+    if (vhits.length) {
+      out.verified = verifiedItems(ctx, vhits);
+      out.verified_note = '확인된 답(관리자 승인)이 먼저입니다. 질문과 맞으면 우선 쓰되 아래 items 의 원문으로 다시 확인하십시오.';
+    }
+    if (!rows.length) return Object.assign(out, { items: [], note: '찾은 자료가 없습니다. 다른 낱말이나 범위로 다시 찾아 보십시오.' });
+    out.items = rows.map(function (c) {
       const ref = ctx.cites.add({ title: c.label, url: c.url, kind: c.src, snippet: c.text });
       return { ref: ref, source: c.src, title: c.label, text: c.text };
-    }) };
+    });
+    return out;
   },
   async get_assembly_article(input, ctx) {
     const rows = ctx.index.article(input.book, input.article, input.chapter);

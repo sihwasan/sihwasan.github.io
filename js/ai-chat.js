@@ -7,7 +7,9 @@
  * 서랍은 답을 가리지 않는다 — 답은 그대로 보이고 서랍만 옆에 선다.
  * 왼쪽에는 「내 질문 내역」(대화별 요약)이 서고(휴대전화는 위쪽에 접는 목록), 누르면 그 대화를
  * 다시 보고 이어 물을 수 있으며 하나씩·모두 지울 수 있다. 내역은 창구 KV 에 본인 것만 저장된다.
- * 답마다 「복사」「공유」 단추가 있다.
+ * 답마다 「복사」「공유」 단추와 「도움이 됐어요 / 아니에요」 평가가 있다. 평가는 창구 /feedback 으로
+ * 질문 기록(ai_logs, 창구가 'logged' 로 준 번호)에 붙고, 관리자가 「못 찾은 질문」에서 보고 확인된 답을 승인한다.
+ * (최고관리자의 질문은 기록하지 않으므로 평가 단추도 없다)
  *
  * 화면:  index.html 의 <div id="ai-hero">  (SHSAI.mount)
  * 창구:  SHS_AI_URL (아래 기본값) — /ask
@@ -145,6 +147,8 @@ var SHSAI = (function () {
       if (r) { ev.preventDefault(); openSource(r.dataset.ref); return; }
       var act = ev.target.closest('.aih-act');
       if (act) { ev.preventDefault(); doAct(act); return; }
+      var fb = ev.target.closest('.aih-fb-btn, .aih-fb-cancel');
+      if (fb) { ev.preventDefault(); onFeedback(fb); return; }
       if (ev.target.closest('#aih-new, #aih-side-new')) { ev.preventDefault(); if (!busy) { reset(); foldSide(); } return; }
       /* 내 질문 내역 */
       var b = ev.target.closest('button');
@@ -162,6 +166,13 @@ var SHSAI = (function () {
       else if (b.classList.contains('aih-h-no')) drawHist();
       else if (b.id === 'aih-h-clear') askClear();
       else if (b.classList.contains('aih-h-clear-yes')) clearHist(b);
+    });
+    /* 「아니에요」 이유 칸 — Enter 로 보낸다 */
+    box.addEventListener('submit', function (ev) {
+      var f = ev.target;
+      if (!f.classList || !f.classList.contains('aih-fb-form')) return;
+      ev.preventDefault();
+      sendFeedback(parseInt(f.dataset.i, 10), false, (f.querySelector('input') || {}).value || '');
     });
     loadHist();
   }
@@ -234,6 +245,8 @@ var SHSAI = (function () {
         var it = newItem(u.q);
         it.turns = { 0: u.a || '' };
         it.sources = u.sources || [];
+        it.log = u.log || null;
+        it.fb = u.fb || null;
         it.done = true;
         return it;
       });
@@ -382,7 +395,9 @@ var SHSAI = (function () {
     var cited = c.sources.filter(function (s) { return s.cited; });
     var rest = c.sources.filter(function (s) { return !s.cited; });
     function one(s) {
-      return '<button type="button" class="aih-src" data-ref="' + s.ref + '"><span class="aih-src-n">' + s.ref.slice(1) + '</span>' +
+      /* 관리자가 승인한 「확인된 답」은 초록 번호로 구분한다 */
+      var v = /^확인된 답/.test(s.kind || '');
+      return '<button type="button" class="aih-src' + (v ? ' aih-src-v' : '') + '" data-ref="' + s.ref + '"><span class="aih-src-n">' + s.ref.slice(1) + '</span>' +
         '<span class="aih-src-t">' + esc(s.title) + '</span><span class="aih-src-k">' + esc(s.kind) + '</span></button>';
     }
     var h = '';
@@ -397,7 +412,70 @@ var SHSAI = (function () {
     if (!c.done || !c.text().trim()) return '';
     return '<button type="button" class="aih-act" data-act="copy" data-i="' + i + '">' + COPY_SVG + '복사</button>' +
       (navigator.share ? '<button type="button" class="aih-act" data-act="share" data-i="' + i + '">' + SHARE_SVG + '공유</button>' : '') +
-      '<span class="aih-act-msg" role="status" aria-live="polite"></span>';
+      '<span class="aih-act-msg" role="status" aria-live="polite"></span>' +
+      fbHtml(c, i);
+  }
+
+  /* ---------- 답 평가 (도움이 됐어요 / 아니에요) ---------- */
+  /* 창구가 질문 기록 번호(c.log)를 준 답에만 단다. 다시 누르면 평가가 바뀐다. */
+  function fbHtml(c, i) {
+    if (!c.log) return '';
+    var dis = c.fbBusy ? ' disabled' : '';
+    return '<span class="aih-fb" role="group" aria-label="이 답의 평가">' +
+      '<span class="aih-fb-q">' + (c.fb ? '평가해 주셔서 고맙습니다' : '이 답이 도움이 되었나요?') + '</span>' +
+      '<button type="button" class="aih-fb-btn' + (c.fb === 'up' ? ' on' : '') + '" data-fb="up" data-i="' + i + '" aria-pressed="' + (c.fb === 'up') + '"' + dis + '>도움이 됐어요</button>' +
+      '<button type="button" class="aih-fb-btn' + (c.fb === 'down' ? ' on' : '') + '" data-fb="down" data-i="' + i + '" aria-pressed="' + (c.fb === 'down') + '"' + dis + '>아니에요</button>' +
+      '</span>' +
+      (c.fbOpen ? '<form class="aih-fb-form" data-i="' + i + '" autocomplete="off">' +
+        '<label class="aih-fb-l" for="aih-fbr-' + i + '">무엇이 부족했나요? <small>(선택 · 관리자가 보고 답을 보완합니다)</small></label>' +
+        '<input type="text" id="aih-fbr-' + i + '" maxlength="300" placeholder="예: 조문 번호가 틀림, 자료가 빠짐" value="' + esc(c.fbReason || '') + '"' + dis + '>' +
+        '<button type="submit" class="aih-fb-send"' + dis + '>' + (c.fbBusy ? '보내는 중' : '보내기') + '</button>' +
+        '<button type="button" class="aih-fb-cancel" data-i="' + i + '"' + dis + '>취소</button></form>' : '');
+  }
+  function paintActs(i, focusSel) {
+    var acts = document.getElementById('aih-act-' + i);
+    if (!acts) return;
+    acts.innerHTML = actsHtml(convo[i], i);
+    if (focusSel) { var f = acts.querySelector(focusSel); if (f) try { f.focus(); } catch (e) {} }
+  }
+  function onFeedback(btn) {
+    var i = parseInt(btn.dataset.i, 10), c = convo[i];
+    if (!c || !c.log || c.fbBusy) return;
+    if (btn.classList.contains('aih-fb-cancel')) { c.fbOpen = false; c.fbReason = ''; paintActs(i, '.aih-fb-btn[data-fb="down"]'); return; }
+    if (btn.dataset.fb === 'up') { c.fbOpen = false; sendFeedback(i, true, ''); return; }
+    /* 「아니에요」 — 이유 칸을 열고 바로 쓸 수 있게 한다 (이유 없이 보내도 된다) */
+    c.fbOpen = true;
+    paintActs(i, '#aih-fbr-' + i);
+  }
+  function sendFeedback(i, helpful, reason) {
+    var c = convo[i];
+    if (!c || !c.log || c.fbBusy) return;   /* 연타·Enter 거듭 눌러도 한 번만 */
+    c.fbBusy = true;
+    c.fbReason = helpful ? '' : String(reason || '');
+    paintActs(i);
+    token().then(function (tk) {
+      if (!tk) throw new Error('로그인이 확인되지 않습니다. 다시 로그인해 주세요.');
+      return fetch(WORKER + '/feedback', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.log, helpful: helpful, reason: helpful ? '' : String(reason || '').slice(0, 300) })
+      });
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) throw new Error(j.error || ('창구 오류 (HTTP ' + r.status + ')'));
+        return j;
+      });
+    }).then(function () {
+      c.fbBusy = false; c.fbOpen = false; c.fbReason = ''; c.fb = helpful ? 'up' : 'down';
+      paintActs(i, '.aih-fb-btn[data-fb="' + c.fb + '"]');
+      var b = document.querySelector('#aih-act-' + i + ' .aih-act');
+      if (b) actMsg(b, helpful ? '고맙습니다.' : '알려 주셔서 고맙습니다. 관리자가 살펴보고 답을 보완하겠습니다.');
+    }, function (e) {
+      c.fbBusy = false;
+      paintActs(i);
+      var b = document.querySelector('#aih-act-' + i + ' .aih-act');
+      if (b) actMsg(b, '평가를 보내지 못했습니다: ' + ((e && e.message) || e), true);
+    });
   }
   /* 화면 글 → 메신저에 붙여도 읽기 좋은 맨글: 근거 꼬리표는 [3] 으로, 굵게·제목 표시는 뗀다 */
   function plainAnswer(t) {
@@ -479,6 +557,7 @@ var SHSAI = (function () {
 
   function newItem(q) {
     return { q: q, turns: {}, sources: null, status: '', error: '', done: false,
+      log: null, fb: null, fbOpen: false, fbBusy: false, fbReason: '',   /* 질문 기록 번호·평가(up/down) */
       text: function () { var ks = Object.keys(this.turns).map(Number).sort(function (a, b) { return a - b; }); var self = this; return ks.map(function (k) { return self.turns[k]; }).join(''); } };
   }
   function setBusy(on) {
@@ -529,6 +608,7 @@ var SHSAI = (function () {
         else if (ev === 'retract') { delete item.turns[data.n]; paint(); }
         else if (ev === 'sources') { item.sources = data.list || []; var s = document.getElementById('aih-src-' + i); if (s) s.innerHTML = sourcesHtml(item); }
         else if (ev === 'saved') { thread = data.thread; upsertHist(data); }
+        else if (ev === 'logged') { item.log = data.id || null; }
         else if (ev === 'error') { item.error = data.message || '오류'; status(''); paint(); }
         else if (ev === 'done') { status(''); }
       }

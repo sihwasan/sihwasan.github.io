@@ -2481,7 +2481,7 @@ td[data-duch]:hover { background: #eef2f8; }
 .aih-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
 .aih-acts:empty { display: none; }
 .aih-act {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; user-select: none;
   border: 1px solid var(--gray-2); background: #fff; color: var(--navy); border-radius: 8px;
   padding: 6px 14px; font-size: 0.86rem; font-weight: 600; cursor: pointer;
 }
@@ -2489,6 +2489,33 @@ td[data-duch]:hover { background: #eef2f8; }
 .aih-act svg { width: 15px; height: 15px; flex: 0 0 auto; }
 .aih-act-msg { font-size: 0.82rem; color: #1a6d3a; }
 .aih-act-msg.err { color: var(--red); }
+/* 답 평가 — 도움이 됐어요 / 아니에요 (아니에요는 이유 칸이 열린다) */
+.aih-fb { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; }
+.aih-fb-q { font-size: 0.82rem; color: var(--gray-5); margin-right: 2px; }
+.aih-fb-btn {
+  min-height: 40px; border: 1px solid var(--gray-2); background: #fff; color: var(--gray-7);
+  border-radius: 999px; padding: 6px 14px; font-size: 0.84rem; cursor: pointer; user-select: none; white-space: nowrap;
+}
+.aih-fb-btn:hover, .aih-fb-btn:focus-visible { border-color: var(--navy); color: var(--navy); }
+.aih-fb-btn.on { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 700; }
+.aih-fb-btn[data-fb="down"].on { background: #8a5a2b; border-color: #8a5a2b; }
+.aih-fb-btn:disabled, .aih-fb-form button:disabled { opacity: 0.6; cursor: default; }
+.aih-fb-form {
+  flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 10px 12px; background: var(--gray-1); border: 1px solid var(--gray-2); border-radius: 10px;
+}
+.aih-fb-l { flex-basis: 100%; font-size: 0.84rem; font-weight: 600; color: var(--ink); }
+.aih-fb-l small { font-weight: 400; color: var(--gray-5); }
+.aih-fb-form input { flex: 1 1 220px; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--gray-2); border-radius: 8px; font-size: 0.9rem; }
+.aih-fb-send, .aih-fb-cancel {
+  min-height: 40px; padding: 6px 16px; border-radius: 8px; font-size: 0.86rem; cursor: pointer; user-select: none;
+  border: 1px solid var(--navy); background: var(--navy); color: #fff; font-weight: 600;
+}
+.aih-fb-cancel { background: #fff; color: var(--gray-7); border-color: var(--gray-2); font-weight: 400; }
+@media (max-width: 600px) { .aih-fb { margin-left: 0; flex-basis: 100%; } .aih-fb-q { flex-basis: 100%; } }
+/* 근거 가운데 관리자가 승인한 「확인된 답」은 초록 번호 */
+.aih-src-v .aih-src-n { background: #1a6d3a; }
+.aih-src-v .aih-src-k { color: #1a6d3a; font-weight: 600; }
 .aih-foot {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
   margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--gray-2);
@@ -2681,6 +2708,44 @@ body.adm-mode .adm-wrap { display: grid; grid-template-columns: 236px minmax(0, 
 .ai-model-d { font-size: 0.82rem; color: var(--gray-7); }
 .ai-model-p { font-size: 0.82rem; color: var(--gray-5); }
 .ai-model-p small { display: block; font-size: 0.72rem; }
+
+/* 관리자 AI 검색 — 못 찾은 질문·확인된 답 */
+.ai-tab-n { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: #b03a3a; color: #fff; font-size: 0.72rem; font-weight: 700; line-height: 20px; text-align: center; }
+.ai-tab-n:empty { display: none; }
+.aiv-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.aiv-bar .tabs.sub-tabs { margin-bottom: 0; }
+.aiv-bar input[type="search"] { flex: 1 1 220px; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--gray-2); border-radius: 8px; }
+.aiv-note { font-size: 0.84rem; color: var(--gray-5); margin: 0 0 12px; line-height: 1.7; }
+.aiv-item { border: 1px solid var(--gray-2); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; background: #fff; }
+.aiv-item.off { background: var(--gray-1); }
+.aiv-meta { font-size: 0.8rem; color: var(--gray-5); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.aiv-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.74rem; font-weight: 700; background: var(--gray-1); color: var(--gray-7); border: 1px solid var(--gray-2); }
+.aiv-badge.miss { background: #fdf3f3; color: #b03a3a; border-color: #e0a9a9; }
+.aiv-badge.down { background: #fbf3ea; color: #8a5a2b; border-color: #e3c9a8; }
+.aiv-badge.up { background: #f2faf5; color: #1a6d3a; border-color: #9fcdb0; }
+.aiv-badge.ok { background: #1a6d3a; color: #fff; border-color: #1a6d3a; }
+.aiv-badge.lv { background: #f5f7fb; color: var(--navy); border-color: #b9c3d6; }
+.aiv-q { font-weight: 700; color: var(--ink); margin: 8px 0 4px; line-height: 1.6; word-break: break-word; }
+.aiv-reason { font-size: 0.88rem; color: #8a5a2b; margin: 2px 0 6px; word-break: break-word; }
+.aiv-item details { margin: 6px 0; }
+.aiv-item summary { cursor: pointer; font-size: 0.84rem; color: var(--navy); min-height: 32px; display: flex; align-items: center; user-select: none; }
+.aiv-ans { font-size: 0.88rem; line-height: 1.75; color: var(--gray-7); background: var(--gray-1); border-radius: 8px; padding: 10px 12px; margin: 6px 0; white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; overscroll-behavior: contain; }
+.aiv-srcs { font-size: 0.8rem; color: var(--gray-5); margin: 4px 0 6px; line-height: 1.7; word-break: break-word; }
+.aiv-srcs a { color: var(--navy); }
+.aiv-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.aiv-acts .btn { min-height: 40px; user-select: none; }
+.aiv-ed { margin-top: 12px; padding: 14px 16px; border: 1px solid #9fcdb0; background: #f7fbf8; border-radius: 10px; }
+.aiv-ed .field { margin-bottom: 12px; }
+.aiv-ed input[type="text"], .aiv-ed textarea, .aiv-ed select { width: 100%; }
+.aiv-ed textarea { min-height: 220px; line-height: 1.7; }
+.aiv-ed small { color: var(--gray-5); font-weight: 400; }
+.aiv-ed-src { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow: auto; overscroll-behavior: contain; padding: 6px 8px; background: #fff; border: 1px solid var(--gray-2); border-radius: 8px; }
+.aiv-ed-src label { display: flex; gap: 8px; align-items: flex-start; font-size: 0.84rem; font-weight: 400; margin: 2px 0; cursor: pointer; }
+.aiv-ed-src label input[type="checkbox"] { width: auto; min-width: 0; height: auto; margin: 4px 0 0; padding: 0; flex: 0 0 auto; display: inline-block; }
+.aiv-ed-src label span { display: inline; flex: 1 1 auto; min-width: 0; }
+.aiv-hint { font-size: 0.82rem; color: #8a5a2b; background: #fbf3ea; border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; line-height: 1.7; }
+.aiv-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 0.86rem; color: #b03a3a; }
+.aiv-empty { color: var(--gray-5); padding: 18px 4px; }
 
 /* AI 검색 근거: 답의 핵심 구절은 원문에서 밑줄·형광, 구절을 못 찾으면 문단에 띠 */
 mark.aih-key {
