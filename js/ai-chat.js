@@ -5,6 +5,9 @@
  * 답 속의 [R3] 같은 근거 번호는 누를 수 있는 꼬리표가 되고, 누르면 오른쪽
  * 서랍(휴대전화는 아래 서랍)에 그 자료 원문과 홈페이지 화면이 열린다.
  * 서랍은 답을 가리지 않는다 — 답은 그대로 보이고 서랍만 옆에 선다.
+ * 왼쪽에는 「내 질문 내역」(대화별 요약)이 서고(휴대전화는 위쪽에 접는 목록), 누르면 그 대화를
+ * 다시 보고 이어 물을 수 있으며 하나씩·모두 지울 수 있다. 내역은 창구 KV 에 본인 것만 저장된다.
+ * 답마다 「복사」「공유」 단추가 있다.
  *
  * 화면:  index.html 의 <div id="ai-hero">  (SHSAI.mount)
  * 창구:  SHS_AI_URL (아래 기본값) — /ask
@@ -21,6 +24,9 @@ var SHSAI = (function () {
   ];
 
   var box = null, user = null, convo = [], busy = false, drawer = null;
+  /* 내 질문 내역 — 창구 KV 에 대화별로 저장된다 (본인만 보고 지운다).
+   * hist = [{ id, title, n, updated, preview }] (최근 것이 앞), thread = 지금 화면의 대화 번호 */
+  var hist = null, thread = null;
   /* 음성으로 묻기 — 브라우저 내장 음성 인식 (크롬·엣지·삼성 인터넷·사파리). 서버를 거치지 않는다. */
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
   var MIC_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -102,6 +108,17 @@ var SHSAI = (function () {
     if (!u || !u.cloud || ROLES.indexOf(u.role) === -1) { box.innerHTML = ''; box.classList.add('hidden'); return; }
     box.classList.remove('hidden');
     box.innerHTML =
+      '<div class="aih-wrap" id="aih-wrap">' +
+      '<aside class="aih-side hidden" id="aih-side" aria-label="내 질문 내역">' +
+      '<button type="button" class="aih-side-toggle" id="aih-side-toggle" aria-expanded="false" aria-controls="aih-side-body">' +
+      '<span>내 질문 내역</span><span class="aih-side-cnt" id="aih-side-cnt"></span><span class="aih-side-caret" aria-hidden="true"></span></button>' +
+      '<div class="aih-side-body" id="aih-side-body">' +
+      '<div class="aih-side-head"><strong>내 질문 내역</strong>' +
+      '<button type="button" class="aih-side-new" id="aih-side-new">새 질문</button></div>' +
+      '<div class="aih-hist" id="aih-hist"></div>' +
+      '<div class="aih-side-foot" id="aih-side-foot"></div>' +
+      '</div></aside>' +
+      '<div class="aih-main">' +
       '<form class="aih-form" id="aih-form" autocomplete="off">' +
       '<span class="aih-tag">AI 검색</span>' +
       '<input type="text" id="aih-q" maxlength="1500" placeholder="노회·총회 자료에 대해 물어보세요 (예: 권징조례에서 해벌 절차는?)">' +
@@ -111,7 +128,8 @@ var SHSAI = (function () {
       '<div class="aih-chips" id="aih-chips">' +
       EXAMPLES.map(function (q) { return '<button type="button" class="aih-chip" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') +
       '</div>' +
-      '<div class="aih-panel hidden" id="aih-panel"></div>';
+      '<div class="aih-panel hidden" id="aih-panel"></div>' +
+      '</div></div>';
     box.querySelector('#aih-form').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var q = box.querySelector('#aih-q').value.trim();
@@ -127,8 +145,152 @@ var SHSAI = (function () {
       if (r) { ev.preventDefault(); openSource(r.dataset.ref); return; }
       var act = ev.target.closest('.aih-act');
       if (act) { ev.preventDefault(); doAct(act); return; }
-      if (ev.target.closest('#aih-new')) { ev.preventDefault(); reset(); }
+      if (ev.target.closest('#aih-new, #aih-side-new')) { ev.preventDefault(); if (!busy) { reset(); foldSide(); } return; }
+      /* 내 질문 내역 */
+      var b = ev.target.closest('button');
+      if (!b || !b.closest('#aih-side')) return;
+      ev.preventDefault();
+      if (b.id === 'aih-side-toggle') {
+        var side = box.querySelector('#aih-side');
+        var open = !side.classList.contains('open');
+        side.classList.toggle('open', open);
+        b.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      else if (b.classList.contains('aih-h-open')) openThread(b.dataset.id);
+      else if (b.classList.contains('aih-h-del')) askDelete(b.dataset.id);
+      else if (b.classList.contains('aih-h-yes')) delThread(b.dataset.id, b);
+      else if (b.classList.contains('aih-h-no')) drawHist();
+      else if (b.id === 'aih-h-clear') askClear();
+      else if (b.classList.contains('aih-h-clear-yes')) clearHist(b);
     });
+    loadHist();
+  }
+
+  /* ---------- 내 질문 내역 ---------- */
+  function api(path, method) {
+    return token().then(function (tk) {
+      if (!tk) throw new Error('로그인이 확인되지 않습니다. 다시 로그인해 주세요.');
+      return fetch(WORKER + path, { method: method || 'GET', headers: { Authorization: 'Bearer ' + tk } });
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) { var e = new Error(j.error || ('창구 오류 (HTTP ' + r.status + ')')); e.status = r.status; throw e; }
+        return j;
+      });
+    });
+  }
+  function loadHist() {
+    api('/history').then(function (j) { hist = j.list || []; drawHist(); },
+      function () { /* 내역을 못 받아도 검색은 그대로 쓴다 */ });
+  }
+  function ymd(d) { return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function groupOf(iso) {
+    var d = new Date(iso), now = new Date();
+    if (isNaN(d)) return '이전';
+    if (ymd(d) === ymd(now)) return '오늘';
+    if (ymd(d) === ymd(new Date(now.getTime() - 864e5))) return '어제';
+    var days = (now - d) / 864e5;
+    return days < 7 ? '지난 7일' : days < 30 ? '지난 30일' : '이전';
+  }
+  function drawHist(msg) {
+    if (!box) return;
+    var side = box.querySelector('#aih-side');
+    if (!side) return;
+    var has = !!(hist && hist.length);
+    side.classList.toggle('hidden', !has);
+    box.querySelector('#aih-wrap').classList.toggle('has-side', has);
+    box.querySelector('#aih-side-cnt').textContent = has ? hist.length + '건' : '';
+    if (!has) return;
+    var h = '', last = '';
+    hist.forEach(function (t) {
+      var g = groupOf(t.updated || t.at);
+      if (g !== last) { h += '<div class="aih-h-group">' + g + '</div>'; last = g; }
+      h += '<div class="aih-h-item' + (t.id === thread ? ' on' : '') + '" data-id="' + esc(t.id) + '">' +
+        '<button type="button" class="aih-h-open" data-id="' + esc(t.id) + '" title="' + esc(t.title) + '">' +
+        '<span class="aih-h-t">' + esc(t.title) + '</span>' +
+        (t.preview || t.n > 1 ? '<span class="aih-h-p">' + (t.n > 1 ? '<em>질문 ' + t.n + '개</em> ' : '') + esc(t.preview || '') + '</span>' : '') +
+        '</button>' +
+        '<button type="button" class="aih-h-del" data-id="' + esc(t.id) + '" aria-label="이 질문 내역 삭제" title="삭제">&times;</button></div>';
+    });
+    box.querySelector('#aih-hist').innerHTML = h;
+    box.querySelector('#aih-side-foot').innerHTML =
+      (msg ? '<p class="aih-h-msg">' + esc(msg) + '</p>' : '') +
+      '<button type="button" class="aih-h-clear" id="aih-h-clear">내역 모두 삭제</button>';
+  }
+  /* 휴대전화에서는 내역을 고르면 목록을 접어 답이 바로 보이게 한다 */
+  function foldSide() {
+    var side = box && box.querySelector('#aih-side');
+    if (!side || !side.classList.contains('open')) return;
+    side.classList.remove('open');
+    var t = box.querySelector('#aih-side-toggle'); if (t) t.setAttribute('aria-expanded', 'false');
+  }
+  function itemEl(id) { return box.querySelector('.aih-h-item[data-id="' + String(id).replace(/[^0-9a-f]/g, '') + '"]'); }
+  function openThread(id) {
+    if (busy || !id) return;
+    var el = itemEl(id);
+    if (el) el.classList.add('loading');
+    api('/history/' + encodeURIComponent(id)).then(function (j) {
+      var t = j.thread;
+      convo = (t.turns || []).map(function (u) {
+        var it = newItem(u.q);
+        it.turns = { 0: u.a || '' };
+        it.sources = u.sources || [];
+        it.done = true;
+        return it;
+      });
+      thread = t.id;
+      quotesOf = {};
+      closeDrawer();
+      var panel = box.querySelector('#aih-panel');
+      panel.classList.remove('hidden');
+      box.querySelector('#aih-chips').classList.add('hidden');
+      panel.innerHTML = panelHtml();
+      box.querySelector('#aih-q').placeholder = '이어서 물어보기';
+      drawHist();
+      foldSide();
+    }, function (e) {
+      if (e.status === 404) { hist = (hist || []).filter(function (x) { return x.id !== id; }); drawHist('이미 지워진 질문입니다.'); }
+      else drawHist('내역을 열지 못했습니다: ' + e.message);
+    });
+  }
+  function askDelete(id) {
+    var el = itemEl(id);
+    if (!el) return;
+    el.classList.add('confirm');
+    el.innerHTML = '<div class="aih-h-confirm"><span>이 질문 내역을 삭제할까요?</span>' +
+      '<button type="button" class="aih-h-yes" data-id="' + esc(id) + '">삭제</button>' +
+      '<button type="button" class="aih-h-no">취소</button></div>';
+    var y = el.querySelector('.aih-h-yes'); if (y) y.focus();
+  }
+  function delThread(id, btn) {
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = '삭제 중';
+    api('/history/' + encodeURIComponent(id), 'DELETE').then(function (j) {
+      hist = j.list || [];
+      if (thread === id && !busy) reset(); else drawHist();
+    }, function (e) { drawHist('삭제하지 못했습니다: ' + e.message); });
+  }
+  function askClear() {
+    var foot = box.querySelector('#aih-side-foot');
+    if (!foot || !hist || !hist.length) return;
+    foot.innerHTML = '<div class="aih-h-confirm"><span>내역 ' + hist.length + '건을 모두 삭제할까요? 되돌릴 수 없습니다.</span>' +
+      '<button type="button" class="aih-h-clear-yes">모두 삭제</button>' +
+      '<button type="button" class="aih-h-no">취소</button></div>';
+    var y = foot.querySelector('.aih-h-clear-yes'); if (y) y.focus();
+  }
+  function clearHist(btn) {
+    if (btn.disabled) return;
+    btn.disabled = true; btn.textContent = '삭제 중';
+    api('/history', 'DELETE').then(function () {
+      hist = [];
+      if (!busy) reset(); else drawHist();
+    }, function (e) { drawHist('삭제하지 못했습니다: ' + e.message); });
+  }
+  /* 답이 내역에 저장되면 목록 맨 위로 올린다 (다시 받아 오지 않고 바로 고친다) */
+  function upsertHist(d) {
+    if (!d || !d.thread) return;
+    hist = (hist || []).filter(function (t) { return t.id !== d.thread; });
+    hist.unshift({ id: d.thread, title: d.title, n: d.n, updated: d.updated, preview: d.preview });
+    drawHist();
   }
 
   function voiceMsg(t, isErr) {
@@ -187,12 +349,15 @@ var SHSAI = (function () {
 
   function reset() {
     convo = [];
+    thread = null;
+    quotesOf = {};
     var p = box.querySelector('#aih-panel');
     p.innerHTML = ''; p.classList.add('hidden');
     box.querySelector('#aih-chips').classList.remove('hidden');
     var inp = box.querySelector('#aih-q');
     inp.value = ''; inp.placeholder = '노회·총회 자료에 대해 물어보세요 (예: 권징조례에서 해벌 절차는?)';
     closeDrawer();
+    drawHist();
   }
 
   function panelHtml() {
@@ -312,11 +477,20 @@ var SHSAI = (function () {
     copied();
   }
 
+  function newItem(q) {
+    return { q: q, turns: {}, sources: null, status: '', error: '', done: false,
+      text: function () { var ks = Object.keys(this.turns).map(Number).sort(function (a, b) { return a - b; }); var self = this; return ks.map(function (k) { return self.turns[k]; }).join(''); } };
+  }
+  function setBusy(on) {
+    busy = on;
+    var go = box.querySelector('#aih-go'); if (go) go.disabled = on;
+    var side = box.querySelector('#aih-side'); if (side) side.classList.toggle('busy', on);
+  }
+
   function ask(q) {
     if (busy) return;
     var inp = box.querySelector('#aih-q');
-    var item = { q: q, turns: {}, sources: null, status: '', error: '',
-      text: function () { var ks = Object.keys(this.turns).map(Number).sort(function (a, b) { return a - b; }); var self = this; return ks.map(function (k) { return self.turns[k]; }).join(''); } };
+    var item = newItem(q);
     var history = [];
     convo.forEach(function (c) { if (c.done) { history.push({ role: 'user', content: c.q }); history.push({ role: 'assistant', content: c.text() }); } });
     convo.push(item);
@@ -327,8 +501,7 @@ var SHSAI = (function () {
     item.status = '질문을 보내는 중';
     panel.innerHTML = panelHtml();
     inp.value = ''; inp.placeholder = '이어서 물어보기';
-    busy = true;
-    box.querySelector('#aih-go').disabled = true;
+    setBusy(true);
 
     var aEl = function () { return document.getElementById('aih-a-' + i); };
     var stEl = function () { return document.getElementById('aih-st-' + i); };
@@ -340,7 +513,7 @@ var SHSAI = (function () {
       return fetch(WORKER + '/ask', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, history: history.slice(-6) })
+        body: JSON.stringify({ question: q, history: history.slice(-6), thread: thread || '' })
       });
     }).then(function (r) {
       if (!r.ok) {
@@ -355,6 +528,7 @@ var SHSAI = (function () {
         else if (ev === 'delta') { item.turns[data.n] = (item.turns[data.n] || '') + data.text; status(''); paint(); }
         else if (ev === 'retract') { delete item.turns[data.n]; paint(); }
         else if (ev === 'sources') { item.sources = data.list || []; var s = document.getElementById('aih-src-' + i); if (s) s.innerHTML = sourcesHtml(item); }
+        else if (ev === 'saved') { thread = data.thread; upsertHist(data); }
         else if (ev === 'error') { item.error = data.message || '오류'; status(''); paint(); }
         else if (ev === 'done') { status(''); }
       }
@@ -384,8 +558,7 @@ var SHSAI = (function () {
       item.done = true;
       if (!item.text() && !item.error) { item.error = '답을 받지 못했습니다. 다시 시도해 주세요.'; paint(); }
       var acts = document.getElementById('aih-act-' + i); if (acts) acts.innerHTML = actsHtml(item, i);
-      busy = false;
-      var go = box.querySelector('#aih-go'); if (go) go.disabled = false;
+      setBusy(false);
     });
   }
 

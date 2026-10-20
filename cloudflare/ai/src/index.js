@@ -10,10 +10,15 @@
  *   GET  /settings        (관리자) 모델·한도·허용 등급·열쇠 등록 여부·오늘 사용량
  *   POST /settings        (관리자) 설정 저장 — api_key 를 주면 열쇠를 바꾼다
  *   POST /settings/test   (관리자) 열쇠로 모델 목록을 받아 보고, 고른 모델로 아주 짧은 인사를 시켜 본다
+ *   GET  /history         내 질문 내역 (대화별 요약: 제목·질문 수·마지막 답 앞부분)
+ *   GET  /history/<id>    대화 하나 (문답 전부 — 다시 보기·이어 묻기)
+ *   DELETE /history/<id>  대화 하나 지우기,  DELETE /history  내 내역 모두 지우기
  *
  * 설정과 열쇠는 Cloudflare KV(AI_KV) 에 둔다. 관리자가 홈페이지 「AI 검색·API 설정」에서 넣는다.
  *   KV 'settings' = { api_key, model, effort, daily_user, daily_total, roles[], enabled, updated_at, updated_by }
  *   KV 'u:<날짜>:<회원id>' / 'u:<날짜>:all' = 오늘 질문 수
+ *   KV 'h:<회원id>' = 그분의 질문 내역 { threads: [{ id, title, at, updated, turns: [{ q, a, sources, at }] }] }
+ *     본인만 읽고 지운다. 관리자도 남의 내역은 볼 수 없다 (관리자가 보는 사용 기록은 Supabase ai_logs).
  *
  * 누가 쓸 수 있나
  *   로그인 증표(Bearer)를 Supabase 에 확인하고 profiles.role 이 허용 등급(기본: 정회원 이상)일 때만.
@@ -47,12 +52,14 @@ export const MODELS = [
 ];
 const MAX_TURNS = 8;          /* 도구를 부르는 횟수 한도 */
 const MAX_OUT = 6000;         /* 답 길이(토큰) */
+const HIST_THREADS = 60;      /* 한 분이 보관하는 대화 수 (넘으면 오래된 것부터 빠진다) */
+const HIST_TURNS = 20;        /* 대화 하나에 담는 문답 수 */
 
 function cors(origin) {
   const allow = ALLOW_ORIGINS.includes(origin) ? origin : ALLOW_ORIGINS[0];
   return {
     'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
     'Vary': 'Origin'
@@ -107,6 +114,57 @@ async function bump(env, uid) {
     env.AI_KV.put('u:' + d + ':all', String(parseInt(all || '0', 10) + 1), ttl),
     env.AI_KV.put('u:' + d + ':' + uid, String(parseInt(me || '0', 10) + 1), ttl)
   ]);
+}
+
+/* ---------- 내 질문 내역 (KV 'h:<회원id>') ---------- */
+function histKey(uid) { return 'h:' + uid; }
+async function histGet(env, uid) {
+  const v = await env.AI_KV.get(histKey(uid), 'json');
+  return v && Array.isArray(v.threads) ? v : { threads: [] };
+}
+/* 목록에 보일 맨글 — 근거 표시·굵게·목록 기호를 뗀 답 앞부분 */
+function histPreview(a) {
+  return String(a || '').replace(/\[R\d+\](\{\{[^{}]*\}\})?/g, '').replace(/\*\*/g, '')
+    .replace(/^\s*([-•·]|\d+[.)])\s+/gm, '').replace(/\s+/g, ' ').trim().slice(0, 90);
+}
+function histSummary(t) {
+  const last = t.turns[t.turns.length - 1] || {};
+  return { id: t.id, title: t.title, n: t.turns.length, at: t.at, updated: t.updated, preview: histPreview(last.a) };
+}
+/* 답 하나를 대화에 붙여 저장한다. threadId 가 없거나 지워졌으면 새 대화로. */
+async function histSave(env, uid, threadId, turn) {
+  const h = await histGet(env, uid);
+  const now = new Date().toISOString();
+  let t = threadId ? h.threads.find(function (x) { return x.id === threadId; }) : null;
+  if (t) h.threads = h.threads.filter(function (x) { return x !== t; });
+  else t = { id: crypto.randomUUID().replace(/-/g, '').slice(0, 16), title: turn.q.slice(0, 80), at: now, updated: now, turns: [] };
+  t.turns.push(turn);
+  if (t.turns.length > HIST_TURNS) t.turns = t.turns.slice(-HIST_TURNS);
+  t.updated = now;
+  h.threads.unshift(t);
+  h.threads = h.threads.slice(0, HIST_THREADS);
+  await env.AI_KV.put(histKey(uid), JSON.stringify(h));
+  return t;
+}
+async function historyApi(request, env, origin, path) {
+  const me = await whoIs(request, env);
+  if (!me) return reply({ error: '로그인이 확인되지 않았습니다. 다시 로그인해 주세요.' }, 401, origin);
+  const id = path.length > 9 ? decodeURIComponent(path.slice(9)) : '';
+  if (request.method === 'GET') {
+    const h = await histGet(env, me.id);
+    if (!id) return reply({ list: h.threads.map(histSummary) }, 200, origin);
+    const t = h.threads.find(function (x) { return x.id === id; });
+    return t ? reply({ thread: t }, 200, origin) : reply({ error: '지워졌거나 없는 질문입니다.' }, 404, origin);
+  }
+  if (request.method === 'DELETE') {
+    if (!id) { await env.AI_KV.delete(histKey(me.id)); return reply({ ok: true, list: [] }, 200, origin); }
+    const h = await histGet(env, me.id);
+    const n = h.threads.length;
+    h.threads = h.threads.filter(function (x) { return x.id !== id; });
+    if (h.threads.length !== n) await env.AI_KV.put(histKey(me.id), JSON.stringify(h));
+    return reply({ ok: true, list: h.threads.map(histSummary) }, 200, origin);
+  }
+  return reply({ error: '없는 주소입니다.' }, 405, origin);
 }
 
 /* ---------- 색인 (홈페이지에서 받아 둔다) ---------- */
@@ -297,6 +355,8 @@ async function answer(request, env, ctx, origin) {
     if (t) history.push({ role: h.role, content: t });
   });
   if (history.length && history[history.length - 1].role === 'user') history.pop();
+  /* 내역의 어느 대화에 이어 붙일지 (없으면 새 대화) */
+  const threadId = /^[0-9a-f]{8,32}$/.test(String((body && body.thread) || '')) ? String(body.thread) : '';
 
   const { readable, writable } = new TransformStream();
   const out = sse(writable.getWriter());
@@ -361,7 +421,17 @@ async function answer(request, env, ctx, origin) {
       (finalText.match(/\[R\d+\]/g) || []).forEach(function (m) { cited[m.slice(1, -1)] = true; });
       /* [R3]{{원문 구절}} — 서랍에서 밑줄 칠 구절 */
       finalText.replace(/\[(R\d+)\]\{\{([^{}]{2,160})\}\}/g, function (m, r, q) { (quotes[r] = quotes[r] || []).push(q.trim()); return m; });
-      await out.send('sources', { list: cites.list.map(function (c) { return Object.assign({ cited: !!cited[c.ref], quotes: quotes[c.ref] || [] }, c); }) });
+      const srcList = cites.list.map(function (c) { return Object.assign({ cited: !!cited[c.ref], quotes: quotes[c.ref] || [] }, c); });
+      await out.send('sources', { list: srcList });
+      if (finalText && finalText !== '(거절)') {
+        try {
+          const t = await histSave(env, me.id, threadId, {
+            q: question, a: finalText.slice(0, 20000), at: new Date().toISOString(),
+            sources: srcList.slice(0, 24).map(function (c) { return Object.assign({}, c, { snippet: String(c.snippet || '').slice(0, c.cited ? 800 : 300) }); })
+          });
+          await out.send('saved', { thread: t.id, title: t.title, n: t.turns.length, updated: t.updated, preview: histPreview(finalText) });
+        } catch (e) { /* 내역 저장이 안 되어도 답은 그대로 */ }
+      }
       await out.send('usage', { model: model, input_tokens: inTok, output_tokens: outTok, ms: Date.now() - started, tools: toolsUsed });
       await out.send('done', {});
     } catch (e) {
@@ -455,6 +525,7 @@ export default {
                        index: idx ? { chunks: idx.N, built: INDEX_BUILT } : null, colo: (request.cf && request.cf.colo) || null }, 200, origin);
       }
       if (path === '/ask' && request.method === 'POST') return await answer(request, env, ctx, origin);
+      if (path === '/history' || path.indexOf('/history/') === 0) return await historyApi(request, env, origin, path);
       if (path === '/settings' && (request.method === 'GET' || request.method === 'POST')) return await settings(request, env, origin, false);
       if (path === '/settings/test' && request.method === 'POST') return await settings(request, env, origin, true);
       return reply({ error: '없는 주소입니다.' }, 404, origin);
