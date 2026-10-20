@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2단계 인증 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261020x">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>2단계 인증</h1>
+    <div class="crumb">홈 &gt; 로그인 &gt; 2단계 인증</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <!-- 임원 등급(최고관리자·노회장·서기·간사·임원)은 로그인할 때 Google OTP 6자리 숫자를 한 번 더 확인한다 (js/mfa.js) -->
+  <div class="form-card mfa-card">
+    <h2 id="mfa-title">Google OTP 확인</h2>
+    <div id="mfa-area"><p style="color:var(--gray-5)">확인하는 중입니다…</p></div>
+  </div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js?v=20261020x"></script>
+<script src="js/main.js?v=20261020v"></script>
+<script src="js/mfa.js?v=20261020x"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  SHSMfa.mountVerify(document.getElementById('mfa-area'));
+});
+</script>
+</body>
+</html>

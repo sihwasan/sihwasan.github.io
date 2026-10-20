@@ -104,6 +104,34 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .noti-item.old { opacity: 0.6; background: var(--gray-1); }
 .noti-item .n-past { font-size: 0.72rem; color: var(--gray-5); border: 1px solid var(--gray-3); padding: 1px 7px; }
 
+/* 2단계 인증 (Google OTP) — mfa.html, 내 정보 (js/mfa.js) */
+.mfa-card .mfa-help { font-size: 0.92rem; color: var(--gray-7); line-height: 1.75; margin: 0 0 12px; }
+.mfa-state { margin: 0 0 8px; font-size: 0.95rem; color: var(--gray-7); }
+.mfa-state.on strong { color: #1a6d3a; }
+.mfa-state span { font-size: 0.8rem; color: var(--gray-5); margin-left: 6px; }
+.mfa-steps { list-style: decimal; padding-left: 0; margin: 0 0 14px 20px; font-size: 0.9rem; line-height: 1.8; color: var(--gray-7); }
+.mfa-qr { display: flex; justify-content: center; margin: 6px 0 12px; }
+.mfa-qr img { width: 200px; height: 200px; background: #fff; border: 1px solid var(--gray-2); border-radius: 8px; padding: 8px; }
+.mfa-manual { font-size: 0.86rem; color: var(--gray-7); margin: 0 0 14px; }
+.mfa-manual summary { cursor: pointer; color: var(--navy); }
+.mfa-manual p { margin: 8px 0 0; }
+.mfa-secret {
+  font-family: Consolas, 'Courier New', monospace; font-size: 1rem; letter-spacing: 1px; word-break: break-all;
+  background: var(--gray-1); border: 1px dashed var(--gray-3); border-radius: 6px; padding: 8px 10px;
+}
+.mfa-row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.mfa-code {
+  flex: 1 1 160px; min-width: 0; font-size: 1.5rem; letter-spacing: 8px; text-align: center;
+  font-family: Consolas, 'Courier New', monospace; padding: 10px 12px;
+}
+.mfa-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.mfa-ask { margin-top: 12px; padding: 12px 14px; background: #fbf3ef; border: 1px solid #ecd3c8; border-radius: 8px; font-size: 0.88rem; }
+.mfa-ask p { margin: 0 0 10px; }
+.mfa-note { font-size: 0.82rem; color: var(--gray-5); line-height: 1.7; }
+.mfa-sub { font-size: 1rem; margin: 26px 0 6px; color: var(--navy); }
+.mfa-sub small { font-weight: 400; color: var(--gray-5); font-size: 0.82rem; margin-left: 6px; }
+.linklike { border: 0; background: none; padding: 0; color: var(--navy); text-decoration: underline; cursor: pointer; font: inherit; }
+
 /* ---------- header ---------- */
 .site-header {
   background: var(--white);

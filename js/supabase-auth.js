@@ -47,6 +47,27 @@ var SHSCloud = (function () {
     });
   }
 
+  /* ---------- 2단계 인증 (구글 OTP) ----------
+   * 임원 등급(최고관리자·노회장·서기·간사·임원)은 모두 2단계 인증을 써야 한다 (2026-10-20 노회 결정).
+   *   · 등록한 분이 비밀번호·구글·네이버로만 들어온 상태(aal1)면 → mfa.html 에서 6자리 숫자 확인
+   *   · 임원 등급인데 아직 등록하지 않았으면              → mfa.html 에서 먼저 등록
+   * 마치면(aal2) 원래 보던 화면으로 돌아온다. 확인 화면 자체와 로그인 마무리·비밀번호 재설정 화면은 보내지 않는다. */
+  var OTP_ROLES = ['superadmin', 'president', 'clerk', 'staff', 'officer'];
+  var MFA_FREE = /(^|\/)(mfa|auth-callback|reset-password)\.html$/;
+  function mfaLevel(c) {
+    if (!c.auth.mfa || !c.auth.mfa.getAuthenticatorAssuranceLevel) return Promise.resolve(null);
+    return c.auth.mfa.getAuthenticatorAssuranceLevel().then(function (r) {
+      return (r && !r.error && r.data) || null;
+    }, function () { return null; });
+  }
+  function goMfa() {
+    try {
+      sessionStorage.setItem('shs_mfa_back', location.pathname.replace(/^.*\//, '') + location.search + location.hash);
+    } catch (e) {}
+    location.replace('mfa.html');
+  }
+  function needsOtp(p) { return !!p && OTP_ROLES.indexOf(p.role) !== -1; }
+
   /* 현재 로그인한 회원의 프로필(등급 포함)을 가져온다. */
   function loadProfile() {
     return init().then(function (c) {
@@ -54,15 +75,30 @@ var SHSCloud = (function () {
       return c.auth.getUser().then(function (res) {
         var user = res && res.data && res.data.user;
         if (!user) { profile = null; return null; }
-        return c.from('profiles').select('*').eq('id', user.id).single()
-          .then(function (r) {
-            profile = r.data || { id: user.id, email: user.email, name: '', role: 'pending' };
-            return profile;
-          })
-          .catch(function () {
-            profile = { id: user.id, email: user.email, name: '', role: 'pending' };
-            return profile;
-          });
+        var free = MFA_FREE.test(location.pathname);
+        return mfaLevel(c).then(function (lv) {
+          if (!free && lv && lv.nextLevel === 'aal2' && lv.currentLevel !== 'aal2') {
+            goMfa();
+            return new Promise(function () {});   /* 화면을 그리지 않고 OTP 확인으로 넘어간다 */
+          }
+          return c.from('profiles').select('*').eq('id', user.id).single()
+            .then(function (r) {
+              profile = r.data || { id: user.id, email: user.email, name: '', role: 'pending' };
+              return profile;
+            })
+            .catch(function () {
+              profile = { id: user.id, email: user.email, name: '', role: 'pending' };
+              return profile;
+            })
+            .then(function (p) {
+              /* 임원 등급인데 아직 OTP 를 등록하지 않았으면 등록부터 */
+              if (!free && lv && lv.nextLevel !== 'aal2' && needsOtp(p)) {
+                goMfa();
+                return new Promise(function () {});
+              }
+              return p;
+            });
+        });
       });
     });
   }
@@ -158,6 +194,7 @@ var SHSCloud = (function () {
     isMember: isMember,
     isOfficer: isOfficer,
     canManage: canManage,
-    isSuperadmin: isSuperadmin
+    isSuperadmin: isSuperadmin,
+    needsOtp: needsOtp
   };
 })();
