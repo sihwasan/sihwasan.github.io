@@ -53,8 +53,6 @@
       { t: '각종 내규', h: 'rules-presbytery.html#bylaws' },
       { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
       { t: '노회 보고서 (회의자료)', h: 'presbytery-report.html' },
-      { t: '노회 회의록', h: 'minutes.html' },
-      { t: '교회상황 보고서', h: 'report.html' },
       { t: '고시 모의고사', h: 'exam.html' },
       { t: '자료실 (공문·회계·파일)', h: 'archive.html' }
     ]},
@@ -94,7 +92,8 @@
       { t: '세례의무금 관리', h: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC' },
       { t: '재정부 회계', h: 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84', fin: true },
       { t: '감사 결과 보고서', h: 'audit-report.html' },
-      { t: '노회 회의록', h: 'minutes.html' }
+      { t: '노회 회의록', h: 'minutes.html' },
+      { t: '교회상황 보고서', h: 'report.html' }
     ]}
   ];
 
