@@ -59,7 +59,8 @@ var SHSData = {
     { name: '전종호', church: '동탄인랜드교회' }, { name: '김성중', church: '한숲우리교회' },
     { name: '권병렬', church: '섬김의교회' }, { name: '안상천', church: '참된빛교회' },
     { name: '이성대', church: '새생명교회' }, { name: '명영석', church: '행복한교회' },
-    { name: '김지수', church: '반월교회' }, { name: '백용선', church: '노진교회' },
+    { name: '김지수', church: '반월교회' }, { name: '손병민', church: '노진교회' },
+    { name: '김영창', church: '경기은목교회' }, { name: '송지용', church: '목자교회' },
     { name: '김종수', church: '섬기는교회' }, { name: '이동진', church: '동탄영광교회' },
     { name: '유성준', church: '주품에교회' }, { name: '김영돈', church: '안산원곡동교회' },
     { name: '김운갑', church: '시흥은혜교회' }, { name: '장정훈', church: '아름다운숲교회' },
@@ -75,7 +76,7 @@ var SHSData = {
   ],
   pastorsWithoutCharge: [
     '유충근', '박지만', '이병준', '이현철', '서기영', '정해정',
-    '김익환', '안상환', '김영창', '안창선', '주재경'
+    '김익환', '안상환', '안창선', '주재경'
   ],
   elders: {
     '북부시찰': [
