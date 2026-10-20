@@ -21,6 +21,11 @@ var SHSAI = (function () {
   ];
 
   var box = null, user = null, convo = [], busy = false, drawer = null;
+  /* 음성으로 묻기 — 브라우저 내장 음성 인식 (크롬·엣지·삼성 인터넷·사파리). 서버를 거치지 않는다. */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  var MIC_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/><path d="M8 21h8"/></svg>';
+  var rec = null;
   var quotesOf = {};   /* 근거 번호 → AI 가 적어 준 원문 구절들 (답에서 뽑아 둔다) */
 
   function esc(s) {
@@ -95,7 +100,9 @@ var SHSAI = (function () {
       '<form class="aih-form" id="aih-form" autocomplete="off">' +
       '<span class="aih-tag">AI 검색</span>' +
       '<input type="text" id="aih-q" maxlength="1500" placeholder="노회·총회 자료에 대해 물어보세요 (예: 권징조례에서 해벌 절차는?)">' +
+      (SR ? '<button type="button" class="aih-mic" id="aih-mic" title="음성으로 묻기 (누르고 말씀하세요)" aria-label="음성으로 묻기">' + MIC_SVG + '</button>' : '') +
       '<button type="submit" class="aih-go" id="aih-go">묻기</button></form>' +
+      '<div class="aih-voice hidden" id="aih-voice"></div>' +
       '<div class="aih-chips" id="aih-chips">' +
       EXAMPLES.map(function (q) { return '<button type="button" class="aih-chip" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') +
       '</div>' +
@@ -108,11 +115,67 @@ var SHSAI = (function () {
     box.querySelectorAll('.aih-chip').forEach(function (b) {
       b.addEventListener('click', function () { ask(b.dataset.q); });
     });
+    var mic = box.querySelector('#aih-mic');
+    if (mic) mic.addEventListener('click', toggleVoice);
     box.addEventListener('click', function (ev) {
       var r = ev.target.closest('.aih-ref, .aih-src');
       if (r) { ev.preventDefault(); openSource(r.dataset.ref); return; }
       if (ev.target.closest('#aih-new')) { ev.preventDefault(); reset(); }
     });
+  }
+
+  function voiceMsg(t, isErr) {
+    var el = box.querySelector('#aih-voice');
+    if (!el) return;
+    el.textContent = t || '';
+    el.classList.toggle('hidden', !t);
+    el.classList.toggle('err', !!isErr);
+  }
+  function toggleVoice() {
+    var mic = box.querySelector('#aih-mic');
+    var inp = box.querySelector('#aih-q');
+    if (!SR || !mic || !inp) return;
+    if (rec) { try { rec.stop(); } catch (e) {} return; }   /* 듣는 중에 다시 누르면 그만 듣고 지금까지의 말로 묻는다 */
+    if (busy) return;
+    var r = new SR();
+    rec = r;
+    r.lang = 'ko-KR';
+    r.interimResults = true;
+    r.maxAlternatives = 1;
+    r.continuous = false;
+    var finalText = '', heard = '', failed = false;
+    var oldPh = inp.placeholder;
+    mic.classList.add('on');
+    inp.value = '';
+    inp.placeholder = '듣고 있습니다… 말씀하신 뒤 잠시 멈추면 바로 묻습니다';
+    voiceMsg('듣고 있습니다. 질문을 말씀해 주세요. (다시 누르면 멈춤)');
+    r.onresult = function (ev) {
+      var t = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        t += ev.results[i][0].transcript;
+        if (ev.results[i].isFinal) finalText += ev.results[i][0].transcript;
+      }
+      heard = finalText || t;
+      inp.value = heard;
+    };
+    r.onerror = function (ev) {
+      failed = true;
+      var code = ev && ev.error;
+      voiceMsg(code === 'not-allowed' || code === 'service-not-allowed' ? '마이크 사용이 막혀 있습니다. 주소창 왼쪽 자물쇠에서 마이크를 허용해 주세요.'
+        : code === 'no-speech' ? '말소리를 듣지 못했습니다. 마이크를 누르고 다시 말씀해 주세요.'
+        : code === 'audio-capture' ? '마이크를 찾지 못했습니다.'
+        : code === 'network' ? '음성 인식 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.'
+        : '음성 인식에 실패했습니다 (' + (code || '알 수 없음') + ').', true);
+    };
+    r.onend = function () {
+      rec = null;
+      mic.classList.remove('on');
+      inp.placeholder = oldPh;
+      var q = (inp.value || heard || '').trim();
+      if (q && !failed) { voiceMsg(''); ask(q); }
+      else if (!failed) voiceMsg('말소리를 듣지 못했습니다. 마이크를 누르고 다시 말씀해 주세요.', true);
+    };
+    try { r.start(); } catch (e) { rec = null; mic.classList.remove('on'); inp.placeholder = oldPh; voiceMsg('음성 인식을 시작하지 못했습니다.', true); }
   }
 
   function reset() {

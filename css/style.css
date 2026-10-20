@@ -2528,3 +2528,16 @@ mark.aih-key {
 
 /* 시스템 알림 띠의 숨김 단추들 */
 .ops-hide-btns { display: inline-flex; flex-wrap: wrap; gap: 6px; vertical-align: middle; }
+
+/* AI 검색 — 음성으로 묻기 */
+.aih-mic {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--gray-3);
+  background: var(--gray-1); color: var(--navy); display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.aih-mic:hover { border-color: var(--accent); color: var(--accent); }
+.aih-mic.on { background: #c0392b; border-color: #c0392b; color: #fff; animation: aih-mic 1.1s ease-in-out infinite; }
+@keyframes aih-mic { 0%, 100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 0.45); } 50% { box-shadow: 0 0 0 10px rgba(192, 57, 43, 0); } }
+.aih-voice { margin-top: 8px; font-size: 0.84rem; color: #fdfbf6; background: rgba(0, 0, 0, 0.22); border-radius: 8px; padding: 6px 12px; }
+.aih-voice.err { background: rgba(192, 57, 43, 0.35); }
+.aih-voice.hidden { display: none; }
+@media (max-width: 900px) { .aih-mic { order: 0; } .aih-form .aih-go { flex: 1 1 auto; } }
