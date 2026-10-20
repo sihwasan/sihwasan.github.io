@@ -282,6 +282,16 @@ input, select, textarea { font-family: inherit; font-size: 0.95rem; }
 .tabs.sub-tabs button.active {
   background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700;
 }
+/* 시찰 방 — 넓은 화면은 메뉴를 왼쪽 세로 줄로, 본문은 오른쪽. 메뉴는 내려가도 화면에 붙어 있다. */
+@media (min-width: 901px) {
+  .si-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .si-layout .si-menu {
+    flex-direction: column; flex-wrap: nowrap; gap: 6px; margin-bottom: 0; padding: 10px;
+    position: sticky; top: calc(var(--nav-h, 64px) + 16px);
+  }
+  .si-layout .si-menu button { text-align: left; border-radius: 8px; padding: 9px 14px; }
+  .si-layout .si-main { min-width: 0; }
+}
 /* 회계 장부의 수입·지출 탭 — 수입은 초록, 지출은 붉은 알약으로 한눈에 구분한다 */
 .tabs.lg-kind-tabs { border-bottom: none; gap: 8px; padding: 0; }
 .tabs.lg-kind-tabs button {

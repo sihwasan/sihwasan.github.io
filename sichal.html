@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>시찰회 - 시화산노회</title>
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261020v">
+<link rel="stylesheet" href="css/style.css?v=20261020w">
 <style>
 /* 사진첩의 영상 칸 — 노회 갤러리 영상 카드와 같은 모양 */
 .vid-thumbbtn { position: absolute; top: 8px; left: 8px; border: none; cursor: pointer; background: rgba(0,0,0,.55); color: #fff; border-radius: 8px; padding: 2px 9px; font-size: 0.74rem; }
@@ -410,7 +410,8 @@ document.addEventListener('DOMContentLoaded', function () {
     /* 아직 진단하지 않은(제출됨) 청원서 건수 — 탭 옆 배지 */
     var revWait = subs.filter(function (p) { return p.status === '제출됨'; }).length;
 
-    h += '<div class="tabs sub-tabs" id="si-tabs">' +
+    /* 시찰 방 메뉴 — 넓은 화면은 왼쪽 세로 메뉴, 좁은 화면은 위쪽 알약 줄 (css .si-layout) */
+    h += '<div class="si-layout"><nav class="tabs sub-tabs si-menu" id="si-tabs" aria-label="시찰 방 메뉴">' +
       '<button class="' + (tab === 'church'  ? 'active' : '') + '" data-t="church">관내 교회 (' + churches.length + ')</button>' +
       '<button class="' + (tab === 'pastor'  ? 'active' : '') + '" data-t="pastor">회원 명단 (' + pastors.length + ')</button>' +
       (myOwnSichal
@@ -433,7 +434,7 @@ document.addEventListener('DOMContentLoaded', function () {
               'font-weight:700;vertical-align:middle">' + revWait + '</span>'
             : '') + '</button>'
         : '') +
-      '</div><div id="si-body"></div>';
+      '</nav><div id="si-body" class="si-main"></div></div>';
 
     area.innerHTML = h;
 
