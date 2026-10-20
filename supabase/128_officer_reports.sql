@@ -14,6 +14,14 @@
 --  실행: Supabase → SQL Editor → 전체 붙여넣고 Run.  여러 번 실행해도 안전합니다.
 -- =====================================================================
 
+-- 0-0) 2단계 인증 확인 함수 — 124 와 같은 내용. 124 를 아직 실행하지 않은 DB 에서도 이 파일이 실패하지 않게
+--      (2026-10-21: 운영 DB 에 124 가 실행된 적이 없어 mfa_ok() 가 없었다. 129 도 같은 줄을 넣었다)
+create or replace function public.mfa_ok()
+returns boolean language sql stable security definer set search_path = public as $fn$
+  select coalesce(auth.jwt() ->> 'aal', 'aal1') = 'aal2'
+$fn$;
+grant execute on function public.mfa_ok() to anon, authenticated;
+
 -- 0) 비밀 열쇠 지문·실행 상태 (규칙이 없으므로 아무도 직접 못 읽는다) -------------------
 create table if not exists public.ai_report_config (k text primary key, v jsonb not null);
 alter table public.ai_report_config enable row level security;
