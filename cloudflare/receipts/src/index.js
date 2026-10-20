@@ -17,11 +17,13 @@
  *
  * 장애에 버티기 (2026-09-11)
  *   Claude 쪽의 잠깐 장애(429·5xx·접속 끊김·JSON 아닌 차단 페이지)는 조금 쉬었다가
- *   다시 부르고, 그래도 안 되면 다른 모델(claude-sonnet-5)로 넘어간다.
+ *   다시 부르고, 그래도 안 되면 다른 모델(claude-sonnet-5-5)로 넘어간다.
  *   오류 글에는 원인(형식·접속 지점·차단 머리글)을 담아 홈페이지에 그대로 보인다.
  *
- * 비밀 열쇠
- *   ANTHROPIC_API_KEY 는 wrangler secret 으로만 넣는다. 코드·설정 파일에 적지 않는다.
+ * 열쇠 (2026-10-20)
+ *   노회의 모든 AI 기능은 열쇠 하나를 함께 쓴다. AI 자료 검색 창구(cloudflare/ai)의 KV(AI_KV)
+ *   'settings'.api_key — 관리자가 홈페이지 「관리자 → AI 검색·API 설정」에서 넣고 바꾼다.
+ *   그 열쇠가 비어 있을 때만 예전 비밀값(wrangler secret ANTHROPIC_API_KEY)을 쓴다.
  */
 
 const ALLOW_ORIGINS = [
@@ -177,9 +179,20 @@ async function withRetry(fn, tries) {
   return last;
 }
 
-async function callClaude(env, body, betaHeader) {
+/* 열쇠 — AI 자료 검색과 같은 열쇠(KV 'settings'.api_key)를 먼저, 없으면 예전 비밀값 */
+async function apiKey(env) {
+  try {
+    const s = env.AI_KV ? await env.AI_KV.get('settings', 'json') : null;
+    if (s && s.api_key) return String(s.api_key);
+  } catch (e) {
+    console.error('AI_KV settings read failed', e && e.message);
+  }
+  return env.ANTHROPIC_API_KEY || '';
+}
+
+async function callClaude(key, body, betaHeader) {
   const headers = {
-    'x-api-key': env.ANTHROPIC_API_KEY,
+    'x-api-key': key,
     'anthropic-version': '2023-06-01',
     'Content-Type': 'application/json'
   };
@@ -192,10 +205,10 @@ async function callClaude(env, body, betaHeader) {
 }
 
 /* 열쇠와 접속이 살아 있는지 — 모델 목록을 물어본다 (토큰을 쓰지 않는다) */
-async function checkApi(env) {
+async function checkApi(key) {
   const r = await withRetry(function () {
     return fetchClaude('https://api.anthropic.com/v1/models?limit=100', {
-      headers: { 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' }
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }
     });
   }, 2);
   if (!r.ok) {
@@ -220,7 +233,7 @@ function explain(res, tried) {
     msg += ' — 열쇠(API 키)가 이 요청을 허용받지 못했습니다. ' +
       'Anthropic 콘솔에서 키가 속한 작업 공간의 모델 권한·지역 제한을 확인해 주세요 (시도한 모델: ' + tried.join(', ') + ')';
   } else if (res.status === 401) {
-    msg += ' — 열쇠(API 키)가 맞지 않거나 폐기되었습니다. Cloudflare 워커의 ANTHROPIC_API_KEY 를 다시 넣어 주세요.';
+    msg += ' — 열쇠(API 키)가 맞지 않거나 폐기되었습니다. 관리자가 홈페이지 「AI 검색·API 설정」에서 열쇠를 다시 넣어 주셔야 합니다.';
   } else if (res.status === 400 && /credit|balance|billing/i.test(res.message)) {
     msg += ' — Anthropic 계정의 잔액(크레딧)이 부족합니다. 충전 뒤 다시 시도해 주세요.';
   }
@@ -233,8 +246,8 @@ function explain(res, tried) {
  *   · 열쇠 권한(403)·모델 없음(404)·베타 거절(400) 이면 다음 조합으로,
  *   · 잠깐의 장애(429·5xx·접속 실패) 는 같은 모델을 되풀이하지 않고 곧장 다른 모델로,
  *   · 그 밖의 400(요청 자체가 틀림) 은 되풀이해도 소용없으니 멈춘다. */
-async function readReceipt(env, mediaType, imageBase64) {
-  const primary = env.ANTHROPIC_MODEL || 'claude-opus-5';
+async function readReceipt(env, key, mediaType, imageBase64) {
+  const primary = env.ANTHROPIC_MODEL || 'claude-opus-5-5';
   const content = [
     { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
     { type: 'text', text: INSTRUCTION }
@@ -253,14 +266,14 @@ async function readReceipt(env, mediaType, imageBase64) {
   const attempts = [
     { model: primary, fb: true },
     { model: primary, fb: false },
-    { model: 'claude-sonnet-5', fb: false }
+    { model: 'claude-sonnet-5-5', fb: false }
   ];
   let last = null;
   const tried = [];
   for (let i = 0; i < attempts.length; i++) {
     const a = attempts[i];
     if (tried.indexOf(a.model) === -1) tried.push(a.model);
-    const r = await callClaude(env, bodyFor(a.model, a.fb), a.fb ? 'server-side-fallback-2026-07-01' : '');
+    const r = await callClaude(key, bodyFor(a.model, a.fb), a.fb ? 'server-side-fallback-2026-07-01' : '');
     if (r.ok) { last = r; break; }
     last = r;
     console.error('claude attempt failed', a.model, a.fb ? 'fallbacks' : 'plain',
@@ -303,17 +316,18 @@ export default {
 
     if (request.method === 'OPTIONS') return reply(null, 204, origin);
     if (url.pathname === '/' || url.pathname === '/health') {
+      const key = await apiKey(env);
       const out = { ok: true, service: '시화산노회 영수증 자동 읽기',
-                    ready: !!env.ANTHROPIC_API_KEY, model: env.ANTHROPIC_MODEL || 'claude-opus-5',
+                    ready: !!key, model: env.ANTHROPIC_MODEL || 'claude-opus-5-5',
                     colo: (request.cf && request.cf.colo) || null };
       const check = url.searchParams.get('check');
-      if (check && env.ANTHROPIC_API_KEY) {
+      if (check && key) {
         /* ?check=1 : 열쇠로 모델 목록을 받아 본다 — 접속·권한 문제를 여기서 바로 본다 */
-        out.api = await checkApi(env);
+        out.api = await checkApi(key);
         /* ?check=2 : 진짜 읽기 경로(모델·구조화 출력·대체)까지 아주 작은 그림으로 돌려 본다 */
         if (check === '2') {
           try {
-            const t = await readReceipt(env, 'image/png', TINY_PNG);
+            const t = await readReceipt(env, key, 'image/png', TINY_PNG);
             out.read = { ok: true, model: t.model, usage: t.usage, result: t.result };
           } catch (e) {
             out.read = { ok: false, error: (e && e.message) || String(e) };
@@ -325,8 +339,9 @@ export default {
     if (url.pathname !== '/read' || request.method !== 'POST') {
       return reply({ error: '없는 주소입니다.' }, 404, origin);
     }
-    if (!env.ANTHROPIC_API_KEY) {
-      return reply({ error: '자동 읽기 열쇠(ANTHROPIC_API_KEY)가 아직 등록되지 않았습니다.' }, 503, origin);
+    const key = await apiKey(env);
+    if (!key) {
+      return reply({ error: 'AI 열쇠가 아직 등록되지 않았습니다. 관리자가 홈페이지 「AI 검색·API 설정」에서 넣어 주셔야 합니다.' }, 503, origin);
     }
 
     const me = await whoIs(request, env);
@@ -348,7 +363,7 @@ export default {
     }
 
     try {
-      const out = await readReceipt(env, mediaType, image);
+      const out = await readReceipt(env, key, mediaType, image);
       return reply({ ok: true, result: out.result, model: out.model, usage: out.usage }, 200, origin);
     } catch (e) {
       const colo = (request.cf && request.cf.colo) || '?';

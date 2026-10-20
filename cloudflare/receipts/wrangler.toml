@@ -7,16 +7,21 @@ account_id = "0c1cf1f4bfdcd3e33660b6d07e66378f"
 
 # 영수증 자동 읽기 창구 (Claude API)
 #
-# 비밀 열쇠(ANTHROPIC_API_KEY)는 이 파일에 적지 않는다. 배포하는 컴퓨터에서
-#   wrangler secret put ANTHROPIC_API_KEY
-# 를 한 번 실행해 붙여 넣으면 Cloudflare 가 보관한다.
+# 열쇠는 AI 자료 검색과 함께 쓴다 (2026-10-20 — 노회의 모든 AI 는 열쇠 하나).
+# 관리자가 홈페이지 「관리자 → AI 검색·API 설정」에서 넣은 열쇠를 아래 AI_KV 에서 읽는다.
+# 그 열쇠가 비어 있을 때만 예전 비밀값(wrangler secret ANTHROPIC_API_KEY)을 쓴다.
 #
 # 부르는 사람이 그 장부를 적을 수 있는 회계인지 확인할 때 쓰는 주소.
 # anon 키는 홈페이지에 이미 공개되어 있는 값이므로 비밀이 아니다.
 [vars]
 SUPABASE_URL = "https://ltbhgwozkffenahqdzfj.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Ymhnd296a2ZmZW5haHFkemZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDk0MDYsImV4cCI6MjEwMTkyNTQwNn0.nSptHsi7nTCWTiyTe_Kl9xpxyHJ3pkhRGoZLI1BdsnI"
-ANTHROPIC_MODEL = "claude-opus-5"
+ANTHROPIC_MODEL = "claude-opus-5-5"
+
+# AI 자료 검색 창구(cloudflare/ai)와 같은 KV — 'settings'.api_key 만 읽는다.
+[[kv_namespaces]]
+binding = "AI_KV"
+id = "77675b962eff474e868e94211f460704"
 
 # Claude API 는 홍콩 등 지원하지 않는 지역에서 오는 요청을 "Request not allowed"(403)로 거절한다.
 # 한국 접속은 Cloudflare 무료 요금제에서 대개 홍콩(HKG) 데이터센터로 들어가고,
