@@ -27,6 +27,11 @@ var SHSAI = (function () {
     '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/><path d="M8 21h8"/></svg>';
   var rec = null;
   var quotesOf = {};   /* 근거 번호 → AI 가 적어 준 원문 구절들 (답에서 뽑아 둔다) */
+  var sharing = false; /* 공유 창이 떠 있는 동안 또 누르면 브라우저가 오류를 낸다 */
+  var COPY_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  var SHARE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -120,6 +125,8 @@ var SHSAI = (function () {
     box.addEventListener('click', function (ev) {
       var r = ev.target.closest('.aih-ref, .aih-src');
       if (r) { ev.preventDefault(); openSource(r.dataset.ref); return; }
+      var act = ev.target.closest('.aih-act');
+      if (act) { ev.preventDefault(); doAct(act); return; }
       if (ev.target.closest('#aih-new')) { ev.preventDefault(); reset(); }
     });
   }
@@ -198,6 +205,7 @@ var SHSAI = (function () {
         '<div class="aih-status' + (c.status ? '' : ' hidden') + '" id="aih-st-' + i + '">' + esc(c.status || '') + '</div>' +
         '<div class="aih-a" id="aih-a-' + i + '">' + render(c.text()) + (c.error ? '<p class="aih-err">' + esc(c.error) + '</p>' : '') + '</div>' +
         '<div class="aih-srcs" id="aih-src-' + i + '">' + sourcesHtml(c) + '</div>' +
+        '<div class="aih-acts" id="aih-act-' + i + '">' + actsHtml(c, i) + '</div>' +
         '</div>';
     });
     h += '<div class="aih-foot"><span class="aih-note">답은 홈페이지에 실린 자료에서 찾은 것으로, 근거 번호를 누르면 원문을 볼 수 있습니다. 중요한 일은 원문을 확인해 주세요.</span>' +
@@ -216,6 +224,92 @@ var SHSAI = (function () {
     if (cited.length) h += '<div class="aih-src-head">근거</div>' + cited.map(one).join('');
     if (rest.length) h += '<details class="aih-more"><summary>함께 살펴본 자료 ' + rest.length + '건</summary>' + rest.map(one).join('') + '</details>';
     return h;
+  }
+
+  /* ---------- 답 복사·공유 ---------- */
+  /* 답이 다 온 뒤에만 단추를 보인다 (흘러오는 중의 반쪽 답을 퍼뜨리지 않게) */
+  function actsHtml(c, i) {
+    if (!c.done || !c.text().trim()) return '';
+    return '<button type="button" class="aih-act" data-act="copy" data-i="' + i + '">' + COPY_SVG + '복사</button>' +
+      (navigator.share ? '<button type="button" class="aih-act" data-act="share" data-i="' + i + '">' + SHARE_SVG + '공유</button>' : '') +
+      '<span class="aih-act-msg" role="status" aria-live="polite"></span>';
+  }
+  /* 화면 글 → 메신저에 붙여도 읽기 좋은 맨글: 근거 꼬리표는 [3] 으로, 굵게·제목 표시는 뗀다 */
+  function plainAnswer(t) {
+    return String(t || '').replace(/\r/g, '')
+      .replace(/\[(R\d+)\]\{\{[^{}]*\}\}/g, '[$1]')
+      .replace(/\{\{[^{}]*\}\}/g, '')
+      .replace(/\[R(\d+)\]/g, '[$1]')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/^#{1,4}\s+/gm, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+  function absUrl(u) {
+    try { return new URL(u, location.href).href; } catch (e) { return u || ''; }
+  }
+  function shareText(c) {
+    var out = '[시화산노회 AI 검색]\n\n질문: ' + c.q + '\n\n' + plainAnswer(c.text());
+    var cited = (c.sources || []).filter(function (s) { return s.cited; });
+    if (cited.length) {
+      out += '\n\n근거\n' + cited.map(function (s) {
+        return '[' + s.ref.slice(1) + '] ' + s.title + (s.kind ? ' (' + s.kind + ')' : '') + (s.url ? '\n' + absUrl(s.url) : '');
+      }).join('\n');
+    }
+    return out + '\n\n※ 시화산노회 홈페이지 자료에서 AI가 찾아 정리한 답입니다. 중요한 일은 원문을 확인해 주세요.\nhttps://sihwasan.org';
+  }
+  function legacyCopy(t) {
+    return new Promise(function (ok, no) {
+      var ta = document.createElement('textarea');
+      ta.value = t;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      try { ta.setSelectionRange(0, t.length); } catch (e) {}
+      var done = false;
+      try { done = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+      if (done) ok(); else no(new Error('copy'));
+    });
+  }
+  function copyText(t) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(t).catch(function () { return legacyCopy(t); });
+    }
+    return legacyCopy(t);
+  }
+  function actMsg(btn, text, isErr) {
+    var el = btn.parentNode && btn.parentNode.querySelector('.aih-act-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('err', !!isErr);
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.textContent = ''; }, 4000);
+  }
+  function doAct(btn) {
+    var c = convo[parseInt(btn.dataset.i, 10)];
+    if (!c || !c.done) return;
+    var text = shareText(c);
+    function copied() {
+      copyText(text).then(function () {
+        actMsg(btn, '복사했습니다. 카카오톡·문자 등에 붙여 넣으세요.');
+      }, function () {
+        actMsg(btn, '복사하지 못했습니다. 답을 길게 눌러 직접 골라 복사해 주세요.', true);
+      }).then(function () { try { btn.focus(); } catch (e) {} });
+    }
+    if (btn.dataset.act === 'share' && navigator.share) {
+      if (sharing) return;
+      sharing = true;
+      navigator.share({ title: '시화산노회 AI 검색', text: text }).then(function () {
+        actMsg(btn, '공유했습니다.');
+      }, function (e) {
+        if (e && e.name === 'AbortError') return;   /* 공유 창을 닫은 것 — 아무것도 하지 않는다 */
+        copied();                                     /* 공유가 막힌 브라우저면 복사로 대신 */
+      }).then(function () { sharing = false; });
+      return;
+    }
+    copied();
   }
 
   function ask(q) {
@@ -289,6 +383,7 @@ var SHSAI = (function () {
     }).then(function () {
       item.done = true;
       if (!item.text() && !item.error) { item.error = '답을 받지 못했습니다. 다시 시도해 주세요.'; paint(); }
+      var acts = document.getElementById('aih-act-' + i); if (acts) acts.innerHTML = actsHtml(item, i);
       busy = false;
       var go = box.querySelector('#aih-go'); if (go) go.disabled = false;
     });

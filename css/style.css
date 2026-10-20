@@ -2394,6 +2394,17 @@ td[data-duch]:hover { background: #eef2f8; }
 .aih-src-t { flex: 1; min-width: 0; }
 .aih-src-k { flex: 0 0 auto; font-size: 0.74rem; color: var(--gray-5); }
 .aih-more summary { cursor: pointer; font-size: 0.82rem; color: var(--gray-5); margin: 6px 0; }
+.aih-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.aih-acts:empty { display: none; }
+.aih-act {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px;
+  border: 1px solid var(--gray-2); background: #fff; color: var(--navy); border-radius: 8px;
+  padding: 6px 14px; font-size: 0.86rem; font-weight: 600; cursor: pointer;
+}
+.aih-act:hover, .aih-act:focus-visible { border-color: var(--accent); color: var(--accent); }
+.aih-act svg { width: 15px; height: 15px; flex: 0 0 auto; }
+.aih-act-msg { font-size: 0.82rem; color: #1a6d3a; }
+.aih-act-msg.err { color: var(--red); }
 .aih-foot {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
   margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--gray-2);
