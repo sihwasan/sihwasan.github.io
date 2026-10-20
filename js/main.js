@@ -615,7 +615,9 @@
                 c.rpc('run_reminders').then(quiet, quiet),
                 /* 정기노회 4주 전 — 서기에게 총대 장로 임기 확인 알림
                  * (111_elder_term_notice.sql 을 실행하기 전이면 조용히 건너뛴다) */
-                c.rpc('run_elder_term_notice').then(quiet, quiet)
+                c.rpc('run_elder_term_notice').then(quiet, quiet),
+                /* 날짜가 지난 임직식을 회원 명단에 반영 (121 sql 을 실행하기 전이면 조용히 건너뛴다) */
+                c.rpc('apply_ordinations').then(quiet, quiet)
               ]);
             }).then(function () {
               loadUnread();
@@ -746,6 +748,11 @@
     if (n.kind === '운영' && key.indexOf('handover-') === 0) {
       return 'dashboard.html';
     }
+    /* 일정 등록 요청 — 글 안의 schedule.html#new=… 주소(미리 채운 등록 창)로 */
+    if (n.kind === '일정') {
+      var sl = String(n.body || '').match(/schedule\.html[^\s]*/);
+      return sl ? sl[0] : 'schedule.html';
+    }
     /* 회의 녹음 열람 허용(113) — 회의 녹음 듣기 화면으로 */
     if (key.indexOf('maudio-') === 0) {
       return 'minutes-audio.html';
@@ -839,7 +846,7 @@
         '<strong class="nt-title">' + SHS.esc(n.title || '') + '</strong>' +
         '<span class="nt-body">' + SHS.esc(String(n.body || '').slice(0, 90)) + '</span>' +
         '<span class="nt-go">' +
-        (n.kind === '문의' ? '답장하기' : (n.kind === '서류' || n.kind === '총대 안내') ? '바로 가기' : '알림함에서 보기') +
+        (n.kind === '문의' ? '답장하기' : (n.kind === '서류' || n.kind === '총대 안내' || n.kind === '일정') ? '바로 가기' : '알림함에서 보기') +
         '</span>' +
         '</a>';
       setTimeout(function () { wrap.appendChild(card); }, i * 250);

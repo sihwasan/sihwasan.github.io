@@ -64,7 +64,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261020a"></script>
+<script src="js/main.js?v=20261020b"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -115,7 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div class="notice-banner">여기서 등록한 일정은 <strong>메인 화면·대시보드의 노회 일정</strong>에 보이고, ' +
     '「공지사항에도 올리기」를 켜 두면 <strong>공지사항에도 저절로 올라갑니다</strong>(고치거나 지우면 공지도 따라갑니다). ' +
     '달력에서 <strong>날짜를 누르면</strong> 일정을 넣거나 고칠 수 있습니다. ' +
-    '<strong>임직식</strong>(목사 위임·장로 장립)은 회원 명단과 연동되어 위임일·장립일이 명단에 기록됩니다.</div>' +
+    '<strong>임직식</strong>(목사 위임·장로 장립)은 <strong>그 날짜가 지난 뒤</strong> 회원 명단에 위임일·장립일이 자동으로 기록됩니다 (121 sql).</div>' +
     '<div class="sc-head">' +
     '<button class="btn ghost sm" id="sc-prev">&#8592; 이전 달</button>' +
     '<h2 id="sc-title" style="min-width:170px;text-align:center"></h2>' +
@@ -250,11 +250,12 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 일정 입력·수정 ---------- */
-  function openEdit(x, ds) {
+  /* pre: 알림의 바로 가기(schedule.html#new=임직식&sub=…&person=…&church=…)로 미리 채울 값 */
+  function openEdit(x, ds, pre) {
     var isNew = !x;
     x = x || {};
-    var meta = x.meta || {};
-    var kindNow = x.kind || '정기노회';
+    var meta = x.meta || pre || {};
+    var kindNow = x.kind || (pre && pre.kind) || '정기노회';
     if (KINDS.indexOf(kindNow) === -1) kindNow = '기타';
 
     /* 임직식 대상자 목록: 위임은 목사 계열, 장립은 명단 전체에서 고른다 */
@@ -328,8 +329,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="inline-form hidden" id="ev-etcperson">' +
       '<div class="field"><label>성명</label><input type="text" id="ev-pname" value="' + e(meta.person || '') + '"></div>' +
       '<div class="field"><label>교회</label><input type="text" id="ev-pchurch" value="' + e(meta.church || '') + '"></div></div>' +
-      '<p style="font-size:0.8rem;color:var(--gray-5);margin:2px 0 10px">저장하면 회원 명단에 ' +
-      '<strong>목사 위임 → 위임일(직분 위임목사)</strong>, <strong>장로 장립 → 장립일</strong>이 함께 기록됩니다.</p></div>' +
+      '<p style="font-size:0.8rem;color:var(--gray-5);margin:2px 0 10px">임직식 <strong>날짜가 지나면</strong> 회원 명단에 ' +
+      '<strong>목사 위임 → 위임일(직분 위임목사)</strong>, <strong>장로 장립 → 장립일</strong>이 자동으로 기록됩니다. 그 전에는 명단이 바뀌지 않습니다.</p></div>' +
       '<div class="inline-form">' +
       '<div class="field" style="flex:0 0 150px"><label>시간 (선택)</label>' +
       '<input type="time" id="ev-time" value="' + e(meta.time || '') + '"></div>' +
@@ -531,29 +532,8 @@ document.addEventListener('DOMContentLoaded', function () {
         title = '임직식 — ' + person + ' ' + sub +
           (church ? ' (' + church + ')' : '') + (note ? ' · ' + note : '');
 
-        /* 회원 명단(roster) 연동: 위임일·장립일 기록 */
-        if (sub === '장로 장립') {
-          if (rid) {
-            sync = function (c) {
-              return c.from('roster').update({ ordained_on: date }).eq('id', rid).then(function () {
-                /* 교회 DB(church_staff)에도 같은 분이 있으면 장립일을 맞춰 준다 */
-                return c.from('church_staff').update({ ordained_on: date })
-                  .eq('name', person).eq('church', church);
-              });
-            };
-          } else if (church) {
-            /* 명단에 없는 새 장로: 교회 DB(원본)에 시무장로로 올린다 */
-            sync = function (c) {
-              return c.from('church_staff').insert({
-                church: church, name: person, role: '시무장로', ordained_on: date, sort: 100000
-              });
-            };
-          }
-        } else if (sub === '목사 위임' && rid) {
-          sync = function (c) {
-            return c.from('roster').update({ position: '위임목사', served_from: date }).eq('id', rid);
-          };
-        }
+        /* 회원 명단(roster) 반영은 여기서 하지 않는다. 임직식 날짜가 지나면 서버의
+         * apply_ordinations()(121 sql)가 위임일·장립일을 적는다 — 미리 적혀 있던 문제를 없앴다. */
       } else if (kind === '수양회') {
         function rv(id) { return mo.el.querySelector(id).value.trim(); }
         var rname = rv('#ev-rname');
@@ -618,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (r && r.error) throw r.error;
         SHSCloud.log(isNew ? 'create' : 'update', '노회 일정 ' + (isNew ? '추가' : '수정'),
           labelOf(date) + ' ' + title +
-          (newMeta ? ' [명단 연동 ' + newMeta.sub + ' ' + newMeta.person + ']' : ''));
+          (newMeta && newMeta.sub ? ' [' + newMeta.sub + ' ' + newMeta.person + ' — 날짜 뒤 명단 반영]' : ''));
         mo.close(); reload();
       }).catch(function (er) { err(er.message || String(er)); });
     });
@@ -687,7 +667,20 @@ document.addEventListener('DOMContentLoaded', function () {
     db = c;
     reload();
     c.from('roster').select('id,name,church,category,position,active').order('sort').order('id')
-      .then(function (r) { roster = (r && r.data) || []; });
+      .then(function (r) {
+        roster = (r && r.data) || [];
+        /* 알림의 바로 가기: #new=임직식&sub=목사 위임&person=송지용&church=목자교회 */
+        var qs = new URLSearchParams(location.hash.replace(/^#/, ''));
+        if (qs.get('new')) {
+          var person = qs.get('person') || '', church = qs.get('church') || '';
+          var hit = roster.filter(function (m) { return m.name === person && (!church || m.church === church) && m.active !== false; })[0];
+          openEdit(null, qs.get('date') || '', {
+            kind: qs.get('new'), sub: qs.get('sub') || '', person: person, church: church,
+            roster_id: hit ? hit.id : null, note: ''
+          });
+          if (history.replaceState) history.replaceState(null, '', location.pathname);
+        }
+      });
     c.from('site_settings').select('value').eq('key', 'sessions')
       .then(function (r) {
         SESSIONS = (r && r.data && r.data[0] && r.data[0].value) || null;
