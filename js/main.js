@@ -47,30 +47,38 @@
       { t: '미래교회자립위원회', h: 'committee.html?c=%EB%AF%B8%EB%9E%98%EA%B5%90%ED%9A%8C%EC%9E%90%EB%A6%BD%EC%9C%84%EC%9B%90%ED%9A%8C' },
       { t: '상비부 대시보드', h: 'dashboard.html' }
     ]},
-    { title: '회칙', href: 'rules-presbytery.html', sub: [
+    /* 노회전자자료실 — 총회전자자료실처럼 노회의 규칙·결의·보고서·회의록·서식을 한 메뉴에 모은다 */
+    { title: '노회전자자료실', href: 'rules-presbytery.html', sub: [
       { t: '노회 회칙', h: 'rules-presbytery.html' },
-      { t: '총회 회칙 안내', h: 'rules-assembly.html' },
-      { t: '각종 내규', h: 'rules-presbytery.html#bylaws' }
+      { t: '각종 내규', h: 'rules-presbytery.html#bylaws' },
+      { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
+      { t: '노회 보고서 (회의자료)', h: 'presbytery-report.html' },
+      { t: '노회 회의록', h: 'minutes.html' },
+      { t: '교회상황 보고서', h: 'report.html' },
+      { t: '고시 모의고사', h: 'exam.html' },
+      { t: '자료실 (공문·회계·파일)', h: 'archive.html' }
     ]},
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
       { t: '신청서류 확인', h: 'request.html#list' },
+      { t: '청원서', h: 'petition.html' },
+      { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
       { t: '증명서 진위 확인', h: 'verify.html' }
     ]},
-    { title: '자료실', href: 'archive.html', sub: [
-      { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
-      { t: '청원서', h: 'petition.html' },
-      { t: '교회상황 보고서', h: 'report.html' },
+    /* 나의 서류 — 내가 낸 청원서·보고서·받은 증명서 */
+    { title: '나의 서류', href: 'mydocs.html', sub: [
       { t: '나의 서류', h: 'mydocs.html' },
-      { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
-      { t: '고시 모의고사', h: 'exam.html' }
+      { t: '서류 신청 내역', h: 'request.html#list' },
+      { t: '알림함', h: 'notifications.html' },
+      { t: '내 정보', h: 'mypage.html' }
     ]},
     { title: '총회', href: 'assembly-constitution.html', sub: [
       { t: '총회 활동현황', h: 'dashboard.html#hub-assembly' },
       { t: '총회 헌법', h: 'assembly-constitution.html' },
       { t: '총회 규정', h: 'assembly-rules.html' },
       { t: '총회 회의결의', h: 'assembly-resolution.html' },
-      { t: '총회 보고서', h: 'assembly-report.html' }
+      { t: '총회 보고서', h: 'assembly-report.html' },
+      { t: '총회 회칙 안내', h: 'rules-assembly.html' }
     ]},
     { title: '게시판', href: 'board.html', sub: [
       { t: '공지사항', h: 'board.html#notice' },
@@ -116,13 +124,13 @@
   /* 관리자 모드(왼쪽 메뉴)를 씌울 관리 화면들 — js/admin-shell.js 가 맡는다 */
   var ADMIN_PAGES = ['admin-home.html', 'admin-ai.html', 'manage.html', 'admin.html', 'schedule.html', 'archive-edit.html',
     'elder-notice.html', 'meeting-admin.html', 'proceed.html', 'documents.html', 'report-intake.html',
-    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html'];
+    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html', 'presbytery-report.html'];
   function loadAdminShell() {
     var pg = location.pathname.split('/').pop() || 'index.html';
     if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
     if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
     var sc = document.createElement('script');
-    sc.src = 'js/admin-shell.js?v=20261020b';
+    sc.src = 'js/admin-shell.js?v=20261021e';
     document.body.appendChild(sc);
   }
 

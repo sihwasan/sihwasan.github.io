@@ -315,7 +315,7 @@ function systemPrompt(me, built) {
     '자료를 찾는 법',
     '- 반드시 도구로 찾은 자료만 근거로 답합니다. 기억에 있는 내용으로 답하지 않습니다.',
     '- 총회 헌법(정치·권징조례·예배모범 등)과 총회 규정·결의는 search_assembly / get_assembly_article 로, 노회규칙은 search_presbytery_rules 로 찾습니다.',
-    '- 노회 사람·교회·조직·일정·공지·결의·회의록·시찰·상비부는 그에 맞는 search_* / get_organization 도구로 찾습니다.',
+    '- 노회 사람·교회·조직·일정·공지·결의·회의록·시찰·상비부·상회비는 그에 맞는 search_* / get_organization 도구로 찾습니다. 정기노회 회의자료 책자(각 부 보고·시찰 보고·명단·주소록)는 search_presbytery_reports 로 찾습니다.',
     '- 처음 찾은 결과가 질문과 맞지 않으면 낱말을 바꾸거나 범위를 좁혀 두세 번 더 찾습니다. 필요하면 여러 도구를 함께 씁니다.',
     '- 관리자가 원문을 확인해 승인해 둔 「확인된 답」이 있을 수 있습니다. 처음 자료를 찾을 때 search_verified_answers 를 다른 검색과 함께 부릅니다(search_assembly 결과 맨 앞에 verified 로 붙어 오기도 합니다).',
     '- 질문과 맞는 확인된 답이 있으면 그것을 우선 근거로 씁니다. 답의 첫 문장 끝에 그 확인된 답의 근거 번호를 달아(구절도 그 확인된 답 글에서) 관리자가 확인한 답임을 보이고, 반드시 그 답이 기대는 원문 조문·결의·규칙을 해당 도구로 다시 찾아 확인해 각 문장에 원문 근거 번호를 함께 답니다. 원문과 다르면 원문을 따르고 그 차이를 짧게 알립니다. 질문과 맞지 않는 확인된 답은 쓰지 않습니다.',
@@ -694,6 +694,63 @@ async function settings(request, env, origin, test) {
   return reply(publicSettings(next, { saved: true, usage: await usageToday(env, me.id) }), 200, origin);
 }
 
+/* ---------- 회의자료 책자 쪽 읽기 (관리자) ----------
+ * 홈페이지(presbytery-report.html)가 PDF 한 쪽(펼침면)을 그림으로 바꿔 보내면,
+ * Claude 가 왼쪽·오른쪽 면을 나누어 인쇄 쪽 번호·제목·글을 그대로 받아 적는다. */
+const OCR_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    pages: { type: 'array', items: { type: 'object', additionalProperties: false,
+      properties: {
+        no: { type: ['integer', 'null'], description: '그 면에 인쇄된 쪽 번호. 없으면 null' },
+        heading: { type: ['string', 'null'], description: '그 면의 큰 제목 (예: 서기 사무보고, 재정부 보고). 없으면 null' },
+        text: { type: 'string', description: '그 면의 글 전부. 줄은 그대로 바꾸고, 표는 줄마다 칸을 " | "로 나눈다. 빈 면이면 빈 글' }
+      }, required: ['no', 'heading', 'text'] } },
+    toc: { type: 'array', description: '이 면이 차례(목차)면 그 항목들. 아니면 빈 배열', items: { type: 'object', additionalProperties: false,
+      properties: { title: { type: 'string' }, page: { type: 'integer' }, level: { type: 'integer', description: '1=큰 항목, 2=작은 항목' } },
+      required: ['title', 'page', 'level'] } }
+  },
+  required: ['pages', 'toc']
+};
+const OCR_PROMPT =
+  '이 그림은 대한예수교장로회 시화산노회 정기노회 회의자료 책자의 한 쪽을 스캔한 것입니다. 보통 왼쪽 면과 오른쪽 면이 함께 보입니다(펼침면). ' +
+  '면마다 따로, 인쇄된 쪽 번호(보통 아래 가운데 동그라미 안 숫자), 그 면의 큰 제목, 그리고 글 전부를 받아 적어 주세요. ' +
+  '글자를 바꾸거나 요약하지 말고 보이는 그대로 적습니다. 이름·교회 이름·숫자·날짜·금액은 특히 정확하게 적습니다. ' +
+  '표는 줄마다 칸을 " | "로 나누어 적고, 점선(……)으로 이어진 차례는 "항목 … 쪽" 꼴로 적습니다. ' +
+  '빈 면이나 그림만 있는 면은 text 를 빈 글로 두고 no 는 null 로 둡니다. 차례(목차) 면이면 toc 에 항목과 쪽 번호를 적습니다. 왼쪽 면을 먼저, 오른쪽 면을 다음에 둡니다.';
+
+async function ocrPage(request, env, origin) {
+  const me = await whoIs(request, env);
+  if (!me) return reply({ error: '로그인이 확인되지 않았습니다.' }, 401, origin);
+  if (ADMIN_ROLES.indexOf(me.role) === -1) return reply({ error: '관리자만 책자를 읽힐 수 있습니다.' }, 403, origin);
+  const s = await getSettings(env);
+  if (!s.api_key) return reply({ error: 'AI 열쇠(API 키)가 아직 등록되지 않았습니다.' }, 503, origin);
+  const body = await request.json().catch(function () { return null; });
+  if (!body || !body.image) return reply({ error: '그림이 없습니다.' }, 400, origin);
+  if (String(body.image).length > 9 * 1024 * 1024) return reply({ error: '그림이 너무 큽니다.' }, 400, origin);
+  const mt = ['image/jpeg', 'image/png', 'image/webp'].indexOf(body.media_type) !== -1 ? body.media_type : 'image/jpeg';
+  const req = {
+    model: s.model,
+    max_tokens: 8000,
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: OCR_SCHEMA } },
+    messages: [{ role: 'user', content: [
+      { type: 'image', source: { type: 'base64', media_type: mt, data: String(body.image) } },
+      { type: 'text', text: OCR_PROMPT + (body.hint ? ' (책자: ' + String(body.hint).slice(0, 80) + ', PDF ' + (body.pdf_page || '?') + '쪽)' : '') }
+    ] }]
+  };
+  try {
+    const res = await claudeCall(s.api_key, req, null);
+    if (res.stop_reason === 'refusal') return reply({ error: '이 쪽은 읽을 수 없다고 응답했습니다.' }, 200, origin);
+    const text = res.content.filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
+    let out = null;
+    try { out = JSON.parse(text); } catch (e) { return reply({ error: '읽은 결과를 해석하지 못했습니다.' }, 200, origin); }
+    out.model = res.model; out.usage = res.usage ? { input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens } : null;
+    return reply(out, 200, origin);
+  } catch (e) {
+    return reply({ error: (e && e.message) || String(e) }, 502, origin);
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
@@ -712,6 +769,7 @@ export default {
       if (path === '/feedback' && request.method === 'POST') return await feedback(request, env, origin);
       if (path === '/reports/run' && request.method === 'POST') return await reportsRun(request, env, ctx, origin);
       if (path === '/history' || path.indexOf('/history/') === 0) return await historyApi(request, env, origin, path);
+      if (path === '/ocr' && request.method === 'POST') return await ocrPage(request, env, origin);
       if (path === '/settings' && (request.method === 'GET' || request.method === 'POST')) return await settings(request, env, origin, false);
       if (path === '/settings/test' && request.method === 'POST') return await settings(request, env, origin, true);
       return reply({ error: '없는 주소입니다.' }, 404, origin);

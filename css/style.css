@@ -2769,3 +2769,43 @@ mark.aih-key {
 .aih-voice.err { background: rgba(192, 57, 43, 0.35); }
 .aih-voice.hidden { display: none; }
 @media (max-width: 900px) { .aih-mic { order: 0; } .aih-form .aih-go { flex: 1 1 auto; } }
+
+/* ---------- 노회 보고서 (회의자료 책자) ---------- */
+.pr-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.pr-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.pr-tab { border: 1px solid var(--gray-3); background: #fff; border-radius: 99px; padding: 7px 14px; font-size: 0.9rem; cursor: pointer; color: var(--gray-7); }
+.pr-tab.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.pr-search { display: flex; gap: 8px; margin: 0 0 16px; }
+.pr-search input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; }
+.pr-wrap { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
+.pr-side { position: sticky; top: calc(var(--nav-h, 0px) + 16px); background: var(--cream, #fbf8f2); border: 1px solid var(--gray-2); border-radius: 12px; padding: 14px; max-height: calc(100vh - var(--nav-h, 0px) - 32px); overflow-y: auto; }
+.pr-side-h { font-size: 0.74rem; letter-spacing: 2px; color: var(--gray-5); margin-bottom: 6px; }
+.pr-toc { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 0.88rem; }
+.pr-toc.lv2 { padding-left: 20px; color: var(--gray-7); }
+.pr-toc span { color: var(--gray-5); font-size: 0.8rem; }
+.pr-toc:hover { background: #fff; }
+.pr-toc.on { background: var(--navy); color: #fff; }
+.pr-toc.on span { color: #fff; }
+.pr-jump { display: flex; gap: 6px; }
+.pr-jump input { width: 80px; padding: 6px 8px; border: 1px solid var(--gray-3); border-radius: 6px; }
+.pr-page { background: #fff; border: 1px solid var(--gray-2); border-radius: 12px; padding: 20px 22px; min-height: 300px; }
+.pr-page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--gray-2); padding-bottom: 10px; margin-bottom: 14px; }
+.pr-page-no { font-size: 0.78rem; letter-spacing: 2px; color: var(--accent); }
+.pr-heading { margin: 2px 0 0; font-size: 1.2rem; border: 0; padding: 0; }
+.pr-heading::after { display: none; }
+.pr-page-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.pr-text { white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem; color: var(--ink); }
+.pr-res-h { font-weight: 700; color: var(--navy); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+.pr-res { display: block; padding: 10px 12px; border: 1px solid var(--gray-2); border-radius: 8px; background: var(--gray-1); margin-bottom: 6px; color: var(--ink); text-decoration: none; }
+.pr-res:hover { border-color: var(--accent); background: #fff; }
+.pr-res-t { display: block; font-size: 0.82rem; color: var(--navy); font-weight: 700; margin-bottom: 3px; }
+.pr-res-s { display: block; font-size: 0.86rem; color: var(--gray-7); line-height: 1.6; }
+#pr-results { margin-bottom: 16px; }
+.pr-progress { margin-top: 10px; }
+.pr-bar { height: 10px; background: var(--gray-2); border-radius: 99px; overflow: hidden; }
+.pr-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.pr-progress div:last-child { font-size: 0.84rem; color: var(--gray-5); margin-top: 4px; }
+@media (max-width: 900px) {
+  .pr-wrap { grid-template-columns: 1fr; }
+  .pr-side { position: static; max-height: none; }
+}

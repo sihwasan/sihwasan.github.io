@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관리자 홈 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261021e">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>관리자 홈</h1>
+    <div class="crumb">홈 &gt; 관리자</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="ah-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script>
+/* ---- 미리보기용 가짜 서버 ---- */
+window.__FAKE_ROLE = new URLSearchParams(location.search).get('role') || 'member';
+window.SHS_SUPABASE = { url: 'https://fake.local', anonKey: 'x', ready: function () { return true; }, redirectTo: '' };
+window.supabase = { createClient: function () { return client; } };
+function thenable(data) { var p = Promise.resolve({ data: data, error: null, count: Array.isArray(data) ? data.length : 0 }); var q = { then: p.then.bind(p), catch: p.catch.bind(p) };
+  ['select','eq','neq','in','order','limit','gte','lte','is','not','single','upsert','insert','update','delete'].forEach(function (m) { q[m] = function () { return q; }; }); return q; }
+var PROFILE = { id: 'u1', email: 'test@example.com', name: '김동석', church: '운평장로교회', position: '위임목사', role: window.__FAKE_ROLE, title: window.__FAKE_ROLE === 'officer' ? '부서기' : null };
+var TABLES = {
+  site_notices: [{ id: 1, cat: '소식', title: '임직식 — 손병민 목사 위임 (노진교회)', date: '2026-10-20', schedule_id: 7 }, { id: 2, cat: '공지', title: '제20회 정기노회 안내', date: '2026-10-01' }],
+  site_schedule: [{ id: 7, date_label: '11.9', title: '임직식 — 손병민 목사 위임 (노진교회)', event_date: '2026-11-09', kind: '임직식' }, { id: 8, date_label: '4.13', title: '제21회 봄 정기노회', event_date: '2027-04-12', kind: '정기노회' }],
+  gallery_items: [], presbytery_reports: [{ id: 1, session: 20, kind: '정기노회', title: '제20회 정기노회 회의자료 (2026 가을)', meet_on: '2026-10-12', pdf_pages: 58, file_path: 'reports/r20.pdf', status: '완료', toc: [{ title: '집회순서', page: 8, level: 1 }, { title: '서기 사무보고', page: 22, level: 1 }, { title: '각 시찰 보고', page: 35, level: 1 }, { title: '북부시찰', page: 35, level: 2 }] }], presbytery_report_pages: [{ id: 1, report_id: 1, pdf_page: 6, page_no: 8, heading: '집회시간', text: '1. 기간 : 주후 2026년 10월 12일(월) 오전 10시~폐회시까지
+2. 개회전 부서모임
+1)고시규칙부 | 9월 28일(월) 오전 9:00 | 노회사무실' }, { id: 2, report_id: 1, pdf_page: 6, page_no: 9, heading: '개회예배', text: '1) 묵도 다같이
+2) 찬송 425장' }], notifications: [], committees: [], committee_events: [], site_settings: [], profiles: [], doc_requests: [], church_reports: [], audit_logs: [], ai_logs: []
+};
+var client = {
+  auth: { getUser: function () { return Promise.resolve({ data: { user: { id: 'u1', email: 'test@example.com' } } }); },
+          getSession: function () { return Promise.resolve({ data: { session: { access_token: 'FAKE' } } }); },
+          signOut: function () { return Promise.resolve(); } },
+  from: function (t) { if (t === 'profiles') { var q = thenable(PROFILE); return q; } return thenable(TABLES[t] || []); },
+  rpc: function (n) { return thenable(n === 'assembly_today' ? null : (n === 'my_committees' ? [] : null)); },
+  storage: { from: function () { return { createSignedUrls: function () { return Promise.resolve({ data: [] }); } }; } }
+};
+/* AI 창구 흉내: /ask 는 SSE, /settings 는 JSON */
+var realFetch = window.fetch;
+window.fetch = function (url, init) {
+  if (typeof url === 'string' && url.indexOf('workers.dev') !== -1) {
+    if (url.indexOf('/settings') !== -1 || url.indexOf('/health') !== -1) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, model: 'claude-opus-5-5', effort: 'medium', daily_user: 30, daily_total: 300, roles: ['member','officer'], enabled: true, has_key: true, key_tail: 'AbCd', updated_at: '2026-10-20T01:00:00Z', updated_by: '김동석',
+        models: [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5', input: 4, output: 20, note: '가장 정확함 · 기본값' }, { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', input: 2, output: 10, note: '빠르고 정확함' }, { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', input: 0.1, output: 0.5, note: '가장 저렴하고 빠름' }],
+        usage: { date: '2026-10-20', total: 12, me: 3 }, index: { chunks: 2697, built: '2026-10-20' }, saved: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
+    var evs = [
+      ['status', { text: '총회 자료를 찾는 중' }],
+      ['delta', { n: 0, text: '잠시만요' }], ['retract', { n: 0 }],
+      ['status', { text: '답을 정리하는 중' }],
+      ['delta', { n: 1, text: '**해벌**은 치리회가 시벌한 자를 회개가 확인되면 풀어 주는 절차입니다. ' }],
+      ['delta', { n: 1, text: '권징조례 제35조는 당회가 정하는 책벌을 권계·견책·정직·면직·수찬 정지·제명·출교로 정합니다 [R2]{{권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교}}. \n\n' }],
+      ['delta', { n: 1, text: '- 시벌과 해벌은 예배모범 제16·17장에 따라 처리합니다 [R1]\n- 면직을 해벌할 때 노회는 극히 근신하여 행합니다 [R3]\n\n자료에서 확인되는 범위는 여기까지입니다.' }],
+      ['sources', { list: [
+        { ref: 'R1', title: '권징조례 제31조', url: 'assembly-constitution.html#b5-s3-a31', kind: '총회 헌법 > 권징조례', snippet: '제31조 치리회가 시벌하거나 해벌하는 때에는 장로회 예배 모범 제 16, 17장의 규정한 바에 의하여 처리함이 옳다.', cited: true },
+        { ref: 'R2', title: '권징조례 제35조', url: 'assembly-constitution.html#b5-s4-a35', kind: '총회 헌법 > 권징조례', snippet: '제35조 당회가 정하는 책벌은 권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교니…', cited: true, quotes: ['권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교'] },
+        { ref: 'R3', title: '예배모범 제17장 해벌', url: 'assembly-constitution.html#b4-s16', kind: '총회 헌법 > 예배모범', snippet: '5. 정직한 목사를 복직하며 면직한 자를 임직할 때는 노회는 극히 근신하여 행할 것이나…', cited: true },
+        { ref: 'R4', title: '제110회 총회(2025년) 「정치부 보고」', url: 'assembly-resolution.html#s110-i11', kind: '총회 회의결의', snippet: '…', cited: false } ] }],
+      ['usage', { model: 'claude-opus-5-5', input_tokens: 18000, output_tokens: 300, ms: 4200 }], ['done', {}]
+    ];
+    var enc = new TextEncoder();
+    var i = 0;
+    var stream = new ReadableStream({ pull: function (ctl) { return new Promise(function (res) { setTimeout(function () {
+      if (i >= evs.length) { ctl.close(); res(); return; }
+      ctl.enqueue(enc.encode('event: ' + evs[i][0] + '\ndata: ' + JSON.stringify(evs[i][1]) + '\n\n')); i++; res(); }, 350); }); } });
+    return Promise.resolve(new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+  }
+  return realFetch.apply(this, arguments);
+};
+</script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261021e"></script>
+<script src="js/ai-chat.js?v=20261020d"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('ah-area');
+  var e = SHS.esc;
+
+  if (!user || !SHSAuth.canManageMembers(user)) {
+    area.innerHTML =
+      '<div class="notice-banner">관리자 홈은 <strong>관리자 등급</strong>이 이용할 수 있습니다.' +
+      (user ? ' 현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 이용할 수 없습니다.'
+            : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') + '</div>';
+    return;
+  }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  function tile(id, label, href, hint) {
+    return '<a class="ah-tile" href="' + href + '"><span class="ah-label">' + label + '</span>' +
+      '<span class="ah-num" id="' + id + '">…</span><span class="ah-hint">' + hint + '</span></a>';
+  }
+  area.innerHTML =
+    '<div class="notice-banner"><strong>' + e(SHS.honorific(user)) + '</strong>, 관리자 모드입니다. ' +
+    '왼쪽 메뉴에서 홈페이지·회원·회무·설정을 관리합니다. 아래는 지금 손볼 일입니다.</div>' +
+    '<div class="ah-grid">' +
+    tile('ah-pending', '승인 대기 회원', 'admin.html', '가입했지만 아직 승인하지 않은 분') +
+    tile('ah-docs', '서류 신청 대기', 'documents.html#requests', '발급을 기다리는 신청') +
+    tile('ah-reports', '보고서 접수 대기', 'report-intake.html', '시찰을 거쳐 올라온 교회상황 보고서') +
+    tile('ah-ai', 'AI 검색 오늘 사용', 'admin-ai.html', '노회 전체 질문 수') +
+    '</div>' +
+    '<div class="ah-cols">' +
+    '<section class="admin-card"><h3 style="margin-top:0">다가오는 일정 <a class="more" href="schedule.html" style="font-size:0.8rem;font-weight:400">일정 관리</a></h3><div id="ah-sched">불러오는 중…</div></section>' +
+    '<section class="admin-card"><h3 style="margin-top:0">최근 공지 <a class="more" href="manage.html#mg-notice" style="font-size:0.8rem;font-weight:400">공지 관리</a></h3><div id="ah-notice">불러오는 중…</div></section>' +
+    '<section class="admin-card"><h3 style="margin-top:0">최근 활동 기록 <a class="more" href="ops.html#ops-audit" style="font-size:0.8rem;font-weight:400">전체 보기</a></h3><div id="ah-audit">불러오는 중…</div></section>' +
+    '</section></div>' +
+    '<h2>바로 가기</h2>' +
+    '<div class="ah-links">' +
+    [['manage.html#mg-hero', '메인 화면 문구'], ['schedule.html', '노회 일정 등록'], ['manage.html#mg-notice', '공지 쓰기'],
+     ['admin.html', '회원 승인·명단'], ['documents.html', '서류 발급'], ['meeting-admin.html', '노회 회의관리'],
+     ['minutes.html', '회의록'], ['admin-ai.html', 'AI 검색·API'], ['settings.html', '직인·도장'], ['archive-edit.html', '자료실·회칙']]
+      .map(function (l) { return '<a class="btn ghost sm" href="' + l[0] + '">' + l[1] + '</a>'; }).join(' ') +
+    '</div>';
+
+  function num(id, v, warn) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = v;
+    if (warn && Number(v) > 0) el.classList.add('warn');
+  }
+
+  SHSCloud.init().then(function (c) {
+    c.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'pending')
+      .then(function (r) { num('ah-pending', r.count == null ? '-' : r.count, true); }, function () { num('ah-pending', '-'); });
+    c.from('doc_requests').select('id', { count: 'exact', head: true }).eq('status', '신청')
+      .then(function (r) { num('ah-docs', r.count == null ? '-' : r.count, true); }, function () { num('ah-docs', '-'); });
+    c.from('church_reports').select('id', { count: 'exact', head: true }).not('presbytery_sent_at', 'is', null).is('approved_at', null)
+      .then(function (r) { num('ah-reports', r.count == null ? '-' : r.count, true); }, function () { num('ah-reports', '-'); });
+
+    c.from('site_schedule').select('id,title,kind,event_date,end_date').gte('event_date', today).order('event_date').limit(6)
+      .then(function (r) {
+        var rows = (r && r.data) || [];
+        document.getElementById('ah-sched').innerHTML = rows.length
+          ? '<ul class="ah-list">' + rows.map(function (s) {
+              return '<li><span class="ah-d">' + e(s.event_date.slice(5).replace('-', '.')) + (s.end_date ? '~' : '') + '</span>' +
+                '<span class="ah-k">' + e(s.kind || '') + '</span> ' + e(s.title) + '</li>';
+            }).join('') + '</ul>'
+          : '<p style="color:var(--gray-5);margin:0">앞으로 등록된 일정이 없습니다. <a href="schedule.html">일정을 등록</a>하면 공지에도 함께 올라갑니다.</p>';
+      });
+    c.from('site_notices').select('id,cat,title,date,schedule_id').order('date', { ascending: false }).order('id', { ascending: false }).limit(6)
+      .then(function (r) {
+        var rows = (r && r.data) || [];
+        document.getElementById('ah-notice').innerHTML = rows.length
+          ? '<ul class="ah-list">' + rows.map(function (n) {
+              return '<li><span class="ah-d">' + e(String(n.date).slice(5).replace('-', '.')) + '</span><span class="ah-k">' + e(n.cat) + '</span> ' + e(n.title) +
+                (n.schedule_id ? ' <small style="color:var(--gray-5)">(일정에서 자동)</small>' : '') + '</li>';
+            }).join('') + '</ul>'
+          : '<p style="color:var(--gray-5);margin:0">공지가 없습니다.</p>';
+      }, function () { document.getElementById('ah-notice').textContent = '-'; });
+    c.from('audit_logs').select('created_at,user_name,action,detail').order('created_at', { ascending: false }).limit(8)
+      .then(function (r) {
+        var rows = (r && r.data) || [];
+        document.getElementById('ah-audit').innerHTML = rows.length
+          ? '<ul class="ah-list">' + rows.map(function (a) {
+              return '<li><span class="ah-d">' + e(String(a.created_at).replace('T', ' ').slice(5, 16)) + '</span>' +
+                '<strong>' + e(a.user_name || '') + '</strong> ' + e(a.action) + ' <small style="color:var(--gray-5)">' + e(String(a.detail || '').slice(0, 40)) + '</small></li>';
+            }).join('') + '</ul>'
+          : '<p style="color:var(--gray-5);margin:0">기록이 없습니다.</p>';
+      }, function () { document.getElementById('ah-audit').textContent = '-'; });
+  });
+
+  /* AI 창구 */
+  SHSCloud.init().then(function (c) { return c.auth.getSession(); }).then(function (r) {
+    var tk = r && r.data && r.data.session && r.data.session.access_token;
+    if (!tk) return;
+    return fetch(SHSAI.url + '/settings', { headers: { Authorization: 'Bearer ' + tk } }).then(function (x) { return x.json(); })
+      .then(function (s) {
+        var el = document.getElementById('ah-ai');
+        if (!el) return;
+        if (s.error) { el.textContent = '연결 안 됨'; el.classList.add('warn'); return; }
+        el.textContent = (s.usage ? s.usage.total : 0) + ' / ' + s.daily_total;
+        if (!s.has_key || !s.enabled) { el.textContent = s.has_key ? '꺼짐' : '열쇠 없음'; el.classList.add('warn'); }
+      }).catch(function () { var el = document.getElementById('ah-ai'); if (el) { el.textContent = '창구 미배포'; el.classList.add('warn'); } });
+  });
+ });
+});
+</script>
+<script src="js/admin-shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 검색 · API 설정 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261021e">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>AI 검색 · API 설정</h1>
+    <div class="crumb">홈 &gt; 관리자 &gt; AI 검색 · API 설정</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="ai-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script>
+/* ---- 미리보기용 가짜 서버 ---- */
+window.__FAKE_ROLE = new URLSearchParams(location.search).get('role') || 'member';
+window.SHS_SUPABASE = { url: 'https://fake.local', anonKey: 'x', ready: function () { return true; }, redirectTo: '' };
+window.supabase = { createClient: function () { return client; } };
+function thenable(data) { var p = Promise.resolve({ data: data, error: null, count: Array.isArray(data) ? data.length : 0 }); var q = { then: p.then.bind(p), catch: p.catch.bind(p) };
+  ['select','eq','neq','in','order','limit','gte','lte','is','not','single','upsert','insert','update','delete'].forEach(function (m) { q[m] = function () { return q; }; }); return q; }
+var PROFILE = { id: 'u1', email: 'test@example.com', name: '김동석', church: '운평장로교회', position: '위임목사', role: window.__FAKE_ROLE, title: window.__FAKE_ROLE === 'officer' ? '부서기' : null };
+var TABLES = {
+  site_notices: [{ id: 1, cat: '소식', title: '임직식 — 손병민 목사 위임 (노진교회)', date: '2026-10-20', schedule_id: 7 }, { id: 2, cat: '공지', title: '제20회 정기노회 안내', date: '2026-10-01' }],
+  site_schedule: [{ id: 7, date_label: '11.9', title: '임직식 — 손병민 목사 위임 (노진교회)', event_date: '2026-11-09', kind: '임직식' }, { id: 8, date_label: '4.13', title: '제21회 봄 정기노회', event_date: '2027-04-12', kind: '정기노회' }],
+  gallery_items: [], presbytery_reports: [{ id: 1, session: 20, kind: '정기노회', title: '제20회 정기노회 회의자료 (2026 가을)', meet_on: '2026-10-12', pdf_pages: 58, file_path: 'reports/r20.pdf', status: '완료', toc: [{ title: '집회순서', page: 8, level: 1 }, { title: '서기 사무보고', page: 22, level: 1 }, { title: '각 시찰 보고', page: 35, level: 1 }, { title: '북부시찰', page: 35, level: 2 }] }], presbytery_report_pages: [{ id: 1, report_id: 1, pdf_page: 6, page_no: 8, heading: '집회시간', text: '1. 기간 : 주후 2026년 10월 12일(월) 오전 10시~폐회시까지
+2. 개회전 부서모임
+1)고시규칙부 | 9월 28일(월) 오전 9:00 | 노회사무실' }, { id: 2, report_id: 1, pdf_page: 6, page_no: 9, heading: '개회예배', text: '1) 묵도 다같이
+2) 찬송 425장' }], notifications: [], committees: [], committee_events: [], site_settings: [], profiles: [], doc_requests: [], church_reports: [], audit_logs: [], ai_logs: []
+};
+var client = {
+  auth: { getUser: function () { return Promise.resolve({ data: { user: { id: 'u1', email: 'test@example.com' } } }); },
+          getSession: function () { return Promise.resolve({ data: { session: { access_token: 'FAKE' } } }); },
+          signOut: function () { return Promise.resolve(); } },
+  from: function (t) { if (t === 'profiles') { var q = thenable(PROFILE); return q; } return thenable(TABLES[t] || []); },
+  rpc: function (n) { return thenable(n === 'assembly_today' ? null : (n === 'my_committees' ? [] : null)); },
+  storage: { from: function () { return { createSignedUrls: function () { return Promise.resolve({ data: [] }); } }; } }
+};
+/* AI 창구 흉내: /ask 는 SSE, /settings 는 JSON */
+var realFetch = window.fetch;
+window.fetch = function (url, init) {
+  if (typeof url === 'string' && url.indexOf('workers.dev') !== -1) {
+    if (url.indexOf('/settings') !== -1 || url.indexOf('/health') !== -1) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, model: 'claude-opus-5-5', effort: 'medium', daily_user: 30, daily_total: 300, roles: ['member','officer'], enabled: true, has_key: true, key_tail: 'AbCd', updated_at: '2026-10-20T01:00:00Z', updated_by: '김동석',
+        models: [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5', input: 4, output: 20, note: '가장 정확함 · 기본값' }, { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', input: 2, output: 10, note: '빠르고 정확함' }, { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', input: 0.1, output: 0.5, note: '가장 저렴하고 빠름' }],
+        usage: { date: '2026-10-20', total: 12, me: 3 }, index: { chunks: 2697, built: '2026-10-20' }, saved: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
+    var evs = [
+      ['status', { text: '총회 자료를 찾는 중' }],
+      ['delta', { n: 0, text: '잠시만요' }], ['retract', { n: 0 }],
+      ['status', { text: '답을 정리하는 중' }],
+      ['delta', { n: 1, text: '**해벌**은 치리회가 시벌한 자를 회개가 확인되면 풀어 주는 절차입니다. ' }],
+      ['delta', { n: 1, text: '권징조례 제35조는 당회가 정하는 책벌을 권계·견책·정직·면직·수찬 정지·제명·출교로 정합니다 [R2]{{권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교}}. \n\n' }],
+      ['delta', { n: 1, text: '- 시벌과 해벌은 예배모범 제16·17장에 따라 처리합니다 [R1]\n- 면직을 해벌할 때 노회는 극히 근신하여 행합니다 [R3]\n\n자료에서 확인되는 범위는 여기까지입니다.' }],
+      ['sources', { list: [
+        { ref: 'R1', title: '권징조례 제31조', url: 'assembly-constitution.html#b5-s3-a31', kind: '총회 헌법 > 권징조례', snippet: '제31조 치리회가 시벌하거나 해벌하는 때에는 장로회 예배 모범 제 16, 17장의 규정한 바에 의하여 처리함이 옳다.', cited: true },
+        { ref: 'R2', title: '권징조례 제35조', url: 'assembly-constitution.html#b5-s4-a35', kind: '총회 헌법 > 권징조례', snippet: '제35조 당회가 정하는 책벌은 권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교니…', cited: true, quotes: ['권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교'] },
+        { ref: 'R3', title: '예배모범 제17장 해벌', url: 'assembly-constitution.html#b4-s16', kind: '총회 헌법 > 예배모범', snippet: '5. 정직한 목사를 복직하며 면직한 자를 임직할 때는 노회는 극히 근신하여 행할 것이나…', cited: true },
+        { ref: 'R4', title: '제110회 총회(2025년) 「정치부 보고」', url: 'assembly-resolution.html#s110-i11', kind: '총회 회의결의', snippet: '…', cited: false } ] }],
+      ['usage', { model: 'claude-opus-5-5', input_tokens: 18000, output_tokens: 300, ms: 4200 }], ['done', {}]
+    ];
+    var enc = new TextEncoder();
+    var i = 0;
+    var stream = new ReadableStream({ pull: function (ctl) { return new Promise(function (res) { setTimeout(function () {
+      if (i >= evs.length) { ctl.close(); res(); return; }
+      ctl.enqueue(enc.encode('event: ' + evs[i][0] + '\ndata: ' + JSON.stringify(evs[i][1]) + '\n\n')); i++; res(); }, 350); }); } });
+    return Promise.resolve(new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+  }
+  return realFetch.apply(this, arguments);
+};
+</script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261021e"></script>
+<script src="js/ai-chat.js?v=20261020d"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('ai-area');
+  var e = SHS.esc;
+  var WORKER = SHSAI.url;
+
+  if (!user || !SHSAuth.canManageMembers(user)) {
+    area.innerHTML =
+      '<div class="notice-banner">AI 검색 설정은 <strong>관리자 등급</strong>이 이용할 수 있습니다.' +
+      (user ? ' 현재 등급(' + SHS.displayRole(user.role, user.title) + ')으로는 이용할 수 없습니다.'
+            : ' <a class="btn sm" style="margin-left:10px" href="login.html">로그인</a>') + '</div>';
+    return;
+  }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+
+  var ROLE_OPTS = [
+    { v: 'member', t: '정회원' }, { v: 'officer', t: '임원' }, { v: 'associate', t: '준회원' },
+    { v: 'advisory', t: '언권회원' }, { v: 'general', t: '일반회원' }
+  ];
+  var WON = 1400;   /* 1달러를 원으로 어림 */
+  var S = null;     /* 창구에서 받은 설정 */
+
+  function token() {
+    return SHSCloud.init().then(function (c) {
+      return c.auth.getSession().then(function (r) { return r && r.data && r.data.session ? r.data.session.access_token : null; });
+    });
+  }
+  function call(path, method, body) {
+    return token().then(function (tk) {
+      return fetch(WORKER + path, {
+        method: method || 'GET',
+        headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+    }).then(function (r) {
+      return r.json().catch(function () { return { error: '창구 응답을 읽지 못했습니다 (HTTP ' + r.status + ')' }; })
+        .then(function (j) { if (!r.ok && !j.error) j.error = 'HTTP ' + r.status; return j; });
+    }).catch(function (x) {
+      return { error: '창구(' + WORKER + ')에 연결하지 못했습니다. 아직 배포 전이거나 인터넷이 끊겼을 수 있습니다. (' + (x && x.message) + ')' };
+    });
+  }
+  function msg(id, ok, text) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'form-msg ' + (ok ? 'ok' : 'err');
+    el.textContent = text;
+  }
+  /* 질문 한 번에 드는 돈 어림: 자료 2만 토큰 읽고 1천 토큰 답할 때 */
+  function perAsk(m) {
+    var usd = 20000 / 1e6 * m.input + 1000 / 1e6 * m.output;
+    var won = Math.round(usd * WON);
+    return won < 10 ? '약 ' + won + '원' : '약 ' + Math.round(won / 10) * 10 + '원';
+  }
+
+  function draw() {
+    var s = S;
+    var u = s.usage || { total: 0, me: 0 };
+    area.innerHTML =
+      '<div class="notice-banner">첫 화면의 <strong>AI 검색</strong>이 쓰는 Claude API 열쇠·모델·하루 한도를 여기서 정합니다. ' +
+      '열쇠는 Cloudflare 창구에 보관되며 이 화면에는 끝 네 자리만 보입니다.</div>' +
+
+      '<div class="admin-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:22px">' +
+      card('상태', s.enabled ? (s.has_key ? '<span style="color:#1a6d3a;font-weight:700">켜짐 · 열쇠 등록됨</span>' : '<span style="color:var(--red);font-weight:700">열쇠 없음</span>')
+                               : '<span style="color:var(--gray-5);font-weight:700">꺼짐</span>',
+           s.has_key ? '열쇠 끝자리 ····' + e(s.key_tail) : '열쇠를 넣어야 검색이 됩니다') +
+      card('모델', '<strong>' + e(modelName(s.model)) + '</strong>', '답변 깊이: ' + effortName(s.effort)) +
+      card('오늘 사용량', '<strong>' + u.total + '</strong> / ' + s.daily_total + '회 (노회 전체)', '나: ' + u.me + ' / ' + s.daily_user + '회 · ' + e(u.date || '')) +
+      card('마지막 수정', s.updated_at ? e(String(s.updated_at).replace('T', ' ').slice(0, 16)) : '-', s.updated_by ? e(s.updated_by) : '') +
+      '</div>' +
+
+      '<h2>1. API 열쇠</h2>' +
+      '<div class="admin-card" style="max-width:760px;margin-bottom:26px">' +
+      '<p style="margin:0 0 10px">Anthropic 콘솔(console.anthropic.com → API Keys)에서 만든 열쇠를 붙여 넣고 저장하세요. ' +
+      '열쇠는 <code>sk-ant-</code>로 시작합니다.</p>' +
+      '<div class="inline-form"><div class="field"><label>새 열쇠</label>' +
+      '<input type="password" id="k-key" autocomplete="off" placeholder="sk-ant-…"></div>' +
+      '<div class="field" style="flex:0 0 auto;align-self:flex-end"><button class="btn" id="k-save">열쇠 저장</button> ' +
+      '<button class="btn ghost" id="k-test">연결 시험</button>' +
+      (s.has_key ? ' <button class="btn danger" id="k-clear">지우기</button>' : '') + '</div></div>' +
+      '<div class="form-msg" id="k-msg"></div>' +
+      '<div id="k-models" style="font-size:0.82rem;color:var(--gray-5);margin-top:6px"></div></div>' +
+
+      '<h2>2. 모델과 답변 깊이</h2>' +
+      '<div class="admin-card" style="max-width:760px;margin-bottom:26px">' +
+      '<div class="ai-models">' + (s.models || []).map(function (m) {
+        return '<label class="ai-model' + (m.id === s.model ? ' on' : '') + '"><input type="radio" name="m-model" value="' + e(m.id) + '"' + (m.id === s.model ? ' checked' : '') + '>' +
+          '<span class="ai-model-n">' + e(m.name) + '</span><span class="ai-model-d">' + e(m.note) + '</span>' +
+          '<span class="ai-model-p">질문 1건 ' + perAsk(m) + ' <small>(입력 $' + m.input + ' · 출력 $' + m.output + ' /100만 토큰)</small></span></label>';
+      }).join('') + '</div>' +
+      '<div class="field" style="margin-top:14px"><label>답변 깊이</label><select id="m-effort" style="max-width:260px">' +
+      [['low', '빠르게 (간단한 질문에 알맞음)'], ['medium', '보통 (권장)'], ['high', '꼼꼼하게 (느리고 비용이 조금 더 듦)']].map(function (o) {
+        return '<option value="' + o[0] + '"' + (s.effort === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
+      }).join('') + '</select></div>' +
+      '<p style="font-size:0.82rem;color:var(--gray-5);margin:6px 0 0">값은 어림입니다. 실제 비용은 Anthropic 콘솔의 Usage 에서 확인하세요.</p>' +
+      '<div style="margin-top:14px"><button class="btn" id="m-save">모델·답변 깊이 저장</button></div>' +
+      '<div class="form-msg" id="m-msg"></div></div>' +
+
+      '<h2>3. 누가 얼마나</h2>' +
+      '<div class="admin-card" style="max-width:760px;margin-bottom:26px">' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 180px"><label>하루 1인 한도 (회)</label><input type="number" id="l-user" min="1" max="500" value="' + s.daily_user + '"></div>' +
+      '<div class="field" style="flex:0 0 180px"><label>하루 전체 한도 (회)</label><input type="number" id="l-total" min="1" max="5000" value="' + s.daily_total + '"></div></div>' +
+      '<div class="field"><label>이용할 수 있는 등급 (관리자는 늘 포함)</label><div style="display:flex;flex-wrap:wrap;gap:14px;margin-top:4px">' +
+      ROLE_OPTS.map(function (o) {
+        return '<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" name="r-role" value="' + o.v + '"' +
+          ((s.roles || []).indexOf(o.v) !== -1 ? ' checked' : '') + '> ' + o.t + '</label>';
+      }).join('') + '</div></div>' +
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer"><input type="checkbox" id="s-enabled"' + (s.enabled ? ' checked' : '') + '> ' +
+      '<strong>AI 검색 켜기</strong> <span style="font-size:0.84rem;color:var(--gray-5)">끄면 검색창이 "지금은 꺼져 있습니다"라고 알립니다</span></label>' +
+      '<div style="margin-top:14px"><button class="btn" id="s-save">설정 저장</button> ' +
+      '<button class="btn ghost" id="s-try">검색 시험 (짧은 인사)</button></div>' +
+      '<div class="form-msg" id="s-msg"></div></div>' +
+
+      '<h2>4. 최근 질문 기록</h2>' +
+      '<div id="ai-logs"><p style="color:var(--gray-5)">불러오는 중...</p></div>' +
+
+      '<h2>5. 창구 정보</h2>' +
+      '<div class="admin-card" style="max-width:760px">' +
+      '<p style="font-size:0.9rem;line-height:1.8;margin:0">창구 주소: <code>' + e(WORKER) + '</code><br>' +
+      '총회 자료 색인: <span id="w-index">' + (s.index ? '조각 ' + s.index.chunks + '개 · 기준일 ' + e(s.index.built) : '확인 중…') + '</span><br>' +
+      '자료는 질문한 분의 로그인 권한으로 읽으므로, 홈페이지에서 볼 수 없는 자료는 AI 도 보지 못합니다. ' +
+      '회의록·임원 자료실은 임원만, 생년월일·정년은 관리자만 답에 쓰입니다.</p></div>';
+
+    bind();
+    loadLogs();
+    call('/health').then(function (h) {
+      var el = document.getElementById('w-index');
+      if (el && h && h.index) el.textContent = '조각 ' + h.index.chunks + '개 · 기준일 ' + h.index.built + (h.colo ? ' · 접속 지점 ' + h.colo : '');
+      else if (el) el.textContent = h && h.error ? h.error : '색인을 아직 받지 못했습니다';
+    });
+  }
+  function card(t, big, small) {
+    return '<div class="admin-card" style="padding:14px 16px"><div style="font-size:0.76rem;letter-spacing:2px;color:var(--gray-5)">' + t + '</div>' +
+      '<div style="font-size:1.05rem;margin:6px 0 2px">' + big + '</div><div style="font-size:0.82rem;color:var(--gray-5)">' + small + '</div></div>';
+  }
+  function modelName(id) { var m = (S.models || []).filter(function (x) { return x.id === id; })[0]; return m ? m.name : id; }
+  function effortName(v) { return { low: '빠르게', medium: '보통', high: '꼼꼼하게' }[v] || v; }
+
+  function bind() {
+    document.getElementById('k-save').addEventListener('click', function () {
+      var k = document.getElementById('k-key').value.trim();
+      if (!k) { msg('k-msg', false, '열쇠를 붙여 넣어 주세요.'); return; }
+      if (k.indexOf('sk-ant-') !== 0) { msg('k-msg', false, '열쇠는 sk-ant- 로 시작합니다. 다시 확인해 주세요.'); return; }
+      msg('k-msg', true, '저장하는 중…');
+      call('/settings', 'POST', { api_key: k }).then(function (r) {
+        if (r.error) { msg('k-msg', false, r.error); return; }
+        S = r; document.getElementById('k-key').value = '';
+        SHSCloud.log('update', 'AI 검색 열쇠 등록', '끝자리 ' + r.key_tail);
+        draw(); msg('k-msg', true, '열쇠를 저장했습니다. 「연결 시험」으로 확인해 보세요.');
+      });
+    });
+    document.getElementById('k-test').addEventListener('click', function () {
+      var k = document.getElementById('k-key').value.trim();
+      msg('k-msg', true, '열쇠로 모델 목록을 받아 보는 중…');
+      call('/settings/test', 'POST', k ? { api_key: k } : {}).then(function (r) {
+        if (r.error || !r.ok) { msg('k-msg', false, r.error || '시험에 실패했습니다.'); return; }
+        msg('k-msg', true, '연결되었습니다. 쓸 수 있는 모델 ' + (r.models || []).length + '개.');
+        document.getElementById('k-models').textContent = (r.models || []).join(', ');
+      });
+    });
+    var clr = document.getElementById('k-clear');
+    if (clr) clr.addEventListener('click', function () {
+      if (!confirm('등록된 열쇠를 지우시겠습니까? 지우면 AI 검색이 멈춥니다.')) return;
+      call('/settings', 'POST', { clear_key: true }).then(function (r) {
+        if (r.error) { alert(r.error); return; }
+        S = r; SHSCloud.log('update', 'AI 검색 열쇠 삭제', ''); draw();
+      });
+    });
+    document.querySelectorAll('input[name="m-model"]').forEach(function (i) {
+      i.addEventListener('change', function () {
+        document.querySelectorAll('.ai-model').forEach(function (l) { l.classList.toggle('on', l.querySelector('input').checked); });
+      });
+    });
+    /* 모델·답변 깊이·한도·등급·켜기를 한꺼번에 저장한다 (2번 칸과 3번 칸의 단추가 같이 쓴다) */
+    function saveAll(msgId) {
+      var body = {
+        model: (document.querySelector('input[name="m-model"]:checked') || {}).value,
+        effort: document.getElementById('m-effort').value,
+        daily_user: parseInt(document.getElementById('l-user').value, 10),
+        daily_total: parseInt(document.getElementById('l-total').value, 10),
+        roles: [].map.call(document.querySelectorAll('input[name="r-role"]:checked'), function (c) { return c.value; }),
+        enabled: document.getElementById('s-enabled').checked
+      };
+      msg(msgId, true, '저장하는 중…');
+      call('/settings', 'POST', body).then(function (r) {
+        if (r.error) { msg(msgId, false, r.error); return; }
+        S = r;
+        SHSCloud.log('update', 'AI 검색 설정', body.model + ' / ' + body.effort + ' / 1인 ' + body.daily_user + ' 전체 ' + body.daily_total + (body.enabled ? '' : ' / 끔'));
+        draw();
+        msg(msgId, true, '저장했습니다. 모델: ' + modelName(r.model) + ' · 답변 깊이: ' + effortName(r.effort));
+        var el = document.getElementById(msgId); if (el) el.scrollIntoView({ block: 'center' });
+      });
+    }
+    document.getElementById('m-save').addEventListener('click', function () { saveAll('m-msg'); });
+    document.getElementById('s-save').addEventListener('click', function () { saveAll('s-msg'); });
+    document.getElementById('s-try').addEventListener('click', function () {
+      msg('s-msg', true, '고른 모델로 짧은 인사를 시켜 보는 중… (토큰을 조금 씁니다)');
+      call('/settings/test', 'POST', { full: true, model: (document.querySelector('input[name="m-model"]:checked') || {}).value }).then(function (r) {
+        if (r.error || !r.ok) { msg('s-msg', false, r.error || '시험에 실패했습니다.'); return; }
+        msg('s-msg', true, '응답(' + (r.model || '') + '): ' + (r.reply || '(빈 답)'));
+      });
+    });
+  }
+
+  function loadLogs() {
+    var box = document.getElementById('ai-logs');
+    SHSCloud.init().then(function (c) {
+      return c.from('ai_logs').select('created_at,user_name,role,question,answer_chars,model,input_tokens,output_tokens,ms')
+        .order('created_at', { ascending: false }).limit(40);
+    }).then(function (r) {
+      if (r.error) {
+        box.innerHTML = '<div class="notice-banner">질문 기록 표(ai_logs)가 아직 없습니다. <code>supabase/114_ai_search.sql</code> 을 SQL Editor 에서 실행하면 여기에 기록이 쌓입니다.' +
+          '<br><small style="color:var(--gray-5)">' + e(r.error.message) + '</small></div>';
+        return;
+      }
+      var rows = r.data || [];
+      if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-5)">아직 질문 기록이 없습니다. (최고관리자의 질문은 기록하지 않습니다)</p>'; return; }
+      var tot = rows.reduce(function (a, x) { return a + (x.input_tokens || 0) * 0 + 1; }, 0);
+      var h = '<table class="tbl"><thead><tr><th style="width:130px">때</th><th style="width:120px">누가</th><th>질문</th>' +
+        '<th style="width:90px">토큰</th><th style="width:60px">초</th></tr></thead><tbody>';
+      rows.forEach(function (x) {
+        h += '<tr><td>' + e(String(x.created_at).replace('T', ' ').slice(5, 16)) + '</td>' +
+          '<td>' + e(x.user_name || '') + '<br><small style="color:var(--gray-5)">' + e(SHS.displayRole(x.role)) + '</small></td>' +
+          '<td class="left">' + e(x.question) + '</td>' +
+          '<td><small>' + (x.input_tokens || 0).toLocaleString() + ' / ' + (x.output_tokens || 0).toLocaleString() + '</small></td>' +
+          '<td>' + (x.ms ? Math.round(x.ms / 100) / 10 : '-') + '</td></tr>';
+      });
+      box.innerHTML = '<p style="font-size:0.84rem;color:var(--gray-5)">최근 ' + tot + '건 · 토큰은 입력 / 출력 · 최고관리자의 질문은 기록하지 않습니다</p>' + h + '</tbody></table>';
+    });
+  }
+
+  area.innerHTML = '<p style="color:var(--gray-5)">창구에서 설정을 불러오는 중...</p>';
+  call('/settings').then(function (r) {
+    if (r.error) {
+      area.innerHTML = '<div class="notice-banner"><strong>창구에 연결하지 못했습니다.</strong><br>' + e(r.error) +
+        '<br><small style="color:var(--gray-5)">창구 주소: ' + e(WORKER) + ' — cloudflare/ai 를 배포한 뒤 다시 열어 주세요.</small></div>';
+      return;
+    }
+    S = r;
+    draw();
+  });
+ });
+});
+</script>
+<script src="js/admin-shell.js"></script>
+</body>
+</html>

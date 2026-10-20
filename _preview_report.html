@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노회 보고서 - 시화산노회</title>
+<meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261021e">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>노회 보고서</h1>
+    <div class="crumb">홈 &gt; 노회전자자료실 &gt; 노회 보고서</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="pr-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script>
+/* ---- 미리보기용 가짜 서버 ---- */
+window.__FAKE_ROLE = new URLSearchParams(location.search).get('role') || 'member';
+window.SHS_SUPABASE = { url: 'https://fake.local', anonKey: 'x', ready: function () { return true; }, redirectTo: '' };
+window.supabase = { createClient: function () { return client; } };
+function thenable(data) { var p = Promise.resolve({ data: data, error: null, count: Array.isArray(data) ? data.length : 0 }); var q = { then: p.then.bind(p), catch: p.catch.bind(p) };
+  ['select','eq','neq','in','order','limit','gte','lte','is','not','single','upsert','insert','update','delete'].forEach(function (m) { q[m] = function () { return q; }; }); return q; }
+var PROFILE = { id: 'u1', email: 'test@example.com', name: '김동석', church: '운평장로교회', position: '위임목사', role: window.__FAKE_ROLE, title: window.__FAKE_ROLE === 'officer' ? '부서기' : null };
+var TABLES = {
+  site_notices: [{ id: 1, cat: '소식', title: '임직식 — 손병민 목사 위임 (노진교회)', date: '2026-10-20', schedule_id: 7 }, { id: 2, cat: '공지', title: '제20회 정기노회 안내', date: '2026-10-01' }],
+  site_schedule: [{ id: 7, date_label: '11.9', title: '임직식 — 손병민 목사 위임 (노진교회)', event_date: '2026-11-09', kind: '임직식' }, { id: 8, date_label: '4.13', title: '제21회 봄 정기노회', event_date: '2027-04-12', kind: '정기노회' }],
+  gallery_items: [], presbytery_reports: [{ id: 1, session: 20, kind: '정기노회', title: '제20회 정기노회 회의자료 (2026 가을)', meet_on: '2026-10-12', pdf_pages: 58, file_path: 'reports/r20.pdf', status: '완료', toc: [{ title: '집회순서', page: 8, level: 1 }, { title: '서기 사무보고', page: 22, level: 1 }, { title: '각 시찰 보고', page: 35, level: 1 }, { title: '북부시찰', page: 35, level: 2 }] }], presbytery_report_pages: [{ id: 1, report_id: 1, pdf_page: 6, page_no: 8, heading: '집회시간', text: '1. 기간 : 주후 2026년 10월 12일(월) 오전 10시~폐회시까지
+2. 개회전 부서모임
+1)고시규칙부 | 9월 28일(월) 오전 9:00 | 노회사무실' }, { id: 2, report_id: 1, pdf_page: 6, page_no: 9, heading: '개회예배', text: '1) 묵도 다같이
+2) 찬송 425장' }], notifications: [], committees: [], committee_events: [], site_settings: [], profiles: [], doc_requests: [], church_reports: [], audit_logs: [], ai_logs: []
+};
+var client = {
+  auth: { getUser: function () { return Promise.resolve({ data: { user: { id: 'u1', email: 'test@example.com' } } }); },
+          getSession: function () { return Promise.resolve({ data: { session: { access_token: 'FAKE' } } }); },
+          signOut: function () { return Promise.resolve(); } },
+  from: function (t) { if (t === 'profiles') { var q = thenable(PROFILE); return q; } return thenable(TABLES[t] || []); },
+  rpc: function (n) { return thenable(n === 'assembly_today' ? null : (n === 'my_committees' ? [] : null)); },
+  storage: { from: function () { return { createSignedUrls: function () { return Promise.resolve({ data: [] }); } }; } }
+};
+/* AI 창구 흉내: /ask 는 SSE, /settings 는 JSON */
+var realFetch = window.fetch;
+window.fetch = function (url, init) {
+  if (typeof url === 'string' && url.indexOf('workers.dev') !== -1) {
+    if (url.indexOf('/settings') !== -1 || url.indexOf('/health') !== -1) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, model: 'claude-opus-5-5', effort: 'medium', daily_user: 30, daily_total: 300, roles: ['member','officer'], enabled: true, has_key: true, key_tail: 'AbCd', updated_at: '2026-10-20T01:00:00Z', updated_by: '김동석',
+        models: [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5', input: 4, output: 20, note: '가장 정확함 · 기본값' }, { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', input: 2, output: 10, note: '빠르고 정확함' }, { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', input: 0.1, output: 0.5, note: '가장 저렴하고 빠름' }],
+        usage: { date: '2026-10-20', total: 12, me: 3 }, index: { chunks: 2697, built: '2026-10-20' }, saved: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    }
+    var evs = [
+      ['status', { text: '총회 자료를 찾는 중' }],
+      ['delta', { n: 0, text: '잠시만요' }], ['retract', { n: 0 }],
+      ['status', { text: '답을 정리하는 중' }],
+      ['delta', { n: 1, text: '**해벌**은 치리회가 시벌한 자를 회개가 확인되면 풀어 주는 절차입니다. ' }],
+      ['delta', { n: 1, text: '권징조례 제35조는 당회가 정하는 책벌을 권계·견책·정직·면직·수찬 정지·제명·출교로 정합니다 [R2]{{권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교}}. \n\n' }],
+      ['delta', { n: 1, text: '- 시벌과 해벌은 예배모범 제16·17장에 따라 처리합니다 [R1]\n- 면직을 해벌할 때 노회는 극히 근신하여 행합니다 [R3]\n\n자료에서 확인되는 범위는 여기까지입니다.' }],
+      ['sources', { list: [
+        { ref: 'R1', title: '권징조례 제31조', url: 'assembly-constitution.html#b5-s3-a31', kind: '총회 헌법 > 권징조례', snippet: '제31조 치리회가 시벌하거나 해벌하는 때에는 장로회 예배 모범 제 16, 17장의 규정한 바에 의하여 처리함이 옳다.', cited: true },
+        { ref: 'R2', title: '권징조례 제35조', url: 'assembly-constitution.html#b5-s4-a35', kind: '총회 헌법 > 권징조례', snippet: '제35조 당회가 정하는 책벌은 권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교니…', cited: true, quotes: ['권계(勸誡), 견책(譴責), 정직, 면직, 수찬 정지, 제명, 출교'] },
+        { ref: 'R3', title: '예배모범 제17장 해벌', url: 'assembly-constitution.html#b4-s16', kind: '총회 헌법 > 예배모범', snippet: '5. 정직한 목사를 복직하며 면직한 자를 임직할 때는 노회는 극히 근신하여 행할 것이나…', cited: true },
+        { ref: 'R4', title: '제110회 총회(2025년) 「정치부 보고」', url: 'assembly-resolution.html#s110-i11', kind: '총회 회의결의', snippet: '…', cited: false } ] }],
+      ['usage', { model: 'claude-opus-5-5', input_tokens: 18000, output_tokens: 300, ms: 4200 }], ['done', {}]
+    ];
+    var enc = new TextEncoder();
+    var i = 0;
+    var stream = new ReadableStream({ pull: function (ctl) { return new Promise(function (res) { setTimeout(function () {
+      if (i >= evs.length) { ctl.close(); res(); return; }
+      ctl.enqueue(enc.encode('event: ' + evs[i][0] + '\ndata: ' + JSON.stringify(evs[i][1]) + '\n\n')); i++; res(); }, 350); }); } });
+    return Promise.resolve(new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+  }
+  return realFetch.apply(this, arguments);
+};
+</script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261021e"></script>
+<script src="js/ai-chat.js?v=20261020d"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('pr-area');
+  var e = SHS.esc;
+
+  /* 정회원 이상만 — 회의자료에는 재정·명단이 들어 있다 */
+  var gate = SHS.memberGate(user, '노회 보고서(회의자료)');
+  if (gate) { area.innerHTML = gate; return; }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">노회 보고서는 서버 로그인(구글 또는 이메일) 후 볼 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+  var canEdit = SHSAuth.canManageMembers(user);
+  var db = null, reports = [], cur = null, pages = [];
+  var qs = new URLSearchParams(location.search);
+
+  function pdfPageOf(p) { return p.pdf_page; }
+  function label(r) { return r.title + (r.meet_on ? ' (' + r.meet_on + ')' : ''); }
+
+  /* ---------- 틀 ---------- */
+  area.innerHTML =
+    '<div class="notice-banner">정기노회 회의자료(책자)를 쪽 단위로 찾아봅니다. 낱말로 찾거나 차례에서 고르면 그 쪽의 글이 보이고, ' +
+    '<strong>PDF 원본</strong>으로도 바로 갈 수 있습니다. 첫 화면의 AI 검색도 이 자료를 함께 찾습니다.</div>' +
+    '<div class="pr-top"><div class="pr-tabs" id="pr-tabs"></div>' +
+    (canEdit ? '<button class="btn sm" id="pr-upload-btn">보고서 올리기</button>' : '') + '</div>' +
+    '<div id="pr-upload" class="hidden"></div>' +
+    '<form class="pr-search" id="pr-search"><input type="search" id="pr-q" placeholder="낱말로 찾기 (예: 상회비, 손병민, 재정부)"><button class="btn" type="submit">찾기</button></form>' +
+    '<div id="pr-results" class="hidden"></div>' +
+    '<div class="pr-wrap"><aside class="pr-side" id="pr-side"></aside><div class="pr-page" id="pr-page"></div></div>';
+
+  /* ---------- 목록 ---------- */
+  function loadReports() {
+    return db.from('presbytery_reports').select('*').order('meet_on', { ascending: false }).order('id', { ascending: false })
+      .then(function (r) {
+        if (r.error) {
+          area.insertAdjacentHTML('afterbegin', '<div class="notice-banner">보고서 표가 아직 없습니다. <code>supabase/123_presbytery_reports.sql</code> 을 실행해 주세요. <small>(' + e(r.error.message) + ')</small></div>');
+          reports = [];
+          return;
+        }
+        reports = r.data || [];
+      });
+  }
+  function drawTabs() {
+    var t = document.getElementById('pr-tabs');
+    if (!reports.length) { t.innerHTML = '<span style="color:var(--gray-5)">아직 올린 보고서가 없습니다.</span>'; return; }
+    t.innerHTML = reports.map(function (r) {
+      return '<button type="button" class="pr-tab' + (cur && cur.id === r.id ? ' on' : '') + '" data-r="' + r.id + '">' +
+        e(r.title) + (r.status !== '완료' ? ' <small>(' + e(r.status) + ')</small>' : '') + '</button>';
+    }).join('');
+    t.querySelectorAll('.pr-tab').forEach(function (b) {
+      b.addEventListener('click', function () { openReport(Number(b.dataset.r)); });
+    });
+  }
+  function openReport(id, pageNo, q) {
+    cur = reports.filter(function (r) { return r.id === id; })[0] || null;
+    drawTabs();
+    if (!cur) return;
+    db.from('presbytery_report_pages').select('id,pdf_page,page_no,heading,text').eq('report_id', id)
+      .order('pdf_page').order('page_no', { nullsFirst: true })
+      .then(function (r) {
+        pages = (r.data || []);
+        drawSide();
+        if (pageNo != null) showPage(pageNo, q);
+        else if (pages.length) showPage(firstPageNo(), '');
+        else document.getElementById('pr-page').innerHTML = '<p style="color:var(--gray-5)">아직 읽어 둔 쪽이 없습니다.</p>';
+      });
+  }
+  function firstPageNo() {
+    var p = pages.filter(function (x) { return x.page_no != null; })[0];
+    return p ? p.page_no : (pages[0] ? pages[0].pdf_page : 1);
+  }
+  function drawSide() {
+    var side = document.getElementById('pr-side');
+    var toc = Array.isArray(cur.toc) ? cur.toc : [];
+    var h = '<div class="pr-side-h">차례</div>';
+    if (toc.length) {
+      h += toc.map(function (t) {
+        return '<a href="#" data-p="' + e(String(t.page)) + '" class="pr-toc' + (t.level > 1 ? ' lv2' : '') + '">' + e(t.title) +
+          '<span>' + e(String(t.page)) + '</span></a>';
+      }).join('');
+    } else {
+      /* 차례가 없으면 제목이 있는 쪽을 차례로 삼는다 */
+      var seen = {};
+      h += pages.filter(function (p) { return p.heading && p.page_no != null && !seen[p.heading] && (seen[p.heading] = 1); })
+        .map(function (p) { return '<a href="#" data-p="' + p.page_no + '" class="pr-toc">' + e(p.heading) + '<span>' + p.page_no + '</span></a>'; }).join('') ||
+        '<div style="color:var(--gray-5);font-size:0.86rem">차례가 없습니다</div>';
+    }
+    h += '<div class="pr-side-h" style="margin-top:14px">쪽으로 가기</div>' +
+      '<div class="pr-jump"><input type="number" id="pr-jump" min="1" placeholder="쪽"><button class="btn ghost sm" id="pr-jump-go">이동</button></div>' +
+      (cur.file_path ? '<button class="btn ghost sm" id="pr-pdf" style="margin-top:10px;width:100%">PDF 원본 열기</button>' : '');
+    side.innerHTML = h;
+    side.querySelectorAll('a[data-p]').forEach(function (a) {
+      a.addEventListener('click', function (ev) { ev.preventDefault(); showPage(parseInt(a.dataset.p, 10), ''); });
+    });
+    side.querySelector('#pr-jump-go').addEventListener('click', function () {
+      var n = parseInt(document.getElementById('pr-jump').value, 10);
+      if (n) showPage(n, '');
+    });
+    var pdf = side.querySelector('#pr-pdf');
+    if (pdf) pdf.addEventListener('click', function () { openPdf(null); });
+  }
+  function openPdf(pdfPage) {
+    if (!cur || !cur.file_path) return;
+    db.storage.from('archive-files').createSignedUrl(cur.file_path, 600).then(function (r) {
+      if (r.error || !r.data) { alert('PDF 를 열지 못했습니다: ' + (r.error && r.error.message)); return; }
+      window.open(r.data.signedUrl + (pdfPage ? '#page=' + pdfPage : ''), '_blank', 'noopener');
+    });
+  }
+  function hl(text, q) {
+    var t = e(text);
+    if (q) { var re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'); t = t.replace(re, '<mark class="ai-hl">$&</mark>'); }
+    return t;
+  }
+  function showPage(pageNo, q) {
+    var box = document.getElementById('pr-page');
+    var hit = pages.filter(function (p) { return p.page_no === pageNo; });
+    if (!hit.length) hit = pages.filter(function (p) { return p.pdf_page === pageNo && p.page_no == null; });
+    if (!hit.length) {
+      /* 가장 가까운 쪽 */
+      var near = pages.filter(function (p) { return p.page_no != null; }).sort(function (a, b) { return Math.abs(a.page_no - pageNo) - Math.abs(b.page_no - pageNo); })[0];
+      if (near) { hit = [near]; pageNo = near.page_no; }
+    }
+    if (!hit.length) { box.innerHTML = '<p style="color:var(--gray-5)">' + pageNo + '쪽을 찾지 못했습니다.</p>'; return; }
+    var p = hit[0];
+    var nos = pages.map(function (x) { return x.page_no; }).filter(function (n) { return n != null; }).sort(function (a, b) { return a - b; });
+    var i = nos.indexOf(p.page_no);
+    var prev = i > 0 ? nos[i - 1] : null, next = i >= 0 && i < nos.length - 1 ? nos[i + 1] : null;
+    box.innerHTML =
+      '<div class="pr-page-head"><div><span class="pr-page-no">' + (p.page_no != null ? p.page_no + '쪽' : 'PDF ' + p.pdf_page + '쪽') + '</span>' +
+      (p.heading ? '<h2 class="pr-heading">' + e(p.heading) + '</h2>' : '') + '</div>' +
+      '<div class="pr-page-btns">' +
+      (prev != null ? '<button class="btn ghost sm" data-go="' + prev + '">&larr; ' + prev + '쪽</button> ' : '') +
+      (next != null ? '<button class="btn ghost sm" data-go="' + next + '">' + next + '쪽 &rarr;</button> ' : '') +
+      (cur.file_path ? '<button class="btn sm" id="pr-pdf-page">PDF 원본 ' + p.pdf_page + '쪽</button>' : '') + '</div></div>' +
+      '<div class="pr-text">' + hl(p.text || '(빈 면)', q) + '</div>' +
+      (canEdit ? '<div style="margin-top:12px;text-align:right"><button class="btn ghost sm" id="pr-edit-page">이 쪽 글 고치기</button></div>' : '');
+    box.querySelectorAll('[data-go]').forEach(function (b) { b.addEventListener('click', function () { showPage(parseInt(b.dataset.go, 10), ''); }); });
+    var pb = box.querySelector('#pr-pdf-page'); if (pb) pb.addEventListener('click', function () { openPdf(p.pdf_page); });
+    var ed = box.querySelector('#pr-edit-page'); if (ed) ed.addEventListener('click', function () { editPage(p); });
+    document.getElementById('pr-side').querySelectorAll('.pr-toc').forEach(function (a) { a.classList.toggle('on', parseInt(a.dataset.p, 10) === p.page_no); });
+    if (history.replaceState) history.replaceState(null, '', 'presbytery-report.html?r=' + cur.id + '&p=' + (p.page_no != null ? p.page_no : p.pdf_page) + (q ? '&q=' + encodeURIComponent(q) : ''));
+    var first = box.querySelector('mark.ai-hl');
+    if (first) setTimeout(function () { first.scrollIntoView({ block: 'center' }); }, 60);
+  }
+  function editPage(p) {
+    var box = document.getElementById('pr-page');
+    box.insertAdjacentHTML('beforeend',
+      '<div class="admin-card" id="pr-editbox" style="margin-top:12px"><h3 style="margin-top:0">쪽 글 고치기 (AI 가 잘못 읽은 글자를 바로잡습니다)</h3>' +
+      '<div class="inline-form"><div class="field" style="flex:0 0 120px"><label>쪽 번호</label><input type="number" id="pe-no" value="' + (p.page_no != null ? p.page_no : '') + '"></div>' +
+      '<div class="field"><label>제목</label><input type="text" id="pe-head" value="' + e(p.heading || '') + '"></div></div>' +
+      '<div class="field"><label>글</label><textarea id="pe-text" rows="16">' + e(p.text || '') + '</textarea></div>' +
+      '<button class="btn" id="pe-save">저장</button> <button class="btn ghost" id="pe-cancel">취소</button><div class="form-msg" id="pe-msg"></div></div>');
+    document.getElementById('pe-cancel').addEventListener('click', function () { document.getElementById('pr-editbox').remove(); });
+    document.getElementById('pe-save').addEventListener('click', function () {
+      var d = { page_no: parseInt(document.getElementById('pe-no').value, 10) || null, heading: document.getElementById('pe-head').value.trim() || null, text: document.getElementById('pe-text').value };
+      db.from('presbytery_report_pages').update(d).eq('id', p.id).then(function (r) {
+        var m = document.getElementById('pe-msg');
+        if (r.error) { m.className = 'form-msg err'; m.textContent = r.error.message; return; }
+        SHSCloud.log('update', '노회 보고서 쪽 수정', cur.title + ' ' + (d.page_no || '') + '쪽');
+        openReport(cur.id, d.page_no, '');
+      });
+    });
+  }
+
+  /* ---------- 찾기 ---------- */
+  document.getElementById('pr-search').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var q = document.getElementById('pr-q').value.trim();
+    var box = document.getElementById('pr-results');
+    if (!q) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    box.innerHTML = '<p style="color:var(--gray-5)">찾는 중…</p>';
+    var pat = '*' + q.replace(/[,()*"']/g, ' ').trim() + '*';
+    db.from('presbytery_report_pages').select('id,report_id,pdf_page,page_no,heading,text')
+      .or('heading.ilike.' + pat + ',text.ilike.' + pat).order('report_id', { ascending: false }).order('page_no').limit(60)
+      .then(function (r) {
+        if (r.error) { box.innerHTML = '<p class="form-msg err">' + e(r.error.message) + '</p>'; return; }
+        var rows = r.data || [];
+        if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-5)">「' + e(q) + '」을(를) 찾지 못했습니다.</p>'; return; }
+        var byRep = {};
+        reports.forEach(function (x) { byRep[x.id] = x; });
+        box.innerHTML = '<div class="pr-res-h">「' + e(q) + '」 ' + rows.length + '곳 <button type="button" class="btn ghost sm" id="pr-res-x">닫기</button></div>' +
+          rows.map(function (p) {
+            var t = p.text || '', i = t.indexOf(q), s = Math.max(0, i - 70), snip = (s > 0 ? '…' : '') + t.slice(s, s + 220) + (s + 220 < t.length ? '…' : '');
+            return '<a href="#" class="pr-res" data-r="' + p.report_id + '" data-p="' + (p.page_no != null ? p.page_no : p.pdf_page) + '">' +
+              '<span class="pr-res-t">' + e(byRep[p.report_id] ? byRep[p.report_id].title : '보고서') + ' · ' + (p.page_no != null ? p.page_no + '쪽' : 'PDF ' + p.pdf_page) +
+              (p.heading ? ' · ' + e(p.heading) : '') + '</span><span class="pr-res-s">' + hl(snip, q) + '</span></a>';
+          }).join('');
+        box.querySelector('#pr-res-x').addEventListener('click', function () { box.classList.add('hidden'); });
+        box.querySelectorAll('.pr-res').forEach(function (a) {
+          a.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            var rid = Number(a.dataset.r), pn = parseInt(a.dataset.p, 10);
+            if (!cur || cur.id !== rid) openReport(rid, pn, q); else showPage(pn, q);
+            document.getElementById('pr-page').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        });
+      });
+  });
+
+  /* ---------- 올리기 (관리자): PDF → 저장소 → 쪽마다 그림으로 → AI 창구가 글로 → 표에 담기 ---------- */
+  var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  var PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  function loadPdfjs() {
+    return new Promise(function (res, rej) {
+      if (window.pdfjsLib) { res(window.pdfjsLib); return; }
+      var s = document.createElement('script'); s.src = PDFJS;
+      s.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; res(window.pdfjsLib); };
+      s.onerror = function () { rej(new Error('pdf.js 를 불러오지 못했습니다.')); };
+      document.head.appendChild(s);
+    });
+  }
+  function token() {
+    return db.auth.getSession().then(function (r) { return r && r.data && r.data.session ? r.data.session.access_token : null; });
+  }
+  function ocr(imageB64, pdfPage, hint) {
+    return token().then(function (tk) {
+      return fetch(SHSAI.url + '/ocr', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageB64, media_type: 'image/jpeg', pdf_page: pdfPage, hint: hint || '' })
+      });
+    }).then(function (r) {
+      return r.json().catch(function () { return { error: 'HTTP ' + r.status }; }).then(function (j) { if (!r.ok && !j.error) j.error = 'HTTP ' + r.status; return j; });
+    });
+  }
+  function renderPage(pdf, n) {
+    return pdf.getPage(n).then(function (page) {
+      var v1 = page.getViewport({ scale: 1 });
+      var scale = Math.min(2.2, 1568 / Math.max(v1.width, v1.height));
+      var vp = page.getViewport({ scale: scale });
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      return page.render({ canvasContext: ctx, viewport: vp }).promise.then(function () {
+        return canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
+      });
+    });
+  }
+  function uploadForm() {
+    var box = document.getElementById('pr-upload');
+    box.classList.toggle('hidden');
+    if (box.innerHTML) return;
+    var y = new Date().getFullYear();
+    box.innerHTML =
+      '<div class="admin-card" style="margin-bottom:18px"><h3 style="margin-top:0">보고서(회의자료 책자) 올리기</h3>' +
+      '<p style="font-size:0.9rem">PDF 를 올리면 저장소에 보관하고, 쪽마다 AI 가 글로 받아 적어 찾아볼 수 있게 합니다. ' +
+      '58쪽이면 5분쯤 걸리며 AI 비용이 조금 듭니다(쪽당 수십 원). 중간에 끊겨도 「이어서 읽기」로 이어집니다.</p>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 110px"><label>회기</label><input type="number" id="up-session" placeholder="20"></div>' +
+      '<div class="field" style="flex:0 0 140px"><label>종류</label><select id="up-kind"><option>정기노회</option><option>임시노회</option><option>임원회</option><option>기타</option></select></div>' +
+      '<div class="field" style="flex:0 0 170px"><label>회의 날짜</label><input type="date" id="up-date"></div>' +
+      '<div class="field"><label>제목</label><input type="text" id="up-title" placeholder="예: 제20회 정기노회 회의자료 (' + y + ' 가을)"></div></div>' +
+      '<div class="field"><label>PDF 파일</label><input type="file" id="up-file" accept="application/pdf"></div>' +
+      '<button class="btn" id="up-go">올리고 읽기 시작</button> ' +
+      '<button class="btn ghost" id="up-resume">이어서 읽기 (이미 올린 책자)</button>' +
+      '<div class="form-msg" id="up-msg"></div><div class="pr-progress hidden" id="up-prog"><div class="pr-bar"><span id="up-bar"></span></div><div id="up-prog-t"></div></div></div>';
+    document.getElementById('up-session').addEventListener('change', function () {
+      var t = document.getElementById('up-title');
+      if (!t.value) t.value = '제' + this.value + '회 ' + document.getElementById('up-kind').value + ' 회의자료';
+    });
+    document.getElementById('up-go').addEventListener('click', startUpload);
+    document.getElementById('up-resume').addEventListener('click', function () {
+      var f = document.getElementById('up-file').files[0];
+      if (!cur) { msg('up-msg', false, '먼저 위 목록에서 이어서 읽을 책자를 고르고, 같은 PDF 파일을 고른 뒤 누르세요.'); return; }
+      if (!f) { msg('up-msg', false, '같은 PDF 파일을 골라 주세요 (그림으로 바꾸는 데 필요합니다).'); return; }
+      readAll(cur, f);
+    });
+  }
+  function msg(id, ok, t) { var m = document.getElementById(id); m.className = 'form-msg ' + (ok ? 'ok' : 'err'); m.textContent = t; }
+  function prog(done, total, t) {
+    var p = document.getElementById('up-prog'); p.classList.remove('hidden');
+    document.getElementById('up-bar').style.width = Math.round(done / Math.max(1, total) * 100) + '%';
+    document.getElementById('up-prog-t').textContent = t || (done + ' / ' + total + ' 쪽');
+  }
+  function startUpload() {
+    var f = document.getElementById('up-file').files[0];
+    var sess = parseInt(document.getElementById('up-session').value, 10) || null;
+    var kind = document.getElementById('up-kind').value;
+    var date = document.getElementById('up-date').value || null;
+    var title = document.getElementById('up-title').value.trim();
+    if (!f) { msg('up-msg', false, 'PDF 파일을 골라 주세요.'); return; }
+    if (!title) { msg('up-msg', false, '제목을 적어 주세요.'); return; }
+    if (f.size > 48 * 1024 * 1024) { msg('up-msg', false, '48MB 보다 큰 파일은 올릴 수 없습니다.'); return; }
+    var key = 'reports/r' + (sess || 0) + '-' + Date.now() + '.pdf';
+    msg('up-msg', true, 'PDF 를 저장소에 올리는 중… (' + Math.round(f.size / 1048576) + 'MB)');
+    db.storage.from('archive-files').upload(key, f, { contentType: 'application/pdf', upsert: false }).then(function (r) {
+      if (r.error) throw r.error;
+      return db.from('presbytery_reports').insert({ session: sess, kind: kind, title: title, meet_on: date, file_path: key, file_name: f.name, created_by: user.name, status: '읽는 중' }).select('*').single();
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      var rep = r.data;
+      reports.unshift(rep); cur = rep; drawTabs();
+      /* 자료실 > 회의자료에도 보이게 */
+      db.from('archive_items').insert({ section: '회의자료', title: title, description: '정기노회 회의자료 책자 (노회 보고서에서 쪽 단위로 찾아볼 수 있습니다)', doc_date: date, access: 'member', file_path: key, file_name: f.name, updated_by: user.name }).then(function () {}, function () {});
+      SHSCloud.log('create', '노회 보고서 올리기', title);
+      return readAll(rep, f);
+    }).catch(function (x) { msg('up-msg', false, (x && x.message) || String(x)); });
+  }
+  /* 쪽마다: 그림 → /ocr → 표 (이미 읽은 쪽은 건너뛴다) */
+  function readAll(rep, file) {
+    var done = 0, total = 0, tocAll = [], failed = [];
+    return Promise.all([loadPdfjs(), file.arrayBuffer(), db.from('presbytery_report_pages').select('pdf_page').eq('report_id', rep.id)])
+      .then(function (rs) {
+        var pdfjs = rs[0], buf = rs[1], have = {};
+        ((rs[2] && rs[2].data) || []).forEach(function (x) { have[x.pdf_page] = 1; });
+        return pdfjs.getDocument({ data: buf }).promise.then(function (pdf) {
+          total = pdf.numPages;
+          if (!rep.pdf_pages) db.from('presbytery_reports').update({ pdf_pages: total }).eq('id', rep.id).then(function () {});
+          var n = 0;
+          function next() {
+            n++;
+            if (n > total) return finish();
+            if (have[n]) { done++; prog(done, total, done + ' / ' + total + ' 쪽 (이미 읽음)'); return next(); }
+            prog(done, total, n + '쪽을 그림으로 바꾸는 중…');
+            return renderPage(pdf, n).then(function (b64) {
+              prog(done, total, n + '쪽을 AI 가 읽는 중… (' + (done + 1) + ' / ' + total + ')');
+              return ocr(b64, n, rep.title);
+            }).then(function (o) {
+              if (!o || o.error) { failed.push(n + '쪽: ' + ((o && o.error) || '응답 없음')); done++; return next(); }
+              var rows = (o.pages || []).map(function (p) {
+                return { report_id: rep.id, pdf_page: n, page_no: p.no == null ? null : p.no, heading: p.heading || null, text: p.text || '' };
+              });
+              if (!rows.length) rows = [{ report_id: rep.id, pdf_page: n, page_no: null, heading: null, text: '' }];
+              (o.toc || []).forEach(function (t) { tocAll.push(t); });
+              return db.from('presbytery_report_pages').insert(rows).then(function (r) {
+                if (r.error) failed.push(n + '쪽 저장: ' + r.error.message);
+                done++; prog(done, total);
+                return next();
+              });
+            }).catch(function (x) { failed.push(n + '쪽: ' + (x && x.message)); done++; return next(); });
+          }
+          return next();
+        });
+      }).then(function () {}).catch(function (x) { msg('up-msg', false, (x && x.message) || String(x)); });
+
+    function finish() {
+      /* 차례: 읽은 차례(toc)가 있으면 그것, 없으면 제목 있는 쪽들 */
+      return db.from('presbytery_report_pages').select('page_no,heading').eq('report_id', rep.id).order('page_no').then(function (r) {
+        var toc = tocAll.filter(function (t) { return t && t.title && t.page; }).map(function (t) { return { title: String(t.title).trim(), page: parseInt(t.page, 10) || t.page, level: t.level || 1 }; });
+        if (!toc.length) {
+          var seen = {};
+          toc = (r.data || []).filter(function (p) { return p.heading && p.page_no != null && !seen[p.heading] && (seen[p.heading] = 1); })
+            .map(function (p) { return { title: p.heading, page: p.page_no, level: 1 }; });
+        }
+        return db.from('presbytery_reports').update({ toc: toc, status: failed.length ? '일부 미읽음' : '완료', updated_at: new Date().toISOString() }).eq('id', rep.id);
+      }).then(function () {
+        msg('up-msg', !failed.length, failed.length ? '읽기를 마쳤지만 ' + failed.length + '쪽은 실패했습니다: ' + failed.slice(0, 5).join(' / ') + ' — 「이어서 읽기」로 다시 시도하세요.' : '모두 읽었습니다.');
+        SHSCloud.log('update', '노회 보고서 읽기 완료', rep.title + ' ' + total + '쪽' + (failed.length ? ' (실패 ' + failed.length + ')' : ''));
+        return loadReports().then(function () { openReport(rep.id); });
+      });
+    }
+  }
+
+  /* ---------- 시작 ---------- */
+  SHSCloud.init().then(function (c) {
+    db = c;
+    var up = document.getElementById('pr-upload-btn');
+    if (up) up.addEventListener('click', uploadForm);
+    return loadReports();
+  }).then(function () {
+    drawTabs();
+    var rid = parseInt(qs.get('r'), 10), pn = parseInt(qs.get('p'), 10), q = qs.get('q') || '';
+    if (q) document.getElementById('pr-q').value = q;
+    if (rid && reports.some(function (r) { return r.id === rid; })) openReport(rid, isNaN(pn) ? null : pn, q);
+    else if (reports.length) openReport(reports[0].id, isNaN(pn) ? null : pn, q);
+    if (q && !rid) { var f = document.getElementById('pr-search'); f.dispatchEvent(new Event('submit')); }
+  });
+ });
+});
+</script>
+<script src="js/admin-shell.js"></script>
+</body>
+</html>
