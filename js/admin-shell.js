@@ -13,7 +13,8 @@ var SHSAdminShell = (function () {
         sub: [{ t: '공지사항', h: 'manage.html#mg-notice' }, { t: '메인 화면 문구', h: 'manage.html#mg-hero' }, { t: '갤러리', h: 'manage.html#mg-gallery' }] },
       { t: '노회 일정', h: 'schedule.html', icon: '▦' },
       { t: '자료실 · 회칙', h: 'archive-edit.html', icon: '▤' },
-      { t: '노회 보고서 (회의자료 올리기)', h: 'presbytery-report.html', icon: '▧' }
+      { t: '노회 보고서 (회의자료 올리기)', h: 'presbytery-report.html', icon: '▧' },
+      { t: '노회 주소록 (대조·수정)', h: 'directory.html', icon: '☎' }
     ] },
     { title: '회원 · 조직', items: [
       { t: '회원 관리', h: 'admin.html', icon: '♟' },

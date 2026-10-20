@@ -187,6 +187,12 @@ export const TOOL_DEFS = {
       session: { type: 'integer', description: '회기 번호 (예: 20). 비우면 모든 책자' }
     }, ['keyword'])
   },
+  search_directory: {
+    description: '노회 주소록: 소속 교회의 주소·우편번호·홈페이지·이메일·교역자(담임·부목사)·시무장로·전화번호(교회/휴대폰/팩스), 원로목사 연락처, 장로회·남전도회·여전도회·주일학교 연합회 임원(직책·성명·교회·휴대폰). "○○교회 주소/전화", "○○교회 담임 누구", "○○ 장로 연락처", "장로회연합회 회장" 같은 질문에 쓴다. 회의자료 책자 주소록을 바탕으로 관리자가 유지한다.',
+    input_schema: S({
+      keyword: { type: 'string', description: '교회 이름, 사람 이름, 직책, 시찰 이름, 주소 일부, 전화번호 일부 (2~3개까지)' }
+    }, ['keyword'])
+  },
   search_dues: {
     description: '노회 상회비(교회가 노회에 다달이 내는 회비) 납부 현황: 교회별 월 상회비, 낸 달, 안 낸 달, 미납액, 회기 마감 여부. 회기는 4월에 시작해 이듬해 3월에 끝난다(year 2026 = 2026년 4월 ~ 2027년 3월). year 를 비우면 이번 회기. "미납 교회", "○○교회 상회비 냈나", "상회비 얼마 걷혔나" 같은 질문에 쓴다. 세례의무금(총회에 내는 세례교인헌금) 현황도 함께 돌려준다.',
     input_schema: S({
@@ -209,7 +215,7 @@ export function toolsFor(role) {
   const officer = ['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(role) !== -1;
   const names = ['search_verified_answers', 'search_assembly', 'get_assembly_article', 'search_presbytery_rules', 'get_organization',
     'search_members', 'search_churches', 'search_schedule', 'search_notices', 'search_presbytery_resolutions',
-    'search_sichal', 'search_committee', 'search_presbytery_reports'];
+    'search_sichal', 'search_committee', 'search_presbytery_reports', 'search_directory'];
   if (officer) names.push('search_minutes', 'search_officer_docs', 'search_dues');
   return names.map(function (n) {
     return { name: n, description: TOOL_DEFS[n].description, input_schema: TOOL_DEFS[n].input_schema };
@@ -233,7 +239,8 @@ export const TOOL_STATUS = {
   search_sichal: '시찰 자료를 찾는 중',
   search_committee: '상비부 기록을 찾는 중',
   search_dues: '상회비 납부 현황을 확인하는 중',
-  search_presbytery_reports: '노회 회의자료 책자를 찾는 중'
+  search_presbytery_reports: '노회 회의자료 책자를 찾는 중',
+  search_directory: '노회 주소록을 찾는 중'
 };
 
 /* ---------- 도구 실행 ---------- */
@@ -594,6 +601,22 @@ const RUN = {
       const sn = snippets(r.text, ws, 300, 4);
       const ref = ctx.cites.add({ title: where, url: 'presbytery-report.html?r=' + r.report_id + '&p=' + (r.page_no != null ? r.page_no : r.pdf_page) + '&q=' + enc(ws[0]), kind: '노회 보고서(회의자료)', snippet: sn });
       return { ref: ref, report: rep.title, session: rep.session, meet_on: rep.meet_on, page: r.page_no, heading: r.heading, text: sn };
+    }) };
+  },
+  async search_directory(input, ctx) {
+    const ws = words(input.keyword || '');
+    if (!ws.length) return { error: '찾을 낱말을 주어야 합니다.' };
+    const cols = ['section', 'name', 'role', 'church', 'address', 'address2', 'pastor', 'elders', 'phone', 'email', 'website'];
+    const rows = await sbGet(ctx.env, ctx.auth, 'presbytery_directory?select=*&' + allWords(cols, ws) + '&order=sort,no,id&limit=25');
+    if (rows.error) return { error: /HTTP 4/.test(rows.error) ? '노회 주소록은 정회원만 볼 수 있습니다 (또는 132 sql 미실행).' : rows.error };
+    if (!rows.length) return { items: [], note: '주소록에서 그 낱말을 찾지 못했습니다. 교회 이름은 「교회」를 빼고(예: 목자), 사람은 이름만으로 다시 찾아 보십시오.' };
+    return { items: rows.map(function (r) {
+      const line = r.kind === 'person'
+        ? [r.section, r.role, r.name, r.church ? r.church + '교회' : '', r.phone].filter(Boolean).join(' · ')
+        : [r.section + (r.no != null ? ' ' + r.no : ''), r.name + '교회', [r.postcode, r.address, r.address2 ? '(' + r.address2 + ')' : ''].filter(Boolean).join(' '),
+           r.pastor ? '교역자 ' + r.pastor : '', r.elders ? '시무장로 ' + r.elders : '', r.phone, r.website, r.email].filter(Boolean).join(' · ');
+      const ref = ctx.cites.add({ title: '노회 주소록 — ' + r.section + ' ' + r.name, url: 'directory.html?q=' + enc(r.name) + '#' + enc(r.section), kind: '노회 주소록', snippet: line });
+      return { ref: ref, section: r.section, kind: r.kind, name: r.name, role: r.role, church: r.church, address: [r.postcode, r.address, r.address2].filter(Boolean).join(' '), pastor: r.pastor, elders: r.elders, phone: r.phone, website: r.website, email: r.email };
     }) };
   },
   async search_dues(input, ctx) {

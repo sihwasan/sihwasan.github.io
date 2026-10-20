@@ -6,7 +6,7 @@
 <title>노회 보고서 - 시화산노회</title>
 <meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021k">
+<link rel="stylesheet" href="css/style.css?v=20261021l">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261021j"></script>
+<script src="js/main.js?v=20261021k"></script>
 <script src="js/ai-chat.js?v=20261020d"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -553,6 +553,8 @@ document.addEventListener('DOMContentLoaded', function () {
         return db.from('presbytery_reports').update({ toc: toc, status: failed.length ? '일부 미읽음' : '완료', updated_at: new Date().toISOString() }).eq('id', rep.id);
       }).then(function () {
         msg('up-msg', !failed.length, failed.length ? '읽기를 마쳤지만 ' + failed.length + '쪽은 실패했습니다: ' + failed.slice(0, 5).join(' / ') + ' — 「이어서 읽기」로 다시 시도하세요.' : '모두 읽었습니다.');
+        /* 주소록은 잘 바뀌지 않으므로 새 책자와 대조해 달라진 것만 고친다 */
+        document.getElementById('up-msg').insertAdjacentHTML('beforeend', ' <a class="btn sm" style="margin-left:8px" href="directory.html?compare=' + rep.id + '">노회 주소록과 대조하기 →</a>');
         SHSCloud.log('update', '노회 보고서 읽기 완료', rep.title + ' ' + total + '쪽' + (failed.length ? ' (실패 ' + failed.length + ')' : ''));
         return loadReports().then(function () { openReport(rep.id); });
       });

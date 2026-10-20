@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노회 주소록 - 시화산노회</title>
+<meta name="description" content="시화산노회 교회·교역자·시무장로 주소록과 연합회 임원 연락처.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261021l">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>노회 주소록</h1>
+    <div class="crumb">홈 &gt; 노회전자자료실 &gt; 노회 주소록</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="dir-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261021k"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+ SHS.getUser().then(function (user) {
+  var area = document.getElementById('dir-area');
+  var e = SHS.esc;
+
+  /* 정회원 이상만 — 전화번호·주소가 들어 있다 */
+  var gate = SHS.memberGate(user, '노회 주소록');
+  if (gate) { area.innerHTML = gate; return; }
+  if (!user.cloud) {
+    area.innerHTML = '<div class="notice-banner">노회 주소록은 서버 로그인(구글 또는 이메일) 후 볼 수 있습니다. ' +
+      '<a class="btn sm" style="margin-left:10px" href="login.html">로그인 화면으로</a></div>';
+    return;
+  }
+  var canEdit = SHSAuth.canManageMembers(user);
+  var db = null, rows = [], curSec = '', q = '';
+  var qs = new URLSearchParams(location.search);
+  var ORDER = ['원로목사', '원로목사·은퇴목사', '북부시찰', '상록시찰', '남부시찰', '화성시찰', '동탄시찰', '장로회 연합회', '남전도회 연합회', '여전도회 연합회', '주일학교 연합회'];
+  var FIELDS = ['section', 'kind', 'no', 'name', 'role', 'church', 'postcode', 'address', 'address2', 'website', 'email', 'pastor', 'elders', 'phone'];
+
+  /* ---------- 틀 ---------- */
+  area.innerHTML =
+    '<div class="notice-banner" id="dir-note">노회 소속 교회의 주소·교역자·시무장로·전화번호와 각 연합회 임원 연락처입니다. ' +
+    '회의자료 책자의 주소록을 바탕으로 만들었고, 새 책자가 올라오면 <strong>달라진 것만</strong> 대조해 고칩니다.</div>' +
+    '<div class="pr-search" style="margin-bottom:12px"><input type="search" id="dir-q" placeholder="교회·이름·주소·전화로 찾기 (예: 목자, 임동준, 상록구, 3872)">' +
+    (canEdit ? '<button class="btn ghost" type="button" id="dir-add">+ 항목 추가</button><button class="btn ghost" type="button" id="dir-cmp">책자와 대조</button>' : '') + '</div>' +
+    '<div id="dir-cmpbox" class="hidden"></div>' +
+    '<div class="dir-tabs" id="dir-tabs"></div>' +
+    '<div id="dir-body"></div>';
+
+  function secOrder(s) { var i = ORDER.indexOf(s); return i === -1 ? 50 + s.length : i; }
+  function sections() {
+    var seen = {}, out = [];
+    rows.forEach(function (r) { if (!seen[r.section]) { seen[r.section] = 1; out.push(r.section); } });
+    return out.sort(function (a, b) { return secOrder(a) - secOrder(b); });
+  }
+  function norm(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+  function hay(r) { return FIELDS.map(function (f) { return r[f] == null ? '' : String(r[f]); }).join(' ').replace(/\s+/g, '').toLowerCase(); }
+
+  function load() {
+    return db.from('presbytery_directory').select('*').order('sort').order('no', { nullsFirst: false }).order('id').then(function (r) {
+      if (r.error) {
+        area.insertAdjacentHTML('afterbegin', '<div class="notice-banner">주소록 표가 아직 없습니다. <code>supabase/132_directory.sql</code> 을 실행해 주세요. <small>(' + e(r.error.message) + ')</small></div>');
+        rows = []; return;
+      }
+      rows = r.data || [];
+      var secs = sections();
+      if (!curSec || secs.indexOf(curSec) === -1) curSec = (location.hash && decodeURIComponent(location.hash.slice(1))) || secs[0] || '';
+      if (secs.indexOf(curSec) === -1) curSec = secs[0] || '';
+      drawTabs(); draw();
+      var latest = rows.map(function (r) { return r.updated_at; }).sort().pop();
+      if (latest) document.getElementById('dir-note').insertAdjacentHTML('beforeend', ' <small style="color:var(--gray-6)">(마지막 갱신 ' + e(String(latest).slice(0, 10)) + ')</small>');
+    });
+  }
+  function drawTabs() {
+    var t = document.getElementById('dir-tabs');
+    t.innerHTML = sections().map(function (s) {
+      var n = rows.filter(function (r) { return r.section === s; }).length;
+      return '<button type="button" class="dir-tab' + (s === curSec && !q ? ' on' : '') + '" data-s="' + e(s) + '">' + e(s) + ' <small>' + n + '</small></button>';
+    }).join('');
+    t.querySelectorAll('.dir-tab').forEach(function (b) {
+      b.addEventListener('click', function () { curSec = b.dataset.s; q = ''; document.getElementById('dir-q').value = ''; history.replaceState(null, '', 'directory.html#' + encodeURIComponent(curSec)); drawTabs(); draw(); });
+    });
+  }
+  function tel(s) {
+    return e(s).replace(/(0\d{1,2}[-\s]?\d{3,4}[-\s]?\d{4})/g, function (m) { return '<a href="tel:' + m.replace(/[^\d]/g, '') + '">' + m + '</a>'; });
+  }
+  function addrHtml(r) {
+    var h = '';
+    if (r.postcode) h += '<span class="dir-pc">' + e(r.postcode) + '</span> ';
+    h += e(r.address || '');
+    if (r.address2) h += ' <small class="dir-sub">(' + e(r.address2) + ')</small>';
+    if (r.website) { var u = /^https?:/.test(r.website) ? r.website : 'http://' + r.website; h += '<br><a href="' + e(u) + '" target="_blank" rel="noopener" class="dir-sub">' + e(r.website) + '</a>'; }
+    if (r.email) h += '<br><a href="mailto:' + e(r.email) + '" class="dir-sub">' + e(r.email) + '</a>';
+    return h;
+  }
+  function tableHtml(sec, list) {
+    var person = list.length && list.every(function (r) { return r.kind === 'person'; });
+    var h = '<h3 class="dir-h" id="sec-' + e(sec) + '">' + e(sec) + ' <small>' + list.length + '</small></h3>';
+    if (person) {
+      h += '<table class="tbl dir-tbl"><thead><tr><th>직책</th><th>성명</th><th>교회명</th><th>휴대폰</th>' + (canEdit ? '<th></th>' : '') + '</tr></thead><tbody>' +
+        list.map(function (r) {
+          return '<tr><td>' + e(r.role || '') + '</td><td><strong>' + e(r.name) + '</strong></td><td>' + e(r.church || '') + '</td><td class="dir-tel">' + tel(r.phone || '') + '</td>' +
+            (canEdit ? '<td class="dir-act"><button type="button" class="btn ghost sm" data-edit="' + r.id + '">고치기</button></td>' : '') + '</tr>';
+        }).join('') + '</tbody></table>';
+    } else {
+      var hasEld = list.some(function (r) { return r.elders; });
+      h += '<table class="tbl dir-tbl"><thead><tr><th>NO</th><th>교회명</th><th>주소</th><th>교역자</th>' + (hasEld ? '<th>시무장로</th>' : '') + '<th>전화번호</th>' + (canEdit ? '<th></th>' : '') + '</tr></thead><tbody>' +
+        list.map(function (r) {
+          return '<tr><td>' + (r.no != null ? r.no : '') + '</td><td><strong>' + e(r.name) + '</strong></td><td class="dir-addr">' + addrHtml(r) + '</td>' +
+            '<td>' + e(r.pastor || '').replace(/ \/ /g, '<br>') + '</td>' + (hasEld ? '<td>' + e(r.elders || '').replace(/·/g, '<br>') + '</td>' : '') +
+            '<td class="dir-tel">' + tel(r.phone || '').replace(/ \/ /g, '<br>') + '</td>' +
+            (canEdit ? '<td class="dir-act"><button type="button" class="btn ghost sm" data-edit="' + r.id + '">고치기</button></td>' : '') + '</tr>';
+        }).join('') + '</tbody></table>';
+    }
+    return h;
+  }
+  function draw() {
+    var body = document.getElementById('dir-body');
+    if (!rows.length) { body.innerHTML = '<p style="color:var(--gray-5)">아직 주소록이 없습니다.' + (canEdit ? ' 「책자와 대조」로 회의자료 책자에서 가져오거나 「항목 추가」로 적어 넣으세요.' : '') + '</p>'; return; }
+    var h = '';
+    if (q) {
+      var k = q.replace(/\s+/g, '').toLowerCase();
+      var hit = rows.filter(function (r) { return hay(r).indexOf(k) !== -1; });
+      h += '<p style="font-size:0.9rem;color:var(--gray-6)">「' + e(q) + '」 ' + hit.length + '건</p>';
+      sections().forEach(function (s) {
+        var l = hit.filter(function (r) { return r.section === s; });
+        if (l.length) h += tableHtml(s, l);
+      });
+      if (!hit.length) h += '<p style="color:var(--gray-5)">찾지 못했습니다.</p>';
+    } else {
+      h += tableHtml(curSec, rows.filter(function (r) { return r.section === curSec; }));
+    }
+    body.innerHTML = h;
+    body.querySelectorAll('[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { editForm(rows.filter(function (r) { return String(r.id) === b.dataset.edit; })[0]); });
+    });
+  }
+  document.getElementById('dir-q').addEventListener('input', function () { q = this.value.trim(); drawTabs(); draw(); });
+
+  /* ---------- 고치기 / 추가 ---------- */
+  function editForm(r) {
+    var old = document.getElementById('dir-edit'); if (old) old.remove();
+    r = r || { kind: 'church', section: curSec };
+    var isNew = !r.id;
+    var secs = sections();
+    var box = document.createElement('div');
+    box.className = 'admin-card'; box.id = 'dir-edit'; box.style.margin = '12px 0';
+    box.innerHTML = '<h3 style="margin-top:0">' + (isNew ? '주소록 항목 추가' : '주소록 항목 고치기') + '</h3>' +
+      '<div class="inline-form">' +
+      '<div class="field" style="flex:0 0 180px"><label>구분(시찰·연합회)</label><input type="text" id="de-section" list="de-secs" value="' + e(r.section || '') + '"><datalist id="de-secs">' + secs.map(function (s) { return '<option value="' + e(s) + '">'; }).join('') + '</datalist></div>' +
+      '<div class="field" style="flex:0 0 120px"><label>종류</label><select id="de-kind"><option value="church"' + (r.kind !== 'person' ? ' selected' : '') + '>교회</option><option value="person"' + (r.kind === 'person' ? ' selected' : '') + '>사람(연합회)</option></select></div>' +
+      '<div class="field" style="flex:0 0 80px"><label>NO</label><input type="number" id="de-no" value="' + (r.no != null ? r.no : '') + '"></div>' +
+      '<div class="field"><label>교회명 / 성명</label><input type="text" id="de-name" value="' + e(r.name || '') + '"></div></div>' +
+      '<div class="inline-form de-person"><div class="field"><label>직책</label><input type="text" id="de-role" value="' + e(r.role || '') + '"></div>' +
+      '<div class="field"><label>교회명(사람)</label><input type="text" id="de-church" value="' + e(r.church || '') + '"></div></div>' +
+      '<div class="inline-form de-church"><div class="field" style="flex:0 0 100px"><label>우편번호</label><input type="text" id="de-postcode" value="' + e(r.postcode || '') + '"></div>' +
+      '<div class="field"><label>주소</label><input type="text" id="de-address" value="' + e(r.address || '') + '"></div>' +
+      '<div class="field"><label>지번·건물</label><input type="text" id="de-address2" value="' + e(r.address2 || '') + '"></div></div>' +
+      '<div class="inline-form de-church"><div class="field"><label>홈페이지</label><input type="text" id="de-website" value="' + e(r.website || '') + '"></div>' +
+      '<div class="field"><label>이메일</label><input type="text" id="de-email" value="' + e(r.email || '') + '"></div></div>' +
+      '<div class="inline-form de-church"><div class="field"><label>교역자 (여럿이면 " / "로)</label><input type="text" id="de-pastor" value="' + e(r.pastor || '') + '"></div>' +
+      '<div class="field"><label>시무장로 (여럿이면 "·"로)</label><input type="text" id="de-elders" value="' + e(r.elders || '') + '"></div></div>' +
+      '<div class="field"><label>전화번호 (여럿이면 " / "로)</label><input type="text" id="de-phone" value="' + e(r.phone || '') + '"></div>' +
+      '<button class="btn" type="button" id="de-save">저장</button> <button class="btn ghost" type="button" id="de-cancel">취소</button> ' +
+      (isNew ? '' : '<button class="btn danger" type="button" id="de-del" style="float:right">지우기</button>') +
+      '<div class="form-msg" id="de-msg"></div>';
+    document.getElementById('dir-body').insertAdjacentElement('beforebegin', box);
+    function kindUi() { var k = document.getElementById('de-kind').value; box.querySelectorAll('.de-person').forEach(function (x) { x.style.display = k === 'person' ? '' : 'none'; }); box.querySelectorAll('.de-church').forEach(function (x) { x.style.display = k === 'church' ? '' : 'none'; }); }
+    kindUi(); document.getElementById('de-kind').addEventListener('change', kindUi);
+    document.getElementById('de-cancel').addEventListener('click', function () { box.remove(); });
+    document.getElementById('de-save').addEventListener('click', function () {
+      var d = {};
+      FIELDS.forEach(function (f) { var el = document.getElementById('de-' + f); if (el) d[f] = el.value.trim() || null; });
+      d.no = d.no != null ? parseInt(d.no, 10) : null;
+      if (!d.section || !d.name) { msg('de-msg', false, '구분과 이름은 꼭 적어야 합니다.'); return; }
+      d.updated_by = user.name; d.updated_at = new Date().toISOString();
+      var pr = isNew ? db.from('presbytery_directory').insert(d) : db.from('presbytery_directory').update(d).eq('id', r.id);
+      pr.then(function (x) {
+        if (x.error) { msg('de-msg', false, x.error.message); return; }
+        SHSCloud.log(isNew ? 'create' : 'update', '노회 주소록 ' + (isNew ? '추가' : '수정'), d.section + ' ' + d.name);
+        box.remove(); load();
+      });
+    });
+    var del = document.getElementById('de-del');
+    if (del) del.addEventListener('click', function () {
+      if (del.dataset.armed !== '1') { del.dataset.armed = '1'; del.textContent = '정말 지우기'; return; }
+      db.from('presbytery_directory').delete().eq('id', r.id).then(function (x) {
+        if (x.error) { msg('de-msg', false, x.error.message); return; }
+        SHSCloud.log('delete', '노회 주소록 삭제', r.section + ' ' + r.name);
+        box.remove(); load();
+      });
+    });
+  }
+  function msg(id, ok, t) { var m = document.getElementById(id); m.className = 'form-msg ' + (ok ? 'ok' : 'err'); m.textContent = t; }
+
+  /* ---------- 책자와 대조 ----------
+   * 회의자료 책자(노회 보고서)의 주소록 면에서 표를 읽어 지금 주소록과 견주고,
+   * 달라진 것(추가·변경·삭제)만 골라 적용한다. 주소록은 잘 바뀌지 않으므로 전부 갈아엎지 않는다. */
+  var SEC_RE = /^(원로목사(?:[·,\s]*은퇴목사)?|[가-힣]{2,3}시찰|[가-힣]{2,6}\s*연합회)$/;
+  function parseAddr(cell) {
+    var s = norm(cell), out = { postcode: null, address: null, address2: null, website: null, email: null };
+    var m;
+    if ((m = s.match(/\b(\d{5})\b/))) { out.postcode = m[1]; s = s.replace(m[0], ' '); }
+    if ((m = s.match(/[\w.\-]+@[\w.\-]+\.\w+/))) { out.email = m[0]; s = s.replace(m[0], ' '); }
+    if ((m = s.match(/(https?:\/\/\S+|www\.\S+)/i))) { out.website = m[1].replace(/[.,]$/, ''); s = s.replace(m[1], ' '); }
+    if ((m = s.match(/\(([^()]{2,40})\)/))) { out.address2 = m[1].trim(); s = s.replace(m[0], ' '); }
+    out.address = norm(s) || null;
+    return out;
+  }
+  function parseBook(pages) {
+    var out = [], sec = null, cols = null, kind = null;
+    function colIdx(names) { for (var i = 0; i < cols.length; i++) { for (var j = 0; j < names.length; j++) { if (cols[i].indexOf(names[j]) !== -1) return i; } } return -1; }
+    pages.forEach(function (pg) {
+      var hd = norm(pg.heading);
+      if (SEC_RE.test(hd)) { sec = hd; cols = null; }
+      var lines = String(pg.text || '').split('\n');
+      lines.forEach(function (ln) {
+        var t = ln.trim();
+        var hm = t.match(/^#{1,4}\s+(.+)$/);
+        if (hm) { var h2 = norm(hm[1]); if (SEC_RE.test(h2)) { sec = h2; cols = null; } return; }
+        if (!sec) return;
+        if (/^\|?\s*:?-{2,}/.test(t) && /-{2,}\s*\|/.test(t)) return;                  /* 구분줄 */
+        if (t.indexOf('|') === -1) { cols = null; return; }
+        var cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
+        if (!cols) {
+          var looksHead = cells.some(function (c) { return /NO|번호|교회명|주\s*소|교역자|시무장로|전화|직\s*책|성\s*명|휴대폰/.test(c); }) && !cells.some(function (c) { return /\d{3,}/.test(c); });
+          if (looksHead) { cols = cells.map(function (c) { return c.replace(/\s+/g, ''); }); kind = cols.some(function (c) { return /직책|성명/.test(c); }) ? 'person' : 'church'; return; }
+          cols = kind === 'person' ? ['직책', '성명', '교회명', '휴대폰'] : ['NO', '교회명', '주소', '교역자', '시무장로', '전화번호'];
+          if (!kind) kind = 'church';
+        }
+        if (!cells.some(Boolean)) return;
+        var r = { section: sec, kind: kind, no: null, name: null, role: null, church: null, postcode: null, address: null, address2: null, website: null, email: null, pastor: null, elders: null, phone: null };
+        var iNo = colIdx(['NO', '번호']), iName = kind === 'person' ? colIdx(['성명', '이름']) : colIdx(['교회명', '교회']);
+        var iRole = colIdx(['직책']), iChurch = kind === 'person' ? colIdx(['교회명', '교회']) : -1;
+        var iAddr = colIdx(['주소']), iPastor = colIdx(['교역자', '목사']), iEld = colIdx(['시무장로', '장로']), iPhone = colIdx(['전화', '휴대폰', '연락처']);
+        if (iNo !== -1 && /^\d+$/.test(cells[iNo] || '')) r.no = parseInt(cells[iNo], 10);
+        r.name = iName !== -1 ? norm(cells[iName]).replace(/\s+/g, '') : null;
+        if (!r.name) return;
+        if (kind === 'person') { r.role = iRole !== -1 ? norm(cells[iRole]).replace(/\s+/g, '') || null : null; r.church = iChurch !== -1 ? norm(cells[iChurch]) || null : null; }
+        else {
+          if (iAddr !== -1) { var a = parseAddr(cells[iAddr]); Object.keys(a).forEach(function (k) { r[k] = a[k]; }); }
+          r.pastor = iPastor !== -1 ? norm(cells[iPastor]) || null : null;
+          r.elders = iEld !== -1 ? norm(cells[iEld]).replace(/\s*[·,/]\s*/g, '·') || null : null;
+        }
+        r.phone = iPhone !== -1 ? norm(cells[iPhone]) || null : null;
+        /* 직책 칸이 비면(합쳐진 칸) 바로 윗줄의 직책을 잇는다 */
+        if (kind === 'person' && !r.role) { var prev = out[out.length - 1]; if (prev && prev.section === sec) r.role = prev.role; }
+        out.push(r);
+      });
+    });
+    return out;
+  }
+  function keyOf(r) { return r.kind === 'person' ? ('p|' + r.section + '|' + norm(r.name)) : ('c|' + norm(r.name)); }
+  var CMP = ['section', 'no', 'role', 'church', 'postcode', 'address', 'address2', 'website', 'email', 'pastor', 'elders', 'phone'];
+  function same(a, b) { return norm(a) === norm(b); }
+  function diff(book) {
+    var cur = {}; rows.forEach(function (r) { cur[keyOf(r)] = r; });
+    var seen = {}, adds = [], chg = [], dels = [];
+    var secsInBook = {}; book.forEach(function (b) { secsInBook[b.section] = 1; });
+    book.forEach(function (b) {
+      var k = keyOf(b); if (seen[k]) return; seen[k] = 1;
+      var o = cur[k];
+      if (!o) { adds.push(b); return; }
+      var fields = CMP.filter(function (f) { return !same(o[f], b[f]); });
+      if (fields.length) chg.push({ old: o, neu: b, fields: fields });
+    });
+    rows.forEach(function (r) {
+      if (!seen[keyOf(r)] && secsInBook[r.section]) dels.push(r);   /* 책자에 그 구분이 있는데 항목이 없으면 삭제 후보 */
+    });
+    return { adds: adds, chg: chg, dels: dels };
+  }
+  function cmpPanel() {
+    var box = document.getElementById('dir-cmpbox');
+    box.classList.remove('hidden');
+    box.innerHTML = '<div class="admin-card" style="margin-bottom:16px"><h3 style="margin-top:0">회의자료 책자와 대조</h3>' +
+      '<p style="font-size:0.9rem">책자의 주소록 면(원로목사·각 시찰·각 연합회)을 읽어 지금 주소록과 견줍니다. <strong>달라진 것만</strong> 골라 적용하고, 나머지는 그대로 둡니다.</p>' +
+      '<div class="inline-form"><div class="field"><label>책자</label><select id="cmp-rep"><option value="">불러오는 중…</option></select></div>' +
+      '<div class="field" style="flex:0 0 auto;justify-content:flex-end"><label>&nbsp;</label><button class="btn" type="button" id="cmp-go">읽어서 견주기</button> <button class="btn ghost" type="button" id="cmp-close">닫기</button></div></div>' +
+      '<div id="cmp-out"></div></div>';
+    document.getElementById('cmp-close').addEventListener('click', function () { box.classList.add('hidden'); box.innerHTML = ''; });
+    db.from('presbytery_reports').select('id,title,meet_on,status').order('meet_on', { ascending: false, nullsFirst: false }).then(function (r) {
+      var sel = document.getElementById('cmp-rep');
+      sel.innerHTML = (r.data || []).map(function (x) { return '<option value="' + x.id + '">' + e(x.title) + (x.meet_on ? ' (' + e(x.meet_on) + ')' : '') + (x.status !== '완료' ? ' · ' + e(x.status) : '') + '</option>'; }).join('') || '<option value="">올린 책자가 없습니다</option>';
+      var want = qs.get('compare'); if (want) sel.value = want;
+      if (want && sel.value === want) runCmp();
+    });
+    document.getElementById('cmp-go').addEventListener('click', runCmp);
+  }
+  function runCmp() {
+    var rid = parseInt(document.getElementById('cmp-rep').value, 10);
+    var out = document.getElementById('cmp-out');
+    if (!rid) return;
+    out.innerHTML = '<p>책자를 읽는 중…</p>';
+    db.from('presbytery_report_pages').select('page_no,pdf_page,heading,text').eq('report_id', rid).order('pdf_page').order('page_no').then(function (r) {
+      var book = parseBook(r.data || []);
+      if (!book.length) { out.innerHTML = '<p class="form-msg err">이 책자에서 주소록 표를 찾지 못했습니다. (면 제목이 「북부시찰」「장로회 연합회」처럼 적혀 있어야 합니다)</p>'; return; }
+      var d = diff(book);
+      var secs = {}; book.forEach(function (b) { secs[b.section] = (secs[b.section] || 0) + 1; });
+      var h = '<p style="font-size:0.9rem">책자에서 읽은 항목: ' + Object.keys(secs).map(function (s) { return e(s) + ' ' + secs[s]; }).join(' · ') + '</p>';
+      if (!d.adds.length && !d.chg.length && !d.dels.length) { out.innerHTML = h + '<p class="form-msg ok">달라진 것이 없습니다. 주소록이 이 책자와 같습니다.</p>'; return; }
+      function row(kind, label, checked, body, idx) {
+        return '<label class="cmp-row"><input type="checkbox" data-k="' + kind + '" data-i="' + idx + '"' + (checked ? ' checked' : '') + '> <span class="cmp-tag cmp-' + kind + '">' + label + '</span> ' + body + '</label>';
+      }
+      function brief(r) { return '<strong>' + e(r.section) + ' · ' + e(r.name) + '</strong>' + (r.kind === 'person' ? ' ' + e(r.role || '') + ' ' + e(r.church || '') : ' ' + e(r.address || '')) + (r.phone ? ' <small>' + e(r.phone) + '</small>' : ''); }
+      if (d.adds.length) h += '<h4>추가 ' + d.adds.length + '</h4>' + d.adds.map(function (a, i) { return row('add', '추가', true, brief(a), i); }).join('');
+      if (d.chg.length) h += '<h4>변경 ' + d.chg.length + '</h4>' + d.chg.map(function (c, i) {
+        return row('chg', '변경', true, '<strong>' + e(c.old.section) + ' · ' + e(c.old.name) + '</strong><ul class="cmp-fields">' + c.fields.map(function (f) {
+          return '<li><em>' + e(f) + '</em>: <s>' + e(c.old[f] == null ? '(없음)' : c.old[f]) + '</s> → ' + e(c.neu[f] == null ? '(없음)' : c.neu[f]) + '</li>';
+        }).join('') + '</ul>', i);
+      }).join('');
+      if (d.dels.length) h += '<h4>책자에 없는 항목 ' + d.dels.length + ' <small>(지우려면 표시)</small></h4>' + d.dels.map(function (x, i) { return row('del', '삭제', false, brief(x), i); }).join('');
+      h += '<p style="margin-top:12px"><button class="btn" type="button" id="cmp-apply">표시한 것만 적용</button> <span class="form-msg" id="cmp-msg" style="display:inline"></span></p>';
+      out.innerHTML = h;
+      document.getElementById('cmp-apply').addEventListener('click', function () {
+        var picks = Array.prototype.slice.call(out.querySelectorAll('input[type=checkbox]:checked'));
+        if (!picks.length) { msg('cmp-msg', false, '적용할 항목을 표시하세요.'); return; }
+        var ops = [], now = new Date().toISOString();
+        picks.forEach(function (c) {
+          var i = parseInt(c.dataset.i, 10), k = c.dataset.k;
+          if (k === 'add') { var a = Object.assign({}, d.adds[i], { source_report_id: rid, updated_by: user.name, updated_at: now }); ops.push(db.from('presbytery_directory').insert(a)); }
+          if (k === 'chg') { var u = {}; d.chg[i].fields.forEach(function (f) { u[f] = d.chg[i].neu[f]; }); u.source_report_id = rid; u.updated_by = user.name; u.updated_at = now; ops.push(db.from('presbytery_directory').update(u).eq('id', d.chg[i].old.id)); }
+          if (k === 'del') ops.push(db.from('presbytery_directory').delete().eq('id', d.dels[i].id));
+        });
+        Promise.all(ops).then(function (rs) {
+          var bad = rs.filter(function (x) { return x.error; });
+          if (bad.length) { msg('cmp-msg', false, bad.length + '건 실패: ' + bad[0].error.message); } else { msg('cmp-msg', true, picks.length + '건을 적용했습니다.'); }
+          SHSCloud.log('update', '노회 주소록 대조 적용', '책자 ' + rid + ' · ' + picks.length + '건');
+          load().then(function () { runCmp(); });
+        });
+      });
+    });
+  }
+
+  /* ---------- 시작 ---------- */
+  SHSCloud.init().then(function (c) {
+    db = c;
+    q = qs.get('q') || '';
+    if (q) document.getElementById('dir-q').value = q;
+    return load();
+  }).then(function () {
+    if (canEdit) {
+      document.getElementById('dir-add').addEventListener('click', function () { editForm(null); });
+      document.getElementById('dir-cmp').addEventListener('click', cmpPanel);
+      if (qs.get('compare')) cmpPanel();
+    }
+  });
+ });
+});
+</script>
+</body>
+</html>
