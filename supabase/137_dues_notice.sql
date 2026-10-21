@@ -37,9 +37,10 @@ returns boolean language sql stable security definer set search_path = public as
 $fn$;
 grant execute on function public.dues_notice_sender() to authenticated;
 
--- 상회비 납부 계좌 (공문에 적는다 — 관리자가 사이트 설정에서 고친다)
+-- 상회비 납부 계좌 (공문에 적는다 — 서류 발급 계좌와 같은 노회 계좌, 2026-10-22 사용자 확인.
+--  관리자는 공문 창의 「이 계좌를 기본으로」로 고칠 수 있다)
 insert into public.site_settings (key, value)
-values ('dues_pay', '{"bank": "", "account": "", "holder": "시화산노회"}'::jsonb)
+values ('dues_pay', '{"bank": "NH농협", "account": "3511015867663", "holder": "시화산노회"}'::jsonb)
 on conflict (key) do nothing;
 
 
