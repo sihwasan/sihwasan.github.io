@@ -39,7 +39,8 @@ var SHSAdminShell = (function () {
       { t: 'AI 검색 · API', h: 'admin-ai.html', icon: '✦' },
       { t: '직인 · 도장 · 수수료', h: 'settings.html', icon: '◎' },
       { t: '노회 운영 · 알림 규칙', h: 'manage.html#mg-ops', icon: '⚙' },
-      { t: '시스템 운영 · 감사 기록', h: 'ops.html', icon: '⌁' }
+      { t: '시스템 운영 · 감사 기록', h: 'ops.html', icon: '⌁' },
+      { t: '최고관리자', h: 'superadmin.html', icon: '◆', who: 'super' }
     ] }
   ];
 
@@ -47,6 +48,7 @@ var SHSAdminShell = (function () {
   function pageOf(h) { return h.split('#')[0]; }
   function allowed(item, u) {
     if (!item.who) return true;
+    if (item.who === 'super') return u.role === 'superadmin';
     if (item.who === 'clerk') return u.role === 'clerk' || u.role === 'superadmin';
     if (item.who === 'meeting') return u.role === 'clerk' || u.role === 'superadmin' || u.role === 'president' || u.role === 'staff' ||
       (u.role === 'officer' && String(u.title || '').trim() === '부서기');

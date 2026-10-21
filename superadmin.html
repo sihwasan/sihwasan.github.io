@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>최고관리자 - 시화산노회</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261021w">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>최고관리자</h1>
+    <div class="crumb">홈 &gt; 관리자 &gt; 최고관리자</div>
+  </div>
+</div>
+
+<main class="page-body container" id="main">
+  <div id="super-area"><p style="color:var(--gray-5)">권한을 확인하는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js?v=20261020za"></script>
+<script src="js/main.js?v=20261022a"></script>
+<script src="js/ai-chat.js?v=20261021a"></script>
+<script src="js/audit-view.js?v=20261022a"></script>
+<script src="js/superadmin.js?v=20261022a"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  SHS.getUser().then(function (user) {
+    SHSSuper.mount(document.getElementById('super-area'), user);
+  });
+});
+</script>
+</body>
+</html>

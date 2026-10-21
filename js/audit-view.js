@@ -14,6 +14,11 @@
  * 기록이 수천 건으로 늘어나므로 한 번에 다 늘어놓지 않고
  * 30·50·100건씩 쪽으로 끊어 보여 주며, 최근·과거순 정렬과
  * 연도·월 조회 기간을 고를 수 있다.
+ *
+ * 감춘 기록 (138 sql, 2026-10-22) — 최고관리자는 오해를 부를 만한 기록을 평소 목록에서
+ * 뺄 수 있다(사유 필수). 원본은 지워지지 않고, 「감춘 기록도 보기」를 켜면 관리자 누구나
+ * '감춤' 표시·사유·날짜와 함께 본다 (노회규칙 제43조 3항 — 3년 보존, 관리자 열람).
+ * 감추기·되돌리기 단추는 최고관리자에게만 보인다.
  */
 var SHSAuditView = (function () {
   'use strict';
@@ -36,6 +41,9 @@ var SHSAuditView = (function () {
     var cloudRows = null;
     var PAGE_MAX = 2000;   /* 서버에서 불러오는 최대 건수 */
     var capped = false;
+    var isSuper = user.role === 'superadmin';
+    var hides = {};        /* 감춘 기록: 기록 번호 → { reason, at } */
+    var hidesOk = false;   /* 138 sql 이 실행되어 감추기 표가 있는가 */
 
     function loadRows() {
       if (!user.cloud) {
@@ -49,11 +57,22 @@ var SHSAuditView = (function () {
         /* 보관 기간(3년)이 지난 기록을 먼저 정리한다. 없으면 아무 일도 하지 않는다. */
         return c.rpc('purge_audit_logs').then(function () { return c; }, function () { return c; });
       }).then(function (c) {
-        return c.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(PAGE_MAX);
-      }).then(function (r) {
+        return Promise.all([
+          c.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(PAGE_MAX),
+          /* 감춘 기록 — 표가 없으면(138 sql 전) 감추기 기능만 쉰다 */
+          c.from('audit_log_hides').select('log_id,reason,hidden_at').then(null, function () { return { error: true }; })
+        ]);
+      }).then(function (rs) {
+        var r = rs[0];
+        hidesOk = !!(rs[1] && !rs[1].error);
+        hides = {};
+        ((hidesOk && rs[1].data) || []).forEach(function (h) {
+          hides[h.log_id] = { reason: h.reason, at: String(h.hidden_at).replace('T', ' ').slice(0, 16) };
+        });
         capped = (r.data || []).length >= PAGE_MAX;
         cloudRows = (r.data || []).map(function (row) {
           return {
+            id: row.id,
             time: String(row.created_at).replace('T', ' ').slice(0, 19),
             who: row.user_name || '-',
             whoSub: (row.user_email || '') + (row.role ? ' / ' + SHSCloud.roleName(row.role) : ''),
@@ -67,13 +86,15 @@ var SHSAuditView = (function () {
     /* ---------- 보기 상태 ---------- */
     var vType = '', vText = '', vYear = '', vMonth = '';
     var vOrder = 'desc';      /* desc 최근 순 | asc 과거 순 */
+    var vHidden = false;      /* 감춘 기록도 보기 */
     var vPer = 30;            /* 한 쪽에 보일 건수 */
     var vPage = 1;
 
     var html = '';
     html += '<div class="notice-banner">개인정보 열람, 자료의 추가·수정·삭제, 서류 발급, 로그인 등 주요 행위가 자동으로 기록됩니다. ' +
       '기록은 고치거나 지울 수 없으며, <strong>3년</strong> 동안 보관된 뒤 자동으로 폐기됩니다. ' +
-      '열람 권한은 <strong>관리자(노회장·서기·간사)</strong>에게 있습니다.</div>';
+      '열람 권한은 <strong>관리자(노회장·서기·간사)</strong>에게 있습니다. ' +
+      '최고관리자가 <strong>감춘 기록</strong>은 평소 목록에서만 빠지며, 아래 「감춘 기록도 보기」를 켜면 사유와 함께 모두 보입니다.</div>';
     html += '<div class="board-controls" style="flex-wrap:wrap;gap:8px">' +
       '<select id="filter-type" style="border:1px solid var(--gray-3);padding:8px 12px">' +
       '<option value="">전체 구분</option>' +
@@ -98,6 +119,8 @@ var SHSAuditView = (function () {
       '<option value="100">100개씩</option>' +
       '</select>' +
       '<input type="text" id="filter-text" placeholder="이용자·내용 검색">' +
+      '<label id="filter-hidden-wrap" style="display:none;align-items:center;gap:6px;font-size:0.9rem;font-weight:400">' +
+      '<input type="checkbox" id="filter-hidden" style="width:auto"> <span id="filter-hidden-txt">감춘 기록도 보기</span></label>' +
       '</div>';
     html += '<div id="log-list"></div>';
     area.innerHTML = html;
@@ -124,7 +147,15 @@ var SHSAuditView = (function () {
     function render() {
       loadRows().then(function (all) {
         fillYears(all);
+        /* 감춘 기록 고르개 — 감춘 것이 있을 때만 (최고관리자에게는 늘) */
+        var nHidden = all.filter(function (r) { return r.id && hides[r.id]; }).length;
+        var hw = document.getElementById('filter-hidden-wrap');
+        if (hw) {
+          hw.style.display = (hidesOk && (nHidden || isSuper)) ? 'inline-flex' : 'none';
+          document.getElementById('filter-hidden-txt').textContent = '감춘 기록도 보기 (' + nHidden + '건)';
+        }
         var rows = all.filter(function (r) {
+          if (!vHidden && r.id && hides[r.id]) return false;
           if (vType && r.type !== vType) return false;
           if (vYear && String(r.time).slice(0, 4) !== vYear) return false;
           if (vMonth && String(r.time).slice(5, 7) !== vMonth) return false;
@@ -148,11 +179,21 @@ var SHSAuditView = (function () {
 
         var body = '';
         slice.forEach(function (r) {
-          body += '<tr><td style="white-space:nowrap">' + e(r.time) + '</td>' +
+          var h = r.id ? hides[r.id] : null;
+          body += '<tr' + (h ? ' style="background:var(--gray-1,#f5f4f0)"' : '') + '>' +
+            '<td style="white-space:nowrap">' + e(r.time) + '</td>' +
             '<td>' + e(r.who) + '<div style="font-size:0.78rem;color:var(--gray-5)">' + e(r.whoSub) + '</div></td>' +
             '<td><span class="role-badge">' + SHSAudit.typeName(r.type) + '</span></td>' +
             '<td class="left">' + e(r.action) +
-            (r.detail ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(r.detail) + '</div>' : '') + '</td></tr>';
+            (r.detail ? '<div style="font-size:0.82rem;color:var(--gray-5)">' + e(r.detail) + '</div>' : '') +
+            (h ? '<div style="font-size:0.8rem;color:var(--gray-6);margin-top:4px"><strong>감춤</strong> ' + e(h.at) +
+              ' · 사유: ' + e(h.reason) + '</div>' : '') +
+            (isSuper && hidesOk && r.id
+              ? '<div class="av-hide" style="margin-top:4px">' +
+                (h ? '<button class="btn ghost sm" data-unhide="' + r.id + '">되돌리기</button>'
+                   : '<button class="btn ghost sm" data-hide="' + r.id + '">감추기</button>') + '</div>'
+              : '') +
+            '</td></tr>';
         });
 
         /* 쪽 넘김 단추 */
@@ -175,6 +216,51 @@ var SHSAuditView = (function () {
           pager() +
           (capped ? '<p style="font-size:0.82rem;color:var(--gray-5)">화면에는 최근 ' + PAGE_MAX +
             '건까지 불러와 보여 줍니다. 그 이전 기록도 서버에 그대로 남아 있습니다.</p>' : '');
+
+        /* 감추기 — 사유를 적어야 한다 (최고관리자, 2단계 인증 로그인) */
+        t.querySelectorAll('button[data-hide]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var box = b.parentNode, id = +b.dataset.hide;
+            box.innerHTML = '<input type="text" maxlength="300" placeholder="감추는 사유 (2자 이상)" ' +
+              'style="width:min(320px,100%);padding:6px 8px;font-size:0.86rem"> ' +
+              '<button class="btn sm" data-ok="1">감추기</button> ' +
+              '<button class="btn ghost sm" data-no="1">취소</button>' +
+              '<span class="form-msg" style="display:block"></span>';
+            var inp = box.querySelector('input'), msg = box.querySelector('.form-msg');
+            inp.focus();
+            box.querySelector('[data-no]').addEventListener('click', render);
+            box.querySelector('[data-ok]').addEventListener('click', function () {
+              var why = inp.value.trim(), btn = this;
+              if (why.length < 2) { msg.className = 'form-msg err'; msg.textContent = '감추는 사유를 적어 주세요.'; return; }
+              btn.disabled = true;
+              SHSCloud.init().then(function (c) {
+                return c.from('audit_log_hides').insert({ log_id: id, reason: why });
+              }).then(function (res) {
+                if (res.error) {
+                  btn.disabled = false;
+                  msg.className = 'form-msg err';
+                  msg.textContent = res.error.code === '42501'
+                    ? '최고관리자(2단계 인증)만 감출 수 있습니다.' : res.error.message;
+                  return;
+                }
+                hides[id] = { reason: why, at: new Date().toISOString().replace('T', ' ').slice(0, 16) };
+                render();
+              });
+            });
+          });
+        });
+        t.querySelectorAll('button[data-unhide]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var id = +b.dataset.unhide;
+            b.disabled = true;
+            SHSCloud.init().then(function (c) {
+              return c.from('audit_log_hides').delete().eq('log_id', id);
+            }).then(function (res) {
+              if (!res.error) delete hides[id];
+              render();
+            });
+          });
+        });
 
         t.querySelectorAll('button[data-pg]').forEach(function (b) {
           b.addEventListener('click', function () {
@@ -204,6 +290,7 @@ var SHSAuditView = (function () {
     bind('filter-month', 'change', function () { vMonth = this.value; vPage = 1; render(); });
     bind('filter-order', 'change', function () { vOrder = this.value; vPage = 1; render(); });
     bind('filter-per', 'change', function () { vPer = parseInt(this.value, 10) || 30; vPage = 1; render(); });
+    bind('filter-hidden', 'change', function () { vHidden = this.checked; vPage = 1; render(); });
     render();
   }
 

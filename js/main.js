@@ -129,13 +129,16 @@
     { t: '서류 발급', h: 'documents.html' },
     { t: '자료·회칙 관리', h: 'archive-edit.html' },
     { t: '직인·도장', h: 'settings.html' },
-    { t: 'AI 검색·API 설정', h: 'admin-ai.html' }
+    { t: 'AI 검색·API 설정', h: 'admin-ai.html' },
+    /* 최고관리자 메뉴 (2026-10-22) — 최고관리자에게만 보인다 (addAdminMenu) */
+    { t: '최고관리자', h: 'superadmin.html', sup: true }
   ]};
 
   /* 관리자 모드(왼쪽 메뉴)를 씌울 관리 화면들 — js/admin-shell.js 가 맡는다 */
   var ADMIN_PAGES = ['admin-home.html', 'admin-ai.html', 'manage.html', 'admin.html', 'schedule.html', 'archive-edit.html',
     'elder-notice.html', 'meeting-admin.html', 'proceed.html', 'documents.html', 'report-intake.html',
-    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html', 'presbytery-report.html', 'directory.html', 'resolutions.html'];
+    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html', 'presbytery-report.html', 'directory.html', 'resolutions.html',
+    'superadmin.html'];
   /* 관리자 모드(왼쪽 관리자 메뉴)는 상단 <관리자>를 눌러 들어왔을 때만 켜진다.
    * 다른 상단 메뉴를 누르면 꺼지고, 관리자 메뉴 안에서 오가는 동안은 켜진 채로 있다. (이 탭 안에서만 기억) */
   var ADMIN_ENTRY = ['admin-home.html', 'admin-ai.html'];
@@ -159,7 +162,7 @@
     if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
     if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
     var sc = document.createElement('script');
-    sc.src = 'js/admin-shell.js?v=20261021d';
+    sc.src = 'js/admin-shell.js?v=20261022a';
     document.body.appendChild(sc);
   }
 
@@ -297,19 +300,21 @@
     }).then(function (r) { if (r && r.data === true) show(); }, function () {});
   }
 
-  function addAdminMenu() {
+  function addAdminMenu(p) {
     var list = document.querySelector('.gnb-list');
     if (!list || document.getElementById('gnb-admin')) return;
     var here = location.pathname.split('/').pop() || 'index.html';
+    /* 최고관리자 메뉴(sup)는 최고관리자에게만 */
+    var sub = ADMIN_NAV.sub.filter(function (s) { return !s.sup || (p && p.role === 'superadmin'); });
     /* 탭으로 흡수된 예전 주소(감독·회칙 개정 반영)로 들어와도 '관리자'를 켠다 */
     var MOVED = ['audit.html', 'rules-edit.html'];
-    var active = (ADMIN_NAV.sub.filter(function (s) { return s.h === here; }).length ||
+    var active = (sub.filter(function (s) { return s.h === here; }).length ||
                   MOVED.indexOf(here) !== -1) ? ' active' : '';
     var li = document.createElement('li');
     li.className = 'gnb-item gnb-admin' + active;
     li.id = 'gnb-admin';
     li.innerHTML = '<a href="' + ADMIN_NAV.href + '">' + ADMIN_NAV.title + '</a><div class="gnb-sub">' +
-      ADMIN_NAV.sub.map(function (s) { return '<a href="' + s.h + '">' + s.t + '</a>'; }).join('') +
+      sub.map(function (s) { return '<a href="' + s.h + '">' + s.t + '</a>'; }).join('') +
       '</div>';
     list.appendChild(li);
   }
@@ -682,7 +687,7 @@
 
         /* 관리자에게 관리자 메뉴를 붙인다 */
         if (['superadmin', 'president', 'clerk', 'staff'].indexOf(p.role) !== -1) {
-          addAdminMenu();
+          addAdminMenu(p);
           addScheduleMenu();
           loadAdminShell();
         }

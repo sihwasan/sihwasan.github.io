@@ -5,6 +5,6 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
-    "test": "node test/search.test.mjs && node test/learning.test.mjs && node test/reports.test.mjs && node test/dues-notice.test.mjs"
+    "test": "node test/search.test.mjs && node test/learning.test.mjs && node test/reports.test.mjs && node test/dues-notice.test.mjs && node test/models.test.mjs"
   }
 }

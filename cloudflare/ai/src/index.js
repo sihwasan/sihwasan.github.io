@@ -60,7 +60,10 @@ const DEFAULTS = {
   report_daily_model: 'claude-sonnet-5-5',  /* 일일 보고서 중 직책별 모델이 없는 분의 모델 */
   report_weekly_day: 1,                     /* 월례 보고서 요일(그 달 첫째 주) — 1 월요일 */
   report_duty_models: { president: 'claude-opus-5-5', clerk: 'claude-sonnet-5-5' },
-  report_effort: 'medium'
+  report_effort: 'medium',
+  /* AI 허용 범위 (2026-10-22 사용자 지시) — 최고관리자가 임원마다 검색 모델을 정한다 { 회원 id: 모델 id }.
+   * 적히지 않은 분은 위 model(기본 모델)을 쓴다. 최고관리자 자신은 늘 Opus. */
+  user_models: {}
 };
 /* 관리자 화면의 모델 고르기에 보여 줄 목록 (값: 1백만 토큰당 미화) */
 export const MODELS = [
@@ -68,6 +71,27 @@ export const MODELS = [
   { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', input: 2, output: 10, note: '빠르고 정확함' },
   { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', input: 0.1, output: 0.5, note: '가장 저렴하고 빠름' }
 ];
+export const SUPER_MODEL = 'claude-opus-5-5';   /* 최고관리자의 검색 모델 */
+
+/* 이 분의 검색 모델 — 최고관리자는 Opus, 최고관리자가 정해 둔 임원은 그 모델, 그 밖은 기본 모델 */
+export function pickModel(s, me) {
+  if (me && me.role === 'superadmin') return SUPER_MODEL;
+  const m = me && s.user_models && s.user_models[me.id];
+  if (m && MODELS.some(function (x) { return x.id === m; })) return m;
+  return s.model;
+}
+
+/* 로그인 증표(JWT)의 인증 단계 — 'aal2' 면 2단계 인증(OTP)을 마친 것.
+ * 증표가 진짜인지는 whoIs 가 Supabase(/auth/v1/user)에 물어 이미 확인한 뒤에만 읽는다. */
+function aalOf(auth) {
+  try {
+    const part = String(auth || '').replace(/^Bearer\s+/, '').split('.')[1] || '';
+    const b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    const json = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64 + '==='.slice((b64.length + 3) % 4)), function (c) { return c.charCodeAt(0); })));
+    return json.aal || '';
+  } catch (e) { return ''; }
+}
+
 const MAX_TURNS = 8;          /* 도구를 부르는 횟수 한도 */
 const MAX_OUT = 6000;         /* 답 길이(토큰) */
 const HIST_THREADS = 60;      /* 한 분이 보관하는 대화 수 (넘으면 오래된 것부터 빠진다) */
@@ -104,7 +128,7 @@ async function whoIs(request, env) {
   const rows = p.ok ? await p.json().catch(function () { return []; }) : [];
   const prof = rows[0] || { id: user.id, role: 'pending', name: '' };
   return { id: user.id, auth: auth, role: prof.role, title: prof.title || '', name: prof.name || '', church: prof.church || '',
-           position: prof.position || '', suspended: !!prof.suspended };
+           position: prof.position || '', suspended: !!prof.suspended, aal: aalOf(auth) };
 }
 
 /* ---------- 설정 ---------- */
@@ -118,6 +142,7 @@ function publicSettings(s, extra) {
     report_enabled: s.report_enabled !== false, report_model: s.report_model || '', report_effort: s.report_effort || 'medium',
     report_daily_model: s.report_daily_model || '', report_weekly_day: s.report_weekly_day == null ? 1 : s.report_weekly_day,
     report_duty_models: s.report_duty_models || {},
+    user_models: s.user_models || {}, super_model: SUPER_MODEL,
     has_key: !!s.api_key, key_tail: s.api_key ? String(s.api_key).slice(-4) : '',
     updated_at: s.updated_at || null, updated_by: s.updated_by || null, models: MODELS
   }, extra || {});
@@ -400,7 +425,8 @@ async function answer(request, env, ctx, origin) {
   const messages = history.concat([{ role: 'user', content: question }]);
   const started = Date.now();
   const toolsUsed = [];
-  let finalText = '', inTok = 0, outTok = 0, model = s.model;
+  const useModel = pickModel(s, me);   /* AI 허용 범위 — 최고관리자 Opus, 임원별 모델, 그 밖은 기본 */
+  let finalText = '', inTok = 0, outTok = 0, model = useModel;
   let logged = false;
 
   /* 질문 기록 한 줄 (114·127 sql 의 ai_logs) — 남긴 줄 번호를 돌려준다. 표가 없거나 실패하면 null.
@@ -440,7 +466,7 @@ async function answer(request, env, ctx, origin) {
       for (let turn = 0; turn < MAX_TURNS; turn++) {
         let turnText = '';
         const req = {
-          model: s.model,
+          model: useModel,
           max_tokens: MAX_OUT,
           system: [{ type: 'text', text: systemPrompt(me, INDEX_BUILT), cache_control: { type: 'ephemeral' } }],
           tools: tools,
@@ -706,6 +732,20 @@ async function settings(request, env, origin, test) {
       if (typeof v === 'string' && v && MODELS.some(function (m) { return m.id === v; })) dm[k] = v;
     });
     next.report_duty_models = dm;
+  }
+  /* 임원별 검색 모델 — 최고관리자만, 2단계 인증(OTP)을 마친 로그인에서만 고칠 수 있다 */
+  if (body.user_models !== undefined) {
+    if (me.role !== 'superadmin') return reply({ error: '임원별 AI 모델은 최고관리자만 정할 수 있습니다.' }, 403, origin);
+    if (me.aal !== 'aal2') return reply({ error: '2단계 인증(OTP)을 마친 뒤에 다시 저장해 주세요.' }, 403, origin);
+    if (!body.user_models || typeof body.user_models !== 'object' || Array.isArray(body.user_models)) {
+      return reply({ error: '임원별 모델 값이 올바르지 않습니다.' }, 400, origin);
+    }
+    const um = {};
+    Object.keys(body.user_models).slice(0, 300).forEach(function (id) {
+      const v = body.user_models[id];
+      if (/^[0-9a-f-]{36}$/i.test(id) && typeof v === 'string' && MODELS.some(function (m) { return m.id === v; })) um[id] = v;
+    });
+    next.user_models = um;
   }
   next.updated_at = new Date().toISOString();
   next.updated_by = me.name || me.id;
