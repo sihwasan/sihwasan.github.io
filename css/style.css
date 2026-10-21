@@ -2788,8 +2788,9 @@ mark.aih-key {
 .pr-search { display: flex; gap: 8px; margin: 0 0 16px; }
 .pr-search input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; }
 .pr-main { max-width: 1480px; }   /* 책자 표(11칸)가 한 줄에 들어가도록 이 쪽만 넓게 */
-.pr-wrap { display: grid; grid-template-columns: 200px 230px minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .pr-wrap { grid-template-columns: 220px minmax(0, 1fr); } .pr-wrap .pr-page { grid-column: 2; grid-row: 1 / span 2; } .pr-wrap .pr-books { position: static; max-height: none; } }
+/* 왼쪽 묶음 메뉴(노회전자자료실)는 그대로 두고, 그 옆에 [책자][차례][본문] */
+.pr-wrap { display: grid; grid-template-columns: 190px 220px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1400px) { .pr-wrap { grid-template-columns: 220px minmax(0, 1fr); } .pr-wrap .pr-page { grid-column: 2; grid-row: 1 / span 2; } .pr-wrap .pr-books { position: static; max-height: none; } }
 .pr-side { position: sticky; top: calc(var(--nav-h, 0px) + 16px); background: var(--cream, #fbf8f2); border: 1px solid var(--gray-2); border-radius: 12px; padding: 14px; max-height: calc(100vh - var(--nav-h, 0px) - 32px); overflow-y: auto; }
 .pr-side-h { font-size: 0.74rem; letter-spacing: 2px; color: var(--gray-5); margin-bottom: 6px; }
 .pr-toc { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 0.88rem; }
