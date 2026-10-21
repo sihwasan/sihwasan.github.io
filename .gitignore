@@ -13,3 +13,7 @@ private/
 
 # 총회 보고서 PDF 변환 임시 파일
 tools/assembly-report/cache/
+
+# 미리보기 시험 하네스 (세션 작업용, 올리지 않는다)
+_preview_*.html
+_p/

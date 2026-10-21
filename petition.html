@@ -10,7 +10,7 @@
 <meta property="og:title" content="청원서 - 시화산노회">
 <meta property="og:description" content="각종 청원 서식을 홈페이지에서 채워 바로 인쇄합니다.">
 <meta property="og:url" content="https://sihwasan.org/petition.html">
-<link rel="stylesheet" href="css/style.css?v=20261020fb">
+<link rel="stylesheet" href="css/style.css?v=20261021w">
 <style>
 /* ----- 청원서 종류 메뉴 (마우스를 올리면 하위 서식이 열린다) ----- */
 .pt-menu {
@@ -193,7 +193,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
 <div class="page-head">
   <div class="container">
     <h1>청원서</h1>
-    <div class="crumb">홈 &gt; 자료실 &gt; 청원서</div>
+    <div class="crumb">홈 &gt; 서류발급 &gt; 청원서</div>
   </div>
 </div>
 
@@ -1568,6 +1568,15 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
 
   function sendToSichal() {
     if (!cloudOn()) { msg('전달하시려면 구글 또는 이메일 계정으로 로그인해 주세요.', true); return; }
+    /* 노회규칙 제29조 1항 — 상회비 미납 중에는 청원서를 접수하지 않는다.
+     * 서버(135 sql 의 트리거)도 막으므로 여기서는 미리 알리고 멈춘다. (135 실행 전이면 그냥 진행) */
+    SHSCloud.init().then(function (c) { return c.rpc('my_dues_rule29'); }).then(function (r) {
+      var st = r && !r.error && r.data;
+      if (st && st.blocked && SHS.dues29Text) { msg(SHS.dues29Text(st), true); return; }
+      sendToSichalGo();
+    }, function () { sendToSichalGo(); });
+  }
+  function sendToSichalGo() {
     viewSeal = null;
     (sealImg ? Promise.resolve(sealImg) : loadSeal()).then(function (s) {
       if (s) { askSichalAndSend(); return; }

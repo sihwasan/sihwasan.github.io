@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노회 보고서 - 시화산노회</title>
+<meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261021w">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>노회 보고서</h1>
+    <div class="crumb">홈 &gt; 노회전자자료실 &gt; 노회 보고서</div>
+  </div>
+</div>
+
+<main class="page-body container pr-main" id="main">
+  <div id="pr-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261021pa"></script>
+<script src="js/ai-chat.js?v=20261021a"></script>
+<script src="js/book-viewer.js?v=20261021e"></script>
+<script>
+SHSBook.mount({
+  page: 'presbytery-report.html', kinds: ['정기노회', '임시노회', '임원회', '기타'],
+  gate: '노회 보고서(회의자료)', sideTitle: '회의자료 책자', searchHint: '낱말로 찾기 (예: 상회비, 손병민, 재정부)',
+  uploadTitle: '보고서(회의자료 책자) 올리기', titleOf: function (sess, kind) { return '제' + sess + '회 ' + kind + ' 회의자료'; },
+  filePrefix: 'r', archiveSection: '회의자료', archiveDesc: '정기노회 회의자료 책자 (노회 보고서에서 쪽 단위로 찾아볼 수 있습니다)',
+  directoryCompare: true, logName: '노회 보고서'
+});
+</script>
+</body>
+</html>

@@ -13,7 +13,7 @@
 <meta property="og:image" content="https://sihwasan.org/images/og-cover.png">
 <meta property="og:site_name" content="시화산노회">
 <meta property="og:locale" content="ko_KR">
-<link rel="stylesheet" href="css/style.css?v=20261020fb">
+<link rel="stylesheet" href="css/style.css?v=20261021w">
 </head>
 <body>
 
@@ -469,6 +469,17 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     if (!document.getElementById('rq-send')) return;   /* 신청 내역 모드에서는 여기까지 */
+    /* 노회규칙 제29조 1항 — 상회비 미납 중에는 서류 발급 신청을 받지 않는다.
+     * 서버(135 sql 의 트리거)도 막으므로 여기서는 미리 알리고 단추를 잠근다. */
+    SHSCloud.init().then(function (c) { return c.rpc('my_dues_rule29'); }).then(function (r) {
+      var st = r && !r.error && r.data;
+      if (!st || !st.blocked || !SHS.dues29Html) return;
+      var btn = document.getElementById('rq-send');
+      if (!btn) return;
+      btn.disabled = true;
+      btn.title = '상회비 미납 중에는 신청할 수 없습니다 (노회규칙 제29조)';
+      btn.insertAdjacentHTML('beforebegin', SHS.dues29Html(st, { where: 'form' }));
+    }).catch(function () {});
     document.getElementById('rq-send').addEventListener('click', function () {
       var msg = document.getElementById('rq-msg');
       var d = {

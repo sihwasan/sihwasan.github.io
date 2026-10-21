@@ -33,16 +33,21 @@ export function dutyOf(o) {
 
 const DUTY_GUIDE = {
   president:
-    '노회장 보고서입니다. 노회 전체를 총괄하는 눈으로 씁니다.\n' +
+    '노회장 보고서입니다. 노회 전체를 총괄하는 눈으로 씁니다. 모든 임원의 활동과 이행 상황이 노회장께 올라가야 합니다.\n' +
+    '- 「임원 활동 내역」 section: 「임원별 이행 현황」 자료를 바탕으로 임원(직책·이름)마다 맡은 일의 진행을 한 줄씩. 변동 없이 멈춘 일이 있는 임원은 그 사실을 분명히 적는다\n' +
+    '- 「보고서 이행 내역」 section: 할 일 전체의 진행률(완료/진행/열림 건수), 기한이 지난 일, 7일 넘게 변동 없는 일, 최근 7일 완료된 일\n' +
+    '- 노회 사무실(간사)이 처리할 일은 todos 의 title 앞에 「[간사] 」를 붙인다 (간사에게 알림으로 간다)\n' +
+    '- 「지시할 일」 section: 노회장이 임원에게 지시해야 할 일을 담당 임원·기한과 함께. 같은 내용을 todos 에도 올린다 (target_kind 임원, target_name 직책, contact_name 그 임원 이름, message 는 노회장 이름으로 보내는 지시 문안)\n' +
     '- 다가오는 정기노회·임원회·행사와 그 준비 상태 (노회규칙에 정한 소집·공고 기한이 있으면 날짜로 계산해 알림)\n' +
-    '- 결의 이행(할 일 목록) 진행률, 늦어지거나 연락이 안 된 일, 부서별로 막힌 곳\n' +
     '- 노회장이 결정·승인·서명할 일 (서류 발급 승인, 지급 확인, 청원 처리 등)\n' +
     '- 재정 요약: 상회비 수납 현황과 미납, 노회 장부의 큰 수입·지출\n' +
-    '- todos 는 노회장이 직접 할 일이나 노회장이 부탁할 상대(서기·회계·부장)로, 3~6개.',
+    '- todos 는 지시할 일과 노회장이 직접 할 일로 4~8개.',
   vice_president:
     '부노회장 보고서입니다. 노회장을 보좌하는 눈으로 노회 전반을 짧게 요약하고, 부노회장이 맡거나 도울 수 있는 일(다음 노회 준비, 늦어진 결의 이행 독려)을 제안합니다. todos 는 2~4개.',
   clerk:
-    '서기 보고서입니다. 서기의 사무 보조로서 씁니다.\n' +
+    '서기 보고서입니다. 서기는 노회 사무를 총괄하므로, 각 임원이 맡은 일을 챙기고 지적된 일이 고쳐지지 않으면 독려해야 합니다.\n' +
+    '- 노회 사무실(간사)이 처리할 일 — 공문·통보 발송, 서류 발급·접수, 일정 등록, 자료 정리 — 는 todos 의 title 앞에 「[간사] 」를 붙인다 (서기 이름으로 간사에게 지시하는 일). 간사에게는 이 항목이 알림으로 간다\n' +
+    '- 「독려할 일」 section: 「임원별 이행 현황」 자료에서 7일 넘게 변동이 없거나 기한이 지난 일을 담당 임원별로 묶어 적고, 그 임원에게 보낼 독려 문안을 todos 로 만든다 (target_kind 임원, target_name 직책, contact_name 그 임원 이름, message 는 서기 이름으로 정중하게 — 무엇이 며칠째 멈춰 있고 언제까지 처리해 주실지). 같은 일이 지난 보고서에도 올랐으면 「다시」임을 밝힌다\n' +
     '- 회의록 등록 뒤 결의에 따라 진행할 일을 부서별(상비부·시찰·기관)로 정리: 누가, 무엇을, 언제까지, 지금 상태\n' +
     '- 오늘 연락할 곳: 각 상비부장·시찰장·기관 대표에게 보낼 연락 문안을 todos 의 message 로 만든다 (연락처는 자료의 연락처에서)\n' +
     '- 서류 발급 신청·청원서 접수 처리, 일정 공지·소집 통지 기한 (노회규칙 근거와 날짜 계산)\n' +
@@ -229,6 +234,42 @@ export function taskContext(b) {
   return L.join('\n');
 }
 
+/* 임원별 이행 현황: 할 일 표의 상태·기한·마지막 변동일로 계산한다 (노회장 보고·서기 독려의 근거) */
+export function followupContext(b) {
+  const ts = arr(b.tasks);
+  const today = Date.parse(String(b.today || '') + 'T00:00:00Z') || Date.now();
+  function days(iso) { const t = Date.parse(String(iso || '').slice(0, 10) + 'T00:00:00Z'); return isNaN(t) ? null : Math.round((today - t) / 864e5); }
+  const OPEN = ['할 일', '진행 중', '연락함'];
+  const by = {};
+  ts.forEach(function (t) {
+    const k = t.owner || 'clerk';
+    const g = by[k] || (by[k] = { open: [], done7: 0, overdue: 0, stale: 0 });
+    if (OPEN.indexOf(t.status) !== -1) {
+      const idle = days(t.updated), late = t.due ? days(t.due) : null;
+      const row = { t: t, idle: idle, late: late };
+      if (late != null && late > 0) g.overdue++;
+      if (idle != null && idle >= 7) g.stale++;
+      g.open.push(row);
+    } else if (t.status === '완료' && days(t.updated) != null && days(t.updated) <= 7) g.done7++;
+  });
+  const L = ['# 임원별 이행 현황 (기준일 ' + b.today + ' · 할 일 표에서 계산)'];
+  const order = ['president', 'clerk', 'treasurer', 'minutes', 'staff', 'officer'];
+  let any = false;
+  order.concat(Object.keys(by).filter(function (k) { return order.indexOf(k) === -1; })).forEach(function (k) {
+    const g = by[k]; if (!g) return; any = true;
+    L.push('- ' + (DUTY_NAME[k] || k) + ': 열린 일 ' + g.open.length + '건 (기한 지남 ' + g.overdue + ', 7일 넘게 변동 없음 ' + g.stale + ') · 최근 7일 완료 ' + g.done7 + '건');
+    g.open.sort(function (a, c) { return (c.late || 0) - (a.late || 0) || (c.idle || 0) - (a.idle || 0); }).slice(0, 12).forEach(function (r) {
+      const t = r.t;
+      L.push('  · [' + t.id + '] ' + t.title + ' · ' + t.status +
+        (r.late != null ? (r.late > 0 ? ' · 기한 ' + r.late + '일 지남' : ' · 기한 D-' + (-r.late)) : '') +
+        (r.idle != null ? ' · ' + r.idle + '일째 변동 없음' : '') +
+        (t.contact ? ' · 연락 ' + t.contact : '') + (t.dept_name ? ' · ' + t.dept_name : ''));
+    });
+  });
+  if (!any) L.push('- (열린 일이 없습니다)');
+  return L.join('\n');
+}
+
 /* ---------- Supabase (열쇠로 여는 두 문) ---------- */
 async function rpc(env, fn, args) {
   const r = await fetch(env.SUPABASE_URL + '/rest/v1/rpc/' + fn, {
@@ -282,7 +323,7 @@ async function writeReport(deps, b, officer, system, model, effort) {
   const who = officer.name + ' ' + (officer.title || DUTY_NAME[duty]) + (officer.church ? ' (' + officer.church + ')' : '');
   const res = await deps.claudeCall(deps.key, {
     model: model, max_tokens: 24000,
-    system: system.concat([{ type: 'text', text: taskContext(b) }]),
+    system: system.concat([{ type: 'text', text: taskContext(b) + '\n\n' + followupContext(b) }]),
     messages: [{ role: 'user', content: '오늘(' + b.today + ') ' + who + '께 드릴 업무 보고서를 써 주세요.\n\n' + DUTY_GUIDE[duty] }],
     output_config: { effort: effort, format: { type: 'json_schema', schema: REPORT_SCHEMA } }
   }, null);
@@ -313,7 +354,28 @@ export async function runReports(env, deps, opts, log) {
   opts = opts || {}; log = log || function () {};
   if (!env.REPORT_KEY) throw new Error('창구에 보고서 열쇠(REPORT_KEY)가 없습니다.');
   const started = new Date().toISOString();
-  const model = deps.model, effort = deps.effort || 'medium';
+  /* 한국 날짜 기준 (2026-10-21 사용자 지시)
+   *   · 매월 첫째 월요일: 모든 임원(간사 제외)에게 월례 보고서 — 직책별 모델, 없으면 report_model
+   *   · 화·목요일: 노회장·서기에게만 일일 보고서
+   *   · 간사: 보고서 대신 노회장·서기 보고서에서 간사가 할 일만 알림으로
+   *   · 토·일·그 밖의 월요일: 예약 실행은 쉼 (손으로 누르면 일일 보고서 묶음)
+   * opts.full 이면 언제나 월례 묶음, opts.only 는 그 임원 한 분 */
+  const kst = new Date(Date.now() + 9 * 3600e3);
+  const kstDay = kst.getUTCDay(), kstDate = kst.getUTCDate();
+  const monthlyDay = deps.weeklyDay == null ? 1 : deps.weeklyDay;
+  const weekly = !!opts.full || (kstDay === monthlyDay && kstDate <= 7);
+  const dailyDay = [2, 4].indexOf(kstDay) !== -1;   /* 화·목요일 */
+  const model = weekly ? deps.model : (deps.dailyModel || deps.model), effort = deps.effort || 'medium';
+  const DAILY = ['president', 'clerk'];
+  if (opts.trigger === 'cron' && !weekly && !dailyDay && !opts.only) {
+    const rest = { trigger: 'cron', started_at: started, finished_at: new Date().toISOString(), date: null, mode: '쉬는 날(월·수·금·토·일 — 첫째 주 월요일 제외)', officers: 0, reports: 0, new_tasks: 0, errors: [] };
+    await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: rest } }).catch(function () {});
+    log('오늘은 보고서를 만들지 않는 날입니다');
+    return rest;
+  }
+  /* 임원마다 쓸 모델: 직책별 모델이 있으면 그것, 없으면 그날의 기본 모델 */
+  const dutyModels = (deps.dutyModels && typeof deps.dutyModels === 'object') ? deps.dutyModels : {};
+  function modelFor(o) { return dutyModels[dutyOf(o)] || model; }
   const errors = [];
   let usage = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
   function add(u) { Object.keys(usage).forEach(function (k) { usage[k] += u[k] || 0; }); }
@@ -342,18 +404,24 @@ export async function runReports(env, deps, opts, log) {
    *    예약 실행은 15분 안에 끝나야 하므로(Cloudflare 한도) 다 쓴 보고서는 그때그때 저장하고,
    *    시한(deadline)이 지나면 남은 분은 시작하지 않고 기록에 남긴다. */
   let officers = arr(b.officers);
-  if (opts.only) officers = officers.filter(function (o) { return o.id === opts.only; });
+  const staff = officers.filter(function (o) { return o.role === 'staff' || dutyOf(o) === 'staff'; });
+  officers = officers.filter(function (o) { return !(o.role === 'staff' || dutyOf(o) === 'staff'); });   /* 간사는 보고서 대신 알림 */
+  if (!weekly) officers = officers.filter(function (o) { return DAILY.indexOf(dutyOf(o)) !== -1; });
+  if (opts.only) officers = arr(b.officers).filter(function (o) { return o.id === opts.only; });
   const deadline = opts.deadline || (Date.parse(started) + 25 * 60 * 1000);
-  const base = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, date: b.today, model: model, officers: officers.length, new_tasks: newTasks };
+  const usedModels = officers.map(modelFor).filter(function (m, i, a) { return a.indexOf(m) === i; });
+  const base = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, date: b.today, model: usedModels.join(', ') || model, mode: weekly ? '월례(전체)' : '일일(노회장·서기)', officers: officers.length, new_tasks: newTasks };
   await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: Object.assign({ running: true }, base) } }).catch(function () {});
   let saved = 0, skipped = 0;
+  const written = [];
   async function one(o) {
     if (Date.now() > deadline) { skipped++; return; }
     log((o.title || DUTY_NAME[dutyOf(o)]) + ' ' + o.name + ' 보고서를 쓰는 중');
     try {
-      const x = await writeReport(deps, b, o, system, model, effort);
+      const x = await writeReport(deps, b, o, system, modelFor(o), effort);
       add(x.usage);
       await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { reports: [x.row] } });
+      written.push(x.row);
       saved++;
     } catch (e) { errors.push(o.name + ': ' + String(e.message || e)); }
   }
@@ -361,7 +429,29 @@ export async function runReports(env, deps, opts, log) {
   await pool(officers.slice(1), deps.parallel || 6, one);
   if (skipped) errors.push('시간이 모자라 ' + skipped + '분의 보고서는 만들지 못했습니다 (다음 실행 때 다시 만듭니다).');
 
-  const run = Object.assign({}, base, { finished_at: new Date().toISOString(), reports: saved, usage: usage, errors: errors.slice(0, 20) });
+  /* 간사 알림: 노회장·서기 보고서의 todos 가운데 간사(사무실)가 할 일을 알림함으로 보낸다 */
+  let alerts = 0;
+  if (staff.length && written.length) {
+    const items = [];
+    written.filter(function (r) { return r.duty === 'president' || r.duty === 'clerk'; }).forEach(function (r) {
+      arr(r.content && r.content.todos).forEach(function (t) {
+        const txt = [t.target_kind, t.target_name, t.contact_name, t.title, t.detail].join(' ');
+        const forStaff = /\[간사\]|간사|사무실|사무국/.test(txt) || staff.some(function (st) { return st.name && txt.indexOf(st.name) !== -1; });
+        if (!forStaff) return;
+        staff.forEach(function (st) {
+          items.push({ user_id: st.id, kind: '업무 지시',
+            title: '[' + (r.title || DUTY_NAME[r.duty]) + ' ' + r.name + '] ' + String(t.title || '').slice(0, 150),
+            body: String(t.detail || '') + (t.due ? ' (기한 ' + t.due + ')' : '') + (t.message ? '\n\n' + t.message : '') });
+        });
+      });
+    });
+    if (items.length) {
+      try { alerts = Number(await rpc(env, 'ai_report_notify', { p_key: env.REPORT_KEY, p_items: items })) || 0; log('간사 알림 ' + alerts + '건'); }
+      catch (e) { errors.push('간사 알림: ' + String(e.message || e).slice(0, 120) + ' (supabase/134_report_notify.sql 실행 필요)'); }
+    }
+  }
+
+  const run = Object.assign({}, base, { finished_at: new Date().toISOString(), reports: saved, staff_alerts: alerts, usage: usage, errors: errors.slice(0, 20) });
   log('저장하는 중');
   await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: run } });
   return run;
