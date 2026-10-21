@@ -1,8 +1,12 @@
 /* 시화산노회 영수증 자동 읽기 창구 (Cloudflare Worker → Claude API)
  *
- * 회계가 장부에 영수증 사진을 올리면 홈페이지가 이 창구에 사진을 보내고,
+ * 회계가 장부에 영수증 사진을 올리면 홈페이지가 먼저 브라우저 안에서 읽고(js/receipt-ocr.js · 무료),
+ * 잘 안 읽혀 회계가 「AI로 다시 읽기」를 누를 때만 이 창구에 사진을 보낸다 (2026-10-22).
  * 창구는 Claude 에게 사진을 보여 주어 일자·사용처·금액·품목을 읽어 돌려준다.
  * 홈페이지는 읽은 값을 입력칸에 미리 채우기만 하고, 저장은 회계가 확인한 뒤 한다.
+ *
+ * 모델 (2026-10-22) — Claude Haiku 5.5 (wrangler.toml ANTHROPIC_MODEL). 영수증 한 장에 1원 안팎.
+ *   Haiku 5.5 는 서버 대체(fallbacks)가 없어서 그 모델일 때는 fallbacks 를 붙이지 않는다.
  *
  * 하는 일
  *   POST /read   { book_id, media_type, image(base64) }  →  { ok, result, usage }
@@ -247,7 +251,7 @@ function explain(res, tried) {
  *   · 잠깐의 장애(429·5xx·접속 실패) 는 같은 모델을 되풀이하지 않고 곧장 다른 모델로,
  *   · 그 밖의 400(요청 자체가 틀림) 은 되풀이해도 소용없으니 멈춘다. */
 async function readReceipt(env, key, mediaType, imageBase64) {
-  const primary = env.ANTHROPIC_MODEL || 'claude-opus-5-5';
+  const primary = env.ANTHROPIC_MODEL || 'claude-haiku-5-5';
   const content = [
     { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
     { type: 'text', text: INSTRUCTION }
@@ -255,7 +259,8 @@ async function readReceipt(env, key, mediaType, imageBase64) {
   function bodyFor(model, withFallback) {
     const b = {
       model: model,
-      max_tokens: 1024,
+      /* Haiku 5.5 는 생각(thinking)을 기본으로 켜고 그것도 max_tokens 에 든다 — 넉넉히 */
+      max_tokens: 4096,
       output_config: { effort: 'low', format: { type: 'json_schema', schema: RESULT_SCHEMA } },
       messages: [{ role: 'user', content: content }]
     };
@@ -263,11 +268,10 @@ async function readReceipt(env, key, mediaType, imageBase64) {
     if (withFallback) b.fallbacks = 'default';
     return b;
   }
-  const attempts = [
-    { model: primary, fb: true },
-    { model: primary, fb: false },
-    { model: 'claude-sonnet-5-5', fb: false }
-  ];
+  /* Haiku 5.5 에는 서버 대체가 없다 — 대체 없이 부르고, 안 되면 Sonnet 5.5 로 */
+  const attempts = /^claude-haiku/.test(primary)
+    ? [{ model: primary, fb: false }, { model: 'claude-sonnet-5-5', fb: false }]
+    : [{ model: primary, fb: true }, { model: primary, fb: false }, { model: 'claude-sonnet-5-5', fb: false }];
   let last = null;
   const tried = [];
   for (let i = 0; i < attempts.length; i++) {
@@ -318,7 +322,7 @@ export default {
     if (url.pathname === '/' || url.pathname === '/health') {
       const key = await apiKey(env);
       const out = { ok: true, service: '시화산노회 영수증 자동 읽기',
-                    ready: !!key, model: env.ANTHROPIC_MODEL || 'claude-opus-5-5',
+                    ready: !!key, model: env.ANTHROPIC_MODEL || 'claude-haiku-5-5',
                     colo: (request.cf && request.cf.colo) || null };
       const check = url.searchParams.get('check');
       if (check && key) {

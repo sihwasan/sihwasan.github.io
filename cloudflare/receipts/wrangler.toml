@@ -16,7 +16,8 @@ account_id = "0c1cf1f4bfdcd3e33660b6d07e66378f"
 [vars]
 SUPABASE_URL = "https://ltbhgwozkffenahqdzfj.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0Ymhnd296a2ZmZW5haHFkemZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYzNDk0MDYsImV4cCI6MjEwMTkyNTQwNn0.nSptHsi7nTCWTiyTe_Kl9xpxyHJ3pkhRGoZLI1BdsnI"
-ANTHROPIC_MODEL = "claude-opus-5-5"
+# 영수증 읽기는 Haiku 5.5 로 (2026-10-22) — 브라우저 OCR 이 못 읽은 것만 오므로 싸고 빠른 모델이면 된다
+ANTHROPIC_MODEL = "claude-haiku-5-5"
 
 # AI 자료 검색 창구(cloudflare/ai)와 같은 KV — 'settings'.api_key 만 읽는다.
 [[kv_namespaces]]

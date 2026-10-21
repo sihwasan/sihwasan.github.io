@@ -58,11 +58,12 @@ var SHSLedger = (function () {
     return pdfLoading;
   }
 
-  /* ---------- 영수증 자동 읽기 (cloudflare/receipts → Claude) ----------
-   * 창구 주소가 없으면 조용히 건너뛴다. 읽은 값은 입력칸에 미리 채우고,
-   * 저장은 언제나 회계가 확인한 뒤에 한다. */
+  /* ---------- 영수증 자동 읽기 ----------
+   * 먼저 브라우저 안에서 읽고(js/receipt-ocr.js · 무료), 잘 안 읽히면 회계가 「AI로 다시 읽기」를 눌러
+   * 영수증 창구(cloudflare/receipts → Claude Haiku 5.5)에 맡긴다. 창구 주소가 없으면 AI 단추를 내지 않는다.
+   * 읽은 값은 입력칸에 미리 채우고, 저장은 언제나 회계가 확인한 뒤에 한다. */
   function ocrBase() { return (window.SHS_RECEIPTS && SHS_RECEIPTS.base) || ''; }
-  function ocrEnabled() { return !!ocrBase(); }
+  function aiEnabled() { return !!ocrBase(); }
   function blobToBase64(blob) {
     return new Promise(function (resolve, reject) {
       var fr = new FileReader();
@@ -80,7 +81,7 @@ var SHSLedger = (function () {
   }
   /* 줄인 사진(jpg)을 창구에 보내 {taken_on, vendor, amount, items, payment, confidence, note} 를 받는다 */
   function readReceipt(blob, bookId) {
-    if (!ocrEnabled() || !bookId) return Promise.resolve(null);
+    if (!aiEnabled() || !bookId) return Promise.resolve(null);
     return Promise.all([blobToBase64(blob), ocrToken()]).then(function (xs) {
       if (!xs[1]) throw new Error('로그인이 확인되지 않았습니다.');
       return fetch(ocrBase() + '/read', {
@@ -816,7 +817,7 @@ var SHSLedger = (function () {
         '<div class="lg-drop-list" id="lg-drop-list"></div></div>' +
         '<div id="lg-ocr" class="lg-ocr"></div>' +
         '<div style="font-size:0.78rem;color:var(--gray-5);margin-top:3px">' +
-        (ocrEnabled() ? '사진을 놓으면 일자·사용처·금액을 자동으로 읽어 미리 채웁니다(확인 후 저장). ' : '') +
+        (window.SHSReceiptOCR || aiEnabled() ? '사진을 놓으면 일자·사용처·금액을 자동으로 읽어 미리 채웁니다(확인 후 저장). ' : '') +
         '저장하면 사진이 함께 올라가고, ' +
         '줄의 <strong>영수증</strong> 단추로 언제든 다시 볼 수 있습니다. ' +
         '이미 적은 줄에는 영수증 칸에 사진을 바로 끌어다 놓아도 됩니다.</div></div>' : '') +
@@ -1411,16 +1412,17 @@ var SHSLedger = (function () {
     }
 
     /* 사진 한 장을 줄여서 보관함에 올리고 영수증 표에 적는다.
-     * 자동 읽기가 켜져 있으면 읽은 일자·사용처·금액도 함께 적어 둔다. */
+     * 읽은 일자·사용처·금액도 함께 적어 둔다 (AI 로 다시 읽었으면 그 값을). */
     function uploadReceipt(entryId, f) {
       var path = book.id + '/' + entryId + '/' + Date.now() + '-' +
         Math.random().toString(36).slice(2, 8) + '.jpg';
-      var size = 0, ocr = f.__ocr || null;
+      var size = 0, ocr = f.__ai || f.__ocr || null;
       return shrinkImage(f).then(function (blob) {
         size = blob.size;
-        /* 입력칸에서 미리 읽어 둔 것이 없으면 여기서 읽는다 (실패해도 올리기는 계속) */
-        var p = (ocr || f.__ocrTried) ? Promise.resolve(ocr)
-              : readReceipt(blob, book.id).then(function (o) { return o; }, function () { return null; });
+        /* 입력칸에서 미리 읽어 둔 것이 없으면 여기서 브라우저 안에서 읽는다 — AI 는 회계가 단추를 누를 때만
+         * (실패해도 올리기는 계속) */
+        var p = (ocr || f.__ocrTried || !window.SHSReceiptOCR) ? Promise.resolve(ocr)
+              : SHSReceiptOCR.read(f).then(function (o) { return o; }, function () { return null; });
         return p.then(function (o) {
           ocr = o;
           return SHSCloud.init().then(function (c) {
@@ -1485,48 +1487,112 @@ var SHSLedger = (function () {
         if (/^image\//.test(f.type)) { pendingFiles.push(f); added.push(f); }
       });
       renderPending();
-      if (ocrEnabled() && book && added.length) prefillFromReceipt(added[0]);
+      if (book && added.length && (window.SHSReceiptOCR || aiEnabled())) prefillFromReceipt(added[0]);
     }
 
-    /* 자동 읽기 — 첫 사진을 읽어 비어 있는 일자·적요(사용처)·금액을 채운다.
+    /* 자동 읽기 — 첫 사진을 먼저 브라우저 안에서 읽어(무료) 비어 있는 일자·적요(사용처)·금액을 채운다.
+     * 잘 안 읽혔으면(금액·일자를 못 찾음, 손글씨 등) 「AI로 다시 읽기」를 앞세워 권하고,
+     * 회계가 누를 때만 영수증 창구(Claude)를 부른다.
      * 이미 적은 값은 건드리지 않고, 읽은 내용을 보여 주어 회계가 확인하게 한다. */
     function prefillFromReceipt(f) {
       var info = document.getElementById('lg-ocr');
       if (!info) return;
+      if (!window.SHSReceiptOCR) { aiReread(f); return; }
       info.className = 'lg-ocr';
-      info.innerHTML = '영수증을 읽는 중입니다… <small>(몇 초 걸립니다)</small>';
-      shrinkImage(f).then(function (blob) {
-        return readReceipt(blob, book.id);
+      info.innerHTML = '영수증을 읽는 중입니다… <small id="lg-ocr-prog">(처음 한 번은 글자 인식 자료를 받느라 10~20초 걸립니다)</small>';
+      SHSReceiptOCR.read(f, function (msg) {
+        var p = document.getElementById('lg-ocr-prog');
+        if (p) p.textContent = '(' + msg + ')';
       }).then(function (o) {
         f.__ocrTried = true;
-        if (!o) { info.innerHTML = ''; return; }
         f.__ocr = o;
-        var filled = [];
-        var dEl = document.getElementById('lg-date');
-        var tEl = document.getElementById('lg-title');
-        var aEl = document.getElementById('lg-amt');
-        var today = new Date().toISOString().slice(0, 10);
-        if (dEl && /^\d{4}-\d{2}-\d{2}$/.test(String(o.taken_on || '')) &&
-            (!dEl.value || dEl.value === today)) { dEl.value = o.taken_on; filled.push('일자'); }
-        if (tEl && o.vendor && !tEl.value.trim()) { tEl.value = o.vendor; filled.push(useCats ? '적요' : '항목'); }
-        if (aEl && o.amount != null && !aEl.value) { aEl.value = Math.round(Number(o.amount)); filled.push('금액'); }
-        info.className = 'lg-ocr ok';
-        info.innerHTML = '<strong>영수증에서 읽음</strong> ' + esc(ocrSummary(o)) +
-          (o.items && o.items.length
-            ? ' <small style="color:var(--gray-5)">· 품목 ' + o.items.slice(0, 4).map(function (it) { return esc(it.name); }).join(', ') +
-              (o.items.length > 4 ? ' 외 ' + (o.items.length - 4) : '') + '</small>' : '') +
-          (filled.length ? '<br><small>' + filled.join('·') + ' 칸을 채웠습니다. 맞는지 확인한 뒤 저장해 주세요.</small>' : '') +
-          (o.confidence === 'low' || o.note
-            ? '<br><small style="color:#b0731f">' + (o.confidence === 'low' ? '확신이 낮습니다. ' : '') + esc(o.note || '') + '</small>' : '');
+        showRead(f, o);
       }).catch(function (err) {
         f.__ocrTried = true;
         info.className = 'lg-ocr err';
-        info.innerHTML = '자동 읽기를 하지 못했습니다: ' + esc((err && err.message) || '') +
-          ' <small>(사진은 그대로 올라갑니다)</small> ' +
-          '<button type="button" class="btn ghost sm" id="lg-ocr-retry">다시 읽기</button>';
-        var rb = document.getElementById('lg-ocr-retry');
-        if (rb) rb.addEventListener('click', function () { prefillFromReceipt(f); });
+        info.innerHTML = '사진에서 글자를 읽지 못했습니다: ' + esc((err && err.message) || '') +
+          ' <small>(사진은 그대로 올라갑니다)</small>' + aiButton(true);
+        bindAiButton(f);
       });
+    }
+
+    /* AI 로 다시 읽기 — 영수증 창구(cloudflare/receipts → Claude) */
+    function aiReread(f) {
+      var info = document.getElementById('lg-ocr');
+      if (!info || !book || !aiEnabled()) return;
+      info.className = 'lg-ocr';
+      info.innerHTML = 'AI가 영수증을 읽는 중입니다… <small>(몇 초 걸립니다)</small>';
+      shrinkImage(f).then(function (blob) {
+        return readReceipt(blob, book.id);
+      }).then(function (o) {
+        if (!o) { info.innerHTML = ''; return; }
+        o.source = 'ai';
+        f.__ai = o;
+        showRead(f, o);
+      }).catch(function (err) {
+        info.className = 'lg-ocr err';
+        info.innerHTML = 'AI로 읽지 못했습니다: ' + esc((err && err.message) || '') +
+          ' <small>(사진은 그대로 올라갑니다)</small> ' +
+          '<button type="button" class="btn ghost sm" id="lg-ocr-ai">다시 시도</button>';
+        bindAiButton(f);
+      });
+    }
+
+    /* 「AI로 다시 읽기」 단추 — 잘 안 읽혔을 때는 눈에 띄게, 잘 읽혔을 때는 옅게 */
+    function aiButton(urge) {
+      if (!aiEnabled()) return '';
+      return ' <button type="button" class="btn ' + (urge ? '' : 'ghost ') + 'sm" id="lg-ocr-ai">AI로 다시 읽기</button>';
+    }
+    function bindAiButton(f) {
+      var b = document.getElementById('lg-ocr-ai');
+      if (b) b.addEventListener('click', function () { aiReread(f); });
+    }
+
+    /* 읽은 값을 입력칸에 채운다 — 칸이 비어 있거나, 앞서 자동으로 채운 값이 그대로일 때만 (회계가 고친 값은 둔다) */
+    function applyRead(f, o) {
+      var prev = f.__fill || {}, fill = {}, filled = [];
+      var today = new Date().toISOString().slice(0, 10);
+      function put(id, key, v, label) {
+        var el = document.getElementById(id);
+        if (!el || v == null || v === '') return;
+        var cur = String(el.value || '').trim();
+        if (cur && cur !== String(prev[key] == null ? '' : prev[key]) && !(key === 'date' && cur === today)) return;
+        el.value = v; fill[key] = String(v); filled.push(label);
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(o.taken_on || ''))) put('lg-date', 'date', o.taken_on, '일자');
+      /* 사용처(상호)는 지출처 칸에 — 적요는 회계가 쓰임새를 적는다 */
+      if (o.vendor) {
+        if (viewKind === '지출' && document.getElementById('lg-church')) put('lg-church', 'church', o.vendor, '지출처');
+        else put('lg-title', 'title', o.vendor, useCats ? '적요' : '항목');
+      }
+      if (o.amount != null && isFinite(Number(o.amount))) put('lg-amt', 'amt', Math.round(Number(o.amount)), '금액');
+      f.__fill = Object.assign({}, prev, fill);
+      return filled;
+    }
+
+    /* 읽은 결과를 입력칸 아래에 보인다 */
+    function showRead(f, o) {
+      var info = document.getElementById('lg-ocr');
+      if (!info) return;
+      var filled = applyRead(f, o);
+      var ai = o.source === 'ai';
+      var weak = !ai && !!o.weak;
+      var sum = ocrSummary(o);
+      info.className = 'lg-ocr' + (weak ? '' : ' ok');
+      info.innerHTML =
+        (sum ? '<strong>' + (ai ? 'AI가 읽음' : '영수증에서 읽음') + '</strong> ' + esc(sum)
+             : '<strong>영수증에서 읽은 값이 없습니다.</strong>') +
+        (o.items && o.items.length
+          ? ' <small style="color:var(--gray-5)">· 품목 ' + o.items.slice(0, 4).map(function (it) { return esc(it.name); }).join(', ') +
+            (o.items.length > 4 ? ' 외 ' + (o.items.length - 4) : '') + '</small>' : '') +
+        (filled.length ? '<br><small>' + filled.join('·') + ' 칸을 채웠습니다. 맞는지 확인한 뒤 저장해 주세요.</small>' : '') +
+        (weak
+          ? '<br><small style="color:#8a5a12">' + esc(o.note || '잘 읽히지 않았습니다.') +
+            (aiEnabled() ? ' 「AI로 다시 읽기」를 누르면 손글씨·흐린 사진도 읽을 수 있습니다.' : '') + '</small>' + aiButton(true)
+          : ((o.confidence === 'low' || (ai && o.note))
+              ? '<br><small style="color:#b0731f">' + (o.confidence === 'low' ? '확신이 낮습니다. ' : '') + esc(o.note || '') + '</small>' : '') +
+            (ai ? '' : aiButton(false)));
+      bindAiButton(f);
     }
     function bindDrop() {
       var zone = document.getElementById('lg-drop');
