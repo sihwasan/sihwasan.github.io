@@ -21,6 +21,29 @@
 .or-progress.ok { background: #f2faf5; color: #1a6d3a; }
 .or-progress.bad { background: #fdf3f3; color: #b03a3a; }
 .or-errs { font-size: 0.82rem; color: #b03a3a; margin-bottom: 10px; }
+.or-wrap { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; align-items: start; }
+.or-side { position: sticky; top: calc(var(--nav-h, 0px) + 16px); background: var(--cream, #fbf8f2); border: 1px solid var(--gray-2); border-radius: 12px; padding: 12px; max-height: calc(100vh - var(--nav-h, 0px) - 32px); overflow-y: auto; }
+.or-side-h { font-size: 0.74rem; letter-spacing: 2px; color: var(--gray-5); margin: 14px 0 6px; }
+.or-cal-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.or-cal-h strong { font-size: 0.95rem; color: var(--navy); }
+.or-cal-nav { border: 1px solid var(--gray-3); background: #fff; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; line-height: 1; color: var(--gray-7); }
+.or-cal-nav:hover { border-color: var(--navy); color: var(--navy); }
+.or-cal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 0.82rem; }
+.or-cal-w { color: var(--gray-5); font-size: 0.72rem; padding: 2px 0 4px; }
+.or-cal-d { display: block; width: 100%; height: 30px; line-height: 30px; border-radius: 6px; color: var(--gray-4); border: 0; background: transparent; font: inherit; }
+.or-cal-d.sun, .or-cal-w.sun { color: #b55; } .or-cal-d.sat, .or-cal-w.sat { color: #357; }
+.or-cal-d.sun:not(.has), .or-cal-d.sat:not(.has) { opacity: 0.45; }
+button.or-cal-d.has { color: var(--ink); background: #fff; border: 1px solid var(--gray-2); cursor: pointer; font-weight: 700; }
+button.or-cal-d.has:hover { border-color: var(--navy); color: var(--navy); }
+.or-cal-d.today { box-shadow: inset 0 0 0 2px var(--accent); }
+button.or-cal-d.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.or-list button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 7px 8px; border-radius: 6px; cursor: pointer; font: inherit; color: var(--ink); }
+.or-list button:hover { background: #fff; }
+.or-list button.on { background: var(--navy); color: #fff; }
+.or-list-n { display: block; font-size: 0.9rem; font-weight: 700; }
+.or-list-s { display: block; font-size: 0.76rem; color: var(--gray-6); margin-top: 2px; line-height: 1.35; word-break: keep-all; }
+.or-list button.on .or-list-s { color: rgba(255,255,255,0.78); }
+@media (max-width: 860px) { .or-wrap { grid-template-columns: 1fr; } .or-side { position: static; max-height: none; } }
 .or-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .or-chips button { min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--gray-2); background: #fff;
   color: var(--gray-7); font-size: 0.86rem; cursor: pointer; user-select: none; }
@@ -93,7 +116,7 @@
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
 <script src="js/main.js?v=20261021r"></script>
-<script src="js/officer-report.js?v=20261021rb"></script>
+<script src="js/officer-report.js?v=20261021rc"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   SHS.getUser().then(function (user) { SHSOReport.mount(document.getElementById('or-area'), user); });

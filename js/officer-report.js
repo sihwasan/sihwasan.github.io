@@ -22,7 +22,7 @@ var SHSOReport = (function () {
   var KINDS = ['상비부', '시찰', '기관', '교회', '임원', '회원', '기타'];
 
   var box = null, user = null, reader = false;
-  var S = { tab: 'rep', list: [], date: null, pick: null, rep: null, tasks: [], tf: 'open', towner: '', phones: {}, busy: false };
+  var S = { tab: 'rep', list: [], date: null, pick: null, rep: null, tasks: [], tf: 'open', towner: '', phones: {}, busy: false, month: null, hasDays: {} };
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -126,11 +126,14 @@ var SHSOReport = (function () {
   function loadAll() {
     var rep = box.querySelector('#or-rep');
     rep.innerHTML = '<p class="or-muted">보고서를 불러오는 중...</p>';
-    var since = ymd(new Date(Date.now() - 20 * 864e5));
+    if (!S.month) S.month = todayStr().slice(0, 7);
+    var mStart = new Date(S.month + '-01T00:00:00');
+    var since = ymd(new Date(mStart.getFullYear(), mStart.getMonth() - 1, 1));           /* 지난달 1일부터 */
+    var until = ymd(new Date(mStart.getFullYear(), mStart.getMonth() + 2, 0));           /* 다음달 말일까지 */
     db().then(function (c) {
       return Promise.all([
         c.from('ai_reports').select('id,report_date,user_id,name,role,title,duty,headline,created_at,model')
-          .gte('report_date', since).order('report_date', { ascending: false }).order('name').limit(400),
+          .gte('report_date', since).lte('report_date', until).order('report_date', { ascending: false }).order('name').limit(1500),
         loadTasks(c),
         reader ? c.rpc('ai_report_last_run') : Promise.resolve({ data: null })
       ]);
@@ -143,8 +146,9 @@ var SHSOReport = (function () {
       }
       S.list = rs[0].data || [];
       S.lastRun = rs[2] && rs[2].data;
+      S.hasDays = {}; S.list.forEach(function (r) { S.hasDays[r.report_date] = (S.hasDays[r.report_date] || 0) + 1; });
       var dates = dates0();
-      if (!S.date || dates.indexOf(S.date) === -1) S.date = dates[0] || null;
+      if (!S.date || !S.hasDays[S.date]) S.date = dates[0] || null;
       var mine = S.list.filter(function (r) { return r.report_date === S.date && r.user_id === user.id; })[0];
       if (!S.pick || !S.list.some(function (r) { return r.id === S.pick; })) {
         var first = mine || S.list.filter(function (r) { return r.report_date === S.date; })[0];
@@ -168,7 +172,25 @@ var SHSOReport = (function () {
   function dates0() {
     var seen = {}, out = [];
     S.list.forEach(function (r) { if (!seen[r.report_date]) { seen[r.report_date] = 1; out.push(r.report_date); } });
-    return out.slice(0, 14);
+    return out;
+  }
+  /* ---------- 달력 (왼쪽) ---------- */
+  function calHtml() {
+    var m = S.month || todayStr().slice(0, 7);
+    var y = parseInt(m.slice(0, 4), 10), mo = parseInt(m.slice(5, 7), 10);
+    var first = new Date(y, mo - 1, 1), last = new Date(y, mo, 0);
+    var today = todayStr();
+    var h = '<div class="or-cal"><div class="or-cal-h"><button type="button" class="or-cal-nav" data-month="prev" aria-label="지난달">‹</button>' +
+      '<strong>' + y + '년 ' + mo + '월</strong><button type="button" class="or-cal-nav" data-month="next" aria-label="다음달">›</button></div>' +
+      '<div class="or-cal-g">' + ['일', '월', '화', '수', '목', '금', '토'].map(function (d, i) { return '<span class="or-cal-w' + (i === 0 ? ' sun' : i === 6 ? ' sat' : '') + '">' + d + '</span>'; }).join('');
+    for (var i = 0; i < first.getDay(); i++) h += '<span></span>';
+    for (var d = 1; d <= last.getDate(); d++) {
+      var ds = m + '-' + pad(d), n = S.hasDays[ds] || 0, dow = (first.getDay() + d - 1) % 7;
+      var cls = 'or-cal-d' + (n ? ' has' : '') + (ds === S.date ? ' on' : '') + (ds === today ? ' today' : '') + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '');
+      h += n ? '<button type="button" class="' + cls + '" data-date="' + ds + '" title="보고서 ' + n + '건">' + d + '</button>' : '<span class="' + cls + '">' + d + '</span>';
+    }
+    h += '</div></div>';
+    return h;
   }
 
   /* ---------- 보고서 탭 ---------- */
@@ -189,26 +211,26 @@ var SHSOReport = (function () {
         (lr && lr.errors && lr.errors.length ? '<details class="or-errs"><summary>오류 보기</summary><ul>' +
           lr.errors.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></details>' : '');
     }
-    if (!dates.length) {
-      rep.innerHTML = h + '<p class="or-empty">아직 보고서가 없습니다. 매일 아침 6시에 만들어지며, 만들어지면 여기와 대시보드에 나타납니다.' +
-        (reader ? ' 지금 바로 보려면 위의 「지금 다시 만들기」를 눌러 주세요 (몇 분 걸립니다).' : '') + '</p>';
-      return;
-    }
-    h += '<div class="or-chips" id="or-dates" aria-label="날짜">' + dates.map(function (d) {
-      return '<button type="button" data-date="' + d + '"' + (d === S.date ? ' class="on"' : '') + '>' + esc(dayLabel(d)) + '</button>';
-    }).join('') + '</div>';
     var day = S.list.filter(function (r) { return r.report_date === S.date; });
-    if (reader && day.length) {
-      h += '<div class="or-chips or-people" id="or-people" aria-label="임원">' + day.map(function (r) {
+    /* 왼쪽: 달력 + 그날 보고서가 있는 임원 목록 (노회장·서기·최고관리자만 모든 임원을 본다) */
+    var side = calHtml();
+    if (reader) {
+      side += '<div class="or-side-h">' + (S.date ? esc(dayLabel(S.date)) + ' 보고서' : '임원') + '</div>';
+      side += day.length ? '<div class="or-list" id="or-people">' + day.map(function (r) {
         return '<button type="button" data-pick="' + r.id + '"' + (r.id === S.pick ? ' class="on"' : '') + '>' +
-          esc(r.title || '') + ' ' + esc(r.name || '') + (r.user_id === user.id ? ' (나)' : '') + '</button>';
-      }).join('') + '</div>';
+          '<span class="or-list-n">' + esc(r.title || '') + ' ' + esc(r.name || '') + (r.user_id === user.id ? ' (나)' : '') + '</span>' +
+          (r.headline ? '<span class="or-list-s">' + esc(r.headline) + '</span>' : '') + '</button>';
+      }).join('') + '</div>' : '<p class="or-empty" style="margin:6px 0 0">이 날은 보고서가 없습니다.</p>';
+    } else if (S.date && !day.some(function (r) { return r.user_id === user.id; })) {
+      side += '<p class="or-empty" style="margin:6px 0 0">이 날은 내 보고서가 없습니다.</p>';
     }
-    if (!day.some(function (r) { return r.user_id === user.id; }) && !reader) {
-      h += '<p class="or-empty">이 날은 내 보고서가 없습니다.</p>';
+    var main = h;
+    if (!dates.length) {
+      main += '<p class="or-empty">아직 보고서가 없습니다. 매일 아침 6시에 만들어지며, 만들어지면 여기와 대시보드에 나타납니다.' +
+        (reader ? ' 지금 바로 보려면 위의 「지금 다시 만들기」를 눌러 주세요 (몇 분 걸립니다).' : '') + '</p>';
     }
-    h += '<div id="or-view"></div>';
-    rep.innerHTML = h;
+    main += '<div id="or-view"></div>';
+    rep.innerHTML = '<div class="or-wrap"><aside class="or-side">' + side + '</aside><div class="or-main">' + main + '</div></div>';
   }
 
   function openReport(id) {
@@ -501,6 +523,12 @@ var SHSOReport = (function () {
     var b = ev.target.closest('button');
     if (!b || !box.contains(b)) return;
     if (b.dataset.tab) { showTab(b.dataset.tab); return; }
+    if (b.dataset.month) {
+      var mm = new Date((S.month || todayStr().slice(0, 7)) + '-01T00:00:00');
+      mm.setMonth(mm.getMonth() + (b.dataset.month === 'prev' ? -1 : 1));
+      S.month = ymd(mm).slice(0, 7); S.date = null; S.pick = null;
+      loadAll(); return;
+    }
     if (b.dataset.date) { S.date = b.dataset.date; S.pick = null; var mine = S.list.filter(function (r) { return r.report_date === S.date && r.user_id === user.id; })[0];
       var first = mine || S.list.filter(function (r) { return r.report_date === S.date; })[0]; S.pick = first ? first.id : null; drawRep(); openReport(S.pick); return; }
     if (b.dataset.pick) { S.pick = Number(b.dataset.pick); drawRep(); openReport(S.pick); return; }
