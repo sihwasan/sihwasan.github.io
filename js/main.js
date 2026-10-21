@@ -744,6 +744,7 @@
           if (!tabRestoring && b.dataset.tab && history.pushState &&
               location.hash !== '#' + b.dataset.tab) {
             history.pushState(null, '', '#' + b.dataset.tab);
+            window.dispatchEvent(new Event('hashchange'));   /* 왼쪽 묶음 메뉴가 지금 탭을 따라 켜지게 */
           }
         });
       });
