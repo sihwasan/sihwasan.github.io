@@ -157,7 +157,7 @@ export const TOOL_DEFS = {
   },
   search_presbytery_resolutions: {
     /* 회기별 회의결의서 책자 */
-    description: '시화산노회 역대 정기노회·임시노회의 결의사항(홈페이지 자료실에 정리된 것)을 찾는다.',
+    description: '시화산노회 역대 정기노회·임시노회의 회의결의서(회기별 결의사항 책자: 임원·상비부 조직, 청빙·위임·허락·헌의안 처리 결의)를 낱말이나 회기 번호로 찾는다. "○○교회 청빙 결의", "제19회 결의사항" 같은 질문에 쓴다.',
     input_schema: S({
       keyword: { type: 'string', description: '찾을 낱말' },
       session: { type: 'string', description: '회기 (예: 제19회)' }
