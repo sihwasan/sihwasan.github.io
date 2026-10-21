@@ -88,9 +88,7 @@ var SHSOReport = (function () {
     if (!u.cloud) { box.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.</div>'; return; }
     reader = READER_ROLES.indexOf(u.role) !== -1;
     box.innerHTML =
-      '<p class="or-lead">매일 아침 6시, AI 가 노회 자료(회의록·결의·회칙·일정·회계·서류)를 살펴 임원마다 직책에 맞는 보고서를 씁니다. ' +
-      (reader ? '노회장·서기는 모든 임원의 보고서를 볼 수 있습니다.' : '내 보고서는 나와 노회장·서기만 봅니다.') +
-      ' 내용은 AI 가 정리한 것이니 중요한 일은 원자료로 확인해 주세요.</p>' +
+      '<p class="or-lead">매일 아침 6시 AI를 통해 업무 보고가 이루어집니다. 임원들은 원활한 노회 운영을 위해 보고서를 살펴 주시기 바랍니다.</p>' +
       '<div class="tabs" id="or-tabs" role="tablist">' +
       '<button type="button" role="tab" data-tab="rep" class="active">보고서</button>' +
       '<button type="button" role="tab" data-tab="task">할 일<span class="or-n" id="or-task-n"></span></button></div>' +
