@@ -352,7 +352,15 @@ export async function runReports(env, deps, opts, log) {
   opts = opts || {}; log = log || function () {};
   if (!env.REPORT_KEY) throw new Error('창구에 보고서 열쇠(REPORT_KEY)가 없습니다.');
   const started = new Date().toISOString();
-  const model = deps.model, effort = deps.effort || 'medium';
+  /* 요일(한국 시간)에 따라: 전체 보고서 날(기본 월요일)은 모든 임원에게 주간 모델로,
+   * 그 밖의 날은 노회장·서기·회계·간사에게만 매일 모델로. (opts.full 이면 언제나 전체) */
+  const kstDay = new Date(Date.now() + 9 * 3600e3).getUTCDay();
+  const weekly = !!opts.full || kstDay === (deps.weeklyDay == null ? 1 : deps.weeklyDay);
+  const model = weekly ? deps.model : (deps.dailyModel || deps.model), effort = deps.effort || 'medium';
+  const DAILY = ['president', 'clerk', 'treasurer', 'staff'];
+  /* 임원마다 쓸 모델: 직책별 모델이 있으면 그것, 없으면 그날의 기본 모델 */
+  const dutyModels = (deps.dutyModels && typeof deps.dutyModels === 'object') ? deps.dutyModels : {};
+  function modelFor(o) { return dutyModels[dutyOf(o)] || model; }
   const errors = [];
   let usage = { input: 0, output: 0, cache_read: 0, cache_write: 0 };
   function add(u) { Object.keys(usage).forEach(function (k) { usage[k] += u[k] || 0; }); }
@@ -381,16 +389,18 @@ export async function runReports(env, deps, opts, log) {
    *    예약 실행은 15분 안에 끝나야 하므로(Cloudflare 한도) 다 쓴 보고서는 그때그때 저장하고,
    *    시한(deadline)이 지나면 남은 분은 시작하지 않고 기록에 남긴다. */
   let officers = arr(b.officers);
-  if (opts.only) officers = officers.filter(function (o) { return o.id === opts.only; });
+  if (!weekly) officers = officers.filter(function (o) { return DAILY.indexOf(dutyOf(o)) !== -1 && String(o.title || '').trim() !== '부회계'; });
+  if (opts.only) officers = arr(b.officers).filter(function (o) { return o.id === opts.only; });
   const deadline = opts.deadline || (Date.parse(started) + 25 * 60 * 1000);
-  const base = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, date: b.today, model: model, officers: officers.length, new_tasks: newTasks };
+  const usedModels = officers.map(modelFor).filter(function (m, i, a) { return a.indexOf(m) === i; });
+  const base = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, date: b.today, model: usedModels.join(', ') || model, mode: weekly ? '전체(주간)' : '핵심 임원(매일)', officers: officers.length, new_tasks: newTasks };
   await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: Object.assign({ running: true }, base) } }).catch(function () {});
   let saved = 0, skipped = 0;
   async function one(o) {
     if (Date.now() > deadline) { skipped++; return; }
     log((o.title || DUTY_NAME[dutyOf(o)]) + ' ' + o.name + ' 보고서를 쓰는 중');
     try {
-      const x = await writeReport(deps, b, o, system, model, effort);
+      const x = await writeReport(deps, b, o, system, modelFor(o), effort);
       add(x.usage);
       await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { reports: [x.row] } });
       saved++;

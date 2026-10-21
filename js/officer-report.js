@@ -88,7 +88,6 @@ var SHSOReport = (function () {
     if (!u.cloud) { box.innerHTML = '<div class="notice-banner">서버 로그인(구글 또는 이메일) 후 이용할 수 있습니다.</div>'; return; }
     reader = READER_ROLES.indexOf(u.role) !== -1;
     box.innerHTML =
-      '<p class="or-lead">매일 아침 6시 AI를 통해 업무 보고가 이루어집니다. 임원들은 원활한 노회 운영을 위해 보고서를 살펴 주시기 바랍니다.</p>' +
       '<div class="tabs" id="or-tabs" role="tablist">' +
       '<button type="button" role="tab" data-tab="rep" class="active">보고서</button>' +
       '<button type="button" role="tab" data-tab="task">할 일<span class="or-n" id="or-task-n"></span></button></div>' +

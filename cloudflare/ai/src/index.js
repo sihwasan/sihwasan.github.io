@@ -54,7 +54,12 @@ const DEFAULTS = {
   roles: ['superadmin', 'president', 'clerk', 'staff', 'officer', 'member'],
   enabled: true,
   report_enabled: true,   /* 임원 업무 보고서 (매일 아침 6시) */
-  report_model: 'claude-opus-5-5',   /* 보고서는 Opus 5.5 로 (2026-10-21 사용자 지시). 비우면 검색과 같은 모델 */
+  /* 2026-10-21 사용자 지시: 평일은 노회장·서기·회계·간사에게만 Haiku 로, 주 1회(월요일)는 전체에게 Sonnet 으로 */
+  report_model: 'claude-sonnet-5-5',        /* 주 1회 전체 보고서 모델(직책별 모델이 없는 임원). 비우면 검색과 같은 모델 */
+  report_daily_model: 'claude-haiku-5-5',   /* 매일 핵심 임원 중 직책별 모델이 없는 분의 모델 */
+  /* 직책별 모델 (2026-10-21 사용자 지시: 노회장 Opus, 서기 Sonnet, 간사 Haiku; 회계는 Haiku) — 매일·주간 모두 적용 */
+  report_duty_models: { president: 'claude-opus-5-5', clerk: 'claude-sonnet-5-5', treasurer: 'claude-haiku-5-5', staff: 'claude-haiku-5-5' },
+  report_weekly_day: 1,                     /* 전체 보고서 요일 (0 일요일 … 1 월요일 … 6 토요일) */
   report_effort: 'medium'
 };
 /* 관리자 화면의 모델 고르기에 보여 줄 목록 (값: 1백만 토큰당 미화) */
@@ -111,6 +116,8 @@ function publicSettings(s, extra) {
   return Object.assign({
     model: s.model, effort: s.effort, daily_user: s.daily_user, daily_total: s.daily_total, roles: s.roles, enabled: s.enabled,
     report_enabled: s.report_enabled !== false, report_model: s.report_model || '', report_effort: s.report_effort || 'medium',
+    report_daily_model: s.report_daily_model || '', report_weekly_day: s.report_weekly_day == null ? 1 : s.report_weekly_day,
+    report_duty_models: s.report_duty_models || {},
     has_key: !!s.api_key, key_tail: s.api_key ? String(s.api_key).slice(-4) : '',
     updated_at: s.updated_at || null, updated_by: s.updated_by || null, models: MODELS
   }, extra || {});
@@ -566,7 +573,9 @@ async function feedback(request, env, origin) {
 function reportDeps(s, env) {
   const via = env && env.CLAUDE ? function (u, init) { return env.CLAUDE.fetch(u, init); } : null;
   return { claudeCall: function (key, body, onText) { return claudeCall(key, body, onText, via); },
-    key: s.api_key, model: s.report_model || s.model, effort: s.report_effort || 'medium' };
+    key: s.api_key, model: s.report_model || s.model, effort: s.report_effort || 'medium',
+    dailyModel: s.report_daily_model || s.report_model || s.model, weeklyDay: s.report_weekly_day == null ? 1 : Number(s.report_weekly_day),
+    dutyModels: s.report_duty_models || {} };
 }
 /* 실패도 마지막 실행 기록에 남긴다 (관리자 화면에서 보이게) */
 async function saveRunError(env, trigger, by, message) {
@@ -688,6 +697,16 @@ async function settings(request, env, origin, test) {
   if (typeof body.report_enabled === 'boolean') next.report_enabled = body.report_enabled;
   if (typeof body.report_model === 'string' && (body.report_model === '' || MODELS.some(function (m) { return m.id === body.report_model; }))) next.report_model = body.report_model;
   if (typeof body.report_effort === 'string' && ['low', 'medium', 'high'].indexOf(body.report_effort) !== -1) next.report_effort = body.report_effort;
+  if (typeof body.report_daily_model === 'string' && (body.report_daily_model === '' || MODELS.some(function (m) { return m.id === body.report_daily_model; }))) next.report_daily_model = body.report_daily_model;
+  if (body.report_weekly_day != null && [0, 1, 2, 3, 4, 5, 6].indexOf(Number(body.report_weekly_day)) !== -1) next.report_weekly_day = Number(body.report_weekly_day);
+  if (body.report_duty_models && typeof body.report_duty_models === 'object') {
+    const dm = {};
+    ['president', 'clerk', 'treasurer', 'staff', 'minutes', 'vice_president', 'vice_clerk', 'officer'].forEach(function (k) {
+      const v = body.report_duty_models[k];
+      if (typeof v === 'string' && v && MODELS.some(function (m) { return m.id === v; })) dm[k] = v;
+    });
+    next.report_duty_models = dm;
+  }
   next.updated_at = new Date().toISOString();
   next.updated_by = me.name || me.id;
   await env.AI_KV.put('settings', JSON.stringify(next));

@@ -84,9 +84,9 @@ document.addEventListener('DOMContentLoaded', function () {
     '</select></div>' +
     '<div class="field" style="flex:0 0 160px"><label>재직 시작(부임)</label>' +
     '<input type="date" id="d-served" title="재직증명서의 재직 기간에 쓰입니다"></div>' +
-    '<div class="field" style="flex:0 0 90px"><label>회기</label><input type="number" id="d-session" value="19" min="1" max="99"></div>' +
+    '<div class="field" style="flex:0 0 90px"><label>회기</label><input type="number" id="d-session" value="20" min="1" max="99"></div>' +
     '<div class="field" style="flex:0 0 200px"><label>문서번호 (비우면 자동)</label>' +
-    '<input type="text" id="d-docno" placeholder="예: 시화산노 제19-008호"></div>' +
+    '<input type="text" id="d-docno" placeholder="예: 시화산노 제20-001호"></div>' +
     '<button class="btn" id="btn-issue">발급</button>' +
     '</div>' +
     '<input type="hidden" id="d-reqid" value="">' +
@@ -826,7 +826,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var pos = document.getElementById('d-pos').value;
     var church = document.getElementById('d-church').value.trim();
     var purpose = document.getElementById('d-purpose').value;
-    var session = parseInt(document.getElementById('d-session').value, 10) || 19;
+    var session = parseInt(document.getElementById('d-session').value, 10) || 20;
     var reqId = document.getElementById('d-reqid').value;
     if (doc === '직인증명서') {
       if (!church) {
