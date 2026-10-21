@@ -76,7 +76,7 @@ var SHSSuper = (function () {
       Promise.all([
         call('/settings'),
         SHSCloud.init().then(function (c) {
-          return c.from('profiles').select('id,name,role,title,church').in('role', OFFICER_ROLES).order('name');
+          return c.from('profiles').select('id,name,role,title,church,email').in('role', OFFICER_ROLES).order('name');
         })
       ]).then(function (rs) {
         var S = rs[0], pr = rs[1];
@@ -118,7 +118,9 @@ var SHSSuper = (function () {
         }
         people.forEach(function (p) {
           var cur = um[p.id] || '';
-          h += '<tr><td>' + e(p.name || '-') + '</td>' +
+          /* 한 분이 계정을 둘 가진 경우가 있어(예: 서기) 계정 이메일을 함께 적는다 */
+          h += '<tr><td>' + e(p.name || '-') +
+            (p.email ? '<div style="font-size:0.76rem;color:var(--gray-5);word-break:break-all">' + e(p.email) + '</div>' : '') + '</td>' +
             '<td>' + e(dutyName(p)) + '</td>' +
             '<td class="left">' + e(p.church || '-') + '</td>' +
             '<td><select data-uid="' + e(p.id) + '" style="width:100%">' +
