@@ -41,6 +41,8 @@ var SHSLedger = (function () {
 
   function esc(s) { return SHS.esc(s); }
   function won(n) { return (Number(n) || 0).toLocaleString('ko-KR'); }
+  /* 오늘 날짜(한국 시각) — toISOString() 은 세계 표준시라 한국 오전 9시 전에는 어제가 나온다 */
+  function kstToday() { return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); }
   function kindOf(k) { return ['committee', 'sichal', 'presbytery', 'ministers'].indexOf(k) >= 0 ? k : 'sichal'; }
 
   /* PDF 도구(html2pdf)는 처음 쓸 때 한 번만 내려받는다 */
@@ -762,7 +764,7 @@ var SHSLedger = (function () {
     var ALLOC_CAT = '상비부 배정';   /* 이 과목의 지출은 상비부 장부에 수입으로 함께 적힌다 */
 
     function entryForm() {
-      var today = new Date().toISOString().slice(0, 10);
+      var today = kstToday();
       /* 노회 장부: 과목을 고르고, 상비부 배정이면 어느 상비부인지 고른다 */
       var catField = useCats
         ? '<div class="field" style="flex:0 0 200px"><label>과목 (고르거나 직접 입력)</label>' +
@@ -1551,7 +1553,7 @@ var SHSLedger = (function () {
     /* 읽은 값을 입력칸에 채운다 — 칸이 비어 있거나, 앞서 자동으로 채운 값이 그대로일 때만 (회계가 고친 값은 둔다) */
     function applyRead(f, o) {
       var prev = f.__fill || {}, fill = {}, filled = [];
-      var today = new Date().toISOString().slice(0, 10);
+      var today = kstToday();
       function put(id, key, v, label) {
         var el = document.getElementById(id);
         if (!el || v == null || v === '') return;
