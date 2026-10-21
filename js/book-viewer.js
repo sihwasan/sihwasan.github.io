@@ -420,17 +420,9 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="admin-card pr-upcard" style="margin-bottom:18px"><h3 style="margin-top:0">' + BOOK.uploadTitle + '</h3>' +
       '<div class="pr-drop" id="up-drop" tabindex="0" role="button" aria-label="PDF 올리기">' +
       '<div class="pr-drop-ic">⇩</div><strong>PDF 를 여기에 끌어다 놓으세요</strong>' +
-      '<span>또는 눌러서 파일 고르기 · 올리면 AI 가 아래 규칙대로 쪽마다 읽어 지금 책자들과 같은 모양으로 정리합니다</span>' +
+      '<span>또는 눌러서 파일 고르기 · 올리면 쪽마다 읽어 지금 책자들과 같은 모양으로 정리합니다</span>' +
       '<em id="up-drop-name"></em></div>' +
       '<p style="font-size:0.86rem;color:var(--gray-6)">저장소에 PDF 원본을 보관하고 쪽마다 글로 받아 적습니다. 58쪽이면 5분쯤 걸리며 AI 비용이 조금 듭니다(쪽당 수십 원). 중간에 끊겨도 「이어서 읽기」로 이어집니다.</p>' +
-      '<details class="pr-rules"><summary>AI 가 책자를 정리하는 규칙</summary><ul>' +
-      '<li>보이는 글자 그대로 받아 적고 요약하지 않습니다. 이름·교회·숫자·날짜·금액은 특히 정확하게.</li>' +
-      '<li>줄마다 줄바꿈으로 나누고, 큰 제목·작은 제목은 따로 한 줄(화면에서 제목 글씨로 보입니다).</li>' +
-      '<li>표는 표로: 첫 줄이 칸 이름, 모든 행의 칸 수를 맞추고 빈 칸은 빈 채로, 한 칸에 겹친 이름은 「·」로 이어서(예: 김종택·이성팔).</li>' +
-      '<li>표 밖의 합계·비고 줄은 표 다음에 따로, 나란한 두 표는 따로따로.</li>' +
-      '<li>차례·예배 순서처럼 점선으로 이어진 줄은 점선을 남겨 「항목 …… 쪽」 꼴로(화면에서 양끝 맞춤).</li>' +
-      '<li>인쇄된 쪽 번호(아래 가운데 동그라미 숫자)를 그 면의 쪽으로 삼고, 차례 면은 차례로 삼습니다.</li>' +
-      '</ul><p style="margin:6px 0 0;font-size:0.84rem;color:var(--gray-6)">이 규칙은 AI 서버(워커)의 읽기 지시에 들어 있습니다. 잘못 읽은 쪽은 「이 쪽 글 고치기」로 바로잡고, 책자 전체를 새 규칙으로 다시 정리하려면 「전부 다시 읽기」를 누릅니다.</p></details>' +
       '<div id="up-fields" class="hidden"><div class="inline-form">' +
       '<div class="field" style="flex:0 0 110px"><label>회기</label><input type="number" id="up-session" placeholder="20"></div>' +
       '<div class="field" style="flex:0 0 140px"><label>종류</label><select id="up-kind">' + BOOK.kinds.map(function (k) { return '<option>' + k + '</option>'; }).join('') + '</select></div>' +
