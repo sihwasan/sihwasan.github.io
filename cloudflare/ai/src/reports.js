@@ -41,6 +41,7 @@ const DUTY_GUIDE = {
     '- 다가오는 정기노회·임원회·행사와 그 준비 상태 (노회규칙에 정한 소집·공고 기한이 있으면 날짜로 계산해 알림)\n' +
     '- 노회장이 결정·승인·서명할 일 (서류 발급 승인, 지급 확인, 청원 처리 등)\n' +
     '- 재정 요약: 상회비 수납 현황과 미납, 노회 장부의 큰 수입·지출\n' +
+    '- 「상회비 3개월 이상 미납 — 납부촉구 공문」 자료가 있으면 재정 요약에 그 교회 수·미납 합계와 공문 발송 진행(보낸 곳/대상)을 적는다. 회계의 월례회 보고를 받는 자리다\n' +
     '- todos 는 지시할 일과 노회장이 직접 할 일로 4~8개.',
   vice_president:
     '부노회장 보고서입니다. 노회장을 보좌하는 눈으로 노회 전반을 짧게 요약하고, 부노회장이 맡거나 도울 수 있는 일(다음 노회 준비, 늦어진 결의 이행 독려)을 제안합니다. todos 는 2~4개.',
@@ -52,6 +53,7 @@ const DUTY_GUIDE = {
     '- 오늘 연락할 곳: 각 상비부장·시찰장·기관 대표에게 보낼 연락 문안을 todos 의 message 로 만든다 (연락처는 자료의 연락처에서)\n' +
     '- 서류 발급 신청·청원서 접수 처리, 일정 공지·소집 통지 기한 (노회규칙 근거와 날짜 계산)\n' +
     '- 연락했는데 진행이 없는 일은 다시 연락하도록 checks 와 todos 에 올린다\n' +
+    '- 「상회비 3개월 이상 미납 — 납부촉구 공문」 자료에서 「공문 미발송」인 교회는 「납부촉구 공문 발송」 section 에 적고 교회마다 todos 로 올린다 (서기가 발송한다 — 홈페이지 임원방 → 상회비 관리 → 납부촉구 공문에서 교회를 누르면 공문이 만들어지고 인쇄·PDF 저장·받는 곳 주소를 볼 수 있으며, 보낸 뒤 「발송 기록」을 누른다). target_kind 교회, target_name 교회 이름, contact_name 그 교회 담임목사, message 는 빈 칸\n' +
     '- todos 는 연락·처리할 일 중심으로 4~10개.',
   vice_clerk:
     '부서기 보고서입니다. 서기를 보좌하는 눈으로, 서기 할 일 가운데 부서기가 나눠 맡을 수 있는 연락·정리 일을 제안하고, 서기 유고 시 대행할 일을 짚습니다. todos 는 2~5개.',
@@ -64,6 +66,7 @@ const DUTY_GUIDE = {
     '회계 보고서입니다 (부회계도 같은 보고서를 받습니다).\n' +
     '- 상회비 수입 집계: 이번 회기 낸 교회·안 낸 교회, 수납액·미납액(만원 단위). 미리 계산된 자료의 숫자를 그대로 쓰고 다시 계산하지 않는다\n' +
     '- 미납 교회마다 담임목사에게 정중한 납부 안내 문안을 todos 의 message 로 (밀린 달과 금액 포함). 미납이 많으면 많이 밀린 곳부터 최대 8곳\n' +
+    '- 「상회비 3개월 이상 미납 — 납부촉구 공문」 자료가 있으면 월례 보고서(매월 첫째 월요일)에 「3개월 이상 미납 보고」 section 을 두고 교회·밀린 달·미납액·공문 발송 여부를 자료 그대로 적는다 — 회계가 월례회 때 노회장·서기에게 보고하는 내용이다. 이번 달 월례회 보고를 홈페이지에 아직 올리지 않았으면 todos 에 「상회비 관리 → 납부촉구 공문 → 월례회 보고서 → 보고하기」를 올린다 (보고하면 노회장·서기에게 알림이 가고 서기가 공문을 발송한다)\n' +
     '- 세례의무금 현황\n' +
     '- 노회 장부: 최근 등록한 수입·지출, 영수증이 없는 지출, 받는 분이 아직 확인하지 않은 지급(지급 확인 대기)\n' +
     '- 재정 상황을 등록한 뒤 노회장·서기에게 확인을 요청할 일을 todos 로\n' +
@@ -151,6 +154,50 @@ export function duesSummary(b) {
     unpaidChurches: rows.filter(function (r) { return r.unpaid.length; }).length };
 }
 
+/* 상회비 3개월 이상 미납 — 납부촉구 공문 대상 (135 sql dues29_late_months · 137 sql 과 같은 셈)
+ *   기한 지난 달 = 이번 회기에서 이번 달 전까지. 다만 이번 달 유예일(기본 3일) 안이면 지난달도 아직 뺀다.
+ *   지난 회기는 12달 모두, 다음 회기는 없음. 월 상회비가 0원인 교회는 공문 대상이 아니다.
+ *   공문 발송 여부는 137 sql 의 ai_report_dues_notices 로 받은 b.dues_notice.notices 에서. */
+export const NOTICE_MIN_MONTHS = 3;
+export function overdueNotices(b) {
+  const rates = arr(b.dues_rates), pays = arr(b.dues_payments);
+  const dn = (b.dues_notice && !b.dues_notice.error) ? b.dues_notice : {};
+  const grace = dn.grace_days == null ? 3 : Number(dn.grace_days);
+  const today = String(b.today || ''), fy = Number(b.fiscal_year || 0);
+  const curY = Number(today.slice(0, 4)), curM = Number(today.slice(5, 7)), curD = Number(today.slice(8, 10));
+  const fiscalNow = curM >= 4 ? curY : curY - 1;
+  const order = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+  let n;
+  if (fy < fiscalNow) n = 12;
+  else if (fy > fiscalNow) n = 0;
+  else n = (curM >= 4 ? curM - 3 : curM + 9) - 1 - (curD <= grace ? 1 : 0);
+  const lateMonths = order.slice(0, Math.max(0, n));
+  const sentOf = {};
+  arr(dn.notices).forEach(function (x) { if (!sentOf[x.church]) sentOf[x.church] = x; });   /* 늦은 것부터 온다 */
+  let total = 0, sent = 0;
+  const rows = [];
+  rates.forEach(function (r) {
+    const rate = Number(r.monthly || 0);
+    if (!rate) return;
+    const pm = pays.filter(function (p) { return p.church === r.church; }).map(function (p) { return Number(p.month); });
+    const late = lateMonths.filter(function (m) { return pm.indexOf(m) === -1; });
+    if (late.length < NOTICE_MIN_MONTHS) return;
+    const s = sentOf[r.church];
+    total += late.length * rate;
+    if (s) sent++;
+    rows.push({ church: r.church, sichal: r.sichal || '', pastor: r.pastor || '', late: late, amount: late.length * rate,
+      sent: s ? d10(s.sent_on) : '', doc_no: s ? (s.doc_no || '') : '', sent_by: s ? (s.sent_by || '') : '' });
+  });
+  return { min: NOTICE_MIN_MONTHS, grace: grace, rows: rows, total: total, sent: sent, report: arr(dn.reports)[0] || null };
+}
+
+/* 공문 발송 기록·월례회 보고 (137 sql) — 아직 실행 전이면 오류만 적어 두고 나머지는 그대로 */
+async function withDuesNotice(env, b) {
+  try { b.dues_notice = await rpc(env, 'ai_report_dues_notices', { p_key: env.REPORT_KEY }); }
+  catch (e) { b.dues_notice = { error: String(e.message || e).slice(0, 120) }; }
+  return b;
+}
+
 /* 모든 임원에게 같은 노회 자료 (캐시되는 부분 — 할 일 목록은 바뀌므로 따로) */
 export function stableContext(b) {
   const L = [];
@@ -192,6 +239,16 @@ export function stableContext(b) {
     L.push('- ' + r.church + (r.sichal ? ' (' + r.sichal + ')' : '') + ' · 담임 ' + (r.pastor || '-') + ' · 월 ' + r.rate + '만원 · 낸 금액 ' + r.paid + '만원' +
       (r.rate ? (r.unpaid.length ? ' · 미납 ' + r.unpaid.join('·') + '월 (' + r.arrears + '만원)' : ' · 미납 없음') : ' · 면제') + (r.last ? ' · 마지막 납부 ' + r.last : ''));
   });
+  const od = overdueNotices(b);
+  L.push('', '## 상회비 3개월 이상 미납 — 납부촉구 공문 (노회규칙 제28·29조, 미리 계산함)' + err(b.dues_notice));
+  L.push('- 기준: 기한(그 달 말)이 지난 미납이 ' + od.min + '개월 이상, 월 상회비가 정해진 교회 (이번 달분은 아직 기한 전, 지난달분은 유예일 ' + od.grace + '일 뒤부터 셈) · 회계가 월례회 때 보고하고 서기가 공문을 발송한다');
+  if (!od.rows.length) L.push('- 대상 교회 없음');
+  od.rows.forEach(function (r) {
+    L.push('- ' + r.church + (r.sichal ? ' (' + r.sichal + ')' : '') + ' · 담임 ' + (r.pastor || '-') + ' · 밀린 달 ' + r.late.join('·') + '월 (' + r.late.length + '개월, ' + r.amount + '만원)' +
+      (r.sent ? ' · 공문 발송 ' + r.sent + (r.doc_no ? ' ' + r.doc_no : '') + (r.sent_by ? ' (' + r.sent_by + ')' : '') : ' · 공문 미발송'));
+  });
+  L.push('- 대상 ' + od.rows.length + '곳 · 미납 합계 ' + od.total + '만원 · 공문 보낸 곳 ' + od.sent + '/' + od.rows.length +
+    (od.report ? ' · 마지막 월례회 보고 ' + od.report.month + (od.report.by ? ' (' + od.report.by + ')' : '') : ' · 홈페이지에 올린 월례회 보고 없음'));
   L.push('', '## 세례의무금 (올해, 원)' + err(b.bapdues));
   arr(b.bapdues).forEach(function (x) { L.push('- ' + x.church + ' · 목표 ' + won(x.target) + ' · 납입 ' + won(x.paid) + (x.paid_on ? ' (' + x.paid_on + ')' : '')); });
 
@@ -381,7 +438,7 @@ export async function runReports(env, deps, opts, log) {
   function add(u) { Object.keys(usage).forEach(function (k) { usage[k] += u[k] || 0; }); }
 
   log('노회 자료를 받는 중');
-  let b = await rpc(env, 'ai_report_bundle', { p_key: env.REPORT_KEY });
+  let b = await withDuesNotice(env, await rpc(env, 'ai_report_bundle', { p_key: env.REPORT_KEY }));
   const system = [{ type: 'text', text: COMMON_RULES + '\n\n' + stableContext(b), cache_control: { type: 'ephemeral' } }];
 
   /* 1) 새 회의록 → 할 일 */
@@ -398,7 +455,7 @@ export async function runReports(env, deps, opts, log) {
       newTasks += arr(r.tasks).length;
     } catch (e) { errors.push(String(e.message || e)); }
   }
-  if (fresh.length) b = await rpc(env, 'ai_report_bundle', { p_key: env.REPORT_KEY });
+  if (fresh.length) b = Object.assign(await rpc(env, 'ai_report_bundle', { p_key: env.REPORT_KEY }), { dues_notice: b.dues_notice });
 
   /* 2) 임원마다 보고서 — 첫 번째가 캐시를 만들고 나머지는 여럿이 함께.
    *    예약 실행은 15분 안에 끝나야 하므로(Cloudflare 한도) 다 쓴 보고서는 그때그때 저장하고,

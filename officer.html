@@ -30,6 +30,7 @@
 <script src="js/ledger.js?v=20260911d"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/absence.js?v=20261021a"></script>
+<script src="js/dues-notice.js?v=20261021dn"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  /* 노회 재정부 장부를 볼 수 있는가 — 회계·부회계(와 총관리자)는 바로 알 수 있고,
@@ -1200,6 +1201,8 @@ document.addEventListener('DOMContentLoaded', function () {
     h += sichalChartHtml();
     /* 노회규칙 제29조 적용 현황 — 그린 뒤 loadRule29 가 채운다 */
     h += '<div id="du-r29"></div>';
+    /* 3개월 이상 미납 — 납부촉구 공문·월례회 보고서 (js/dues-notice.js · 137 sql) */
+    h += '<div id="du-notice"></div>';
 
     /* ----- 완납/미납 필터와 검색 ----- */
     var elNow = duesElapsed();
@@ -1276,6 +1279,7 @@ document.addEventListener('DOMContentLoaded', function () {
     bindDuesCells();
     bindDuesFilter();
     loadRule29();
+    if (window.SHSDuesNotice) SHSDuesNotice.mount(document.getElementById('du-notice'), { year: duesYear, user: user });
   }
 
   /* ----- 노회규칙 제29조 적용 현황 (supabase/135_dues_rule29.sql) -----
