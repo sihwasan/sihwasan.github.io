@@ -2844,7 +2844,9 @@ mark.aih-key {
 .pr-progress div:last-child { font-size: 0.84rem; color: var(--gray-5); margin-top: 4px; }
 @media (max-width: 900px) {
   .pr-wrap { grid-template-columns: 1fr; }
-  .pr-side { position: static; max-height: none; }
+  /* 1400px 아래 규칙의 '본문은 둘째 칸'을 풀어야 한 줄로 쌓인다 (안 풀면 책자·차례가 좁은 첫 칸에 눌려 글자가 세로로 쪼개졌다) */
+  .pr-wrap .pr-page { grid-column: auto; grid-row: auto; }
+  .pr-wrap .pr-side { position: static; max-height: 260px; overflow-y: auto; }
 }
 
 /* ---------- 상단 메뉴의 왼쪽 세로 메뉴 (js/section-nav.js) — 관리자 메뉴보다 밝은 색 ---------- */
