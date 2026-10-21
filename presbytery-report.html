@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }).join('') + '</div>';
         return;
       }
-      if (t.length <= 60 && /^(\d{1,2}\s*[.)]|[가-힣]\s*[.)]|[①-⑳]|[■◈●◎□○※◆▶])\s*\S/.test(t) && !/[.。]\s*$/.test(t)) {
+      if (t.length <= 30 && /^(\d{1,2}\s*[.)]|[가-힣]\s*[.)]|[①-⑳]|[■◈●◎□○※◆▶])\s*\S/.test(t) && !/[.。,]\s*$/.test(t)) {
         html += '<p class="pr-sub">' + hl(t, q) + '</p>'; return;
       }
       html += '<p>' + hl(t, q) + '</p>';
