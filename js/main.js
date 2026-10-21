@@ -50,7 +50,11 @@
     /* 노회전자자료실 — 총회전자자료실처럼 노회의 규칙·결의·보고서·회의록·서식을 한 메뉴에 모은다 */
     { title: '노회전자자료실', href: 'rules-presbytery.html', sub: [
       { t: '노회 회칙', h: 'rules-presbytery.html' },
-      { t: '각종 내규', h: 'rules-presbytery.html#bylaws' },
+      { t: '각종 내규', h: 'rules-presbytery.html#rule-jarip' },
+      /* 가지: 왼쪽 묶음 메뉴에서 각종 내규 아래 들여쓰기로 보인다 (상단 펼침 메뉴에서는 감춤) */
+      { t: '미래교회자립위원회 내규', h: 'rules-presbytery.html#rule-jarip', kid: true },
+      { t: '선거관리위원회 내규', h: 'rules-presbytery.html#rule-sunguh', kid: true },
+      { t: '사회복지부 내규', h: 'rules-presbytery.html#rule-bokji', kid: true },
       { t: '노회 회의결의', h: 'resolutions.html' },
       { t: '노회 보고서 (회의자료)', h: 'presbytery-report.html' },
       { t: '노회 주소록', h: 'directory.html' },
@@ -380,7 +384,7 @@
         /* '미래교회자립위원회'처럼 긴 이름은 '위원회'를 다음 줄로 내려 칸 밖으로 나가지 않게 한다 */
         var label = s.t.replace(/^(.{4,})(위원회)$/, '$1<br>$2');
         /* 재정부 회계는 회계·부회계에게만 — 로그인 확인 뒤 showFinanceMenu 가 켠다 */
-        html += '<a href="' + s.h + '"' + (s.fin ? ' data-fin="1" style="display:none"' : '') + '>' + label + '</a>';
+        html += '<a href="' + s.h + '"' + (s.kid ? ' class="gnb-kid"' : '') + (s.fin ? ' data-fin="1" style="display:none"' : '') + '>' + label + '</a>';
       });
       html += '</div></li>';
     });
@@ -573,7 +577,7 @@
       if (pg === 'index.html' || /[?&]embed=1(?:&|$)/.test(location.search)) return;
       if (document.querySelector('script[src^="js/section-nav.js"]')) return;
       var sc = document.createElement('script');
-      sc.src = 'js/section-nav.js?v=20261021d';
+      sc.src = 'js/section-nav.js?v=20261021e';
       document.body.appendChild(sc);
     })();
     /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.

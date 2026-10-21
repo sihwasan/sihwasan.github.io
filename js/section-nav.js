@@ -73,7 +73,7 @@ var SHSSide = (function () {
     var links = [].slice.call(section.querySelectorAll('.gnb-sub a'));
     /* 현재 항목: 주소가 꼭 같은 것, 없으면 같은 쪽인 첫 항목 */
     var onIdx = -1;
-    links.forEach(function (a, i) { var h = a.getAttribute('href'); if (onIdx === -1 && (h === full || h === here + location.search)) onIdx = i; });
+    links.forEach(function (a, i) { var h = a.getAttribute('href'); if ((h === full || h === here + location.search) && (onIdx === -1 || a.classList.contains('gnb-kid'))) onIdx = i; });
     if (onIdx === -1) links.forEach(function (a, i) { if (onIdx === -1 && pageOf(a.getAttribute('href')) === here) onIdx = i; });
     var cur = onIdx >= 0 ? links[onIdx].textContent.replace(/\s+/g, ' ').trim() : title;
     var html =
@@ -82,7 +82,7 @@ var SHSSide = (function () {
       '<div class="adm-menu"><div class="adm-head"><span class="adm-badge">' + esc(title) + '</span></div><div class="adm-group">';
     links.forEach(function (a, i) {
       if (a.style.display === 'none') return;   /* 자격이 없어 감춘 항목(재정부 회계 등) */
-      html += '<a class="adm-link' + (i === onIdx ? ' on' : '') + '" href="' + esc(a.getAttribute('href')) + '">' +
+      html += '<a class="adm-link' + (a.classList.contains('gnb-kid') ? ' lv2' : '') + (i === onIdx ? ' on' : '') + '" href="' + esc(a.getAttribute('href')) + '">' +
         esc(a.textContent.replace(/\s+/g, ' ').trim()) + '</a>';
     });
     html += '</div><a class="adm-exit" href="index.html">← 홈페이지로</a></div>';
