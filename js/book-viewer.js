@@ -372,15 +372,52 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
   }
+  /* 파일 이름에서 회기·종류·연도를 읽는다: "제18회기 정기노회(가을) 2025.pdf", "제19회 회의결의서 (PDF).pdf" */
+  function guessFromName(name) {
+    var g = { session: null, kind: null, year: null, season: null };
+    var m = String(name || '').match(/제\s*(\d{1,3})\s*회/); if (m) g.session = parseInt(m[1], 10);
+    m = String(name || '').match(/(20\d\d)/); if (m) g.year = m[1];
+    if (/봄/.test(name)) g.season = '봄'; else if (/가을/.test(name)) g.season = '가을';
+    if (/결의/.test(name)) g.kind = BOOK.kinds.indexOf('회의결의서') !== -1 ? '회의결의서' : null;
+    else if (/임원회/.test(name)) g.kind = BOOK.kinds.indexOf('임원회') !== -1 ? '임원회' : (BOOK.kinds.indexOf('임원회 결의') !== -1 ? '임원회 결의' : null);
+    else if (/임시/.test(name)) g.kind = BOOK.kinds.indexOf('임시노회') !== -1 ? '임시노회' : null;
+    if (!g.kind) g.kind = BOOK.kinds[0];
+    return g;
+  }
+  /* 파일이 정해지면(끌어다 놓기·고르기) 칸을 채우고, 회기를 알면 바로 읽기 시작 */
+  function fileChosen(f) {
+    if (!f) return;
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') { msg('up-msg', false, 'PDF 파일만 올릴 수 있습니다: ' + f.name); return; }
+    var dt = new DataTransfer(); dt.items.add(f);
+    document.getElementById('up-file').files = dt.files;
+    document.getElementById('up-fields').classList.remove('hidden');
+    document.getElementById('up-drop').classList.add('has');
+    document.getElementById('up-drop-name').textContent = f.name + ' (' + Math.round(f.size / 1048576) + 'MB)';
+    var g = guessFromName(f.name);
+    var sessEl = document.getElementById('up-session'), kindEl = document.getElementById('up-kind'), titleEl = document.getElementById('up-title');
+    if (g.session) sessEl.value = g.session;
+    if (g.kind) kindEl.value = g.kind;
+    if (g.session) titleEl.value = BOOK.titleOf(g.session, kindEl.value) + (g.year ? ' (' + g.year + (g.season ? ' ' + g.season : '') + ')' : '');
+    if (g.session && titleEl.value.trim()) {
+      msg('up-msg', true, '「' + titleEl.value + '」로 올리고 바로 읽기 시작합니다. (회의 날짜는 읽은 뒤 책자 목록에서 고칠 수 있습니다)');
+      setTimeout(startUpload, 400);
+    } else {
+      msg('up-msg', false, '파일 이름에서 회기를 알 수 없습니다. 회기와 제목을 적고 「올리고 읽기 시작」을 누르세요.');
+      sessEl.focus();
+    }
+  }
   function uploadForm() {
     var box = document.getElementById('pr-upload');
-    box.classList.toggle('hidden');
-    if (box.innerHTML) return;
+    if (box.innerHTML) { box.classList.toggle('hidden'); return; }
+    box.classList.remove('hidden');
     var y = new Date().getFullYear();
     box.innerHTML =
-      '<div class="admin-card" style="margin-bottom:18px"><h3 style="margin-top:0">' + BOOK.uploadTitle + '</h3>' +
-      '<p style="font-size:0.9rem">PDF 를 올리면 저장소에 보관하고, 쪽마다 AI 가 글로 받아 적어 찾아볼 수 있게 합니다. ' +
-      '58쪽이면 5분쯤 걸리며 AI 비용이 조금 듭니다(쪽당 수십 원). 중간에 끊겨도 「이어서 읽기」로 이어집니다.</p>' +
+      '<div class="admin-card pr-upcard" style="margin-bottom:18px"><h3 style="margin-top:0">' + BOOK.uploadTitle + '</h3>' +
+      '<div class="pr-drop" id="up-drop" tabindex="0" role="button" aria-label="PDF 올리기">' +
+      '<div class="pr-drop-ic">⇩</div><strong>PDF 를 여기에 끌어다 놓으세요</strong>' +
+      '<span>또는 눌러서 파일 고르기 · 올리면 AI 가 아래 규칙대로 쪽마다 읽어 지금 책자들과 같은 모양으로 정리합니다</span>' +
+      '<em id="up-drop-name"></em></div>' +
+      '<p style="font-size:0.86rem;color:var(--gray-6)">저장소에 PDF 원본을 보관하고 쪽마다 글로 받아 적습니다. 58쪽이면 5분쯤 걸리며 AI 비용이 조금 듭니다(쪽당 수십 원). 중간에 끊겨도 「이어서 읽기」로 이어집니다.</p>' +
       '<details class="pr-rules"><summary>AI 가 책자를 정리하는 규칙</summary><ul>' +
       '<li>보이는 글자 그대로 받아 적고 요약하지 않습니다. 이름·교회·숫자·날짜·금액은 특히 정확하게.</li>' +
       '<li>줄마다 줄바꿈으로 나누고, 큰 제목·작은 제목은 따로 한 줄(화면에서 제목 글씨로 보입니다).</li>' +
@@ -389,16 +426,27 @@ document.addEventListener('DOMContentLoaded', function () {
       '<li>차례·예배 순서처럼 점선으로 이어진 줄은 점선을 남겨 「항목 …… 쪽」 꼴로(화면에서 양끝 맞춤).</li>' +
       '<li>인쇄된 쪽 번호(아래 가운데 동그라미 숫자)를 그 면의 쪽으로 삼고, 차례 면은 차례로 삼습니다.</li>' +
       '</ul><p style="margin:6px 0 0;font-size:0.84rem;color:var(--gray-6)">이 규칙은 AI 서버(워커)의 읽기 지시에 들어 있습니다. 잘못 읽은 쪽은 「이 쪽 글 고치기」로 바로잡고, 책자 전체를 새 규칙으로 다시 정리하려면 「전부 다시 읽기」를 누릅니다.</p></details>' +
-      '<div class="inline-form">' +
+      '<div id="up-fields" class="hidden"><div class="inline-form">' +
       '<div class="field" style="flex:0 0 110px"><label>회기</label><input type="number" id="up-session" placeholder="20"></div>' +
       '<div class="field" style="flex:0 0 140px"><label>종류</label><select id="up-kind">' + BOOK.kinds.map(function (k) { return '<option>' + k + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" style="flex:0 0 170px"><label>회의 날짜</label><input type="date" id="up-date"></div>' +
       '<div class="field"><label>제목</label><input type="text" id="up-title" placeholder="예: 제20회 정기노회 회의자료 (' + y + ' 가을)"></div></div>' +
-      '<div class="field"><label>PDF 파일</label><input type="file" id="up-file" accept="application/pdf"></div>' +
+      '<input type="file" id="up-file" accept="application/pdf" hidden>' +
       '<button class="btn" id="up-go">올리고 읽기 시작</button> ' +
-      '<button class="btn ghost" id="up-resume">이어서 읽기 (이미 올린 책자)</button> ' +
-      '<button class="btn ghost" id="up-redo">이 책자 전부 다시 읽기 (저장된 PDF 로)</button>' +
+      '<button class="btn ghost" id="up-resume">이어서 읽기 (이미 올린 책자)</button></div> ' +
+      '<div style="margin-top:8px"><button class="btn ghost sm" id="up-redo">고른 책자 전부 다시 읽기 (저장된 PDF 로)</button></div>' +
       '<div class="form-msg" id="up-msg"></div><div class="pr-progress hidden" id="up-prog"><div class="pr-bar"><span id="up-bar"></span></div><div id="up-prog-t"></div></div></div>';
+    /* 끌어다 놓기 / 눌러서 고르기 */
+    var drop = document.getElementById('up-drop'), fileEl = document.getElementById('up-file');
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; fileChosen(f); });
+    drop.addEventListener('click', function () { fileEl.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileEl.click(); } });
+    fileEl.addEventListener('change', function () { fileChosen(this.files[0]); });
+    /* 쪽 어디에 떨어뜨려도 받는다 (브라우저가 PDF 를 열어 버리지 않게) */
+    document.addEventListener('dragover', function (e) { if (e.dataTransfer && [].slice.call(e.dataTransfer.types || []).indexOf('Files') !== -1) e.preventDefault(); });
+    document.addEventListener('drop', function (e) { if (e.target.closest && e.target.closest('#up-drop')) return; if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) { e.preventDefault(); fileChosen(e.dataTransfer.files[0]); drop.scrollIntoView({ block: 'center', behavior: 'smooth' }); } });
     document.getElementById('up-session').addEventListener('change', function () {
       var t = document.getElementById('up-title');
       if (!t.value) t.value = BOOK.titleOf(this.value, document.getElementById('up-kind').value);
@@ -566,6 +614,7 @@ document.addEventListener('DOMContentLoaded', function () {
     return loadReports();
   }).then(function () {
     drawBooks();
+    if (canEdit) uploadForm();   /* 서기·노회장·간사·최고관리자: 올리기 상자를 늘 보인다 */
     var rid = parseInt(qs.get('r'), 10), pn = parseInt(qs.get('p'), 10), q = qs.get('q') || '';
     if (q) document.getElementById('pr-q').value = q;
     if (rid && reports.some(function (r) { return r.id === rid; })) openReport(rid, isNaN(pn) ? null : pn, q);
