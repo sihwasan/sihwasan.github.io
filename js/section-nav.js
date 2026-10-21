@@ -73,7 +73,14 @@ var SHSSide = (function () {
     var links = [].slice.call(section.querySelectorAll('.gnb-sub a'));
     /* 현재 항목: 주소가 꼭 같은 것, 없으면 같은 쪽인 첫 항목 */
     var onIdx = -1;
-    links.forEach(function (a, i) { var h = (a.getAttribute('href') || '').replace(/\?[^#]*/, ''); if ((h === full || h === here) && (onIdx === -1 || a.classList.contains('gnb-kid'))) onIdx = i; });
+    /* 같은 쪽을 ?c=부서 처럼 물음표 값으로 나누는 메뉴(상비부·시찰 등)는 물음표 값까지 꼭 같은 항목을 먼저 고른다 */
+    function dec(t) { try { return decodeURIComponent(t); } catch (x) { return t; } }
+    var hereQ = dec(here + location.search);
+    if (location.search) links.forEach(function (a, i) {
+      var h = (a.getAttribute('href') || '').split('#')[0];
+      if (onIdx === -1 && h.indexOf('?') !== -1 && dec(h) === hereQ) onIdx = i;
+    });
+    if (onIdx === -1) links.forEach(function (a, i) { var h = (a.getAttribute('href') || '').replace(/\?[^#]*/, ''); if ((h === full || h === here) && (onIdx === -1 || a.classList.contains('gnb-kid'))) onIdx = i; });
     if (onIdx === -1) links.forEach(function (a, i) { if (onIdx === -1 && pageOf(a.getAttribute('href')) === here) onIdx = i; });
     var cur = onIdx >= 0 ? links[onIdx].textContent.replace(/\s+/g, ' ').trim() : title;
     var html =
