@@ -14,6 +14,7 @@ var SHSAdminShell = (function () {
       { t: '노회 일정', h: 'schedule.html', icon: '▦' },
       { t: '자료실 · 회칙', h: 'archive-edit.html', icon: '▤' },
       { t: '노회 보고서 (회의자료 올리기)', h: 'presbytery-report.html', icon: '▧' },
+      { t: '노회 회의결의 (결의서 올리기)', h: 'resolutions.html', icon: '✓' },
       { t: '노회 주소록 (대조·수정)', h: 'directory.html', icon: '☎' }
     ] },
     { title: '회원 · 조직', items: [

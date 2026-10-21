@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노회 회의결의 - 시화산노회</title>
+<meta name="description" content="시화산노회 정기노회 회의결의서를 회기별·쪽 단위로 찾아봅니다.">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css?v=20261021n">
+</head>
+<body>
+
+<div class="page-head">
+  <div class="container">
+    <h1>노회 회의결의</h1>
+    <div class="crumb">홈 &gt; 노회전자자료실 &gt; 노회 회의결의</div>
+  </div>
+</div>
+
+<main class="page-body container pr-main" id="main">
+  <div id="pr-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
+</main>
+
+<script src="js/auth.js?v=20260921j"></script>
+<script src="js/data.js"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/supabase-auth.js"></script>
+<script src="js/main.js?v=20261021m"></script>
+<script src="js/ai-chat.js?v=20261020d"></script>
+<script src="js/book-viewer.js?v=20261021a"></script>
+<script>
+SHSBook.mount({
+  page: 'resolutions.html', kinds: ['회의결의서', '임원회 결의'],
+  gate: '노회 회의결의', sideTitle: '회의결의서', searchHint: '낱말로 찾기 (예: 청빙, 허락, 위임, 교회 이름)',
+  uploadTitle: '회의결의서 올리기', titleOf: function (sess, kind) { return kind === '회의결의서' ? '제' + sess + '회 정기노회 결의사항' : '제' + sess + '회기 ' + kind; },
+  filePrefix: 'res', archiveSection: null, archiveDesc: '',
+  directoryCompare: false, logName: '노회 회의결의'
+});
+</script>
+</body>
+</html>

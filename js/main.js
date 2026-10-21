@@ -51,7 +51,7 @@
     { title: '노회전자자료실', href: 'rules-presbytery.html', sub: [
       { t: '노회 회칙', h: 'rules-presbytery.html' },
       { t: '각종 내규', h: 'rules-presbytery.html#bylaws' },
-      { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
+      { t: '노회 회의결의', h: 'resolutions.html' },
       { t: '노회 보고서 (회의자료)', h: 'presbytery-report.html' },
       { t: '노회 주소록', h: 'directory.html' },
       { t: '고시 모의고사', h: 'exam.html' }
@@ -123,7 +123,7 @@
   /* 관리자 모드(왼쪽 메뉴)를 씌울 관리 화면들 — js/admin-shell.js 가 맡는다 */
   var ADMIN_PAGES = ['admin-home.html', 'admin-ai.html', 'manage.html', 'admin.html', 'schedule.html', 'archive-edit.html',
     'elder-notice.html', 'meeting-admin.html', 'proceed.html', 'documents.html', 'report-intake.html',
-    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html', 'presbytery-report.html', 'directory.html'];
+    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html', 'presbytery-report.html', 'directory.html', 'resolutions.html'];
   /* 관리자 모드(왼쪽 관리자 메뉴)는 상단 <관리자>를 눌러 들어왔을 때만 켜진다.
    * 다른 상단 메뉴를 누르면 꺼지고, 관리자 메뉴 안에서 오가는 동안은 켜진 채로 있다. (이 탭 안에서만 기억) */
   var ADMIN_ENTRY = ['admin-home.html', 'admin-ai.html'];
@@ -147,7 +147,7 @@
     if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
     if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
     var sc = document.createElement('script');
-    sc.src = 'js/admin-shell.js?v=20261021c';
+    sc.src = 'js/admin-shell.js?v=20261021d';
     document.body.appendChild(sc);
   }
 
@@ -573,7 +573,7 @@
       if (pg === 'index.html' || /[?&]embed=1(?:&|$)/.test(location.search)) return;
       if (document.querySelector('script[src^="js/section-nav.js"]')) return;
       var sc = document.createElement('script');
-      sc.src = 'js/section-nav.js?v=20261021b';
+      sc.src = 'js/section-nav.js?v=20261021c';
       document.body.appendChild(sc);
     })();
     /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.

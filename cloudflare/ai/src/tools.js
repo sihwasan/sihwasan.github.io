@@ -156,6 +156,7 @@ export const TOOL_DEFS = {
     })
   },
   search_presbytery_resolutions: {
+    /* 회기별 회의결의서 책자 */
     description: '시화산노회 역대 정기노회·임시노회의 결의사항(홈페이지 자료실에 정리된 것)을 찾는다.',
     input_schema: S({
       keyword: { type: 'string', description: '찾을 낱말' },
@@ -521,17 +522,21 @@ const RUN = {
     }) };
   },
   async search_presbytery_resolutions(input, ctx) {
+    /* 결의는 회기별 「회의결의서」 책자(presbytery_reports.kind = 회의결의서)의 쪽에서 찾는다 */
     const ws = words(input.keyword || '');
-    const q = [];
-    if (input.session) q.push('session=ilike.' + enc('*' + clean(input.session) + '*'));
-    if (ws.length) q.push(allWords(['items', 'session'], ws));
-    const rows = await sbGet(ctx.env, ctx.auth, 'resolutions?select=id,seq,kind,session,year,president,place,held_on,items&' + q.join('&') + '&order=sort.desc,id.desc&limit=8');
-    if (rows.error) return { error: rows.error };
-    if (!rows.length) return { items: [], note: '결의사항을 찾지 못했습니다.' };
-    return { items: rows.map(function (r) {
-      const text = ws.length ? snippets(r.items, ws, 260, 4) : String(r.items || '').slice(0, 900);
-      const ref = ctx.cites.add({ title: r.session + ' 결의사항', url: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD', kind: '노회 결의사항', snippet: text });
-      return { ref: ref, session: r.session, year: r.year, held_on: r.held_on, president: r.president, place: r.place, text: text };
+    let q = 'presbytery_report_pages?select=id,report_id,pdf_page,page_no,heading,text,presbytery_reports!inner(title,session,meet_on,kind)&presbytery_reports.kind=in.(회의결의서,임원회 결의)&order=report_id.desc,page_no&limit=12';
+    if (ws.length) q += '&' + allWords(['heading', 'text'], ws);
+    if (input.session) q += '&presbytery_reports.session=eq.' + parseInt(String(input.session).replace(/\D/g, ''), 10);
+    const rows = await sbGet(ctx.env, ctx.auth, q);
+    if (rows.error) return { error: /HTTP 4/.test(rows.error) ? '노회 회의결의는 정회원만 볼 수 있습니다.' : rows.error };
+    const list = rows.filter(function (r) { return r.presbytery_reports; });
+    if (!list.length) return { items: [], note: '회의결의서에서 그 낱말을 찾지 못했습니다. 다른 낱말이나 회기 번호로 다시 찾아 보십시오.' };
+    return { items: list.map(function (r) {
+      const rep = r.presbytery_reports || {};
+      const where = (rep.title || '회의결의서') + ' ' + (r.page_no != null ? r.page_no + '쪽' : 'PDF ' + r.pdf_page + '쪽') + (r.heading ? ' 「' + r.heading + '」' : '');
+      const sn = ws.length ? snippets(r.text, ws, 300, 4) : String(r.text || '').slice(0, 600);
+      const ref = ctx.cites.add({ title: where, url: 'resolutions.html?r=' + r.report_id + '&p=' + (r.page_no != null ? r.page_no : r.pdf_page) + (ws.length ? '&q=' + enc(ws[0]) : ''), kind: '노회 회의결의', snippet: sn });
+      return { ref: ref, report: rep.title, session: rep.session, meet_on: rep.meet_on, page: r.page_no, heading: r.heading, text: sn };
     }) };
   },
   async search_minutes(input, ctx) {
