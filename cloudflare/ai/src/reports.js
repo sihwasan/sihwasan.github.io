@@ -354,7 +354,7 @@ export async function runReports(env, deps, opts, log) {
   const started = new Date().toISOString();
   /* 한국 날짜 기준 (2026-10-21 사용자 지시)
    *   · 매월 첫째 월요일: 모든 임원(간사 제외)에게 월례 보고서 — 직책별 모델, 없으면 report_model
-   *   · 화~금: 노회장·서기에게만 일일 보고서
+   *   · 화·목요일: 노회장·서기에게만 일일 보고서
    *   · 간사: 보고서 대신 노회장·서기 보고서에서 간사가 할 일만 알림으로
    *   · 토·일·그 밖의 월요일: 예약 실행은 쉼 (손으로 누르면 일일 보고서 묶음)
    * opts.full 이면 언제나 월례 묶음, opts.only 는 그 임원 한 분 */
@@ -362,11 +362,11 @@ export async function runReports(env, deps, opts, log) {
   const kstDay = kst.getUTCDay(), kstDate = kst.getUTCDate();
   const monthlyDay = deps.weeklyDay == null ? 1 : deps.weeklyDay;
   const weekly = !!opts.full || (kstDay === monthlyDay && kstDate <= 7);
-  const dailyDay = [2, 3, 4, 5].indexOf(kstDay) !== -1;
+  const dailyDay = [2, 4].indexOf(kstDay) !== -1;   /* 화·목요일 */
   const model = weekly ? deps.model : (deps.dailyModel || deps.model), effort = deps.effort || 'medium';
   const DAILY = ['president', 'clerk'];
   if (opts.trigger === 'cron' && !weekly && !dailyDay && !opts.only) {
-    const rest = { trigger: 'cron', started_at: started, finished_at: new Date().toISOString(), date: null, mode: '쉬는 날(토·일·둘째 주 이후 월요일)', officers: 0, reports: 0, new_tasks: 0, errors: [] };
+    const rest = { trigger: 'cron', started_at: started, finished_at: new Date().toISOString(), date: null, mode: '쉬는 날(월·수·금·토·일 — 첫째 주 월요일 제외)', officers: 0, reports: 0, new_tasks: 0, errors: [] };
     await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: rest } }).catch(function () {});
     log('오늘은 보고서를 만들지 않는 날입니다');
     return rest;

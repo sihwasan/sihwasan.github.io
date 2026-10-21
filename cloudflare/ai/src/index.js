@@ -54,7 +54,7 @@ const DEFAULTS = {
   roles: ['superadmin', 'president', 'clerk', 'staff', 'officer', 'member'],
   enabled: true,
   report_enabled: true,   /* 임원 업무 보고서 (매일 아침 6시) */
-  /* 2026-10-21 사용자 지시: 화~금 노회장(Opus)·서기(Sonnet) 일일 보고서, 매월 첫째 월요일 전체(간사 제외) 월례 보고서(Sonnet),
+  /* 2026-10-21 사용자 지시: 화·목 노회장(Opus)·서기(Sonnet) 일일 보고서, 매월 첫째 월요일 전체(간사 제외) 월례 보고서(Sonnet),
    * 간사는 보고서 대신 알림(업무 지시)만 */
   report_model: 'claude-sonnet-5-5',        /* 월례 보고서 모델(직책별 모델이 없는 임원). 비우면 검색과 같은 모델 */
   report_daily_model: 'claude-sonnet-5-5',  /* 일일 보고서 중 직책별 모델이 없는 분의 모델 */
