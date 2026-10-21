@@ -177,7 +177,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
-<script src="js/main.js?v=20261020y"></script>
+<script src="js/main.js?v=20261021pa"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -693,7 +693,8 @@ document.addEventListener('DOMContentLoaded', function () {
           ? cardRow('생년월일', fmtBirth(info.birth)) +
             cardRow('남은 임기', fmtRemain(info.birth, info.retire))
           : '') +
-        /* 시무목사 청빙 — 당회가 없는 교회의 담임은 3년마다 다시 청원해야 한다 */
+        /* 청빙 임기 — 당회가 없는 교회의 담임(시무목사)은 3년마다, 부목사는 해마다
+         * 다시 청원해야 한다. 부목사는 남은 임기를 적고 임시당회장이 없다. */
         (function () {
           var t = SHS.callTerm(info);
           if (t.state === 'na') return '';
@@ -702,11 +703,11 @@ document.addEventListener('DOMContentLoaded', function () {
           var v = (t.on ? e(t.on) + ' 허락' +
               (t.until ? ' · ' + e(t.until) + ' 만료' : '') + '<br>' : '') +
             '<span class="' + tone + '">' + e(t.label) + '</span>' +
-            (info.call_acting
+            (info.call_acting && t.kind !== 'assoc'
               ? '<br><span style="color:var(--gray-5);font-size:0.84rem">임시당회장 ' +
                 e(info.call_acting) + ' 목사</span>'
               : '');
-          return cardRowHtml('시무목사 청빙', v);
+          return cardRowHtml(t.state === 'done' ? '청빙 기록' : t.kindName + ' 청빙', v);
         })() +
         /* 준회원이면 그 뜻을 적어 둔다 — 회의에서 언권만 가진다 */
         (info.role === 'associate'

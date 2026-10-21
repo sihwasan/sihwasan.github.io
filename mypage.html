@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
-<script src="js/main.js?v=20261020y"></script>
+<script src="js/main.js?v=20261021pa"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/my-duties.js"></script>
 <script src="js/my-payouts.js?v=20260911a"></script>
@@ -200,11 +200,12 @@ document.addEventListener('DOMContentLoaded', function () {
           '<span style="font-size:0.8rem;color:var(--gray-5)">수정이 필요하시면 노회 서기에게 문의해 주세요. ' +
           '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a></span></div>';
       })() +
-      /* 시무목사 청빙 — 당회가 없는 교회의 담임은 3년마다 다시 청원해야 한다.
-       * 지금 임기와 함께, 여태 허락받은 지난 기록도 모두 보여 준다.
+      /* 청빙 임기 — 당회가 없는 교회의 담임(시무목사)은 3년마다, 부목사는 해마다
+       * 다시 청원해야 한다. 지금 임기와 함께, 여태 허락받은 지난 기록도 모두 보여 준다.
        * 날짜를 고치는 일은 노회 서기·간사 등 관리자만 할 수 있다(본인은 볼 뿐). */
       (function () {
         var t = SHS.callTerm(p);
+        var assoc = t.kind === 'assoc';
         var past = p.calls || [];
         if (t.state === 'na' && !past.length) return '';
         var tone = t.state === 'over' || t.state === 'none' ? 'fail'
@@ -217,24 +218,27 @@ document.addEventListener('DOMContentLoaded', function () {
         var hist = '';
         if (past.length) {
           hist = '<table class="tbl" style="margin:8px 0 6px;font-size:0.86rem">' +
-            '<thead><tr><th>청빙 허락일</th><th>시무 만료일</th><th>임시당회장</th><th>비고</th></tr></thead><tbody>' +
+            '<thead><tr><th>청빙 허락일</th><th>시무 만료일</th>' +
+            (assoc ? '' : '<th>임시당회장</th>') + '<th>비고</th></tr></thead><tbody>' +
             past.map(function (c2, i) {
               return '<tr' + (i === 0 ? ' style="background:var(--gray-1)"' : '') + '>' +
-                '<td>' + e(c2.out_approved_on || '-') + (i === 0 ? ' <strong>(현재)</strong>' : '') + '</td>' +
-                '<td>' + e(c2.out_until_on || '-') + '</td>' +
-                '<td>' + e(c2.out_acting ? c2.out_acting + ' 목사' : '-') + '</td>' +
+                '<td style="white-space:nowrap">' + e(c2.out_approved_on || '-') +
+                (i === 0 ? ' <strong>(현재)</strong>' : '') + '</td>' +
+                '<td style="white-space:nowrap">' + e(c2.out_until_on || '-') + '</td>' +
+                (assoc ? '' : '<td>' + e(c2.out_acting ? c2.out_acting + ' 목사' : '-') + '</td>') +
                 '<td>' + e(c2.out_note || '-') + '</td></tr>';
             }).join('') +
             '</tbody></table>';
         }
 
-        return '<div class="field"><label>시무목사 청빙 (' + SHS.CALL_YEARS + '년 임기)</label>' +
+        return '<div class="field"><label>' +
+          (t.state === 'done' ? '청빙 기록' : t.kindName + ' 청빙 (' + t.years + '년 임기)') + '</label>' +
           '<input type="text" value="' + e(head) + '" disabled>' +
           (t.label
             ? '<span class="' + tone + '" style="display:block;font-size:0.84rem;margin-top:4px">' +
               e(t.label) + '</span>'
             : '') +
-          (p.call_acting
+          (p.call_acting && !assoc
             ? '<span style="display:block;font-size:0.8rem;color:var(--gray-5)">임시당회장 ' +
               e(p.call_acting) + ' 목사</span>'
             : '') +
@@ -242,8 +246,12 @@ document.addEventListener('DOMContentLoaded', function () {
             ? '<span style="display:block;font-size:0.82rem;color:var(--gray-6);margin-top:10px">' +
               '<strong>여태 허락받은 기록</strong> — 모두 ' + past.length + '번</span>' + hist
             : '') +
-          '<span style="font-size:0.8rem;color:var(--gray-5)">당회가 조직되지 않은 교회의 담임은 ' +
-          '시무목사로서 ' + SHS.CALL_YEARS + '년마다 시무목사 청빙청원을 해야 합니다. ' +
+          '<span style="font-size:0.8rem;color:var(--gray-5)">' +
+          (assoc
+            ? '부목사는 시무 기간이 ' + SHS.ASSOC_YEARS + '년입니다. 해마다 정기노회에서 ' +
+              '부목사 계속 청빙청원이 가결되면 다시 ' + SHS.ASSOC_YEARS + '년을 시무합니다. '
+            : '당회가 조직되지 않은 교회의 담임은 ' +
+              '시무목사로서 ' + SHS.CALL_YEARS + '년마다 시무목사 청빙청원을 해야 합니다. ') +
           '<strong>청빙 날짜는 노회 서기·간사 등 관리자만 고칠 수 있습니다.</strong> ' +
           '기록이 사실과 다르면 문의해 주세요. ' +
           '<a class="btn ghost sm" style="margin-left:6px" href="board.html#inquiry">문의하기</a>' +

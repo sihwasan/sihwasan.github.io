@@ -1389,9 +1389,15 @@
    *
    *   call_on     노회가 청빙을 허락한 날
    *   call_until  시무가 끝나는 날 (비어 있으면 허락일부터 3년 뒤)
-   *   call_acting 임시당회장 */
+   *   call_acting 임시당회장
+   *
+   * 부목사도 같은 칸을 쓴다. 다만 부목사는 시무 기간이 1년이어서, 해마다
+   * 부목사 계속 청빙청원이 가결되어야 다시 1년을 시무한다. 그래서 부목사는
+   * 지난 기간이 아니라 남은 임기를 보여 준다. */
   var CALL_YEARS = 3;
   var CALL_SOON_DAYS = 180;   /* 반년 — 한 회기 앞이면 다시 청원을 준비할 때다 */
+  var ASSOC_YEARS = 1;
+  var ASSOC_SOON_DAYS = 120;  /* 다음 정기노회 전에 끝나는 분 — 이번 노회에서 계속 청원할 때다 */
 
   /* 3년마다 청빙청원을 해야 하는 자리인가.
    * 명단의 직분은 대개 '목사'로 적혀 있고, 위임을 받은 분만 '위임목사'다.
@@ -1401,20 +1407,41 @@
     return m.category === '목사' && (m.position === '목사' || m.position === '시무목사');
   }
 
+  /* 해마다 부목사 계속 청빙청원을 해야 하는 자리인가 */
+  function isAssocPastor(m) {
+    if (!m) return false;
+    return m.category === '부목사' || m.position === '부목사';
+  }
+
+  /* 청빙 임기의 갈래 — 'simu'(시무목사 3년) · 'assoc'(부목사 1년) · ''(해당 없음) */
+  function callKind(m) {
+    return isAssocPastor(m) ? 'assoc' : (isSimuPastor(m) ? 'simu' : '');
+  }
+  function callYears(m) {
+    return callKind(m) === 'assoc' ? ASSOC_YEARS : CALL_YEARS;
+  }
+
   function ymd(d) {
     return d.getFullYear() + '-' +
       ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
 
-  /* 시무 만료일 — 명단에 따로 적혀 있으면 그것을 따르고, 없으면 허락일 + 3년 */
+  /* 허락일 + 임기(해) — 만료일을 비워 둔 줄을 채우는 데 쓴다 */
+  function callEnd(on, years) {
+    if (!on) return null;
+    var d = new Date(String(on).slice(0, 10) + 'T00:00:00');
+    if (isNaN(d)) return null;
+    d.setFullYear(d.getFullYear() + (years || CALL_YEARS));
+    return ymd(d);
+  }
+
+  /* 시무 만료일 — 명단에 따로 적혀 있으면 그것을 따르고, 없으면 허락일 + 임기
+   * (시무목사 3년, 부목사 1년) */
   function callUntil(m) {
     if (!m) return null;
     if (m.call_until) return String(m.call_until).slice(0, 10);
     if (!m.call_on) return null;
-    var d = new Date(String(m.call_on).slice(0, 10) + 'T00:00:00');
-    if (isNaN(d)) return null;
-    d.setFullYear(d.getFullYear() + CALL_YEARS);
-    return ymd(d);
+    return callEnd(m.call_on, callYears(m));
   }
 
   /* 남은 날수를 '2년 3개월' 같은 우리말로 */
@@ -1441,44 +1468,79 @@
     return Math.round((todayStart() - d) / 86400000);
   }
 
+  /* 남은 임기 — 부목사 칸에 쓴다 ('남은 임기 5개월', '만료 12일 지남').
+   * 남은 달은 내림으로 센다 (356일 남았는데 '1년'이라 하면 넉넉해 보이므로) */
+  function leftLabel(days) {
+    if (days === null || days === undefined) return '';
+    if (days === 0) return '오늘 만료';
+    var n = Math.abs(days), span;
+    if (n < 31) span = n + '일';
+    else {
+      var mo = Math.floor(n / 30.44), y = Math.floor(mo / 12), mm = mo % 12;
+      span = y ? y + '년' + (mm ? ' ' + mm + '개월' : '') : mm + '개월';
+    }
+    return days < 0 ? '만료 ' + span + ' 지남' : '남은 임기 ' + span;
+  }
+
   function callTerm(m) {
     var on = m && m.call_on ? String(m.call_on).slice(0, 10) : null;
     var until = callUntil(m);
+    var kind = callKind(m);
+    var base = { kind: kind, kindName: kind === 'assoc' ? '부목사' : '시무목사',
+                 years: callYears(m) };
+    function out(o) {
+      for (var k in base) if (!(k in o)) o[k] = base[k];
+      return o;
+    }
 
-    if (!isSimuPastor(m)) {
+    if (!kind) {
       if (!on) {
-        return { state: 'na', on: null, until: null, days: null, since: null,
-                 sinceLabel: '', label: '' };
+        return out({ state: 'na', on: null, until: null, days: null, since: null,
+                     sinceLabel: '', left: '', label: '' });
       }
-      return { state: 'done', on: on, until: until, days: null,
-        since: daysSince(on), sinceLabel: spanKo(daysSince(on)) + ' 경과',
+      return out({ state: 'done', on: on, until: until, days: null,
+        since: daysSince(on), sinceLabel: spanKo(daysSince(on)) + ' 경과', left: '',
         label: on + ' 청빙 · 지금은 ' + ((m && (m.position || m.category)) || '다른 직분') +
-          '이므로 시무목사 임기는 끝났습니다' };
+          '이므로 청빙 임기는 끝났습니다' });
     }
     if (!on) {
-      return { state: 'none', on: null, until: null, days: null, since: null,
-        sinceLabel: '', label: '청빙청원 기록이 없습니다' };
+      return out({ state: 'none', on: null, until: null, days: null, since: null,
+        sinceLabel: '', left: '',
+        label: kind === 'assoc' ? '부목사 청빙 기록이 없습니다' : '청빙청원 기록이 없습니다' });
     }
 
     var d = new Date(until + 'T00:00:00');
     if (isNaN(d)) {
-      return { state: 'none', on: on, until: null, days: null, since: null,
-               sinceLabel: '', label: '만료일을 알 수 없습니다' };
+      return out({ state: 'none', on: on, until: null, days: null, since: null,
+                   sinceLabel: '', left: '', label: '만료일을 알 수 없습니다' });
     }
 
-    /* 얼마나 남았는지가 아니라 허락받은 뒤 얼마나 지났는지를 적는다.
-     * 3년이 지나면 시무 기한이 끝난 것이므로 그때 다시 청원해야 한다.
-     * (재직일 칸의 '15년 9개월 경과'와 같은 말씨를 쓴다) */
     var days = Math.round((d - todayStart()) / 86400000);
     var since = daysSince(on);
     var sinceLabel = spanKo(since) + ' 경과';
+    var left = leftLabel(days);
+
+    /* 부목사 — 1년 임기이므로 남은 임기를 적는다.
+     * 다음 정기노회 전에 끝나면 이번 노회에서 계속 청빙청원을 해야 한다. */
+    if (kind === 'assoc') {
+      var st = days < 0 ? 'over' : (days <= ASSOC_SOON_DAYS ? 'soon' : 'ok');
+      return out({ state: st, on: on, until: until, days: days,
+        since: since, sinceLabel: sinceLabel, left: left,
+        label: st === 'over' ? left + ' — 부목사 계속 청빙청원이 필요합니다'
+          : st === 'soon' ? left + ' — 부목사 계속 청빙청원할 때입니다'
+          : left });
+    }
+
+    /* 시무목사 — 얼마나 남았는지가 아니라 허락받은 뒤 얼마나 지났는지를 적는다.
+     * 3년이 지나면 시무 기한이 끝난 것이므로 그때 다시 청원해야 한다.
+     * (재직일 칸의 '15년 9개월 경과'와 같은 말씨를 쓴다) */
     var state = days < 0 ? 'over' : (days <= CALL_SOON_DAYS ? 'soon' : 'ok');
     var label =
       state === 'over' ? sinceLabel + ' — 시무목사 청빙청원이 필요합니다'
       : state === 'soon' ? sinceLabel + ' — 다시 청빙청원할 때입니다'
       : sinceLabel;
-    return { state: state, on: on, until: until, days: days,
-             since: since, sinceLabel: sinceLabel, label: label };
+    return out({ state: state, on: on, until: until, days: days,
+                 since: since, sinceLabel: sinceLabel, left: left, label: label });
   }
 
   /* 남은 임기 안내 문구 */
@@ -1983,9 +2045,14 @@
     termLabel: termLabel,
     retireLabel: retireLabel,
     isSimuPastor: isSimuPastor,
+    isAssocPastor: isAssocPastor,
+    callKind: callKind,
+    callYears: callYears,
+    callEnd: callEnd,
     callUntil: callUntil,
     callTerm: callTerm,
     CALL_YEARS: CALL_YEARS,
+    ASSOC_YEARS: ASSOC_YEARS,
     isAssociate: isAssociate,
     isLimitedMember: isLimitedMember,
     associateHint: associateHint,

@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
-<script src="js/main.js?v=20261020y"></script>
+<script src="js/main.js?v=20261021pa"></script>
 <script src="js/name-picker.js?v=20260928a"></script>
 <script src="js/addr-search.js?v=20260830a"></script>
 <script src="js/dashboard.js"></script>
@@ -1344,10 +1344,11 @@ document.addEventListener('DOMContentLoaded', function () {
         '<button class="btn" id="ro-add">추가</button>' +
         '</div><div class="form-msg" id="ro-msg"></div></div>';
 
-      /* ---------- 시무목사 청빙 임기 명단 ----------
+      /* ---------- 청빙 임기 명단 (시무목사 · 부목사) ----------
        * 당회가 조직되지 않은 교회의 담임은 시무목사로서 3년마다 다시 청빙청원을
-       * 해야 한다. 언제까지인지, 얼마나 남았는지를 남은 기간 순으로 모아 둔 자리다.
-       * 노회를 앞두고 이 명단만 보면 이번에 청원할 분들을 가려낼 수 있다. */
+       * 해야 한다. 부목사는 시무 기간이 1년이어서 해마다 부목사 계속 청빙청원이
+       * 가결되어야 다시 1년을 시무한다. 두 갈래를 따로 모아 두어, 노회를 앞두고
+       * 이 명단만 보면 이번에 청원할 분들을 가려낼 수 있다. */
 
       /* 줄 세우기에 쓸 값 — 기록이 없으면 가장 급한 것으로, 이미 끝난 지난
        * 기록(위임 등)은 맨 뒤로 보낸다. */
@@ -1357,67 +1358,103 @@ document.addEventListener('DOMContentLoaded', function () {
         if (t.state === 'done') return 999999;
         return t.days;
       }
-      var callRows = rows.filter(function (m) { return SHS.callTerm(m).state !== 'na'; });
+      var callRows = rows.filter(function (m) {
+        var t = SHS.callTerm(m);
+        return t.state !== 'na' && t.kind !== 'assoc';
+      });
+      /* 부목사는 기록이 없어도 모두 싣는다 — 기록이 없으면 '청빙 기록 없음'으로 알린다 */
+      var assocRows = rows.filter(function (m) { return SHS.callTerm(m).kind === 'assoc'; });
 
-      html += '<div class="admin-card" id="call-card" style="margin-bottom:16px">' +
-        '<h3 style="margin-top:0">시무목사 청빙 임기</h3>' +
-        '<p style="font-size:0.86rem;color:var(--gray-6);margin:-6px 0 12px">' +
-        '당회가 조직되지 않은 교회의 담임은 시무목사로서 <strong>' + SHS.CALL_YEARS +
-        '년마다</strong> 시무목사 청빙청원을 해야 합니다. 3년이 <span class="warn">가까워졌거나</span> ' +
-        '<span class="fail">이미 지난</span> 분은 빛깔로 알려 드립니다. ' +
-        '허락일·만료일은 각 줄의 <strong>수정</strong>에서 고칩니다.</p>';
+      /* 날짜는 한 줄로 (좁은 칸에서 '1996-10-' 처럼 꺾이지 않게) */
+      var ND = ' style="white-space:nowrap"';
 
-      if (!callRows.length) {
-        html += '<p style="color:var(--gray-5)">해당하는 분이 없습니다.</p></div>';
-      } else {
-        html += '<div class="inline-form no-print" style="margin-bottom:10px">' +
-          '<div class="field" style="flex:0 0 200px"><label for="call-sort">보기 순서</label>' +
-          '<select id="call-sort">' +
-          '<option value="soon">경과 오래된 순 (급한 순)</option>' +
-          '<option value="late">경과 짧은 순</option>' +
+      function callCardHtml(p, list, assoc) {
+        var h = '<div class="admin-card" id="' + p + '-card" style="margin-bottom:16px">';
+        if (assoc) {
+          h += '<h3 style="margin-top:0">부목사 청빙 임기</h3>' +
+            '<p style="font-size:0.86rem;color:var(--gray-6);margin:-6px 0 12px">' +
+            '부목사는 시무 기간이 <strong>' + SHS.ASSOC_YEARS + '년</strong>입니다. ' +
+            '해마다 정기노회에서 <strong>부목사 계속 청빙청원</strong>이 가결되어야 다시 ' +
+            SHS.ASSOC_YEARS + '년을 시무합니다. 남은 임기가 <span class="warn">넉 달 안으로 줄었거나</span> ' +
+            '<span class="fail">이미 끝난</span> 분, 기록이 없는 분은 빛깔로 알려 드립니다. ' +
+            '청빙 허락일은 각 줄의 <strong>수정</strong>에서 적습니다 (만료일은 허락일부터 1년 뒤로 저절로 채워집니다).</p>';
+        } else {
+          h += '<h3 style="margin-top:0">시무목사 청빙 임기</h3>' +
+            '<p style="font-size:0.86rem;color:var(--gray-6);margin:-6px 0 12px">' +
+            '당회가 조직되지 않은 교회의 담임은 시무목사로서 <strong>' + SHS.CALL_YEARS +
+            '년마다</strong> 시무목사 청빙청원을 해야 합니다. 3년이 <span class="warn">가까워졌거나</span> ' +
+            '<span class="fail">이미 지난</span> 분은 빛깔로 알려 드립니다. ' +
+            '허락일·만료일은 각 줄의 <strong>수정</strong>에서 고칩니다.</p>';
+        }
+
+        if (!list.length) {
+          return h + '<p style="color:var(--gray-5)">해당하는 분이 없습니다.</p></div>';
+        }
+        h += '<div class="inline-form no-print" style="margin-bottom:10px">' +
+          '<div class="field" style="flex:0 0 200px"><label for="' + p + '-sort">보기 순서</label>' +
+          '<select id="' + p + '-sort">' +
+          (assoc
+            ? '<option value="soon">남은 임기 짧은 순 (급한 순)</option>' +
+              '<option value="late">남은 임기 긴 순</option>'
+            : '<option value="soon">경과 오래된 순 (급한 순)</option>' +
+              '<option value="late">경과 짧은 순</option>') +
           '<option value="on">청빙 허락일 순</option>' +
           '<option value="sichal">시찰 · 이름 순</option>' +
           '</select></div>' +
-          '<div class="field" style="flex:0 0 150px"><label for="call-sichal">시찰</label>' +
-          '<select id="call-sichal"><option value="">시찰 전체</option>' +
+          '<div class="field" style="flex:0 0 150px"><label for="' + p + '-sichal">시찰</label>' +
+          '<select id="' + p + '-sichal"><option value="">시찰 전체</option>' +
           sichalNames.map(function (x) { return '<option>' + e(x) + '</option>'; }).join('') +
           '</select></div>' +
-          '<div class="field" style="flex:0 0 200px"><label for="call-state">형편</label>' +
-          '<select id="call-state">' +
+          '<div class="field" style="flex:0 0 200px"><label for="' + p + '-state">형편</label>' +
+          '<select id="' + p + '-state">' +
           '<option value="">전체</option>' +
-          '<option value="due">기한이 가깝거나 지난 분 (청원 대상)</option>' +
-          '<option value="over">기한이 지난 분만</option>' +
+          '<option value="due">' + (assoc ? '임기가 짧거나 끝난 분 (계속 청원 대상)'
+                                          : '기한이 가깝거나 지난 분 (청원 대상)') + '</option>' +
+          '<option value="over">' + (assoc ? '임기가 끝난 분만' : '기한이 지난 분만') + '</option>' +
           '<option value="none">기록이 없는 분만</option>' +
           '</select></div>' +
-          '<div class="field" style="flex:0 0 auto;align-self:flex-end;margin-bottom:6px">' +
-          '<label style="display:flex;align-items:center;gap:6px;font-weight:400">' +
-          '<input type="checkbox" id="call-past" style="width:auto"> 지난 기록도 보기</label></div>' +
-          '<button class="btn ghost" id="call-print-btn" style="align-self:flex-end;margin-bottom:2px">인쇄</button>' +
+          (assoc ? '' :
+            '<div class="field" style="flex:0 0 auto;align-self:flex-end;margin-bottom:6px">' +
+            '<label style="display:flex;align-items:center;gap:6px;font-weight:400">' +
+            '<input type="checkbox" id="' + p + '-past" style="width:auto"> 지난 기록도 보기</label></div>') +
+          '<button class="btn ghost" id="' + p + '-print-btn" style="align-self:flex-end;margin-bottom:2px">인쇄</button>' +
           '</div>';
 
-        html += '<table class="tbl" id="call-tbl" style="margin-bottom:6px"><thead><tr>' +
+        h += '<table class="tbl" id="' + p + '-tbl" style="margin-bottom:6px"><thead><tr>' +
           '<th style="width:46px">번호</th><th style="width:100px">성명</th>' +
           '<th>시무교회</th><th style="width:100px">시찰</th>' +
           '<th style="width:110px">청빙 허락일</th><th style="width:110px">시무 만료일</th>' +
-          '<th style="width:160px">청빙 경과</th><th style="width:100px">임시당회장</th>' +
+          (assoc
+            ? '<th style="width:220px">남은 임기</th>'
+            : '<th style="width:160px">청빙 경과</th><th style="width:100px">임시당회장</th>') +
           '<th style="width:70px" class="no-print">관리</th></tr></thead><tbody>';
 
-        callRows.slice().sort(function (a, b) {
+        list.slice().sort(function (a, b) {
           return callDays(a) - callDays(b);
         }).forEach(function (m) {
           var t = SHS.callTerm(m);
           var tone = t.state === 'over' || t.state === 'none' ? 'fail'
             : (t.state === 'soon' ? 'warn' : '');
-          /* 남은 기간이 아니라 허락받은 뒤 지난 기간을 적는다.
-           * 3년이 지나면 시무 기한이 끝난 것이므로 붉게 알린다. */
-          var left =
-            t.state === 'none' ? '<span class="fail">청빙 기록 없음</span>'
-            : t.state === 'done' ? '<span style="color:var(--gray-5)">' +
-                e(m.position || '') + '로 위임되어 끝남</span>'
-            : t.state === 'over' ? '<span class="fail">' + spanShort(t.since) +
-                ' 경과 — 재청원 필요</span>'
-            : '<span class="' + tone + '">' + spanShort(t.since) + ' 경과</span>';
-          html += '<tr data-callrow="' + m.id + '" data-cs="' + t.state + '"' +
+          var left;
+          if (assoc) {
+            /* 부목사는 1년 임기 — 남은 임기를 적는다 */
+            left =
+              t.state === 'none' ? '<span class="fail">청빙 기록 없음</span>'
+              : t.state === 'over' ? '<span class="fail">' + e(t.left) + ' — 계속 청원 필요</span>'
+              : t.state === 'soon' ? '<span class="warn">' + e(t.left) + ' — 계속 청원할 때</span>'
+              : e(t.left);
+          } else {
+            /* 시무목사는 남은 기간이 아니라 허락받은 뒤 지난 기간을 적는다.
+             * 3년이 지나면 시무 기한이 끝난 것이므로 붉게 알린다. */
+            left =
+              t.state === 'none' ? '<span class="fail">청빙 기록 없음</span>'
+              : t.state === 'done' ? '<span style="color:var(--gray-5)">' +
+                  e(m.position || '') + '로 위임되어 끝남</span>'
+              : t.state === 'over' ? '<span class="fail">' + spanShort(t.since) +
+                  ' 경과 — 재청원 필요</span>'
+              : '<span class="' + tone + '">' + spanShort(t.since) + ' 경과</span>';
+          }
+          h += '<tr data-callrow="' + m.id + '" data-cs="' + t.state + '"' +
             ' data-cd="' + callDays(m) + '" data-csi="' + e(m.sichal || '') + '"' +
             ' data-cn="' + e(m.name || '') + '" data-con="' + e(t.on || '') + '">' +
             '<td class="call-no"></td>' +
@@ -1426,17 +1463,21 @@ document.addEventListener('DOMContentLoaded', function () {
             'text-decoration-style:dotted;text-underline-offset:3px">' + e(m.name) + '</a></td>' +
             '<td class="left">' + e(m.church || '-') + '</td>' +
             '<td>' + e(m.sichal || '-') + '</td>' +
-            '<td>' + (t.on ? e(t.on) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
-            '<td>' + (t.until ? e(t.until) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td' + ND + '>' + (t.on ? e(t.on) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            '<td' + ND + '>' + (t.until ? e(t.until) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             '<td>' + left + '</td>' +
-            '<td>' + (m.call_acting ? e(m.call_acting) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
+            (assoc ? '' :
+              '<td>' + (m.call_acting ? e(m.call_acting) : '<span style="color:var(--gray-5)">-</span>') + '</td>') +
             '<td class="no-print"><button class="btn sm" data-roedit="' + m.id + '">수정</button></td>' +
             '</tr>';
         });
-        html += '</tbody></table>';
-        html += '<p style="font-size:0.84rem;color:var(--gray-6)" id="call-sum"></p>';
-        html += '</div>';
+        h += '</tbody></table>';
+        h += '<p style="font-size:0.84rem;color:var(--gray-6)" id="' + p + '-sum"></p>';
+        return h + '</div>';
       }
+
+      html += callCardHtml('call', callRows, false);
+      html += callCardHtml('acall', assocRows, true);
 
       /* 명단 조회 */
       html += '<div class="inline-form" style="margin-bottom:12px">' +
@@ -1486,20 +1527,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
       /* 시무목사 청빙 — 당회가 없는 교회의 담임은 3년마다 다시 청원해야 한다.
        * 허락일과 만료일, 남은 기간을 한 칸에 담고 다가온 것은 빛깔로 알린다. */
+      /* 날짜는 한 줄로 — 좁은 칸에서 '1996-10-' 처럼 꺾이지 않게 */
+      function dateNw(d) { return '<span style="white-space:nowrap">' + e(d) + '</span>'; }
+
       function callCell(m) {
         var t = SHS.callTerm(m);
         if (t.state === 'na') return '<span style="color:var(--gray-5)">-</span>';
         if (t.state === 'none') {
-          return '<span class="fail" style="font-size:0.82rem">기록 없음</span>';
+          return '<span class="fail" style="font-size:0.82rem">' +
+            (t.kind === 'assoc' ? '부목사 ' : '') + '기록 없음</span>';
         }
         if (t.state === 'done') {
-          return '<span style="color:var(--gray-5);font-size:0.8rem">' + e(t.on) + ' 청빙<br>' +
+          return '<span style="color:var(--gray-5);font-size:0.8rem">' + dateNw(t.on) + ' 청빙<br>' +
             e(m.position || '') + '로 마침</span>';
         }
         var tone = t.state === 'over' ? 'fail' : (t.state === 'soon' ? 'warn' : '');
-        /* 얼마나 남았는지가 아니라 허락받은 뒤 얼마나 지났는지를 적는다
+        /* 부목사 — 1년 임기이므로 남은 임기를 적는다 */
+        if (t.kind === 'assoc') {
+          return dateNw(t.on) + ' 허락' +
+            '<div class="' + tone + '" style="font-size:0.76rem' + (tone ? '' : ';color:var(--gray-5)') + '">' +
+            e(t.left) + (t.state === 'over' ? ' — 계속 청원 필요' : '') + '</div>';
+        }
+        /* 시무목사 — 얼마나 남았는지가 아니라 허락받은 뒤 얼마나 지났는지를 적는다
          * (재직일 칸의 '15년 9개월 경과'와 같은 말씨) */
-        return e(t.on) + ' 허락' +
+        return dateNw(t.on) + ' 허락' +
           '<div class="' + tone + '" style="font-size:0.76rem' + (tone ? '' : ';color:var(--gray-5)') + '">' +
           spanShort(t.since) + ' 경과' +
           (t.state === 'over' ? ' — 재청원 필요' : '') + '</div>';
@@ -1519,8 +1570,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '<th>소속 교회</th><th style="width:110px">시찰</th>' +
         '<th style="width:120px">임직일자</th>' +
         '<th style="width:120px">재직일(부임)</th>' +
-        '<th style="width:150px" title="당회가 없는 교회의 담임(시무목사)은 3년마다 다시 청빙청원을 해야 합니다">' +
-        '시무목사 청빙</th>' +
+        '<th style="width:150px" title="당회가 없는 교회의 담임(시무목사)은 3년마다, ' +
+        '부목사는 해마다 다시 청빙청원을 해야 합니다">청빙 임기</th>' +
         '<th style="width:140px;cursor:pointer;user-select:none" id="ro-th-term"></th>' +
         '<th style="width:130px;cursor:pointer;user-select:none" id="ro-th-grade"></th>' +
         '<th style="width:80px">관리</th></tr></thead><tbody>';
@@ -1544,10 +1595,10 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td class="left">' + e(m.church || '-') + '</td>' +
           '<td>' + e(m.sichal || '-') + '</td>' +
           '<td>' + (m.ordained_on
-            ? e(m.ordained_on)
+            ? dateNw(m.ordained_on)
             : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td>' + (m.served_from
-            ? e(m.served_from) + '<div style="font-size:0.76rem;color:var(--gray-5)">' + servedDur(m) + '</div>'
+            ? dateNw(m.served_from) + '<div style="font-size:0.76rem;color:var(--gray-5)">' + servedDur(m) + '</div>'
             : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
           '<td>' + callCell(m) + '</td>' +
           '<td>' + remainLabel(m) + '</td>' +
@@ -1568,19 +1619,20 @@ document.addEventListener('DOMContentLoaded', function () {
       box.innerHTML = html;
       loadThumbs();
 
-      /* ----- 시무목사 청빙 임기 명단: 줄 세우기 · 가려내기 · 인쇄 ----- */
-      (function () {
-        var tbl = document.getElementById('call-tbl');
+      /* ----- 청빙 임기 명단 (시무목사 · 부목사): 줄 세우기 · 가려내기 · 인쇄 ----- */
+      function wireCallCard(p, assoc) {
+        var tbl = document.getElementById(p + '-tbl');
         if (!tbl) return;
         var tbody = tbl.querySelector('tbody');
-        var sortEl = document.getElementById('call-sort');
-        var siEl = document.getElementById('call-sichal');
-        var stEl = document.getElementById('call-state');
-        var pastEl = document.getElementById('call-past');
-        var sumEl = document.getElementById('call-sum');
+        var sortEl = document.getElementById(p + '-sort');
+        var siEl = document.getElementById(p + '-sichal');
+        var stEl = document.getElementById(p + '-state');
+        var pastEl = document.getElementById(p + '-past');   /* 부목사 칸에는 없다 */
+        var sumEl = document.getElementById(p + '-sum');
 
         function draw() {
-          var mode = sortEl.value, si = siEl.value, st = stEl.value, past = pastEl.checked;
+          var mode = sortEl.value, si = siEl.value, st = stEl.value;
+          var past = pastEl ? pastEl.checked : true;
 
           var trs = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-callrow]'));
           trs.sort(function (a, b) {
@@ -1615,40 +1667,50 @@ document.addEventListener('DOMContentLoaded', function () {
           });
 
           var parts = ['모두 <strong>' + n + '</strong>명'];
-          if (over) parts.push('<span class="fail">기한 지남 ' + over + '명</span>');
-          if (soon) parts.push('<span class="warn">기한 임박 ' + soon + '명</span>');
+          if (over) parts.push('<span class="fail">' + (assoc ? '임기 끝남 ' : '기한 지남 ') + over + '명</span>');
+          if (soon) parts.push('<span class="warn">' + (assoc ? '계속 청원할 때 ' : '기한 임박 ') + soon + '명</span>');
           if (none) parts.push('<span class="fail">기록 없음 ' + none + '명</span>');
           sumEl.innerHTML = parts.join(' · ') +
-            (over + soon + none ? ' — 이번 노회에서 시무목사 청빙청원을 살펴 주세요.' : '');
+            (over + soon + none
+              ? (assoc ? ' — 이번 노회에서 부목사 계속 청빙청원을 살펴 주세요.'
+                       : ' — 이번 노회에서 시무목사 청빙청원을 살펴 주세요.')
+              : '');
         }
 
         [sortEl, siEl, stEl, pastEl].forEach(function (el) {
-          el.addEventListener('change', draw);
+          if (el) el.addEventListener('change', draw);
         });
         draw();
 
-        /* 인쇄 — 몸통 바로 아래에 인쇄용 자리를 만들어 이 명단만 종이에 앉힌다 */
-        document.getElementById('call-print-btn').addEventListener('click', function () {
+        /* 인쇄 — 몸통 바로 아래에 인쇄용 자리를 만들어 이 명단만 종이에 앉힌다.
+         * 화면 표의 머리칸과 칸을 그대로 옮기되 '관리' 칸(no-print)은 뺀다. */
+        document.getElementById(p + '-print-btn').addEventListener('click', function () {
           var shown = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-callrow]'))
             .filter(function (tr) { return !tr.classList.contains('hidden'); });
           if (!shown.length) { alert('인쇄할 줄이 없습니다.'); return; }
 
+          function cells(tr, tag) {
+            return Array.prototype.filter.call(tr.querySelectorAll(tag), function (c) {
+              return !c.classList.contains('no-print');
+            });
+          }
+          var heads = cells(tbl.querySelector('thead tr'), 'th');
+
           var today = new Date();
-          var h = '<h2>시화산노회 시무목사 청빙 임기</h2>' +
+          var h = '<h2>시화산노회 ' + (assoc ? '부목사' : '시무목사') + ' 청빙 임기</h2>' +
             '<p class="cp-sub">' + today.getFullYear() + '년 ' + (today.getMonth() + 1) + '월 ' +
             today.getDate() + '일 기준 · ' + shown.length + '명' +
             (siEl.value ? ' · ' + e(siEl.value) : '') +
             (stEl.options[stEl.selectedIndex].value ? ' · ' + e(stEl.options[stEl.selectedIndex].text) : '') +
             '</p>' +
-            '<table><thead><tr><th>번호</th><th>성명</th><th>시무교회</th><th>시찰</th>' +
-            '<th>청빙 허락일</th><th>시무 만료일</th><th>남은 기간</th><th>임시당회장</th></tr></thead><tbody>';
+            '<table><thead><tr>' +
+            heads.map(function (th) { return '<th>' + e(th.textContent.trim()) + '</th>'; }).join('') +
+            '</tr></thead><tbody>';
           shown.forEach(function (tr, i) {
-            var td = tr.querySelectorAll('td');
-            function txt(k) { return e((td[k].textContent || '').trim() || '-'); }
-            h += '<tr><td>' + (i + 1) + '</td><td>' + txt(1) + '</td>' +
-              '<td class="left">' + txt(2) + '</td><td>' + txt(3) + '</td>' +
-              '<td>' + txt(4) + '</td><td>' + txt(5) + '</td>' +
-              '<td>' + txt(6) + '</td><td>' + txt(7) + '</td></tr>';
+            h += '<tr>' + cells(tr, 'td').map(function (td, k) {
+              var v = k === 0 ? String(i + 1) : ((td.textContent || '').trim() || '-');
+              return '<td' + (k === 2 ? ' class="left"' : '') + '>' + e(v) + '</td>';
+            }).join('') + '</tr>';
           });
           h += '</tbody></table>';
 
@@ -1668,7 +1730,9 @@ document.addEventListener('DOMContentLoaded', function () {
           window.print();
           setTimeout(done, 1500);   /* afterprint 를 주지 않는 기기를 위한 대비 */
         });
-      })();
+      }
+      wireCallCard('call', false);
+      wireCallCard('acall', true);
 
       document.getElementById('ro-order').addEventListener('click', function () {
         var msg = document.getElementById('ro-ordmsg');
@@ -1905,19 +1969,18 @@ document.addEventListener('DOMContentLoaded', function () {
           '<input type="text" id="rm-ordby" value="' + e(m.ordained_by || '') + '" placeholder="예: 시화산노회"' +
           ' title="안수증명서 발급 시 이 기록과 대조합니다"></div>' +
           '</div>' +
-          /* 시무목사 청빙 이력 — 3년마다 다시 청원하므로 기록이 여러 번 쌓인다.
-           * 목사 갈래에만 보인다 (무임목사가 청빙받아 부임하는 일도 있으므로
-           * 지금 시무목사가 아니더라도 목사면 열어 둔다). 장로·직원에게는 숨긴다.
+          /* 청빙 이력 — 시무목사는 3년마다, 부목사는 해마다 다시 청원하므로
+           * 기록이 여러 번 쌓인다. 목사 갈래에만 보인다 (무임목사가 청빙받아
+           * 부임하는 일도 있으므로 지금 시무목사가 아니더라도 목사면 열어 둔다).
+           * 장로·직원에게는 숨긴다. 제목과 안내는 위 직분 칸을 따라 바뀐다.
            * 이 칸은 관리자만 볼 수 있는 자리이고, 본인은 내 정보에서 볼 뿐이다. */
           (/목사/.test(m.category || '') || m.call_on
-            ? '<div class="field"><label>시무목사 청빙 이력</label>' +
+            ? '<div class="field"><label id="rm-call-label">' +
+              (SHS.callKind(m) === 'assoc' ? '부목사' : '시무목사') + ' 청빙 이력</label>' +
               '<div id="rm-call-box" style="border:1px solid var(--gray-2,#e5e4df);border-radius:8px;padding:10px 12px">' +
               '<span style="color:var(--gray-5);font-size:0.85rem">청빙 기록을 불러오는 중...</span></div>' +
               '<div class="form-msg" id="rm-call-msg"></div>' +
-              '<span style="display:block;font-size:0.8rem;color:var(--gray-5);margin:4px 0 12px">' +
-              '당회가 조직되지 않은 교회의 담임은 시무목사로서 3년마다 시무목사 청빙청원을 해야 합니다. ' +
-              '만료일을 비워 두고 저장하면 허락일부터 3년 뒤로 채워집니다. ' +
-              '가장 최근 기록이 명단과 내 정보에 <strong>지금 임기</strong>로 나옵니다.</span></div>'
+              '<span id="rm-call-help" style="display:block;font-size:0.8rem;color:var(--gray-5);margin:4px 0 12px"></span></div>'
             : '') +
           /* 준회원 판단의 근거 — 목사에게만 물어본다.
            * 적어 두기만 할 뿐 등급을 저절로 바꾸지는 않는다(등급은 관리자가 정한다). */
@@ -1998,24 +2061,65 @@ document.addEventListener('DOMContentLoaded', function () {
           draw();
         })();
 
-        /* ----- 시무목사 청빙 이력 (관리자 전용) -----
-         * 3년마다 다시 청원하므로 기록이 여러 번 쌓인다. 여기서 낱낱이 적어 두면
-         * 가장 최근 기록이 명단과 내 정보의 '지금 임기'가 된다.
+        /* ----- 청빙 이력 (관리자 전용) — 시무목사 3년 · 부목사 1년 -----
+         * 시무목사는 3년마다, 부목사는 해마다 다시 청원하므로 기록이 여러 번
+         * 쌓인다. 여기서 낱낱이 적어 두면 가장 최근 기록이 명단과 내 정보의
+         * '지금 임기'가 된다. 몇 년 임기인지는 위 직분 칸을 따른다.
          * 본인은 내 정보에서 볼 수만 있고, 고치는 일은 이 자리에서만 한다. */
         (function () {
           var box = document.getElementById('rm-call-box');
           if (!box) return;
           var msg = document.getElementById('rm-call-msg');
+          var catEl = document.getElementById('rm-cat');
+          var labelEl = document.getElementById('rm-call-label');
+          var helpEl = document.getElementById('rm-call-help');
           var loaded = [];      /* 불러온 그대로 — 지운 줄을 가려내는 데 쓴다 */
 
-          function plus3(d) {
-            if (!d) return '';
-            var t = new Date(d + 'T00:00:00');
-            if (isNaN(t)) return '';
-            t.setFullYear(t.getFullYear() + SHS.CALL_YEARS);
-            return t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) +
-              '-' + ('0' + t.getDate()).slice(-2);
+          /* 지금 고르고 있는 직분이 부목사인가 (저장 전에 바꿔도 바로 따른다) */
+          function isAssoc() {
+            return catEl ? catEl.value === '부목사' : SHS.callKind(m) === 'assoc';
           }
+          function years() { return isAssoc() ? SHS.ASSOC_YEARS : SHS.CALL_YEARS; }
+          /* 허락일 + 임기 */
+          function plusY(d) { return SHS.callEnd(d, years()) || ''; }
+          /* 만료일이 1년·3년 기본값 그대로인가 — 손수 적은 날짜는 건드리지 않는다 */
+          function isDefault(on, un) {
+            return !un || un === SHS.callEnd(on, SHS.ASSOC_YEARS) ||
+              un === SHS.callEnd(on, SHS.CALL_YEARS);
+          }
+
+          /* 제목·안내·임시당회장 칸을 직분에 맞춘다 */
+          function applyKind() {
+            var a = isAssoc();
+            if (labelEl) labelEl.textContent = (a ? '부목사' : '시무목사') + ' 청빙 이력';
+            if (helpEl) {
+              helpEl.innerHTML = a
+                ? '부목사는 시무 기간이 ' + SHS.ASSOC_YEARS + '년입니다. 해마다 정기노회에서 ' +
+                  '<strong>부목사 계속 청빙청원</strong>이 가결되면 다시 ' + SHS.ASSOC_YEARS +
+                  '년을 시무합니다. 가결된 노회 날을 허락일로 적어 주세요. ' +
+                  '만료일을 비워 두고 저장하면 허락일부터 1년 뒤로 채워집니다. ' +
+                  '가장 최근 기록이 명단과 내 정보에 <strong>남은 임기</strong>로 나옵니다.'
+                : '당회가 조직되지 않은 교회의 담임은 시무목사로서 3년마다 시무목사 청빙청원을 해야 합니다. ' +
+                  '만료일을 비워 두고 저장하면 허락일부터 3년 뒤로 채워집니다. ' +
+                  '가장 최근 기록이 명단과 내 정보에 <strong>지금 임기</strong>로 나옵니다.';
+            }
+            box.querySelectorAll('.rm-call-acting').forEach(function (f) {
+              f.style.display = a ? 'none' : '';
+            });
+            box.querySelectorAll('[data-ck="note"]').forEach(function (el) {
+              el.placeholder = a ? '예: 제20회 계속 청빙' : '예: 위임으로 마침';
+            });
+            /* 기본값으로 채워 둔 만료일은 새 임기로 다시 셈한다 */
+            box.querySelectorAll('.rm-call-row').forEach(function (row) {
+              var onEl = row.querySelector('[data-ck="approved_on"]');
+              var unEl = row.querySelector('[data-ck="until_on"]');
+              if (onEl.value && unEl.value && isDefault(onEl.value, unEl.value)) {
+                unEl.value = plusY(onEl.value);
+              }
+            });
+          }
+          if (catEl) catEl.addEventListener('change', applyKind);
+          applyKind();
 
           function rowHtml(c) {
             c = c || {};
@@ -2026,26 +2130,28 @@ document.addEventListener('DOMContentLoaded', function () {
               '<input type="date" data-ck="approved_on" value="' + e(c.approved_on || '') + '"></div>' +
               '<div class="field" style="flex:0 0 150px;margin:0"><label style="font-size:0.78rem">시무 만료일</label>' +
               '<input type="date" data-ck="until_on" value="' + e(c.until_on || '') + '"></div>' +
-              '<div class="field" style="flex:0 0 110px;margin:0"><label style="font-size:0.78rem">임시당회장</label>' +
+              '<div class="field rm-call-acting" style="flex:0 0 110px;margin:0' +
+              (isAssoc() ? ';display:none' : '') + '"><label style="font-size:0.78rem">임시당회장</label>' +
               '<input type="text" data-ck="acting" value="' + e(c.acting || '') + '" placeholder="예: 강명우"></div>' +
               '<div class="field" style="margin:0"><label style="font-size:0.78rem">비고</label>' +
-              '<input type="text" data-ck="note" value="' + e(c.note || '') + '" placeholder="예: 위임으로 마침"></div>' +
+              '<input type="text" data-ck="note" value="' + e(c.note || '') + '" placeholder="' +
+              (isAssoc() ? '예: 제20회 계속 청빙' : '예: 위임으로 마침') + '"></div>' +
               '<button type="button" class="btn ghost sm" data-cdel="1" style="margin-bottom:2px">삭제</button>' +
               '</div>';
           }
 
-          /* 허락일을 적으면 만료일을 3년 뒤로 함께 채운다.
-           * 서기가 3년과 다른 날짜를 손수 적어 둔 줄은 건드리지 않는다. */
+          /* 허락일을 적으면 만료일을 임기(시무목사 3년·부목사 1년) 뒤로 함께 채운다.
+           * 서기가 기본값과 다른 날짜를 손수 적어 둔 줄은 건드리지 않는다. */
           function wire(row) {
             var onEl = row.querySelector('[data-ck="approved_on"]');
             var unEl = row.querySelector('[data-ck="until_on"]');
-            var auto = !unEl.value || unEl.value === plus3(onEl.value);
+            var auto = isDefault(onEl.value, unEl.value);
             onEl.addEventListener('change', function () {
               if (!onEl.value) { unEl.value = ''; return; }
-              if (auto) unEl.value = plus3(onEl.value);
+              if (auto) unEl.value = plusY(onEl.value);
             });
             unEl.addEventListener('change', function () {
-              auto = !unEl.value || unEl.value === plus3(onEl.value);
+              auto = !unEl.value || unEl.value === plusY(onEl.value);
             });
             row.querySelector('[data-cdel]').addEventListener('click', function () {
               row.remove();
@@ -2102,8 +2208,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 jobs.push(c.from('roster_calls').delete().eq('id', o.id));
               });
               list.forEach(function (o) {
+                /* 만료일을 비워 두었으면 여기서 채워 보낸다 — 서버의 기본값은 3년이라
+                 * 부목사(1년)는 반드시 화면에서 셈해 보내야 한다 */
                 var row = { roster_id: m.id, approved_on: o.approved_on,
-                            until_on: o.until_on, acting: o.acting, note: o.note };
+                            until_on: o.until_on || plusY(o.approved_on) || null,
+                            acting: o.acting, note: o.note };
                 jobs.push(o.id
                   ? c.from('roster_calls').update(row).eq('id', o.id)
                   : c.from('roster_calls').insert(row));
@@ -2117,7 +2226,8 @@ document.addEventListener('DOMContentLoaded', function () {
                   ? '청빙 날짜는 관리자만 고칠 수 있습니다.' : bad.error.message;
                 return;
               }
-              SHSCloud.log('update', '시무목사 청빙 이력', m.name + ' ' + list.length + '건');
+              SHSCloud.log('update', (isAssoc() ? '부목사' : '시무목사') + ' 청빙 이력',
+                m.name + ' ' + list.length + '건');
               msg.className = 'form-msg ok';
               msg.textContent = '청빙 이력을 저장했습니다. 명단의 지금 임기도 함께 맞췄습니다.';
               load();
@@ -2507,11 +2617,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (t.state === 'na') return '';
             var tone = t.state === 'over' || t.state === 'none' ? 'fail'
               : (t.state === 'soon' ? 'warn' : '');
-            return viewRow('시무목사 청빙',
+            /* 시무목사(3년)·부목사(1년) — 부목사는 남은 임기를 적고 임시당회장이 없다 */
+            return viewRow(t.state === 'done' ? '청빙 기록' : t.kindName + ' 청빙',
               (t.on ? e(t.on) + ' 허락' +
                 (t.until ? ' · ' + e(t.until) + ' 만료' : '') + '<br>' : '') +
               '<span class="' + tone + '">' + e(t.label) + '</span>' +
-              (m.call_acting
+              (m.call_acting && t.kind !== 'assoc'
                 ? '<br><span style="color:var(--gray-5);font-size:0.84rem">임시당회장 ' +
                   e(m.call_acting) + ' 목사</span>'
                 : '')) +
@@ -2553,7 +2664,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }, function () {});
         })();
 
-        /* 시무목사 청빙 이력 — 여태 허락받은 기록을 모두 적어 준다 */
+        /* 청빙 이력(시무목사·부목사) — 여태 허락받은 기록을 모두 적어 준다 */
         (function () {
           var tr = mo.ov.querySelector('#rv-calls');
           if (!tr) return;
