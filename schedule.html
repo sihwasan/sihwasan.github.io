@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var events = [];      /* site_schedule 전체 */
   var roster = [];      /* 임직식 대상자 선택용 노회 명단 */
   var SESSIONS = null;  /* 회기 설정 {current, list} — 정기노회 회기 자동 입력용 */
+  var COMMITTEES = [];  /* 주관부서 선택지 — 상비부·위원회 이름 (committees 표) */
   var now = new Date();
   var calY = now.getFullYear(), calM = now.getMonth();   /* 보고 있는 달 */
 
@@ -96,6 +97,8 @@ document.addEventListener('DOMContentLoaded', function () {
   if (hm) { calY = Number(hm[1]); calM = Number(hm[2]) - 1; }
 
   var KINDS = ['정기노회', '임원회의', '상비부 일정', '임직식', '총회', '수양회', '사모위로회', '기타'];
+  /* 주관부서를 고르는 행사 — 상비부 일정은 반드시 고른다 */
+  var DEPT_KINDS = ['상비부 일정', '수양회', '사모위로회', '기타'];
 
   function pad2(n) { return String(n).padStart(2, '0'); }
   function ymd(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
@@ -217,6 +220,8 @@ document.addEventListener('DOMContentLoaded', function () {
               '<span style="flex:1">' + e(x.title) +
               (x.end_date ? '<div style="font-size:0.76rem;color:var(--gray-5)">' +
                 e(dateOfRow(x)) + ' ~ ' + e(x.end_date) + '</div>' : '') +
+              (x.meta && x.meta.dept ? '<div style="font-size:0.76rem;color:var(--gray-5)">주관 ' +
+                e(x.meta.dept) + (x.meta.committee_event_id ? ' (부서 달력에서 올림)' : '') + '</div>' : '') +
               (x.meta && x.meta.contact ? '<div style="font-size:0.76rem;color:var(--gray-5)">담당 ' +
                 e(x.meta.contact) + '</div>' : '') +
               (x.meta && x.meta.info ? '<div style="font-size:0.78rem;color:var(--gray-6);white-space:pre-line">' +
@@ -239,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function () {
     mo.el.querySelectorAll('[data-ddel]').forEach(function (b) {
       b.addEventListener('click', function () {
         var x = events.filter(function (v) { return String(v.id) === b.dataset.ddel; })[0];
-        if (!x || !confirm('일정 "' + x.title + '" 을(를) 삭제하시겠습니까?')) return;
+        if (!x || !confirm('일정 "' + x.title + '" 을(를) 삭제하시겠습니까?' + linkedNote(x))) return;
         db.from('site_schedule').delete().eq('id', x.id).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
           SHSCloud.log('delete', '노회 일정 삭제', x.title);
@@ -268,8 +273,19 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
+    /* 주관부서 — 상비부·위원회 목록에서 고른다. 목록에 없는 이름(옛 기록)은 직접 입력으로 */
+    var deptNow = meta.dept || '';
+    var DEPTS = COMMITTEES.concat(['임원회']);
+    var deptSel = !deptNow ? '' : (DEPTS.indexOf(deptNow) !== -1 ? deptNow : '__etc');
+    var fromCom = meta.committee_event_id ? deptNow : '';   /* 부서 달력에서 올린 일정 */
+
     var mo = modal(
       '<h3 style="margin:0 0 14px;color:var(--navy)">' + (isNew ? '일정 추가' : '일정 수정') + '</h3>' +
+      (fromCom
+        ? '<div class="notice-banner" style="margin:0 0 12px;font-size:0.86rem">' +
+          '<strong>' + e(fromCom) + '</strong> 달력에서 올린 일정입니다. 제목·날짜·장소·내용은 그 부서 달력에서 ' +
+          '고치면 여기에도 따라 바뀝니다. 여기서 지우면 부서 달력의 「노회 일정에도 올리기」가 꺼집니다.</div>'
+        : '') +
       '<div class="inline-form">' +
       '<div class="field" style="flex:0 0 160px"><label>시작 날짜</label>' +
       '<input type="date" id="ev-date" value="' + e(ds || '') + '"></div>' +
@@ -279,6 +295,21 @@ document.addEventListener('DOMContentLoaded', function () {
       KINDS.map(function (k) {
         return '<option' + (k === kindNow ? ' selected' : '') + '>' + k + '</option>';
       }).join('') + '</select></div></div>' +
+      /* 주관부서: 상비부 달력과 이어진다 — 고른 부서의 달력에 이 일정이 함께 보인다 */
+      '<div class="inline-form hidden" id="ev-deptwrap">' +
+      '<div class="field" style="flex:0 0 220px"><label>주관부서</label>' +
+      '<select id="ev-dept"' + (fromCom ? ' disabled title="부서 달력에서 올린 일정은 그 부서가 주관합니다"' : '') + '>' +
+      '<option value="">— 고르지 않음 —</option>' +
+      DEPTS.map(function (n) {
+        return '<option' + (n === deptSel ? ' selected' : '') + '>' + e(n) + '</option>';
+      }).join('') +
+      '<option value="__etc"' + (deptSel === '__etc' ? ' selected' : '') + '>직접 입력</option>' +
+      '</select></div>' +
+      '<div class="field' + (deptSel === '__etc' ? '' : ' hidden') + '" id="ev-deptetcwrap"><label>주관 (직접 입력)</label>' +
+      '<input type="text" id="ev-deptetc" value="' + e(deptSel === '__etc' ? deptNow : '') +
+      '" placeholder="예: 임원회 · 교육친교부"></div>' +
+      '<div class="field" style="align-self:flex-end;font-size:0.78rem;color:var(--gray-5);margin-bottom:8px" id="ev-depthint">' +
+      '고른 부서의 달력에도 이 일정이 보입니다.</div></div>' +
       /* 정기노회: 회기·봄가을 선택 → 내용에 자동 반영 */
       '<div class="inline-form hidden" id="ev-seswrap">' +
       '<div class="field" style="flex:0 0 170px"><label>회기</label><select id="ev-ses"></select></div>' +
@@ -299,8 +330,6 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field"><label>회비</label>' +
       '<input type="text" id="ev-rfee" value="' + e(meta.fee || '') + '" placeholder="예: 10만원"></div></div>' +
       '<div class="inline-form">' +
-      '<div class="field"><label>주관부서</label>' +
-      '<input type="text" id="ev-rdept" value="' + e(meta.dept || '') + '" placeholder="예: 임원회 · 교육부"></div>' +
       '<div class="field"><label>담당자 연락처</label>' +
       '<input type="text" id="ev-rcontact" value="' + e(meta.contact || '') + '" placeholder="예: 김동석 목사 010-0000-0000"></div></div>' +
       '<div class="field"><label>안내문구 (선택)</label>' +
@@ -431,6 +460,7 @@ document.addEventListener('DOMContentLoaded', function () {
       mo.el.querySelector('#ev-ordwrap').classList.toggle('hidden', k !== '임직식');
       mo.el.querySelector('#ev-retwrap').classList.toggle('hidden', k !== '수양회');
       mo.el.querySelector('#ev-seswrap').classList.toggle('hidden', k !== '정기노회');
+      mo.el.querySelector('#ev-deptwrap').classList.toggle('hidden', DEPT_KINDS.indexOf(k) === -1 && !fromCom);
       /* 수양회는 위쪽에 전용 장소 칸이 있으므로 공용 장소 칸은 감춘다 */
       mo.el.querySelector('#ev-locwrap').classList.toggle('hidden', k === '수양회');
       refreshEtcPerson();
@@ -479,6 +509,19 @@ document.addEventListener('DOMContentLoaded', function () {
       setTimeout(function () { tlist.classList.add('hidden'); }, 150);
     });
     kindSel.addEventListener('change', refreshKind);
+    var deptEl = mo.el.querySelector('#ev-dept');
+    deptEl.addEventListener('change', function () {
+      mo.el.querySelector('#ev-deptetcwrap').classList.toggle('hidden', deptEl.value !== '__etc');
+      mo.el.querySelector('#ev-depthint').classList.toggle('hidden', deptEl.value === '__etc');
+    });
+    mo.el.querySelector('#ev-depthint').classList.toggle('hidden', deptEl.value === '__etc');
+    /* 고른 주관부서 이름 ('' = 없음) */
+    function deptValue() {
+      if (fromCom) return fromCom;
+      if (DEPT_KINDS.indexOf(kindSel.value) === -1) return '';
+      if (deptEl.value === '__etc') return mo.el.querySelector('#ev-deptetc').value.trim();
+      return deptEl.value;
+    }
     function refreshOrdEtc() {
       mo.el.querySelector('#ev-ordetcwrap').classList.toggle('hidden',
         mo.el.querySelector('#ev-ordsub').value !== '기타');
@@ -505,6 +548,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var title = '';
       var newMeta = null;
       var sync = null;    /* 회원 명단 연동 작업 */
+      var dept = deptValue();
+      if (kind === '상비부 일정' && !dept) { err('주관부서를 골라 주세요.'); return; }
 
       if (kind === '기타') {
         title = mo.el.querySelector('#ev-etc').value.trim();
@@ -542,7 +587,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!place) { err('수양회 장소를 입력해 주세요.'); return; }
         newMeta = {
           rname: rname, place: place, target: rv('#ev-rtarget'), fee: rv('#ev-rfee'),
-          dept: rv('#ev-rdept'), contact: rv('#ev-rcontact'), info: rv('#ev-rinfo'), note: note
+          dept: dept, contact: rv('#ev-rcontact'), info: rv('#ev-rinfo'), note: note
         };
         /* 제목은 행사명만 깔끔하게 — 장소·대상·회비 등은 세부 정보(팝업)에서 보여 준다 */
         title = rname;
@@ -552,6 +597,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (note.indexOf('정기노회') !== -1) note = '';
         title = sesText() + (note ? ' (' + note + ')' : '');
         newMeta = { note: note };
+      } else if (kind === '상비부 일정') {
+        /* 노회 달력에서 어느 부서 일인지 보이도록 부서 이름을 앞에 둔다 (부서 달력에서 올린 것과 같은 꼴) */
+        title = note || '일정';
+        if (title.indexOf(dept) === -1) title = dept + ' · ' + title;
       } else {
         title = note || kind;
       }
@@ -570,6 +619,13 @@ document.addEventListener('DOMContentLoaded', function () {
       newMeta = newMeta || {};
       newMeta.time = evTime || '';
       newMeta.loc = evLoc || '';
+      if (dept) newMeta.dept = dept;
+      else delete newMeta.dept;
+      /* 부서 달력에서 올린 일정 — 그 부서 일정과의 연결과, 여기서 고칠 칸이 없는 안내문은 지킨다 */
+      if (meta.committee_event_id) {
+        newMeta.committee_event_id = meta.committee_event_id;
+        if (!('info' in newMeta) && meta.info) newMeta.info = meta.info;
+      }
 
       var row = {
         title: title, kind: kind, meta: newMeta,
@@ -605,6 +661,14 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 등록된 일정 목록 ---------- */
+  /* 부서 달력에서 올린 일정을 지우면 그 부서 쪽 「노회 일정에도 올리기」도 꺼진다 (136 sql) */
+  function linkedNote(x) {
+    return x && x.meta && x.meta.committee_event_id
+      ? '\n\n' + (x.meta.dept || '상비부') + ' 달력에서 올린 일정입니다. 지우면 그 부서 달력의 ' +
+        '「노회 일정에도 올리기」도 꺼집니다 (부서 달력의 일정은 남습니다).'
+      : '';
+  }
+
   function drawList() {
     var box = document.getElementById('sc-list');
     var rows = events.slice().sort(function (a, b) { return (a.sort || 0) - (b.sort || 0); });
@@ -616,7 +680,10 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<tr><td>' + e(dateOfRow(x) || x.date_label || '-') +
         (x.end_date ? '<br>~ ' + e(x.end_date) : '') + '</td>' +
         '<td>' + e(x.kind || '-') + '</td>' +
-        '<td class="left">' + e(x.title) + '</td>' +
+        '<td class="left">' + e(x.title) +
+        (x.meta && x.meta.dept ? '<div style="font-size:0.78rem;color:var(--gray-5)">주관 ' +
+          e(x.meta.dept) + (x.meta.committee_event_id ? ' · 부서 달력에서 올림' : '') + '</div>' : '') +
+        '</td>' +
         '<td><button class="btn sm" data-ledit="' + x.id + '">수정</button> ' +
         '<button class="btn danger sm" data-ldel="' + x.id + '">삭제</button></td></tr>';
     });
@@ -631,7 +698,7 @@ document.addEventListener('DOMContentLoaded', function () {
     box.querySelectorAll('[data-ldel]').forEach(function (b) {
       b.addEventListener('click', function () {
         var x = events.filter(function (v) { return String(v.id) === b.dataset.ldel; })[0];
-        if (!x || !confirm('일정 "' + x.title + '" 을(를) 삭제하시겠습니까?')) return;
+        if (!x || !confirm('일정 "' + x.title + '" 을(를) 삭제하시겠습니까?' + linkedNote(x))) return;
         db.from('site_schedule').delete().eq('id', x.id).then(function (r) {
           if (r.error) { alert(r.error.message); return; }
           SHSCloud.log('delete', '노회 일정 삭제', x.title);
@@ -681,6 +748,11 @@ document.addEventListener('DOMContentLoaded', function () {
           if (history.replaceState) history.replaceState(null, '', location.pathname);
         }
       });
+    /* 주관부서 선택지 — 상비부 대시보드의 부서 목록과 같은 순서 */
+    c.from('committees').select('name').order('sort')
+      .then(function (r) {
+        COMMITTEES = ((r && r.data) || []).map(function (x) { return x.name; });
+      }, function () {});
     c.from('site_settings').select('value').eq('key', 'sessions')
       .then(function (r) {
         SESSIONS = (r && r.data && r.data[0] && r.data[0].value) || null;
