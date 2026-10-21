@@ -104,6 +104,21 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!tops.length) tops = toc.slice();
     tops.sort(function (x, y) { return x.page - y.page; });
     var subs = toc.filter(function (t) { return tops.indexOf(t) === -1; }).concat(derived);
+    /* 같은 쪽에 차례 항목("감사헌의부")과 쪽 제목("감사헌의부 보고")이 둘 다 있으면 쪽 제목 하나만 남긴다 */
+    var byPage = {};
+    subs.forEach(function (k) {
+      var cur = byPage[k.page];
+      if (!cur) { byPage[k.page] = [k]; return; }
+      var b = norm(k.title), kept = false;
+      for (var i = 0; i < cur.length; i++) {
+        var a = norm(cur[i].title);
+        if (a === b || a.indexOf(b) !== -1) { kept = true; break; }                 /* 이미 같거나 더 자세한 것이 있다 */
+        if (b.indexOf(a) !== -1) { cur[i] = k; kept = true; break; }                /* 새것이 더 자세하면 바꾼다 */
+      }
+      if (!kept) cur.push(k);
+    });
+    subs = [];
+    Object.keys(byPage).forEach(function (pg) { subs = subs.concat(byPage[pg]); });
     tops.forEach(function (t, i) {
       t.end = i < tops.length - 1 ? tops[i + 1].page - 1 : 9999;
       var seen = {};
