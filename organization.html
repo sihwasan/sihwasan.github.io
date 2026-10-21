@@ -127,7 +127,10 @@
     </table>
 
     <h3>무임목사</h3>
-    <p id="nocharge-body" style="font-size:0.94rem"></p>
+    <table class="tbl" style="max-width:640px">
+      <thead><tr><th>번호</th><th>성명</th><th>섬기는 곳</th></tr></thead>
+      <tbody id="nocharge-body"></tbody>
+    </table>
 
     <h3>장로 총대</h3>
     <div id="elders-body"></div>
@@ -177,7 +180,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
-<script src="js/main.js?v=20261022a"></script>
+<script src="js/main.js?v=20261022m"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -423,15 +426,13 @@ document.addEventListener('DOMContentLoaded', function () {
         '<td>' + e(m.cat || '') + '</td><td>' + e(m.church) + '</td></tr>';
     }).join(''));
 
-    var nc = document.getElementById('nocharge-body');
-    if (nc) nc.innerHTML = (D.pastorsWithoutCharge || []).map(function (n) {
+    /* 무임목사도 다른 갈래처럼 표로 — 기도처 등 섬기는 곳이 적혀 있으면 그 칸에 */
+    fill('nocharge-body', (D.pastorsWithoutCharge || []).map(function (n, i) {
       var nm = typeof n === 'string' ? n : n.name;
       var ch = typeof n === 'string' ? '' : (n.church || '');
-      /* 기도처 등 섬기는 곳이 적혀 있으면 이름 뒤에 함께 보여 준다 */
-      var tag = (ch && ch !== '무임')
-        ? ' <span style="color:var(--gray-5);font-size:0.86em">(' + e(ch) + ')</span>' : '';
-      return (canSee ? mlink(nm, ch) : e(SHS.maskName(nm))) + tag;
-    }).join(', ');
+      return '<tr><td>' + (i + 1) + '</td><td>' + (canSee ? mlink(nm, ch) : e(SHS.maskName(nm))) + '</td>' +
+        '<td>' + e(ch && ch !== '무임' ? ch : '') + '</td></tr>';
+    }).join(''));
 
     fill('staff-body', (D.staff || []).map(function (m, i) {
       return '<tr><td>' + (i + 1) + '</td><td>' + mlink(m.name, m.church) + '</td><td>' + e(m.church) +
@@ -461,7 +462,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (SHS.isRetired(b)) return '정년 경과';
     var d = SHS.daysToRetire(b);
     if (d == null) return '';
-    return d < 365 ? d + '일 남음' : Math.floor(d / 365) + '년 ' + Math.floor(d % 365 / 30) + '개월 남음';
+    if (d < 365) return d + '일 남음';
+    var y = Math.floor(d / 365), mo = Math.floor(d % 365 / 30.42);   /* 30 으로 나누면 12개월이 나올 수 있어 */
+    if (mo > 11) { y++; mo = 0; }
+    return y + '년 ' + mo + '개월 남음';
   }
   function paintBirths() {
     if (!birthMap) return;

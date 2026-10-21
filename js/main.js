@@ -1419,6 +1419,12 @@
   }
 
   /* 정년일까지 남은 날수 (0 = 오늘이 정년일, 음수 = 경과, null = 생년월일 없음) */
+  /* 남은 날수 → 'N년 M개월' (30 으로 나누면 12개월이 나올 수 있어 달 길이를 30.42 로, 12 가 되면 해로 올린다) */
+  function ymText(days) {
+    var y = Math.floor(days / 365), mo = Math.floor(days % 365 / 30.42);
+    if (mo > 11) { y++; mo = 0; }
+    return y + '년 ' + mo + '개월';
+  }
   function daysToRetire(birth) {
     var rd = retireDate(birth);
     if (!rd) return null;
@@ -1440,7 +1446,7 @@
     if (days < 0) return y + ' (정년 경과)';
     if (days === 0) return y + ' (오늘이 정년일)';
     if (days < 400) return y + ' (' + days + '일 남음)';
-    return y + ' (' + Math.floor(days / 365) + '년 ' + Math.floor(days % 365 / 30) + '개월 남음)';
+    return y + ' (' + ymText(days) + ' 남음)';
   }
 
   /* ---------- 시무목사 청빙 (3년 임기) ----------
@@ -1614,7 +1620,7 @@
       if (days < 0) parts.push('정년 경과');
       else if (days === 0) parts.push('오늘이 정년일');
       else if (days < 400) parts.push('정년까지 ' + days + '일');
-      else parts.push('정년까지 ' + Math.floor(days / 365) + '년 ' + (Math.floor(days % 365 / 30)) + '개월');
+      else parts.push('정년까지 ' + ymText(days));
     } else {
       parts.push('생년월일 미등록');
     }
