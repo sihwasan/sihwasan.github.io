@@ -1368,6 +1368,27 @@ document.addEventListener('DOMContentLoaded', function () {
       /* 날짜는 한 줄로 (좁은 칸에서 '1996-10-' 처럼 꺾이지 않게) */
       var ND = ' style="white-space:nowrap"';
 
+      /* 부목사가 시무하는 교회의 당회장 — 명단에서 찾는다.
+       * 그 교회 담임이 위임목사면 그분, 시무목사이고 임시당회장이 적혀 있으면 그 임시당회장,
+       * 임시당회장이 비어 있으면 담임 이름에 직분을 붙여 보인다. 담임이 명단에 없으면 null. */
+      function moderatorOf(m) {
+        var leads = rows.filter(function (r) {
+          return r.id !== m.id && chKey(r.church) === chKey(m.church) &&
+            ['목사', '위임목사', '시무목사'].indexOf(r.category) !== -1 &&
+            ['', '목사', '위임목사', '시무목사', '담임목사'].indexOf(String(r.position || '').trim()) !== -1;
+        });
+        if (!leads.length) return null;
+        var lead = leads.filter(function (r) { return r.position === '위임목사'; })[0] || leads[0];
+        if (lead.position === '위임목사') return { name: lead.name, basis: '위임목사' };
+        if (lead.call_acting) return { name: lead.call_acting, basis: '임시당회장' };
+        return { name: lead.name, basis: (lead.position || '담임목사') + ' · 임시당회장 미기록' };
+      }
+      function moderatorCell(m) {
+        var md = moderatorOf(m);
+        if (!md) return '<span class="fail">담임 기록 없음</span>';
+        return e(md.name) + ' <small style="color:var(--gray-5)">' + e(md.basis) + '</small>';
+      }
+
       function callCardHtml(p, list, assoc) {
         var h = '<div class="admin-card" id="' + p + '-card" style="margin-bottom:16px">';
         if (assoc) {
@@ -1424,7 +1445,9 @@ document.addEventListener('DOMContentLoaded', function () {
         h += '<div style="overflow-x:auto">' +
           '<table class="tbl" id="' + p + '-tbl" style="margin-bottom:6px"><thead><tr>' +
           '<th style="width:46px">번호</th><th style="width:100px">성명</th>' +
-          '<th>시무교회</th><th style="width:100px">시찰</th>' +
+          '<th>시무교회</th>' +
+          (assoc ? '<th style="width:150px">당회장</th>' : '') +
+          '<th style="width:100px">시찰</th>' +
           '<th style="width:110px">청빙 허락일</th><th style="width:110px">시무 만료일</th>' +
           (assoc
             ? '<th style="width:220px">남은 임기</th>'
@@ -1464,6 +1487,7 @@ document.addEventListener('DOMContentLoaded', function () {
             'style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;' +
             'text-decoration-style:dotted;text-underline-offset:3px">' + e(m.name) + '</a></td>' +
             '<td class="left">' + e(m.church || '-') + '</td>' +
+            (assoc ? '<td>' + moderatorCell(m) + '</td>' : '') +
             '<td>' + e(m.sichal || '-') + '</td>' +
             '<td' + ND + '>' + (t.on ? e(t.on) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
             '<td' + ND + '>' + (t.until ? e(t.until) : '<span style="color:var(--gray-5)">-</span>') + '</td>' +
@@ -1534,7 +1558,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
       function callCell(m) {
         var t = SHS.callTerm(m);
-        if (t.state === 'na') return '<span style="color:var(--gray-5)">-</span>';
+        /* 위임목사는 청빙 임기가 없다 — 빈칸 대신 '위임'으로 적는다 (2026-10-22 사용자 지시) */
+        if (t.state === 'na') {
+          return m.position === '위임목사' || m.category === '위임목사'
+            ? '위임' : '<span style="color:var(--gray-5)">-</span>';
+        }
         if (t.state === 'none') {
           return '<span class="fail" style="font-size:0.82rem">' +
             (t.kind === 'assoc' ? '부목사 ' : '') + '기록 없음</span>';
