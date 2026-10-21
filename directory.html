@@ -25,7 +25,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js"></script>
-<script src="js/main.js?v=20261021o"></script>
+<script src="js/main.js?v=20261021p"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return '<button type="button" class="dir-tab' + (s === curSec && !q ? ' on' : '') + '" data-s="' + e(s) + '">' + e(s) + ' <small>' + n + '</small></button>';
     }).join('');
     t.querySelectorAll('.dir-tab').forEach(function (b) {
-      b.addEventListener('click', function () { curSec = b.dataset.s; q = ''; document.getElementById('dir-q').value = ''; history.replaceState(null, '', 'directory.html#' + encodeURIComponent(curSec)); drawTabs(); draw(); });
+      b.addEventListener('click', function () { curSec = b.dataset.s; q = ''; document.getElementById('dir-q').value = ''; history.replaceState(null, '', 'directory.html#' + encodeURIComponent(curSec)); drawTabs(); draw(); window.dispatchEvent(new Event('hashchange')); });
     });
   }
   function tel(s) {
@@ -145,6 +145,11 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
   document.getElementById('dir-q').addEventListener('input', function () { q = this.value.trim(); drawTabs(); draw(); });
+  /* 왼쪽 묶음 메뉴의 가지(원로목사·북부시찰 …)를 누르면 해시만 바뀐다 */
+  window.addEventListener('hashchange', function () {
+    var want = decodeURIComponent((location.hash || '').slice(1));
+    if (want && want !== curSec && sections().indexOf(want) !== -1) { curSec = want; q = ''; document.getElementById('dir-q').value = ''; drawTabs(); draw(); }
+  });
 
   /* ---------- 고치기 / 추가 ---------- */
   function editForm(r) {

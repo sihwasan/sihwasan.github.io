@@ -58,6 +58,14 @@
       { t: '노회 회의결의', h: 'resolutions.html' },
       { t: '노회 보고서 (회의자료)', h: 'presbytery-report.html' },
       { t: '노회 주소록', h: 'directory.html' },
+      { t: '원로목사', h: 'directory.html#%EC%9B%90%EB%A1%9C%EB%AA%A9%EC%82%AC', kid: true },
+      { t: '북부시찰', h: 'directory.html#%EB%B6%81%EB%B6%80%EC%8B%9C%EC%B0%B0', kid: true },
+      { t: '상록시찰', h: 'directory.html#%EC%83%81%EB%A1%9D%EC%8B%9C%EC%B0%B0', kid: true },
+      { t: '남부시찰', h: 'directory.html#%EB%82%A8%EB%B6%80%EC%8B%9C%EC%B0%B0', kid: true },
+      { t: '장로회 연합회', h: 'directory.html#%EC%9E%A5%EB%A1%9C%ED%9A%8C%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
+      { t: '남전도회 연합회', h: 'directory.html#%EB%82%A8%EC%A0%84%EB%8F%84%ED%9A%8C%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
+      { t: '여전도회 연합회', h: 'directory.html#%EC%97%AC%EC%A0%84%EB%8F%84%ED%9A%8C%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
+      { t: '주일학교 연합회', h: 'directory.html#%EC%A3%BC%EC%9D%BC%ED%95%99%EA%B5%90%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
       { t: '고시 모의고사', h: 'exam.html' }
     ]},
     { title: '총회', href: 'assembly-constitution.html', sub: [
