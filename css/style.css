@@ -2892,3 +2892,4 @@ mark.aih-key {
 .cmp-fields li { list-style: none; }
 .cmp-fields em { font-style: normal; color: var(--gray-5); }
 @media (max-width: 900px) { .dir-tbl { display: block; overflow-x: auto; } }
+.aih-chips-t { font-size: 0.76rem; color: rgba(255,255,255,0.7); letter-spacing: 1px; margin-right: 6px; align-self: center; }
