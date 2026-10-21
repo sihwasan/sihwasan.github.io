@@ -379,14 +379,16 @@
   function buildGnb() {
     var here = location.pathname.split('/').pop() || 'index.html';
     var html = '<nav class="gnb" id="gnb" aria-label="주 메뉴"><ul class="gnb-list" id="gnb-list">';
+    var activeDone = false;   /* 여러 메뉴에 같은 쪽이 있어도 처음 맞는 하나만 켠다 */
     NAV.forEach(function (m) {
       /* sichal.html?s=북부시찰 처럼 물음표가 붙은 주소도 알아보게 한다 */
-      var active = (here === m.href.split('?')[0] || m.sub.some(function (s) {
+      var active = (!activeDone && (here === m.href.split('?')[0] || m.sub.some(function (s) {
         var page = s.h.split('#')[0].split('?')[0];
         /* 대시보드는 상단에 제 메뉴가 따로 생기므로 여기서는 켜지 않는다 (중복 선택 방지) */
         if (page === 'dashboard.html') return false;
         return page === here;
-      })) ? ' active' : '';
+      }))) ? ' active' : '';
+      if (active) activeDone = true;
       html += '<li class="gnb-item' + active + '"><a href="' + m.href + '">' + m.title + '</a><div class="gnb-sub">';
       m.sub.forEach(function (s) {
         /* '미래교회자립위원회'처럼 긴 이름은 '위원회'를 다음 줄로 내려 칸 밖으로 나가지 않게 한다 */
@@ -585,7 +587,7 @@
       if (pg === 'index.html' || /[?&]embed=1(?:&|$)/.test(location.search)) return;
       if (document.querySelector('script[src^="js/section-nav.js"]')) return;
       var sc = document.createElement('script');
-      sc.src = 'js/section-nav.js?v=20261021v';
+      sc.src = 'js/section-nav.js?v=20261021w';
       document.body.appendChild(sc);
     })();
     /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.
@@ -1981,7 +1983,7 @@
         ev.preventDefault();
         var id = a.getAttribute('href').slice(1);
         /* 기록을 남겨 두어야 뒤로 가기가 이전 영역으로 돌아간다 */
-        if (history.pushState) history.pushState(null, '', '#' + id);
+        if (history.pushState) { history.pushState(null, '', '#' + id); window.dispatchEvent(new Event('hashchange')); }
         else location.hash = id;
         show(id);
         container.scrollIntoView({ behavior: 'smooth', block: 'start' });

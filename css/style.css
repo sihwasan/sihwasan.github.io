@@ -2893,3 +2893,7 @@ mark.aih-key {
 .cmp-fields em { font-style: normal; color: var(--gray-5); }
 @media (max-width: 900px) { .dir-tbl { display: block; overflow-x: auto; } }
 .aih-chips-t { font-size: 0.76rem; color: rgba(255,255,255,0.7); letter-spacing: 1px; margin-right: 6px; align-self: center; }
+
+/* no-select-boxes: 상자처럼 누르는 메뉴·차례·탭은 여러 번 눌러도 글자가 선택돼 칠해지지 않게 (2026-10-21) */
+.pr-toc, .pr-book, .adm-link, .adm-sub a, .section-nav a, .lib-side a, .gnb-item > a,
+.np-item, .aih-h-item, .ai-model, .md-dot, .tabs button, .lib-tab, .dir-tab { -webkit-user-select: none; user-select: none; }

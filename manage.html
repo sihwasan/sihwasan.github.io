@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>사이트 관리 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20261021s">
+<link rel="stylesheet" href="css/style.css?v=20261021t">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
 <script src="js/supabase-auth.js?v=20261020za"></script>
 <script src="js/photos-config.js"></script>
 <script src="js/photos.js"></script>
-<script src="js/main.js?v=20261021v"></script>
+<script src="js/main.js?v=20261021w"></script>
 <script src="js/audit-mark.js?v=20260907b"></script>
 <script src="js/audit-view.js?v=20260902a"></script>
 <script src="js/ops-panel.js?v=20261020z"></script>
@@ -80,11 +80,11 @@ document.addEventListener('DOMContentLoaded', function () {
     '<div id="mg-terms" style="margin-top:22px;max-width:760px"></div></div>';
 
   /* 탭 전환 (main.js의 탭 코드는 페이지 로드 시점에 실행되므로 여기서 직접 연결) */
-  area.querySelectorAll('.tabs button').forEach(function (b) {
+  area.querySelectorAll(':scope > .tabs button').forEach(function (b) {
     b.addEventListener('click', function () {
-      area.querySelectorAll('.tabs button').forEach(function (x) { x.classList.remove('active'); });
+      area.querySelectorAll(':scope > .tabs button').forEach(function (x) { x.classList.remove('active'); });
       b.classList.add('active');
-      area.querySelectorAll('.tab-panel').forEach(function (p) {
+      area.querySelectorAll(':scope > .tab-panel').forEach(function (p) {
         p.classList.toggle('active', p.id === b.dataset.tab);
       });
     });

@@ -80,7 +80,8 @@ var SHSSide = (function () {
       var h = (a.getAttribute('href') || '').split('#')[0];
       if (onIdx === -1 && h.indexOf('?') !== -1 && dec(h) === hereQ) onIdx = i;
     });
-    if (onIdx === -1) links.forEach(function (a, i) { var h = (a.getAttribute('href') || '').replace(/\?[^#]*/, ''); if ((h === full || h === here) && (onIdx === -1 || a.classList.contains('gnb-kid'))) onIdx = i; });
+    if (onIdx === -1) links.forEach(function (a, i) { var h = (a.getAttribute('href') || '').replace(/\?[^#]*/, ''); if (h === full && (onIdx === -1 || a.classList.contains('gnb-kid'))) onIdx = i; });
+    if (onIdx === -1) links.forEach(function (a, i) { var h = (a.getAttribute('href') || '').replace(/\?[^#]*/, ''); if (onIdx === -1 && h === here) onIdx = i; });
     if (onIdx === -1) links.forEach(function (a, i) { if (onIdx === -1 && pageOf(a.getAttribute('href')) === here) onIdx = i; });
     var cur = onIdx >= 0 ? links[onIdx].textContent.replace(/\s+/g, ' ').trim() : title;
     var html =

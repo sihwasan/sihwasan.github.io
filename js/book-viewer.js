@@ -100,7 +100,9 @@ document.addEventListener('DOMContentLoaded', function () {
       if (toc.some(function (t) { return t.page === pg.page_no && norm(t.title) === norm(hd); })) return;
       derived.push({ title: hd, page: pg.page_no, level: 2 });
     });
-    if (!toc.length) return derived.map(function (d) { d.level = 1; d.end = 9999; d.kids = []; return d; });
+    if (!toc.length) return derived.map(function (d, i) {   /* 차례가 없으면 쪽 제목들이 1단계 — 끝 쪽은 다음 항목 바로 앞까지 */
+      d.level = 1; d.end = i < derived.length - 1 ? Math.max(d.page, derived[i + 1].page - 1) : 9999; d.kids = []; return d;
+    });
     var tops = toc.filter(function (t) { return t.level === 1; });
     if (!tops.length) tops = toc.slice();
     tops.sort(function (x, y) { return x.page - y.page; });
@@ -135,8 +137,11 @@ document.addEventListener('DOMContentLoaded', function () {
     var tree = tocTree();
     var h = '<div class="pr-side-h">차례</div>';
     if (!tree.length) h += '<div style="color:var(--gray-5);font-size:0.86rem">차례가 없습니다</div>';
+    /* 지금 쪽이 든 1단계 항목은 하나만 (같은 쪽에서 시작하는 항목이 여럿이면 뒤의 것) */
+    var curTop = null;
+    if (curNo != null) tree.forEach(function (t) { if (curNo >= t.page && curNo <= t.end) curTop = t; });
     h += tree.map(function (t) {
-      var open = curNo != null && curNo >= t.page && curNo <= t.end && !collapsed[t.page];
+      var open = t === curTop && !collapsed[t.page];
       var kidOn = null;
       if (open) t.kids.forEach(function (k) { if (k.page <= curNo) kidOn = k; });
       var s = '<a href="#" data-p="' + t.page + '"' + (t.kids.length ? ' data-sec="1" data-open="' + (open ? 1 : 0) + '"' : '') + ' class="pr-toc' + (t.kids.length ? ' sec' : '') + (open && !kidOn ? ' on' : '') + '">' + e(t.title) + '<span>' + t.page + '</span></a>';
