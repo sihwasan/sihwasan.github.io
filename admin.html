@@ -1420,7 +1420,9 @@ document.addEventListener('DOMContentLoaded', function () {
           '<button class="btn ghost" id="' + p + '-print-btn" style="align-self:flex-end;margin-bottom:2px">인쇄</button>' +
           '</div>';
 
-        h += '<table class="tbl" id="' + p + '-tbl" style="margin-bottom:6px"><thead><tr>' +
+        /* 좁은 화면에서는 표가 상자 밖으로 넘치지 않고 그 안에서 옆으로 밀린다 */
+        h += '<div style="overflow-x:auto">' +
+          '<table class="tbl" id="' + p + '-tbl" style="margin-bottom:6px"><thead><tr>' +
           '<th style="width:46px">번호</th><th style="width:100px">성명</th>' +
           '<th>시무교회</th><th style="width:100px">시찰</th>' +
           '<th style="width:110px">청빙 허락일</th><th style="width:110px">시무 만료일</th>' +
@@ -1471,7 +1473,7 @@ document.addEventListener('DOMContentLoaded', function () {
             '<td class="no-print"><button class="btn sm" data-roedit="' + m.id + '">수정</button></td>' +
             '</tr>';
         });
-        h += '</tbody></table>';
+        h += '</tbody></table></div>';
         h += '<p style="font-size:0.84rem;color:var(--gray-6)" id="' + p + '-sum"></p>';
         return h + '</div>';
       }
@@ -1563,7 +1565,10 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       /* 명단 표 — 읽기 전용. [수정]을 누르면 팝업에서 고친다. */
-      html += '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th>' +
+      /* 칸이 많아 좁은 화면(왼쪽 메뉴가 선 화면 포함)에서는 표가 상자를 넘친다 —
+       * 감싸개 안에서 옆으로 밀리게 한다 (날짜는 한 줄로 두므로 더 넓어진다) */
+      html += '<div style="overflow-x:auto">' +
+        '<table class="tbl" id="ro-tbl"><thead><tr><th style="width:50px">번호</th>' +
         '<th style="width:52px">사진</th>' +
         '<th style="width:110px">성명</th>' +
         '<th style="width:110px;cursor:pointer;user-select:none" id="ro-th-pos"></th>' +
@@ -1606,7 +1611,7 @@ document.addEventListener('DOMContentLoaded', function () {
           '<td><button class="btn sm" data-roedit="' + m.id + '">수정</button></td>' +
           '</tr>';
       });
-      html += '</tbody></table>';
+      html += '</tbody></table></div>';
       html += '<div class="form-msg' + (rosterFlash ? ' ok' : '') + '" id="ro-rowmsg">' +
         rosterFlash + '</div>';
       rosterFlash = '';
