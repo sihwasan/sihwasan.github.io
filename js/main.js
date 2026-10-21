@@ -585,7 +585,7 @@
       if (pg === 'index.html' || /[?&]embed=1(?:&|$)/.test(location.search)) return;
       if (document.querySelector('script[src^="js/section-nav.js"]')) return;
       var sc = document.createElement('script');
-      sc.src = 'js/section-nav.js?v=20261021e';
+      sc.src = 'js/section-nav.js?v=20261021f';
       document.body.appendChild(sc);
     })();
     /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.

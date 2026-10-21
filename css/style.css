@@ -2846,6 +2846,9 @@ mark.aih-key {
 .adm-side.sec .adm-link:hover { background: #fff; color: var(--navy); }
 .adm-side.sec .adm-link.on { background: var(--navy); color: #fff; font-weight: 700; }
 .gnb-sub .gnb-kid { display: none; }                       /* 가지 항목은 왼쪽 묶음 메뉴에만 */
+.adm-side.sec .adm-link { font-weight: 700; color: var(--ink); }                 /* 상위 항목은 굵게 */
+.adm-side.sec .adm-link.lv2 { font-weight: 400; color: var(--gray-6); }          /* 가지는 보통 글씨 */
+.adm-side.sec .adm-link.lv2.on { color: #fff; }
 .adm-link.lv2 { padding-left: 26px; font-size: 0.85rem; position: relative; }
 .adm-link.lv2::before { content: ''; position: absolute; left: 13px; top: 0; bottom: 0; border-left: 1px solid var(--gray-3); }
 .adm-link.lv2.on::before { border-color: rgba(255,255,255,0.5); }

@@ -69,11 +69,11 @@ var SHSSide = (function () {
     var top = section.querySelector(':scope > a');
     var title = top ? top.textContent.trim() : '';
     var here = location.pathname.split('/').pop() || 'index.html';
-    var full = here + location.search + location.hash;
+    var full = here + location.hash;                     /* 물음표 뒤(검색어 등)는 무시 */
     var links = [].slice.call(section.querySelectorAll('.gnb-sub a'));
     /* 현재 항목: 주소가 꼭 같은 것, 없으면 같은 쪽인 첫 항목 */
     var onIdx = -1;
-    links.forEach(function (a, i) { var h = a.getAttribute('href'); if ((h === full || h === here + location.search) && (onIdx === -1 || a.classList.contains('gnb-kid'))) onIdx = i; });
+    links.forEach(function (a, i) { var h = (a.getAttribute('href') || '').replace(/\?[^#]*/, ''); if ((h === full || h === here) && (onIdx === -1 || a.classList.contains('gnb-kid'))) onIdx = i; });
     if (onIdx === -1) links.forEach(function (a, i) { if (onIdx === -1 && pageOf(a.getAttribute('href')) === here) onIdx = i; });
     var cur = onIdx >= 0 ? links[onIdx].textContent.replace(/\s+/g, ' ').trim() : title;
     var html =
