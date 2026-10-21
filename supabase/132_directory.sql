@@ -171,3 +171,8 @@ where not exists (select 1 from public.presbytery_directory limit 1);
 update public.presbytery_directory set source_report_id = (select id from public.presbytery_reports where session = 20 order by id limit 1), updated_by = '제20회 회의자료'
  where source_report_id is null;
 
+-- 제20회 정기노회(2026-10-12) 청빙 결의 반영: 책자 인쇄 뒤 담임(시무목사)이 바뀐 세 교회
+-- (위임식 전까지는 시무목사. 바뀐 뒤에는 「책자와 대조」로 다음 책자와 맞춘다)
+update public.presbytery_directory set pastor = '⊙송지용', updated_by = '제20회 청빙 결의' where section = '북부시찰' and name = '목자'   and pastor like '(임)%';
+update public.presbytery_directory set pastor = '⊙손병민', updated_by = '제20회 청빙 결의' where section = '남부시찰' and name = '노진'   and pastor like '(임)%';
+update public.presbytery_directory set pastor = '⊙김영창', updated_by = '제20회 청빙 결의' where section = '남부시찰' and name = '경기은목' and pastor like '(임)%';
