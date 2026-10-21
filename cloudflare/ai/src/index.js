@@ -54,12 +54,12 @@ const DEFAULTS = {
   roles: ['superadmin', 'president', 'clerk', 'staff', 'officer', 'member'],
   enabled: true,
   report_enabled: true,   /* 임원 업무 보고서 (매일 아침 6시) */
-  /* 2026-10-21 사용자 지시: 평일은 노회장·서기·회계·간사에게만 Haiku 로, 주 1회(월요일)는 전체에게 Sonnet 으로 */
-  report_model: 'claude-sonnet-5-5',        /* 주 1회 전체 보고서 모델(직책별 모델이 없는 임원). 비우면 검색과 같은 모델 */
-  report_daily_model: 'claude-haiku-5-5',   /* 매일 핵심 임원 중 직책별 모델이 없는 분의 모델 */
-  /* 직책별 모델 (2026-10-21 사용자 지시: 노회장 Opus, 서기 Sonnet, 간사 Haiku; 회계는 Haiku) — 매일·주간 모두 적용 */
-  report_duty_models: { president: 'claude-opus-5-5', clerk: 'claude-sonnet-5-5', treasurer: 'claude-haiku-5-5', staff: 'claude-haiku-5-5' },
-  report_weekly_day: 1,                     /* 전체 보고서 요일 (0 일요일 … 1 월요일 … 6 토요일) */
+  /* 2026-10-21 사용자 지시: 화~금 노회장(Opus)·서기(Sonnet) 일일 보고서, 매월 첫째 월요일 전체(간사 제외) 월례 보고서(Sonnet),
+   * 간사는 보고서 대신 알림(업무 지시)만 */
+  report_model: 'claude-sonnet-5-5',        /* 월례 보고서 모델(직책별 모델이 없는 임원). 비우면 검색과 같은 모델 */
+  report_daily_model: 'claude-sonnet-5-5',  /* 일일 보고서 중 직책별 모델이 없는 분의 모델 */
+  report_weekly_day: 1,                     /* 월례 보고서 요일(그 달 첫째 주) — 1 월요일 */
+  report_duty_models: { president: 'claude-opus-5-5', clerk: 'claude-sonnet-5-5' },
   report_effort: 'medium'
 };
 /* 관리자 화면의 모델 고르기에 보여 줄 목록 (값: 1백만 토큰당 미화) */

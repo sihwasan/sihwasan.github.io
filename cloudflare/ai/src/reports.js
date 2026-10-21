@@ -352,12 +352,25 @@ export async function runReports(env, deps, opts, log) {
   opts = opts || {}; log = log || function () {};
   if (!env.REPORT_KEY) throw new Error('창구에 보고서 열쇠(REPORT_KEY)가 없습니다.');
   const started = new Date().toISOString();
-  /* 요일(한국 시간)에 따라: 전체 보고서 날(기본 월요일)은 모든 임원에게 주간 모델로,
-   * 그 밖의 날은 노회장·서기·회계·간사에게만 매일 모델로. (opts.full 이면 언제나 전체) */
-  const kstDay = new Date(Date.now() + 9 * 3600e3).getUTCDay();
-  const weekly = !!opts.full || kstDay === (deps.weeklyDay == null ? 1 : deps.weeklyDay);
+  /* 한국 날짜 기준 (2026-10-21 사용자 지시)
+   *   · 매월 첫째 월요일: 모든 임원(간사 제외)에게 월례 보고서 — 직책별 모델, 없으면 report_model
+   *   · 화~금: 노회장·서기에게만 일일 보고서
+   *   · 간사: 보고서 대신 노회장·서기 보고서에서 간사가 할 일만 알림으로
+   *   · 토·일·그 밖의 월요일: 예약 실행은 쉼 (손으로 누르면 일일 보고서 묶음)
+   * opts.full 이면 언제나 월례 묶음, opts.only 는 그 임원 한 분 */
+  const kst = new Date(Date.now() + 9 * 3600e3);
+  const kstDay = kst.getUTCDay(), kstDate = kst.getUTCDate();
+  const monthlyDay = deps.weeklyDay == null ? 1 : deps.weeklyDay;
+  const weekly = !!opts.full || (kstDay === monthlyDay && kstDate <= 7);
+  const dailyDay = [2, 3, 4, 5].indexOf(kstDay) !== -1;
   const model = weekly ? deps.model : (deps.dailyModel || deps.model), effort = deps.effort || 'medium';
-  const DAILY = ['president', 'clerk', 'treasurer', 'staff'];
+  const DAILY = ['president', 'clerk'];
+  if (opts.trigger === 'cron' && !weekly && !dailyDay && !opts.only) {
+    const rest = { trigger: 'cron', started_at: started, finished_at: new Date().toISOString(), date: null, mode: '쉬는 날(토·일·둘째 주 이후 월요일)', officers: 0, reports: 0, new_tasks: 0, errors: [] };
+    await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: rest } }).catch(function () {});
+    log('오늘은 보고서를 만들지 않는 날입니다');
+    return rest;
+  }
   /* 임원마다 쓸 모델: 직책별 모델이 있으면 그것, 없으면 그날의 기본 모델 */
   const dutyModels = (deps.dutyModels && typeof deps.dutyModels === 'object') ? deps.dutyModels : {};
   function modelFor(o) { return dutyModels[dutyOf(o)] || model; }
@@ -389,13 +402,16 @@ export async function runReports(env, deps, opts, log) {
    *    예약 실행은 15분 안에 끝나야 하므로(Cloudflare 한도) 다 쓴 보고서는 그때그때 저장하고,
    *    시한(deadline)이 지나면 남은 분은 시작하지 않고 기록에 남긴다. */
   let officers = arr(b.officers);
-  if (!weekly) officers = officers.filter(function (o) { return DAILY.indexOf(dutyOf(o)) !== -1 && String(o.title || '').trim() !== '부회계'; });
+  const staff = officers.filter(function (o) { return o.role === 'staff' || dutyOf(o) === 'staff'; });
+  officers = officers.filter(function (o) { return !(o.role === 'staff' || dutyOf(o) === 'staff'); });   /* 간사는 보고서 대신 알림 */
+  if (!weekly) officers = officers.filter(function (o) { return DAILY.indexOf(dutyOf(o)) !== -1; });
   if (opts.only) officers = arr(b.officers).filter(function (o) { return o.id === opts.only; });
   const deadline = opts.deadline || (Date.parse(started) + 25 * 60 * 1000);
   const usedModels = officers.map(modelFor).filter(function (m, i, a) { return a.indexOf(m) === i; });
-  const base = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, date: b.today, model: usedModels.join(', ') || model, mode: weekly ? '전체(주간)' : '핵심 임원(매일)', officers: officers.length, new_tasks: newTasks };
+  const base = { trigger: opts.trigger || 'manual', by: opts.by || null, started_at: started, date: b.today, model: usedModels.join(', ') || model, mode: weekly ? '월례(전체)' : '일일(노회장·서기)', officers: officers.length, new_tasks: newTasks };
   await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: Object.assign({ running: true }, base) } }).catch(function () {});
   let saved = 0, skipped = 0;
+  const written = [];
   async function one(o) {
     if (Date.now() > deadline) { skipped++; return; }
     log((o.title || DUTY_NAME[dutyOf(o)]) + ' ' + o.name + ' 보고서를 쓰는 중');
@@ -403,6 +419,7 @@ export async function runReports(env, deps, opts, log) {
       const x = await writeReport(deps, b, o, system, modelFor(o), effort);
       add(x.usage);
       await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { reports: [x.row] } });
+      written.push(x.row);
       saved++;
     } catch (e) { errors.push(o.name + ': ' + String(e.message || e)); }
   }
@@ -410,7 +427,29 @@ export async function runReports(env, deps, opts, log) {
   await pool(officers.slice(1), deps.parallel || 6, one);
   if (skipped) errors.push('시간이 모자라 ' + skipped + '분의 보고서는 만들지 못했습니다 (다음 실행 때 다시 만듭니다).');
 
-  const run = Object.assign({}, base, { finished_at: new Date().toISOString(), reports: saved, usage: usage, errors: errors.slice(0, 20) });
+  /* 간사 알림: 노회장·서기 보고서의 todos 가운데 간사(사무실)가 할 일을 알림함으로 보낸다 */
+  let alerts = 0;
+  if (staff.length && written.length) {
+    const items = [];
+    written.filter(function (r) { return r.duty === 'president' || r.duty === 'clerk'; }).forEach(function (r) {
+      arr(r.content && r.content.todos).forEach(function (t) {
+        const txt = [t.target_kind, t.target_name, t.contact_name, t.title, t.detail].join(' ');
+        const forStaff = /간사|사무실|사무국/.test(txt) || staff.some(function (st) { return st.name && txt.indexOf(st.name) !== -1; });
+        if (!forStaff) return;
+        staff.forEach(function (st) {
+          items.push({ user_id: st.id, kind: '업무 지시',
+            title: '[' + (r.title || DUTY_NAME[r.duty]) + ' ' + r.name + '] ' + String(t.title || '').slice(0, 150),
+            body: String(t.detail || '') + (t.due ? ' (기한 ' + t.due + ')' : '') + (t.message ? '\n\n' + t.message : '') });
+        });
+      });
+    });
+    if (items.length) {
+      try { alerts = Number(await rpc(env, 'ai_report_notify', { p_key: env.REPORT_KEY, p_items: items })) || 0; log('간사 알림 ' + alerts + '건'); }
+      catch (e) { errors.push('간사 알림: ' + String(e.message || e).slice(0, 120) + ' (supabase/134_report_notify.sql 실행 필요)'); }
+    }
+  }
+
+  const run = Object.assign({}, base, { finished_at: new Date().toISOString(), reports: saved, staff_alerts: alerts, usage: usage, errors: errors.slice(0, 20) });
   log('저장하는 중');
   await rpc(env, 'ai_report_save', { p_key: env.REPORT_KEY, p_data: { run: run } });
   return run;

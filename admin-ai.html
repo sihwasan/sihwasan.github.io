@@ -157,12 +157,13 @@ document.addEventListener('DOMContentLoaded', function () {
       '<h2>4. 임원 업무 보고서</h2>' +
       '<div class="admin-card" style="max-width:760px;margin-bottom:26px">' +
       '<p style="margin:0 0 10px;line-height:1.8">아침 6시(한국) AI 가 노회 자료(회의록·결의·노회규칙·일정·상회비·장부·서류)를 살펴 보고서를 씁니다. ' +
-      '<strong>월요일</strong>에는 모든 임원(최고관리자 제외)에게, 그 밖의 날에는 <strong>노회장·서기·회계·간사</strong>에게만 씁니다. 노회장·서기는 모든 임원의 보고서를 보고, 다른 임원은 자기 보고서만 봅니다. ' +
+      '<strong>화~금요일</strong>에는 노회장·서기에게 일일 보고서를, <strong>매월 첫째 월요일</strong>에는 모든 임원(간사·최고관리자 제외)에게 월례 보고서를 씁니다. ' +
+      '간사에게는 보고서 대신 노회장·서기 보고서에서 간사가 할 일만 알림함으로 보냅니다. 노회장·서기는 모든 임원의 보고서를 보고, 다른 임원은 자기 보고서만 봅니다. ' +
       '<a href="officer-report.html">보고서 화면 열기</a></p>' +
       '<label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="rp-enabled"' + (s.report_enabled !== false ? ' checked' : '') + '> ' +
       '<strong>아침 보고서 만들기</strong></label>' +
       '<div class="inline-form" style="margin-top:10px">' +
-      '<div class="field" style="flex:1 1 260px"><label>월요일 전체 보고서 모델 (직책별 모델이 없는 임원)</label><select id="rp-model">' +
+      '<div class="field" style="flex:1 1 260px"><label>월례 보고서 모델 (직책별 모델이 없는 임원)</label><select id="rp-model">' +
       '<option value=""' + (!s.report_model ? ' selected' : '') + '>검색과 같은 모델 (' + e(modelName(s.model)) + ')</option>' +
       (s.models || []).map(function (m) {
         return '<option value="' + e(m.id) + '"' + (s.report_model === m.id ? ' selected' : '') + '>' + e(m.name) + '</option>';
@@ -172,7 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
         return '<option value="' + o[0] + '"' + ((s.report_effort || 'medium') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
       }).join('') + '</select></div></div>' +
       '<div class="inline-form" style="margin-top:6px">' +
-      [['president', '노회장'], ['clerk', '서기'], ['treasurer', '회계·부회계'], ['staff', '간사']].map(function (d) {
+      [['president', '노회장'], ['clerk', '서기']].map(function (d) {
         var cur = (s.report_duty_models || {})[d[0]] || '';
         return '<div class="field" style="flex:1 1 160px"><label>' + d[1] + ' 보고서 모델</label><select data-duty="' + d[0] + '">' +
           '<option value=""' + (!cur ? ' selected' : '') + '>그날 기본 모델</option>' +
@@ -313,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function () {
         S = r;
         SHSCloud.log('update', '임원 업무 보고서 설정', (body.report_enabled ? '켬' : '끔') + ' / ' + (body.report_model || '검색과 같음') + ' / ' + body.report_effort);
         draw();
-        msg('rp-msg', true, '저장했습니다. ' + (r.report_enabled ? '월요일 전체 보고서는 ' + modelName(r.report_model || r.model) + ', 직책별 모델은 ' + Object.keys(r.report_duty_models || {}).map(function (k) { return ({ president: '노회장', clerk: '서기', treasurer: '회계', staff: '간사' })[k] + ' ' + modelName(r.report_duty_models[k]); }).join(' · ') + '.' : '아침 보고서를 만들지 않습니다.'));
+        msg('rp-msg', true, '저장했습니다. ' + (r.report_enabled ? '월례 보고서는 ' + modelName(r.report_model || r.model) + ', 직책별 모델은 ' + Object.keys(r.report_duty_models || {}).map(function (k) { return ({ president: '노회장', clerk: '서기', treasurer: '회계', staff: '간사' })[k] + ' ' + modelName(r.report_duty_models[k]); }).join(' · ') + '.' : '아침 보고서를 만들지 않습니다.'));
         var el = document.getElementById('rp-msg'); if (el) el.scrollIntoView({ block: 'center' });
       });
     });
