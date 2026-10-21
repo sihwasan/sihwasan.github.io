@@ -54,8 +54,7 @@
       { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
       { t: '노회 보고서 (회의자료)', h: 'presbytery-report.html' },
       { t: '노회 주소록', h: 'directory.html' },
-      { t: '고시 모의고사', h: 'exam.html' },
-      { t: '자료실 (공문·회계·파일)', h: 'archive.html' }
+      { t: '고시 모의고사', h: 'exam.html' }
     ]},
     { title: '총회', href: 'assembly-constitution.html', sub: [
       { t: '총대 총회 활동 현황', h: 'dashboard.html#hub-assembly' },
