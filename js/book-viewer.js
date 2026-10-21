@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   var canEdit = SHSAuth.canManageMembers(user);
   var db = null, reports = [], cur = null, pages = [];
+  var collapsed = {}, lastNo = null;   /* 차례에서 손으로 닫아 둔 묶음(쪽 번호), 지금 쪽 */
   var qs = new URLSearchParams(location.search);
 
   function pdfPageOf(p) { return p.pdf_page; }
@@ -129,15 +130,16 @@ document.addEventListener('DOMContentLoaded', function () {
     return tops;
   }
   function drawSide(curNo) {
+    lastNo = curNo;
     var side = document.getElementById('pr-toc');
     var tree = tocTree();
     var h = '<div class="pr-side-h">차례</div>';
     if (!tree.length) h += '<div style="color:var(--gray-5);font-size:0.86rem">차례가 없습니다</div>';
     h += tree.map(function (t) {
-      var open = curNo != null && curNo >= t.page && curNo <= t.end;
+      var open = curNo != null && curNo >= t.page && curNo <= t.end && !collapsed[t.page];
       var kidOn = null;
       if (open) t.kids.forEach(function (k) { if (k.page <= curNo) kidOn = k; });
-      var s = '<a href="#" data-p="' + t.page + '" class="pr-toc' + (t.kids.length ? ' sec' : '') + (open && !kidOn ? ' on' : '') + '">' + e(t.title) + '<span>' + t.page + '</span></a>';
+      var s = '<a href="#" data-p="' + t.page + '"' + (t.kids.length ? ' data-sec="1" data-open="' + (open ? 1 : 0) + '"' : '') + ' class="pr-toc' + (t.kids.length ? ' sec' : '') + (open && !kidOn ? ' on' : '') + '">' + e(t.title) + '<span>' + t.page + '</span></a>';
       if (open && t.kids.length) {
         s += '<div class="pr-kids">' + t.kids.map(function (k) {
           return '<a href="#" data-p="' + k.page + '" class="pr-toc lv2' + (kidOn === k ? ' on' : '') + '">' + e(k.title) + '<span>' + k.page + '</span></a>';
@@ -150,7 +152,15 @@ document.addEventListener('DOMContentLoaded', function () {
       (cur.file_path ? '<button class="btn ghost sm" id="pr-pdf" style="margin-top:10px;width:100%">PDF 원본 열기</button>' : '');
     side.innerHTML = h;
     side.querySelectorAll('a[data-p]').forEach(function (a) {
-      a.addEventListener('click', function (ev) { ev.preventDefault(); showPage(parseInt(a.dataset.p, 10), ''); });
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var pg = parseInt(a.dataset.p, 10);
+        if (a.dataset.sec === '1') {
+          if (a.dataset.open === '1') { collapsed[pg] = true; drawSide(lastNo); return; }   /* 열린 묶음을 다시 누르면 닫는다 */
+          delete collapsed[pg];
+        }
+        showPage(pg, '');
+      });
     });
     side.querySelector('#pr-jump-go').addEventListener('click', function () {
       var n = parseInt(document.getElementById('pr-jump').value, 10);
