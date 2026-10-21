@@ -96,7 +96,11 @@ var SHSBoard = (function () {
       var cards = '';
       cards += hubCard('noti', '나의 알림', '', { badge: 'hub-badge-noti' });
       /* 임원에게 — 매일 아침 6시 AI 가 쓰는 직책별 업무 보고서 (officer-report.html, 128 sql) */
-      if (SHSAuth.isOfficer(user)) cards += hubCard('oreport', '업무 보고서', '매일 아침 6시', { cid: 'hub-card-oreport' });
+      if (SHSAuth.isOfficer(user)) {
+        var when = (user.role === 'president' || user.role === 'clerk') ? '화·목요일 아침 6시'
+                 : user.role === 'staff' ? '할 일은 알림으로 옵니다' : '매월 첫째 월요일 아침 6시';
+        cards += hubCard('oreport', '업무 보고서', when, { cid: 'hub-card-oreport' });
+      }
       /* 공지와 일정은 한 카드에서 함께 본다 */
       cards += hubCard('notice', '노회 공지·일정', '');
       cards += hubCard('assembly', '총회 활동 현황', '총대 · 파송 이사');

@@ -36,6 +36,7 @@ const DUTY_GUIDE = {
     '노회장 보고서입니다. 노회 전체를 총괄하는 눈으로 씁니다. 모든 임원의 활동과 이행 상황이 노회장께 올라가야 합니다.\n' +
     '- 「임원 활동 내역」 section: 「임원별 이행 현황」 자료를 바탕으로 임원(직책·이름)마다 맡은 일의 진행을 한 줄씩. 변동 없이 멈춘 일이 있는 임원은 그 사실을 분명히 적는다\n' +
     '- 「보고서 이행 내역」 section: 할 일 전체의 진행률(완료/진행/열림 건수), 기한이 지난 일, 7일 넘게 변동 없는 일, 최근 7일 완료된 일\n' +
+    '- 노회 사무실(간사)이 처리할 일은 todos 의 title 앞에 「[간사] 」를 붙인다 (간사에게 알림으로 간다)\n' +
     '- 「지시할 일」 section: 노회장이 임원에게 지시해야 할 일을 담당 임원·기한과 함께. 같은 내용을 todos 에도 올린다 (target_kind 임원, target_name 직책, contact_name 그 임원 이름, message 는 노회장 이름으로 보내는 지시 문안)\n' +
     '- 다가오는 정기노회·임원회·행사와 그 준비 상태 (노회규칙에 정한 소집·공고 기한이 있으면 날짜로 계산해 알림)\n' +
     '- 노회장이 결정·승인·서명할 일 (서류 발급 승인, 지급 확인, 청원 처리 등)\n' +
@@ -45,6 +46,7 @@ const DUTY_GUIDE = {
     '부노회장 보고서입니다. 노회장을 보좌하는 눈으로 노회 전반을 짧게 요약하고, 부노회장이 맡거나 도울 수 있는 일(다음 노회 준비, 늦어진 결의 이행 독려)을 제안합니다. todos 는 2~4개.',
   clerk:
     '서기 보고서입니다. 서기는 노회 사무를 총괄하므로, 각 임원이 맡은 일을 챙기고 지적된 일이 고쳐지지 않으면 독려해야 합니다.\n' +
+    '- 노회 사무실(간사)이 처리할 일 — 공문·통보 발송, 서류 발급·접수, 일정 등록, 자료 정리 — 는 todos 의 title 앞에 「[간사] 」를 붙인다 (서기 이름으로 간사에게 지시하는 일). 간사에게는 이 항목이 알림으로 간다\n' +
     '- 「독려할 일」 section: 「임원별 이행 현황」 자료에서 7일 넘게 변동이 없거나 기한이 지난 일을 담당 임원별로 묶어 적고, 그 임원에게 보낼 독려 문안을 todos 로 만든다 (target_kind 임원, target_name 직책, contact_name 그 임원 이름, message 는 서기 이름으로 정중하게 — 무엇이 며칠째 멈춰 있고 언제까지 처리해 주실지). 같은 일이 지난 보고서에도 올랐으면 「다시」임을 밝힌다\n' +
     '- 회의록 등록 뒤 결의에 따라 진행할 일을 부서별(상비부·시찰·기관)로 정리: 누가, 무엇을, 언제까지, 지금 상태\n' +
     '- 오늘 연락할 곳: 각 상비부장·시찰장·기관 대표에게 보낼 연락 문안을 todos 의 message 로 만든다 (연락처는 자료의 연락처에서)\n' +
@@ -434,7 +436,7 @@ export async function runReports(env, deps, opts, log) {
     written.filter(function (r) { return r.duty === 'president' || r.duty === 'clerk'; }).forEach(function (r) {
       arr(r.content && r.content.todos).forEach(function (t) {
         const txt = [t.target_kind, t.target_name, t.contact_name, t.title, t.detail].join(' ');
-        const forStaff = /간사|사무실|사무국/.test(txt) || staff.some(function (st) { return st.name && txt.indexOf(st.name) !== -1; });
+        const forStaff = /\[간사\]|간사|사무실|사무국/.test(txt) || staff.some(function (st) { return st.name && txt.indexOf(st.name) !== -1; });
         if (!forStaff) return;
         staff.forEach(function (st) {
           items.push({ user_id: st.id, kind: '업무 지시',
