@@ -662,6 +662,8 @@
                 /* 정기노회 4주 전 — 서기에게 총대 장로 임기 확인 알림
                  * (111_elder_term_notice.sql 을 실행하기 전이면 조용히 건너뛴다) */
                 c.rpc('run_elder_term_notice').then(quiet, quiet),
+                /* 상회비 미납 안내 — 노회규칙 제29조, 달마다 한 번 (135 sql 을 실행하기 전이면 조용히 건너뛴다) */
+                c.rpc('notify_dues_rule29', { p_manual: false }).then(quiet, quiet),
                 /* 날짜가 지난 임직식을 회원 명단에 반영 (121 sql 을 실행하기 전이면 조용히 건너뛴다) */
                 c.rpc('apply_ordinations').then(quiet, quiet),
                 /* 보안 점검 — 예약(pg_cron)이 안 될 때의 대비, 20시간 안에 했으면 서버가 건너뛴다 (126 sql) */
@@ -851,6 +853,13 @@
       return 'minutes-audio.html';
     }
     /* 정기노회 4주 전 총대 장로 임기 확인(111) — 서기의 공문 시안 화면으로 */
+    /* 상회비 미납 안내(135) — 요약은 임원방 상회비 관리로, 당사자 안내는 대시보드 <나의 상회비>로 */
+    if (key.indexOf('dues29-sum-') === 0) {
+      return 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC';
+    }
+    if (key.indexOf('dues29-') === 0) {
+      return 'dashboard.html#hub-mydues';
+    }
     if (key.indexOf('elder-term-') === 0) {
       return 'elder-notice.html';
     }
@@ -1692,6 +1701,48 @@
     return p;
   }
 
+  /* ---------- 노회규칙 제29조 (상회비 미납) 안내 글 ----------
+   * my_dues_rule29() 가 돌려준 상태(st)로 화면 안내를 만든다. (supabase/135_dues_rule29.sql)
+   *   st.church / st.fy / st.late_months [4,5] / st.late_count / st.late_amount(만원) /
+   *   st.cur_month / st.cur_unpaid / st.roles [맡은 직책] / st.blocked
+   * 미납 = 기한(그 달 말)이 지난 달. 세례의무금은 세지 않는다. */
+  function d29esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function dues29Months(st) { return ((st && st.late_months) || []).join('·') + '월'; }
+  function dues29Text(st) {
+    return '노회규칙 제29조 제1항에 따라 상회비 미납 중에는 서류 발급 신청과 청원서 접수가 중지됩니다. (' +
+      st.church + ' — ' + st.fy + '년 회기 ' + dues29Months(st) + '분 미납, ' +
+      Number(st.late_amount || 0).toLocaleString('ko-KR') + '만원) 납부 뒤 다시 신청해 주세요. ' +
+      '이미 납부하셨다면 노회 회계에게 납부 확인을 요청해 주세요.';
+  }
+  function dues29Html(st, opts) {
+    var top = !!(opts && opts.where === 'top');
+    var roles = (st && st.roles) || [];
+    return '<div class="notice-banner dues29-banner" style="border-left:4px solid var(--red);margin:' +
+      (top ? '0 0 18px' : '10px 0 0') + '">' +
+      '<strong style="color:var(--red)">상회비 미납 안내 — 노회규칙 제29조 적용 중</strong><br>' +
+      d29esc(st.church) + ' ' + st.fy + '년 회기 <strong>' + d29esc(dues29Months(st)) + '분</strong> 상회비 ' +
+      st.late_count + '개월, <strong>' + Number(st.late_amount || 0).toLocaleString('ko-KR') + '만원</strong>이 ' +
+      '아직 납부 확인되지 않았습니다. <span style="color:var(--gray-7)">(매월 상회비는 그 달 말까지 — 제28조)</span>' +
+      '<ul style="margin:8px 0 0 18px;padding:0;font-size:0.9rem;list-style:disc">' +
+      '<li>각종 서류·증명서의 <strong>발급과 접수가 중지</strong>됩니다. 홈페이지의 서류 발급 신청과 청원서 전달이 막혀 있습니다. (제1항)</li>' +
+      '<li>과년도 미납금은 당해 연도 배당금에 합산하여 납부합니다. (제2항)</li>' +
+      '<li>미납교회는 노회 임원 및 총대, 시찰·상비부 임원을 할 수 없습니다. (제3항)' +
+      (roles.length
+        ? '<br><span style="color:var(--red)">현재 맡고 계신 직책: <strong>' + d29esc(roles.join(', ')) + '</strong></span>'
+        : '') + '</li></ul>' +
+      (st.cur_unpaid
+        ? '<p style="margin:8px 0 0;font-size:0.9rem">이번 달(' + st.cur_month + '월)분도 아직 납부 전입니다. 이번 달 말일까지 납부해 주세요.</p>'
+        : '') +
+      '<p style="margin:8px 0 0;font-size:0.84rem;color:var(--gray-7)">납부하시면 노회 회계가 확인한 뒤 이 안내가 사라집니다. ' +
+      '이미 납부하셨는데도 보인다면 노회 회계에게 납부 확인을 요청해 주세요.' +
+      (top ? ' <a href="dashboard.html#hub-mydues" style="text-decoration:underline">나의 상회비 보기</a>' : '') +
+      '</p></div>';
+  }
+
   /* 상회비를 볼 수 없는 분에게는 임원방의 <상회비 관리>·<세례의무금 관리> 메뉴를 감춘다 */
   function hideDuesMenu(u) {
     duesAccess(u).then(function (ok) {
@@ -2024,6 +2075,8 @@
     memberGate: memberGate,
     fullMemberGate: fullMemberGate,
     paysDues: paysDues,
+    dues29Text: dues29Text,
+    dues29Html: dues29Html,
     managesDues: managesDues,
     duesAccess: duesAccess,
     DUES_NOTICE: DUES_NOTICE,

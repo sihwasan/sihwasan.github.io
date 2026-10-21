@@ -108,7 +108,7 @@ var SHSBoard = (function () {
         cards += hubCard('church', '나의 교회', '');
         cards += hubCard('sichal', '나의 시찰');
         /* 상회비를 볼 수 있는 분에게만 연다 (duesGate 가 확인한 뒤 보인다) */
-        cards += hubCard('mydues', '나의 상회비', '상회비 · 세례의무금', { cid: 'hub-card-mydues', hidden: true });
+        cards += hubCard('mydues', '나의 상회비', '상회비 · 세례의무금', { cid: 'hub-card-mydues', hidden: true, badge: 'hub-badge-mydues' });
         cards += hubCard('com', '상비부', '');
       }
       cards += hubCard('doc', '서류 발급', '');
@@ -123,6 +123,8 @@ var SHSBoard = (function () {
 
       box.innerHTML =
         /* 서기 알림 카드 자리 — 정기노회 4주 전 총대 장로 임기 확인 (js/elder-notice.js) */
+        /* 상회비 미납 안내 자리 — 노회규칙 제29조 (loadRule29 가 채운다) */
+        '<div id="hub-dues29"></div>' +
         '<div id="hub-elder"></div>' +
         '<div id="hub-home" class="dash-hub">' +
         '<div class="hub-left">' +
@@ -186,6 +188,8 @@ var SHSBoard = (function () {
         });
         var elderSlot = document.getElementById('hub-elder');
         if (elderSlot) elderSlot.classList.toggle('hidden', !!panel);
+        var d29Slot = document.getElementById('hub-dues29');
+        if (d29Slot) d29Slot.classList.toggle('hidden', !!panel);
         if (!panel) {
           document.getElementById('hub-detail').classList.add('hidden');
           document.getElementById('hub-home').classList.remove('hidden');
@@ -372,6 +376,7 @@ var SHSBoard = (function () {
       window.addEventListener('hashchange', hubFromHash);
       hubFromHash();
       loadAudit();
+      loadRule29();
     }
 
     /* ---------- 감사함 ----------
@@ -554,6 +559,31 @@ var SHSBoard = (function () {
      * 관리자와 회계·부회계에게는 노회 전체 요약을 함께 보여 준다.
      * 내 교회는 노회 명단(roster)에서 온다 — my_dues 가 계정→명단→교회로 잇는다.
      * 상회비를 내지 않는 분(부목사·무임목사·원로·은퇴 등)에게는 불러오지 않는다 (아래 duesGate). */
+    /* ---------- 노회규칙 제29조 (상회비 미납) ----------
+     * 내 교회가 기한 지난 상회비 미납이면 대시보드 맨 위에 안내를 띄우고,
+     * 나의 상회비 카드에 표식을 달고, 나의 상회비 상세에도 같은 안내를 둔다.
+     * 서류 발급 중지(1항)는 교회 단위로 걸리므로 상회비를 내지 않는 분(부목사 등)에게도 안내는 보인다.
+     * (supabase/135_dues_rule29.sql — 실행 전이면 조용히 건너뛴다) */
+    var r29 = null;
+    function paintR29() {
+      var slot = document.getElementById('md-r29');
+      if (!slot || !r29 || !SHS.dues29Html) return;
+      slot.innerHTML = SHS.dues29Html(r29, { where: 'panel' });
+    }
+    function loadRule29() {
+      if (!user.cloud || isSuper || !SHS.dues29Html) return;
+      SHSCloud.init().then(function (c) { return c.rpc('my_dues_rule29'); }).then(function (r) {
+        var st = r && !r.error && r.data;
+        if (!st || !st.blocked) return;
+        r29 = st;
+        var top = document.getElementById('hub-dues29');
+        if (top) top.innerHTML = SHS.dues29Html(st, { where: 'top' });
+        var badge = document.getElementById('hub-badge-mydues');
+        if (badge) { badge.textContent = '미납 ' + st.late_count + '개월'; badge.classList.remove('hidden'); }
+        paintR29();
+      }).catch(function () {});
+    }
+
     function loadDues() {
       if (!user.cloud) return;
       var canDues = SHSAuth.canManageMembers(user) || user.role === 'officer';
@@ -622,8 +652,10 @@ var SHSBoard = (function () {
           (info.out_closed ? ' <span class="dues-mini-closed">' + yr + '년 마감</span>' : '') + '</div>' +
           '<div class="mydues-dots">' + dots + '</div>' +
           lateHtml +
+          '<div id="md-r29"></div>' +
           '<p class="mydues-sum">이번 회기 ' + months + '개월 납부 · ' + sum.toLocaleString('ko-KR') + '만원' +
           '<span class="mydues-note">납부 확인이 실제와 다르면 노회 회계에게 알려 주세요.</span></p>';
+        paintR29();
       }).catch(function () {
         var el = document.getElementById('dash-mydues');
         if (el) el.innerHTML = '<p class="dash-none">상회비 현황을 불러오지 못했습니다.</p>';
