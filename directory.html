@@ -6,7 +6,7 @@
 <title>노회 주소록 - 시화산노회</title>
 <meta name="description" content="시화산노회 교회·교역자·시무장로 주소록과 연합회 임원 연락처.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021m">
+<link rel="stylesheet" href="css/style.css?v=20261021n">
 </head>
 <body>
 
@@ -216,26 +216,37 @@ document.addEventListener('DOMContentLoaded', function () {
     out.address = norm(s) || null;
     return out;
   }
-  function parseBook(pages) {
-    var out = [], sec = null, cols = null, kind = null;
+  function parseBook(pages, startPage) {
+    var out = [], sec = null, cols = null, kind = null, skip = false;
     function colIdx(names) { for (var i = 0; i < cols.length; i++) { for (var j = 0; j < names.length; j++) { if (cols[i].indexOf(names[j]) !== -1) return i; } } return -1; }
     pages.forEach(function (pg) {
+      /* 차례에 "노회 주소록 ○○쪽"이 있으면 그 쪽부터만 본다 (앞쪽의 총대 명단·시찰 보고와 섞이지 않게) */
+      if (startPage && (pg.page_no == null || pg.page_no < startPage)) return;
       var hd = norm(pg.heading);
-      if (SEC_RE.test(hd)) { sec = hd; cols = null; }
+      if (SEC_RE.test(hd)) { sec = hd; cols = null; skip = false; }
+      else if (hd && !startPage) { sec = null; }                                   /* 다른 제목의 면이 시작되면 주소록 구간이 끝난 것 */
       var lines = String(pg.text || '').split('\n');
       lines.forEach(function (ln) {
         var t = ln.trim();
         var hm = t.match(/^#{1,4}\s+(.+)$/);
-        if (hm) { var h2 = norm(hm[1]); if (SEC_RE.test(h2)) { sec = h2; cols = null; } return; }
+        if (hm) { var h2 = norm(hm[1]); if (SEC_RE.test(h2)) { sec = h2; cols = null; skip = false; } else if (!startPage) { sec = null; } return; }
         if (!sec) return;
         if (/^\|?\s*:?-{2,}/.test(t) && /-{2,}\s*\|/.test(t)) return;                  /* 구분줄 */
-        if (t.indexOf('|') === -1) { cols = null; return; }
+        if (t.indexOf('|') === -1) { cols = null; skip = false; return; }
+        if (skip) return;
         var cells = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (c) { return c.trim(); });
         if (!cols) {
           var looksHead = cells.some(function (c) { return /NO|번호|교회명|주\s*소|교역자|시무장로|전화|직\s*책|성\s*명|휴대폰/.test(c); }) && !cells.some(function (c) { return /\d{3,}/.test(c); });
-          if (looksHead) { cols = cells.map(function (c) { return c.replace(/\s+/g, ''); }); kind = cols.some(function (c) { return /직책|성명/.test(c); }) ? 'person' : 'church'; return; }
+          if (looksHead) {
+            cols = cells.map(function (c) { return c.replace(/\s+/g, ''); });
+            var hasAddr = cols.some(function (c) { return /주소/.test(c); }), hasTel = cols.some(function (c) { return /전화|휴대폰|연락처/.test(c); });
+            var hasPerson = cols.some(function (c) { return /직책|성명/.test(c); });
+            if (!(hasAddr || (hasTel && hasPerson))) { skip = true; cols = null; return; }      /* 주소·전화 칸이 없으면 주소록 표가 아니다 */
+            kind = hasPerson ? 'person' : 'church'; return;
+          }
+          /* 머리글 없는 표: 바로 앞 표의 종류를 잇되, 칸 수가 맞을 때만 */
+          if (!kind || cells.length < 4) { skip = true; cols = null; return; }
           cols = kind === 'person' ? ['직책', '성명', '교회명', '휴대폰'] : ['NO', '교회명', '주소', '교역자', '시무장로', '전화번호'];
-          if (!kind) kind = 'church';
         }
         if (!cells.some(Boolean)) return;
         var r = { section: sec, kind: kind, no: null, name: null, role: null, church: null, postcode: null, address: null, address2: null, website: null, email: null, pastor: null, elders: null, phone: null };
@@ -247,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!r.name) return;
         if (kind === 'person') { r.role = iRole !== -1 ? norm(cells[iRole]).replace(/\s+/g, '') || null : null; r.church = iChurch !== -1 ? norm(cells[iChurch]) || null : null; }
         else {
-          if (iAddr !== -1) { var a = parseAddr(cells[iAddr]); Object.keys(a).forEach(function (k) { r[k] = a[k]; }); }
+          if (iAddr !== -1) { var ad = parseAddr(cells[iAddr]); Object.keys(ad).forEach(function (k) { r[k] = ad[k]; }); }
           r.pastor = iPastor !== -1 ? norm(cells[iPastor]) || null : null;
           r.elders = iEld !== -1 ? norm(cells[iEld]).replace(/\s*[·,/]\s*/g, '·') || null : null;
         }
@@ -261,7 +272,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function keyOf(r) { return r.kind === 'person' ? ('p|' + r.section + '|' + norm(r.name)) : ('c|' + norm(r.name)); }
   var CMP = ['section', 'no', 'role', 'church', 'postcode', 'address', 'address2', 'website', 'email', 'pastor', 'elders', 'phone'];
-  function same(a, b) { return norm(a) === norm(b); }
+  /* 띄어쓰기·빗금·쉼표 차이는 같은 것으로 본다 */
+  function cmpNorm(v) { return String(v == null ? '' : v).replace(/[\s\/]+/g, '').replace(/[,·]/g, '·'); }
+  function same(a, b) { return cmpNorm(a) === cmpNorm(b); }
   function diff(book) {
     var cur = {}; rows.forEach(function (r) { cur[keyOf(r)] = r; });
     var seen = {}, adds = [], chg = [], dels = [];
@@ -300,8 +313,15 @@ document.addEventListener('DOMContentLoaded', function () {
     var out = document.getElementById('cmp-out');
     if (!rid) return;
     out.innerHTML = '<p>책자를 읽는 중…</p>';
-    db.from('presbytery_report_pages').select('page_no,pdf_page,heading,text').eq('report_id', rid).order('pdf_page').order('page_no').then(function (r) {
-      var book = parseBook(r.data || []);
+    Promise.all([
+      db.from('presbytery_report_pages').select('page_no,pdf_page,heading,text').eq('report_id', rid).order('pdf_page').order('page_no'),
+      db.from('presbytery_reports').select('toc').eq('id', rid).single()
+    ]).then(function (rs) {
+      var r = rs[0];
+      var toc = (rs[1].data && Array.isArray(rs[1].data.toc)) ? rs[1].data.toc : [];
+      var hit = toc.filter(function (t) { return /주소록/.test(String(t.title || '')); })[0];
+      var startPage = hit ? parseInt(hit.page, 10) || 0 : 0;
+      var book = parseBook(r.data || [], startPage);
       if (!book.length) { out.innerHTML = '<p class="form-msg err">이 책자에서 주소록 표를 찾지 못했습니다. (면 제목이 「북부시찰」「장로회 연합회」처럼 적혀 있어야 합니다)</p>'; return; }
       var d = diff(book);
       var secs = {}; book.forEach(function (b) { secs[b.section] = (secs[b.section] || 0) + 1; });

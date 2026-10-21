@@ -6,7 +6,7 @@
 <title>노회 보고서 - 시화산노회</title>
 <meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021m">
+<link rel="stylesheet" href="css/style.css?v=20261021n">
 </head>
 <body>
 
@@ -17,7 +17,7 @@
   </div>
 </div>
 
-<main class="page-body container" id="main">
+<main class="page-body container pr-main" id="main">
   <div id="pr-area"><p style="color:var(--gray-5)">불러오는 중...</p></div>
 </main>
 
@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var head = rows[0].every(function (c) { return c.length <= 12 && !/\d{2,}/.test(c); }) && rows[0].filter(Boolean).length >= 2;
       html += '<div class="pr-tblwrap"><table class="pr-tbl">' + rows.map(function (cells, i) {
         var tag = head && i === 0 ? 'th' : 'td';
-        return '<tr>' + cells.map(function (c) { return '<' + tag + '>' + hl(c, q) + '</' + tag + '>'; }).join('') + '</tr>';
+        return '<tr>' + cells.map(function (c) { return '<' + tag + (c.length <= 8 ? ' class="nw"' : '') + '>' + hl(c, q) + '</' + tag + '>'; }).join('') + '</tr>';
       }).join('') + '</table></div>';
     }
     lines.forEach(function (ln) {
