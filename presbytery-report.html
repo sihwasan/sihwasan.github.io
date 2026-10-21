@@ -6,7 +6,7 @@
 <title>노회 보고서 - 시화산노회</title>
 <meta name="description" content="시화산노회 정기노회 회의자료(보고서)를 쪽 단위로 찾아봅니다.">
 <meta name="robots" content="noindex">
-<link rel="stylesheet" href="css/style.css?v=20261021l">
+<link rel="stylesheet" href="css/style.css?v=20261021m">
 </head>
 <body>
 
@@ -226,10 +226,10 @@ document.addEventListener('DOMContentLoaded', function () {
         return front ? pad.concat(r) : r.concat(pad);
       });
       var head = rows[0].every(function (c) { return c.length <= 12 && !/\d{2,}/.test(c); }) && rows[0].filter(Boolean).length >= 2;
-      html += '<table class="pr-tbl">' + rows.map(function (cells, i) {
+      html += '<div class="pr-tblwrap"><table class="pr-tbl">' + rows.map(function (cells, i) {
         var tag = head && i === 0 ? 'th' : 'td';
         return '<tr>' + cells.map(function (c) { return '<' + tag + '>' + hl(c, q) + '</' + tag + '>'; }).join('') + '</tr>';
-      }).join('') + '</table>';
+      }).join('') + '</table></div>';
     }
     lines.forEach(function (ln) {
       var t = ln.trim();
