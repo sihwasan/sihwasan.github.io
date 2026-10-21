@@ -47,30 +47,48 @@
       { t: '미래교회자립위원회', h: 'committee.html?c=%EB%AF%B8%EB%9E%98%EA%B5%90%ED%9A%8C%EC%9E%90%EB%A6%BD%EC%9C%84%EC%9B%90%ED%9A%8C' },
       { t: '상비부 대시보드', h: 'dashboard.html' }
     ]},
-    { title: '회칙', href: 'rules-presbytery.html', sub: [
+    /* 노회전자자료실 — 총회전자자료실처럼 노회의 규칙·결의·보고서·회의록·서식을 한 메뉴에 모은다 */
+    { title: '노회전자자료실', href: 'rules-presbytery.html', sub: [
       { t: '노회 회칙', h: 'rules-presbytery.html' },
-      { t: '총회 회칙 안내', h: 'rules-assembly.html' },
-      { t: '각종 내규', h: 'rules-presbytery.html#bylaws' }
+      { t: '각종 내규', h: 'rules-presbytery.html#rule-jarip' },
+      /* 가지: 왼쪽 묶음 메뉴에서 각종 내규 아래 들여쓰기로 보인다 (상단 펼침 메뉴에서는 감춤) */
+      { t: '미래교회자립위원회 내규', h: 'rules-presbytery.html#rule-jarip', kid: true },
+      { t: '선거관리위원회 내규', h: 'rules-presbytery.html#rule-sunguh', kid: true },
+      { t: '사회복지부 내규', h: 'rules-presbytery.html#rule-bokji', kid: true },
+      { t: '노회 회의결의', h: 'resolutions.html' },
+      { t: '노회 보고서 (회의자료)', h: 'presbytery-report.html' },
+      { t: '노회 주소록', h: 'directory.html' },
+      { t: '원로목사', h: 'directory.html#%EC%9B%90%EB%A1%9C%EB%AA%A9%EC%82%AC', kid: true },
+      { t: '북부시찰', h: 'directory.html#%EB%B6%81%EB%B6%80%EC%8B%9C%EC%B0%B0', kid: true },
+      { t: '상록시찰', h: 'directory.html#%EC%83%81%EB%A1%9D%EC%8B%9C%EC%B0%B0', kid: true },
+      { t: '남부시찰', h: 'directory.html#%EB%82%A8%EB%B6%80%EC%8B%9C%EC%B0%B0', kid: true },
+      { t: '장로회 연합회', h: 'directory.html#%EC%9E%A5%EB%A1%9C%ED%9A%8C%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
+      { t: '남전도회 연합회', h: 'directory.html#%EB%82%A8%EC%A0%84%EB%8F%84%ED%9A%8C%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
+      { t: '여전도회 연합회', h: 'directory.html#%EC%97%AC%EC%A0%84%EB%8F%84%ED%9A%8C%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
+      { t: '주일학교 연합회', h: 'directory.html#%EC%A3%BC%EC%9D%BC%ED%95%99%EA%B5%90%20%EC%97%B0%ED%95%A9%ED%9A%8C', kid: true },
+      { t: '고시 모의고사', h: 'exam.html' }
+    ]},
+    { title: '총회', href: 'assembly-constitution.html', sub: [
+      { t: '총대 총회 활동 현황', h: 'dashboard.html#hub-assembly' },
+      { t: '총회 헌법', h: 'assembly-constitution.html' },
+      { t: '총회 규정', h: 'assembly-rules.html' },
+      { t: '총회 회의결의', h: 'assembly-resolution.html' },
+      { t: '총회 보고서', h: 'assembly-report.html' },
+      { t: '총회 회칙 안내', h: 'rules-assembly.html' }
     ]},
     { title: '서류발급', href: 'request.html', sub: [
       { t: '서류 신청', h: 'request.html' },
       { t: '신청서류 확인', h: 'request.html#list' },
+      { t: '청원서', h: 'petition.html' },
+      { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
       { t: '증명서 진위 확인', h: 'verify.html' }
     ]},
-    { title: '자료실', href: 'archive.html', sub: [
-      { t: '구비서류 안내', h: 'archive.html#sec-%EA%B5%AC%EB%B9%84%EC%84%9C%EB%A5%98-%EC%95%88%EB%82%B4' },
-      { t: '청원서', h: 'petition.html' },
-      { t: '교회상황 보고서', h: 'report.html' },
+    /* 나의 서류 — 내가 낸 청원서·보고서·받은 증명서 */
+    { title: '나의 서류', href: 'mydocs.html', sub: [
       { t: '나의 서류', h: 'mydocs.html' },
-      { t: '노회 회의결의', h: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD' },
-      { t: '고시 모의고사', h: 'exam.html' }
-    ]},
-    { title: '총회', href: 'assembly-constitution.html', sub: [
-      { t: '총회 활동현황', h: 'dashboard.html#hub-assembly' },
-      { t: '총회 헌법', h: 'assembly-constitution.html' },
-      { t: '총회 규정', h: 'assembly-rules.html' },
-      { t: '총회 회의결의', h: 'assembly-resolution.html' },
-      { t: '총회 보고서', h: 'assembly-report.html' }
+      { t: '서류 신청 내역', h: 'request.html#list' },
+      { t: '알림함', h: 'notifications.html' },
+      { t: '내 정보', h: 'mypage.html' }
     ]},
     { title: '게시판', href: 'board.html', sub: [
       { t: '공지사항', h: 'board.html#notice' },
@@ -86,7 +104,8 @@
       { t: '세례의무금 관리', h: 'officer.html#sec-%EC%84%B8%EB%A1%80%EC%9D%98%EB%AC%B4%EA%B8%88-%EA%B4%80%EB%A6%AC' },
       { t: '재정부 회계', h: 'officer.html#sec-%EC%9E%AC%EC%A0%95%EB%B6%80-%ED%9A%8C%EA%B3%84', fin: true },
       { t: '감사 결과 보고서', h: 'audit-report.html' },
-      { t: '노회 회의록', h: 'minutes.html' }
+      { t: '노회 회의록', h: 'minutes.html' },
+      { t: '교회상황 보고서', h: 'report.html' }
     ]}
   ];
 
@@ -116,13 +135,31 @@
   /* 관리자 모드(왼쪽 메뉴)를 씌울 관리 화면들 — js/admin-shell.js 가 맡는다 */
   var ADMIN_PAGES = ['admin-home.html', 'admin-ai.html', 'manage.html', 'admin.html', 'schedule.html', 'archive-edit.html',
     'elder-notice.html', 'meeting-admin.html', 'proceed.html', 'documents.html', 'report-intake.html',
-    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html'];
+    'audit-report.html', 'settings.html', 'ops.html', 'minutes.html', 'officer.html', 'presbytery-report.html', 'directory.html', 'resolutions.html'];
+  /* 관리자 모드(왼쪽 관리자 메뉴)는 상단 <관리자>를 눌러 들어왔을 때만 켜진다.
+   * 다른 상단 메뉴를 누르면 꺼지고, 관리자 메뉴 안에서 오가는 동안은 켜진 채로 있다. (이 탭 안에서만 기억) */
+  var ADMIN_ENTRY = ['admin-home.html', 'admin-ai.html'];
+  function adminMode(v) {
+    try {
+      if (v != null) sessionStorage.setItem('shs_admin_mode', v ? '1' : '0');
+      return sessionStorage.getItem('shs_admin_mode') === '1';
+    } catch (x) { return false; }
+  }
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+    if (!a) return;
+    if (a.closest('#adm-side')) { adminMode(!a.classList.contains('adm-exit')); return; }
+    if (a.closest('#gnb-admin')) { adminMode(true); return; }
+    if (a.closest('.gnb') || a.closest('.topbar') || a.closest('.site-header')) adminMode(false);
+  }, true);
   function loadAdminShell() {
     var pg = location.pathname.split('/').pop() || 'index.html';
+    if (ADMIN_ENTRY.indexOf(pg) !== -1) adminMode(true);
+    if (!adminMode()) return;
     if (ADMIN_PAGES.indexOf(pg) === -1 || document.querySelector('script[src^="js/admin-shell.js"]')) return;
     if (/[?&]embed=1(?:&|$)/.test(location.search)) return;
     var sc = document.createElement('script');
-    sc.src = 'js/admin-shell.js?v=20261020b';
+    sc.src = 'js/admin-shell.js?v=20261021d';
     document.body.appendChild(sc);
   }
 
@@ -342,20 +379,22 @@
   function buildGnb() {
     var here = location.pathname.split('/').pop() || 'index.html';
     var html = '<nav class="gnb" id="gnb" aria-label="주 메뉴"><ul class="gnb-list" id="gnb-list">';
+    var activeDone = false;   /* 여러 메뉴에 같은 쪽이 있어도 처음 맞는 하나만 켠다 */
     NAV.forEach(function (m) {
       /* sichal.html?s=북부시찰 처럼 물음표가 붙은 주소도 알아보게 한다 */
-      var active = (here === m.href.split('?')[0] || m.sub.some(function (s) {
+      var active = (!activeDone && (here === m.href.split('?')[0] || m.sub.some(function (s) {
         var page = s.h.split('#')[0].split('?')[0];
         /* 대시보드는 상단에 제 메뉴가 따로 생기므로 여기서는 켜지 않는다 (중복 선택 방지) */
         if (page === 'dashboard.html') return false;
         return page === here;
-      })) ? ' active' : '';
+      }))) ? ' active' : '';
+      if (active) activeDone = true;
       html += '<li class="gnb-item' + active + '"><a href="' + m.href + '">' + m.title + '</a><div class="gnb-sub">';
       m.sub.forEach(function (s) {
         /* '미래교회자립위원회'처럼 긴 이름은 '위원회'를 다음 줄로 내려 칸 밖으로 나가지 않게 한다 */
         var label = s.t.replace(/^(.{4,})(위원회)$/, '$1<br>$2');
         /* 재정부 회계는 회계·부회계에게만 — 로그인 확인 뒤 showFinanceMenu 가 켠다 */
-        html += '<a href="' + s.h + '"' + (s.fin ? ' data-fin="1" style="display:none"' : '') + '>' + label + '</a>';
+        html += '<a href="' + s.h + '"' + (s.kid ? ' class="gnb-kid"' : '') + (s.fin ? ' data-fin="1" style="display:none"' : '') + '>' + label + '</a>';
       });
       html += '</div></li>';
     });
@@ -542,6 +581,15 @@
     setupInstall();
 
     document.body.insertAdjacentHTML('afterbegin', buildTopbar() + buildHeader() + buildGnb());
+    /* 상단 메뉴의 하위 항목을 왼쪽 세로 메뉴로도 보여 준다 (js/section-nav.js) */
+    (function () {
+      var pg = location.pathname.split('/').pop() || 'index.html';
+      if (pg === 'index.html' || /[?&]embed=1(?:&|$)/.test(location.search)) return;
+      if (document.querySelector('script[src^="js/section-nav.js"]')) return;
+      var sc = document.createElement('script');
+      sc.src = 'js/section-nav.js?v=20261021w';
+      document.body.appendChild(sc);
+    })();
     /* 첫 화면처럼 글로 미리 적어 둔 아래쪽 안내가 있으면 그대로 쓴다.
      * (검색로봇은 자바스크립트를 돌리지 않으므로, 적어 둔 것이 있어야 읽는다) */
     if (!document.querySelector('footer.site-footer')) {
@@ -616,6 +664,8 @@
                 /* 정기노회 4주 전 — 서기에게 총대 장로 임기 확인 알림
                  * (111_elder_term_notice.sql 을 실행하기 전이면 조용히 건너뛴다) */
                 c.rpc('run_elder_term_notice').then(quiet, quiet),
+                /* 상회비 미납 안내 — 노회규칙 제29조, 달마다 한 번 (135 sql 을 실행하기 전이면 조용히 건너뛴다) */
+                c.rpc('notify_dues_rule29', { p_manual: false }).then(quiet, quiet),
                 /* 날짜가 지난 임직식을 회원 명단에 반영 (121 sql 을 실행하기 전이면 조용히 건너뛴다) */
                 c.rpc('apply_ordinations').then(quiet, quiet),
                 /* 보안 점검 — 예약(pg_cron)이 안 될 때의 대비, 20시간 안에 했으면 서버가 건너뛴다 (126 sql) */
@@ -698,6 +748,7 @@
           if (!tabRestoring && b.dataset.tab && history.pushState &&
               location.hash !== '#' + b.dataset.tab) {
             history.pushState(null, '', '#' + b.dataset.tab);
+            window.dispatchEvent(new Event('hashchange'));   /* 왼쪽 묶음 메뉴가 지금 탭을 따라 켜지게 */
           }
         });
       });
@@ -804,6 +855,13 @@
       return 'minutes-audio.html';
     }
     /* 정기노회 4주 전 총대 장로 임기 확인(111) — 서기의 공문 시안 화면으로 */
+    /* 상회비 미납 안내(135) — 요약은 임원방 상회비 관리로, 당사자 안내는 대시보드 <나의 상회비>로 */
+    if (key.indexOf('dues29-sum-') === 0) {
+      return 'officer.html#sec-%EC%83%81%ED%9A%8C%EB%B9%84-%EA%B4%80%EB%A6%AC';
+    }
+    if (key.indexOf('dues29-') === 0) {
+      return 'dashboard.html#hub-mydues';
+    }
     if (key.indexOf('elder-term-') === 0) {
       return 'elder-notice.html';
     }
@@ -1707,6 +1765,48 @@
     return p;
   }
 
+  /* ---------- 노회규칙 제29조 (상회비 미납) 안내 글 ----------
+   * my_dues_rule29() 가 돌려준 상태(st)로 화면 안내를 만든다. (supabase/135_dues_rule29.sql)
+   *   st.church / st.fy / st.late_months [4,5] / st.late_count / st.late_amount(만원) /
+   *   st.cur_month / st.cur_unpaid / st.roles [맡은 직책] / st.blocked
+   * 미납 = 기한(그 달 말)이 지난 달. 세례의무금은 세지 않는다. */
+  function d29esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function dues29Months(st) { return ((st && st.late_months) || []).join('·') + '월'; }
+  function dues29Text(st) {
+    return '노회규칙 제29조 제1항에 따라 상회비 미납 중에는 서류 발급 신청과 청원서 접수가 중지됩니다. (' +
+      st.church + ' — ' + st.fy + '년 회기 ' + dues29Months(st) + '분 미납, ' +
+      Number(st.late_amount || 0).toLocaleString('ko-KR') + '만원) 납부 뒤 다시 신청해 주세요. ' +
+      '이미 납부하셨다면 노회 회계에게 납부 확인을 요청해 주세요.';
+  }
+  function dues29Html(st, opts) {
+    var top = !!(opts && opts.where === 'top');
+    var roles = (st && st.roles) || [];
+    return '<div class="notice-banner dues29-banner" style="border-left:4px solid var(--red);margin:' +
+      (top ? '0 0 18px' : '10px 0 0') + '">' +
+      '<strong style="color:var(--red)">상회비 미납 안내 — 노회규칙 제29조 적용 중</strong><br>' +
+      d29esc(st.church) + ' ' + st.fy + '년 회기 <strong>' + d29esc(dues29Months(st)) + '분</strong> 상회비 ' +
+      st.late_count + '개월, <strong>' + Number(st.late_amount || 0).toLocaleString('ko-KR') + '만원</strong>이 ' +
+      '아직 납부 확인되지 않았습니다. <span style="color:var(--gray-7)">(매월 상회비는 그 달 말까지 — 제28조)</span>' +
+      '<ul style="margin:8px 0 0 18px;padding:0;font-size:0.9rem;list-style:disc">' +
+      '<li>각종 서류·증명서의 <strong>발급과 접수가 중지</strong>됩니다. 홈페이지의 서류 발급 신청과 청원서 전달이 막혀 있습니다. (제1항)</li>' +
+      '<li>과년도 미납금은 당해 연도 배당금에 합산하여 납부합니다. (제2항)</li>' +
+      '<li>미납교회는 노회 임원 및 총대, 시찰·상비부 임원을 할 수 없습니다. (제3항)' +
+      (roles.length
+        ? '<br><span style="color:var(--red)">현재 맡고 계신 직책: <strong>' + d29esc(roles.join(', ')) + '</strong></span>'
+        : '') + '</li></ul>' +
+      (st.cur_unpaid
+        ? '<p style="margin:8px 0 0;font-size:0.9rem">이번 달(' + st.cur_month + '월)분도 아직 납부 전입니다. 이번 달 말일까지 납부해 주세요.</p>'
+        : '') +
+      '<p style="margin:8px 0 0;font-size:0.84rem;color:var(--gray-7)">납부하시면 노회 회계가 확인한 뒤 이 안내가 사라집니다. ' +
+      '이미 납부하셨는데도 보인다면 노회 회계에게 납부 확인을 요청해 주세요.' +
+      (top ? ' <a href="dashboard.html#hub-mydues" style="text-decoration:underline">나의 상회비 보기</a>' : '') +
+      '</p></div>';
+  }
+
   /* 상회비를 볼 수 없는 분에게는 임원방의 <상회비 관리>·<세례의무금 관리> 메뉴를 감춘다 */
   function hideDuesMenu(u) {
     duesAccess(u).then(function (ok) {
@@ -1945,7 +2045,7 @@
         ev.preventDefault();
         var id = a.getAttribute('href').slice(1);
         /* 기록을 남겨 두어야 뒤로 가기가 이전 영역으로 돌아간다 */
-        if (history.pushState) history.pushState(null, '', '#' + id);
+        if (history.pushState) { history.pushState(null, '', '#' + id); window.dispatchEvent(new Event('hashchange')); }
         else location.hash = id;
         show(id);
         container.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2039,6 +2139,8 @@
     memberGate: memberGate,
     fullMemberGate: fullMemberGate,
     paysDues: paysDues,
+    dues29Text: dues29Text,
+    dues29Html: dues29Html,
     managesDues: managesDues,
     duesAccess: duesAccess,
     DUES_NOTICE: DUES_NOTICE,

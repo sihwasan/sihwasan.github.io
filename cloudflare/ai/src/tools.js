@@ -156,7 +156,8 @@ export const TOOL_DEFS = {
     })
   },
   search_presbytery_resolutions: {
-    description: '시화산노회 역대 정기노회·임시노회의 결의사항(홈페이지 자료실에 정리된 것)을 찾는다.',
+    /* 회기별 회의결의서 책자 */
+    description: '시화산노회 역대 정기노회·임시노회의 회의결의서(회기별 결의사항 책자: 임원·상비부 조직, 청빙·위임·허락·헌의안 처리 결의)를 낱말이나 회기 번호로 찾는다. "○○교회 청빙 결의", "제19회 결의사항" 같은 질문에 쓴다.',
     input_schema: S({
       keyword: { type: 'string', description: '찾을 낱말' },
       session: { type: 'string', description: '회기 (예: 제19회)' }
@@ -178,6 +179,19 @@ export const TOOL_DEFS = {
     input_schema: S({
       keyword: { type: 'string', description: '찾을 낱말' },
       sichal: { type: 'string', description: '시찰 이름' }
+    }, ['keyword'])
+  },
+  search_presbytery_reports: {
+    description: '시화산노회 정기노회 회의자료 책자(노회 보고서)의 본문을 낱말로 찾는다: 서기 사무보고, 각 상비부·시찰 보고, 임원회 보고, 회원 명단, 역대 임원, 교회 주소록, 회의순서 등. 어느 회기 책자 몇 쪽에 무엇이 적혀 있는지 돌려준다.',
+    input_schema: S({
+      keyword: { type: 'string', description: '찾을 낱말 (2~3개까지)' },
+      session: { type: 'integer', description: '회기 번호 (예: 20). 비우면 모든 책자' }
+    }, ['keyword'])
+  },
+  search_directory: {
+    description: '노회 주소록: 소속 교회의 주소·우편번호·홈페이지·이메일·교역자(담임·부목사)·시무장로·전화번호(교회/휴대폰/팩스), 원로목사 연락처, 장로회·남전도회·여전도회·주일학교 연합회 임원(직책·성명·교회·휴대폰). "○○교회 주소/전화", "○○교회 담임 누구", "○○ 장로 연락처", "장로회연합회 회장" 같은 질문에 쓴다. 회의자료 책자 주소록을 바탕으로 관리자가 유지한다.',
+    input_schema: S({
+      keyword: { type: 'string', description: '교회 이름, 사람 이름, 직책, 시찰 이름, 주소 일부, 전화번호 일부 (2~3개까지)' }
     }, ['keyword'])
   },
   search_dues: {
@@ -202,7 +216,7 @@ export function toolsFor(role) {
   const officer = ['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(role) !== -1;
   const names = ['search_verified_answers', 'search_assembly', 'get_assembly_article', 'search_presbytery_rules', 'get_organization',
     'search_members', 'search_churches', 'search_schedule', 'search_notices', 'search_presbytery_resolutions',
-    'search_sichal', 'search_committee'];
+    'search_sichal', 'search_committee', 'search_presbytery_reports', 'search_directory'];
   if (officer) names.push('search_minutes', 'search_officer_docs', 'search_dues');
   return names.map(function (n) {
     return { name: n, description: TOOL_DEFS[n].description, input_schema: TOOL_DEFS[n].input_schema };
@@ -225,7 +239,9 @@ export const TOOL_STATUS = {
   search_officer_docs: '임원 자료실을 찾는 중',
   search_sichal: '시찰 자료를 찾는 중',
   search_committee: '상비부 기록을 찾는 중',
-  search_dues: '상회비 납부 현황을 확인하는 중'
+  search_dues: '상회비 납부 현황을 확인하는 중',
+  search_presbytery_reports: '노회 회의자료 책자를 찾는 중',
+  search_directory: '노회 주소록을 찾는 중'
 };
 
 /* ---------- 도구 실행 ---------- */
@@ -506,17 +522,21 @@ const RUN = {
     }) };
   },
   async search_presbytery_resolutions(input, ctx) {
+    /* 결의는 회기별 「회의결의서」 책자(presbytery_reports.kind = 회의결의서)의 쪽에서 찾는다 */
     const ws = words(input.keyword || '');
-    const q = [];
-    if (input.session) q.push('session=ilike.' + enc('*' + clean(input.session) + '*'));
-    if (ws.length) q.push(allWords(['items', 'session'], ws));
-    const rows = await sbGet(ctx.env, ctx.auth, 'resolutions?select=id,seq,kind,session,year,president,place,held_on,items&' + q.join('&') + '&order=sort.desc,id.desc&limit=8');
-    if (rows.error) return { error: rows.error };
-    if (!rows.length) return { items: [], note: '결의사항을 찾지 못했습니다.' };
-    return { items: rows.map(function (r) {
-      const text = ws.length ? snippets(r.items, ws, 260, 4) : String(r.items || '').slice(0, 900);
-      const ref = ctx.cites.add({ title: r.session + ' 결의사항', url: 'archive.html#sec-%EA%B2%B0%EC%9D%98%EC%82%AC%ED%95%AD', kind: '노회 결의사항', snippet: text });
-      return { ref: ref, session: r.session, year: r.year, held_on: r.held_on, president: r.president, place: r.place, text: text };
+    let q = 'presbytery_report_pages?select=id,report_id,pdf_page,page_no,heading,text,presbytery_reports!inner(title,session,meet_on,kind)&presbytery_reports.kind=in.(회의결의서,임원회 결의)&order=report_id.desc,page_no&limit=12';
+    if (ws.length) q += '&' + allWords(['heading', 'text'], ws);
+    if (input.session) q += '&presbytery_reports.session=eq.' + parseInt(String(input.session).replace(/\D/g, ''), 10);
+    const rows = await sbGet(ctx.env, ctx.auth, q);
+    if (rows.error) return { error: /HTTP 4/.test(rows.error) ? '노회 회의결의는 정회원만 볼 수 있습니다.' : rows.error };
+    const list = rows.filter(function (r) { return r.presbytery_reports; });
+    if (!list.length) return { items: [], note: '회의결의서에서 그 낱말을 찾지 못했습니다. 다른 낱말이나 회기 번호로 다시 찾아 보십시오.' };
+    return { items: list.map(function (r) {
+      const rep = r.presbytery_reports || {};
+      const where = (rep.title || '회의결의서') + ' ' + (r.page_no != null ? r.page_no + '쪽' : 'PDF ' + r.pdf_page + '쪽') + (r.heading ? ' 「' + r.heading + '」' : '');
+      const sn = ws.length ? snippets(r.text, ws, 300, 4) : String(r.text || '').slice(0, 600);
+      const ref = ctx.cites.add({ title: where, url: 'resolutions.html?r=' + r.report_id + '&p=' + (r.page_no != null ? r.page_no : r.pdf_page) + (ws.length ? '&q=' + enc(ws[0]) : ''), kind: '노회 회의결의', snippet: sn });
+      return { ref: ref, report: rep.title, session: rep.session, meet_on: rep.meet_on, page: r.page_no, heading: r.heading, text: sn };
     }) };
   },
   async search_minutes(input, ctx) {
@@ -570,6 +590,39 @@ const RUN = {
     });
     if (!items.length) return { items: [], note: '시찰 자료에서 찾지 못했습니다. (질문한 분이 볼 수 있는 시찰 자료만 찾습니다)' };
     return { items: items };
+  },
+  async search_presbytery_reports(input, ctx) {
+    const ws = words(input.keyword || '');
+    if (!ws.length) return { error: '찾을 낱말을 주어야 합니다.' };
+    let q = 'presbytery_report_pages?select=id,report_id,pdf_page,page_no,heading,text,presbytery_reports(title,session,meet_on)&' + allWords(['heading', 'text'], ws) + '&order=report_id.desc,page_no&limit=12';
+    if (input.session) q += '&presbytery_reports.session=eq.' + parseInt(input.session, 10);
+    const rows = await sbGet(ctx.env, ctx.auth, q);
+    if (rows.error) return { error: /HTTP 4/.test(rows.error) ? '노회 보고서는 정회원만 볼 수 있습니다 (또는 131 sql 미실행).' : rows.error };
+    const list = rows.filter(function (r) { return r.presbytery_reports; });
+    if (!list.length) return { items: [], note: '회의자료 책자에서 그 낱말을 찾지 못했습니다. 다른 낱말로 다시 찾아 보십시오.' };
+    return { items: list.map(function (r) {
+      const rep = r.presbytery_reports || {};
+      const where = (rep.title || '노회 보고서') + ' ' + (r.page_no != null ? r.page_no + '쪽' : 'PDF ' + r.pdf_page + '쪽') + (r.heading ? ' 「' + r.heading + '」' : '');
+      const sn = snippets(r.text, ws, 300, 4);
+      const ref = ctx.cites.add({ title: where, url: 'presbytery-report.html?r=' + r.report_id + '&p=' + (r.page_no != null ? r.page_no : r.pdf_page) + '&q=' + enc(ws[0]), kind: '노회 보고서(회의자료)', snippet: sn });
+      return { ref: ref, report: rep.title, session: rep.session, meet_on: rep.meet_on, page: r.page_no, heading: r.heading, text: sn };
+    }) };
+  },
+  async search_directory(input, ctx) {
+    const ws = words(input.keyword || '');
+    if (!ws.length) return { error: '찾을 낱말을 주어야 합니다.' };
+    const cols = ['section', 'name', 'role', 'church', 'address', 'address2', 'pastor', 'elders', 'phone', 'email', 'website'];
+    const rows = await sbGet(ctx.env, ctx.auth, 'presbytery_directory?select=*&' + allWords(cols, ws) + '&order=sort,no,id&limit=25');
+    if (rows.error) return { error: /HTTP 4/.test(rows.error) ? '노회 주소록은 정회원만 볼 수 있습니다 (또는 132 sql 미실행).' : rows.error };
+    if (!rows.length) return { items: [], note: '주소록에서 그 낱말을 찾지 못했습니다. 교회 이름은 「교회」를 빼고(예: 목자), 사람은 이름만으로 다시 찾아 보십시오.' };
+    return { items: rows.map(function (r) {
+      const line = r.kind === 'person'
+        ? [r.section, r.role, r.name, r.church ? r.church + '교회' : '', r.phone].filter(Boolean).join(' · ')
+        : [r.section + (r.no != null ? ' ' + r.no : ''), r.name + '교회', [r.postcode, r.address, r.address2 ? '(' + r.address2 + ')' : ''].filter(Boolean).join(' '),
+           r.pastor ? '교역자 ' + r.pastor : '', r.elders ? '시무장로 ' + r.elders : '', r.phone, r.website, r.email].filter(Boolean).join(' · ');
+      const ref = ctx.cites.add({ title: '노회 주소록 — ' + r.section + ' ' + r.name, url: 'directory.html?q=' + enc(r.name) + '#' + enc(r.section), kind: '노회 주소록', snippet: line });
+      return { ref: ref, section: r.section, kind: r.kind, name: r.name, role: r.role, church: r.church, address: [r.postcode, r.address, r.address2].filter(Boolean).join(' '), pastor: r.pastor, elders: r.elders, phone: r.phone, website: r.website, email: r.email };
+    }) };
   },
   async search_dues(input, ctx) {
     /* 회기: 4월 ~ 이듬해 3월. 이번 회기 시작 연도 */

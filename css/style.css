@@ -2769,3 +2769,133 @@ mark.aih-key {
 .aih-voice.err { background: rgba(192, 57, 43, 0.35); }
 .aih-voice.hidden { display: none; }
 @media (max-width: 900px) { .aih-mic { order: 0; } .aih-form .aih-go { flex: 1 1 auto; } }
+
+/* ---------- 노회 보고서 (회의자료 책자) ---------- */
+.pr-books-h { display: flex; justify-content: space-between; align-items: center; }
+.pr-mini { border: 1px solid var(--gray-3); background: #fff; border-radius: 6px; padding: 2px 8px; font-size: 0.78rem; cursor: pointer; color: var(--navy); letter-spacing: 0; }
+.pr-mini:hover { border-color: var(--navy); }
+.pr-year { font-size: 0.78rem; font-weight: 700; color: var(--accent); margin: 8px 0 2px; }
+.pr-book { display: block; padding: 6px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 0.88rem; line-height: 1.35; }
+.pr-book small { display: block; color: var(--gray-5); font-size: 0.76rem; }
+.pr-book:hover { background: #fff; }
+.pr-book.on { background: var(--navy); color: #fff; }
+.pr-book.on small { color: rgba(255,255,255,0.75); }
+.pr-drop { border: 2px dashed var(--gray-3); border-radius: 12px; padding: 22px 16px; text-align: center; cursor: pointer; background: #fff; margin: 4px 0 12px; transition: border-color .15s, background .15s; }
+.pr-drop:hover, .pr-drop:focus { border-color: var(--accent); outline: none; }
+.pr-drop.over { border-color: var(--navy); background: #f3efe6; }
+.pr-drop.has { border-style: solid; border-color: var(--accent); }
+.pr-drop-ic { font-size: 1.6rem; color: var(--accent); line-height: 1; margin-bottom: 4px; }
+.pr-drop strong { display: block; font-size: 1rem; color: var(--navy); }
+.pr-drop span { display: block; font-size: 0.84rem; color: var(--gray-6); margin-top: 4px; }
+.pr-drop em { display: block; font-style: normal; font-size: 0.86rem; color: var(--navy); margin-top: 6px; font-weight: 700; }
+.pr-rules { margin: 0 0 12px; font-size: 0.88rem; background: var(--gray-1); border-radius: 8px; padding: 8px 12px; }
+.pr-rules summary { cursor: pointer; font-weight: 700; color: var(--navy); }
+.pr-rules ul { margin: 8px 0 0; padding-left: 18px; }
+.pr-rules li { margin: 3px 0; }
+@media (max-width: 760px) { .pr-wrap { grid-template-columns: 1fr; } .pr-wrap .pr-page { grid-column: auto; grid-row: auto; } .pr-side { position: static; max-height: none; } }
+.pr-search { display: flex; gap: 8px; margin: 0 0 16px; }
+.pr-search input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--gray-3); border-radius: 8px; font-size: 0.95rem; }
+.pr-main { max-width: 1480px; }   /* 책자 표(11칸)가 한 줄에 들어가도록 이 쪽만 넓게 */
+/* 왼쪽 묶음 메뉴(노회전자자료실)는 그대로 두고, 그 옆에 [책자][차례][본문] */
+.pr-wrap { display: grid; grid-template-columns: 190px 220px minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1400px) { .pr-wrap { grid-template-columns: 220px minmax(0, 1fr); } .pr-wrap .pr-page { grid-column: 2; grid-row: 1 / span 2; } .pr-wrap .pr-books { position: static; max-height: none; } }
+.pr-side { position: sticky; top: calc(var(--nav-h, 0px) + 16px); background: var(--cream, #fbf8f2); border: 1px solid var(--gray-2); border-radius: 12px; padding: 14px; max-height: calc(100vh - var(--nav-h, 0px) - 32px); overflow-y: auto; }
+.pr-side-h { font-size: 0.74rem; letter-spacing: 2px; color: var(--gray-5); margin-bottom: 6px; }
+.pr-toc { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--ink); text-decoration: none; font-size: 0.88rem; }
+.pr-toc.sec { font-weight: 700; }
+.pr-kids { margin: 0 0 6px; border-left: 2px solid var(--gray-2); margin-left: 10px; }
+.pr-toc.lv2 { padding-left: 14px; color: var(--gray-7); font-size: 0.85rem; }
+.pr-toc span { color: var(--gray-5); font-size: 0.8rem; }
+.pr-toc:hover { background: #fff; }
+.pr-toc.on { background: var(--navy); color: #fff; }
+.pr-toc.on span { color: #fff; }
+.pr-jump { display: flex; gap: 6px; }
+.pr-jump input { width: 80px; padding: 6px 8px; border: 1px solid var(--gray-3); border-radius: 6px; }
+.pr-page { background: #fff; border: 1px solid var(--gray-2); border-radius: 12px; padding: 20px 22px; min-height: 300px; }
+.pr-page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--gray-2); padding-bottom: 10px; margin-bottom: 14px; }
+.pr-page-no { font-size: 0.78rem; letter-spacing: 2px; color: var(--accent); }
+.pr-heading { margin: 2px 0 0; font-size: 1.2rem; border: 0; padding: 0; }
+.pr-heading::after { display: none; }
+.pr-page-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.pr-text { line-height: 1.8; font-size: 0.95rem; color: var(--ink); }
+.pr-text p { margin: 0 0 8px; }
+.pr-text .pr-sub { font-weight: 700; color: var(--navy); margin: 14px 0 6px; }
+.pr-text .pr-h { font-size: 1.05rem; color: var(--navy); margin: 16px 0 8px; border: 0; padding: 0; }
+.pr-text .pr-h::after { display: none; }
+.pr-line { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
+.pr-line > span:first-child { white-space: nowrap; }
+.pr-lead { flex: 1; min-width: 24px; border-bottom: 1px dotted var(--gray-3); transform: translateY(-5px); }
+.pr-page { min-width: 0; overflow: hidden; }
+.pr-tblwrap { max-width: 100%; overflow-x: auto; margin: 8px 0 16px; }
+.pr-tbl { width: 100%; border-collapse: collapse; font-size: 0.86rem; margin: 0; }
+.pr-tbl th, .pr-tbl td { border: 1px solid var(--gray-2); padding: 5px 7px; text-align: left; vertical-align: top; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
+.pr-tbl th { background: var(--gray-1); font-weight: 700; color: var(--gray-7); white-space: nowrap; }
+.pr-tbl .nw { white-space: nowrap; }   /* 이름·숫자처럼 짧은 칸은 줄을 나누지 않는다 (표가 넓으면 감싸개 안에서 가로로 민다) */
+.pr-tbl tr:nth-child(even) td { background: #fdfbf7; }
+.pr-res-h { font-weight: 700; color: var(--navy); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+.pr-res { display: block; padding: 10px 12px; border: 1px solid var(--gray-2); border-radius: 8px; background: var(--gray-1); margin-bottom: 6px; color: var(--ink); text-decoration: none; }
+.pr-res:hover { border-color: var(--accent); background: #fff; }
+.pr-res-t { display: block; font-size: 0.82rem; color: var(--navy); font-weight: 700; margin-bottom: 3px; }
+.pr-res-s { display: block; font-size: 0.86rem; color: var(--gray-7); line-height: 1.6; }
+#pr-results { margin-bottom: 16px; }
+.pr-progress { margin-top: 10px; }
+.pr-bar { height: 10px; background: var(--gray-2); border-radius: 99px; overflow: hidden; }
+.pr-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.pr-progress div:last-child { font-size: 0.84rem; color: var(--gray-5); margin-top: 4px; }
+@media (max-width: 900px) {
+  .pr-wrap { grid-template-columns: 1fr; }
+  /* 1400px 아래 규칙의 '본문은 둘째 칸'을 풀어야 한 줄로 쌓인다 (안 풀면 책자·차례가 좁은 첫 칸에 눌려 글자가 세로로 쪼개졌다) */
+  .pr-wrap .pr-page { grid-column: auto; grid-row: auto; }
+  .pr-wrap .pr-side { position: static; max-height: 260px; overflow-y: auto; }
+}
+
+/* ---------- 상단 메뉴의 왼쪽 세로 메뉴 (js/section-nav.js) — 관리자 메뉴보다 밝은 색 ---------- */
+.adm-side.sec { background: var(--cream, #fbf8f2); border-right: 1px solid var(--gray-2); color: var(--ink); }
+.adm-side.sec .adm-badge { color: var(--accent); font-size: 0.74rem; }
+.adm-side.sec .adm-link { color: var(--gray-7); }
+.adm-side.sec .adm-link:hover { background: #fff; color: var(--navy); }
+.adm-side.sec .adm-link.on { background: var(--navy); color: #fff; font-weight: 700; }
+.gnb-sub .gnb-kid { display: none; }                       /* 가지 항목은 왼쪽 묶음 메뉴에만 */
+.adm-side.sec .adm-link { font-weight: 700; color: var(--ink); }                 /* 상위 항목은 굵게 */
+.adm-side.sec .adm-link.lv2 { font-weight: 400; color: var(--gray-6); }          /* 가지는 보통 글씨 */
+.adm-side.sec .adm-link.lv2.on { color: #fff; }
+.adm-link.lv2 { padding-left: 26px; font-size: 0.85rem; position: relative; }
+.adm-link.lv2::before { content: ''; position: absolute; left: 13px; top: 0; bottom: 0; border-left: 1px solid var(--gray-3); }
+.adm-link.lv2.on::before { border-color: rgba(255,255,255,0.5); }
+.adm-side.sec .adm-exit { color: var(--gray-5); }
+.adm-side.sec .adm-exit:hover { color: var(--navy); }
+@media (max-width: 900px) {
+  .adm-side.sec .adm-toggle { background: var(--cream, #fbf8f2); color: var(--ink); border-bottom: 1px solid var(--gray-2); }
+  .adm-side.sec .adm-toggle-c { color: var(--gray-5); }
+}
+
+/* ---------- 노회 주소록 (directory.html) ---------- */
+.dir-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.dir-tab { border: 1px solid var(--gray-3); background: #fff; border-radius: 99px; padding: 6px 14px; font-size: 0.9rem; cursor: pointer; color: var(--gray-7); }
+.dir-tab small { color: var(--gray-5); margin-left: 2px; }
+.dir-tab.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+.dir-tab.on small { color: rgba(255,255,255,0.75); }
+.dir-h { font-size: 1.05rem; margin: 18px 0 8px; border: 0; padding: 0; }
+.dir-h::after { display: none; }
+.dir-h small { color: var(--gray-5); font-weight: 400; font-size: 0.85rem; }
+.dir-tbl { font-size: 0.88rem; }
+.dir-tbl td { vertical-align: top; line-height: 1.5; }
+.dir-tbl .dir-addr { min-width: 220px; }
+.dir-tbl .dir-tel { white-space: nowrap; }
+.dir-tbl .dir-tel a { color: var(--ink); text-decoration: none; border-bottom: 1px dotted var(--gray-4); }
+.dir-pc { font-size: 0.78rem; color: var(--gray-5); }
+.dir-sub { color: var(--gray-6); font-size: 0.8rem; }
+.dir-act { white-space: nowrap; }
+.cmp-row { display: block; padding: 6px 8px; border-bottom: 1px solid var(--gray-2); font-size: 0.9rem; cursor: pointer; }
+.cmp-row:hover { background: var(--gray-1); }
+.cmp-tag { display: inline-block; font-size: 0.74rem; padding: 1px 7px; border-radius: 99px; margin: 0 4px; color: #fff; }
+.cmp-add { background: #2e7d32; } .cmp-chg { background: var(--accent); } .cmp-del { background: var(--red); }
+.cmp-fields { margin: 4px 0 0 28px; padding: 0; font-size: 0.84rem; color: var(--gray-7); }
+.cmp-fields li { list-style: none; }
+.cmp-fields em { font-style: normal; color: var(--gray-5); }
+@media (max-width: 900px) { .dir-tbl { display: block; overflow-x: auto; } }
+.aih-chips-t { font-size: 0.76rem; color: rgba(255,255,255,0.7); letter-spacing: 1px; margin-right: 6px; align-self: center; }
+
+/* no-select-boxes: 상자처럼 누르는 메뉴·차례·탭은 여러 번 눌러도 글자가 선택돼 칠해지지 않게 (2026-10-21) */
+.pr-toc, .pr-book, .adm-link, .adm-sub a, .section-nav a, .lib-side a, .gnb-item > a,
+.np-item, .aih-h-item, .ai-model, .md-dot, .tabs button, .lib-tab, .dir-tab { -webkit-user-select: none; user-select: none; }

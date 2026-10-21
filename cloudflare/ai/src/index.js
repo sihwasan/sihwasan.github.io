@@ -54,7 +54,12 @@ const DEFAULTS = {
   roles: ['superadmin', 'president', 'clerk', 'staff', 'officer', 'member'],
   enabled: true,
   report_enabled: true,   /* 임원 업무 보고서 (매일 아침 6시) */
-  report_model: 'claude-opus-5-5',   /* 보고서는 Opus 5.5 로 (2026-10-21 사용자 지시). 비우면 검색과 같은 모델 */
+  /* 2026-10-21 사용자 지시: 화·목 노회장(Opus)·서기(Sonnet) 일일 보고서, 매월 첫째 월요일 전체(간사 제외) 월례 보고서(Sonnet),
+   * 간사는 보고서 대신 알림(업무 지시)만 */
+  report_model: 'claude-sonnet-5-5',        /* 월례 보고서 모델(직책별 모델이 없는 임원). 비우면 검색과 같은 모델 */
+  report_daily_model: 'claude-sonnet-5-5',  /* 일일 보고서 중 직책별 모델이 없는 분의 모델 */
+  report_weekly_day: 1,                     /* 월례 보고서 요일(그 달 첫째 주) — 1 월요일 */
+  report_duty_models: { president: 'claude-opus-5-5', clerk: 'claude-sonnet-5-5' },
   report_effort: 'medium'
 };
 /* 관리자 화면의 모델 고르기에 보여 줄 목록 (값: 1백만 토큰당 미화) */
@@ -111,6 +116,8 @@ function publicSettings(s, extra) {
   return Object.assign({
     model: s.model, effort: s.effort, daily_user: s.daily_user, daily_total: s.daily_total, roles: s.roles, enabled: s.enabled,
     report_enabled: s.report_enabled !== false, report_model: s.report_model || '', report_effort: s.report_effort || 'medium',
+    report_daily_model: s.report_daily_model || '', report_weekly_day: s.report_weekly_day == null ? 1 : s.report_weekly_day,
+    report_duty_models: s.report_duty_models || {},
     has_key: !!s.api_key, key_tail: s.api_key ? String(s.api_key).slice(-4) : '',
     updated_at: s.updated_at || null, updated_by: s.updated_by || null, models: MODELS
   }, extra || {});
@@ -315,7 +322,7 @@ function systemPrompt(me, built) {
     '자료를 찾는 법',
     '- 반드시 도구로 찾은 자료만 근거로 답합니다. 기억에 있는 내용으로 답하지 않습니다.',
     '- 총회 헌법(정치·권징조례·예배모범 등)과 총회 규정·결의는 search_assembly / get_assembly_article 로, 노회규칙은 search_presbytery_rules 로 찾습니다.',
-    '- 노회 사람·교회·조직·일정·공지·결의·회의록·시찰·상비부는 그에 맞는 search_* / get_organization 도구로 찾습니다.',
+    '- 노회 사람·교회·조직·일정·공지·결의·회의록·시찰·상비부·상회비는 그에 맞는 search_* / get_organization 도구로 찾습니다. 정기노회 회의자료 책자(각 부 보고·시찰 보고·명단)는 search_presbytery_reports 로, 교회 주소·전화·교역자·시무장로와 연합회 임원 연락처는 search_directory(노회 주소록)로 찾습니다.',
     '- 처음 찾은 결과가 질문과 맞지 않으면 낱말을 바꾸거나 범위를 좁혀 두세 번 더 찾습니다. 필요하면 여러 도구를 함께 씁니다.',
     '- 관리자가 원문을 확인해 승인해 둔 「확인된 답」이 있을 수 있습니다. 처음 자료를 찾을 때 search_verified_answers 를 다른 검색과 함께 부릅니다(search_assembly 결과 맨 앞에 verified 로 붙어 오기도 합니다).',
     '- 질문과 맞는 확인된 답이 있으면 그것을 우선 근거로 씁니다. 답의 첫 문장 끝에 그 확인된 답의 근거 번호를 달아(구절도 그 확인된 답 글에서) 관리자가 확인한 답임을 보이고, 반드시 그 답이 기대는 원문 조문·결의·규칙을 해당 도구로 다시 찾아 확인해 각 문장에 원문 근거 번호를 함께 답니다. 원문과 다르면 원문을 따르고 그 차이를 짧게 알립니다. 질문과 맞지 않는 확인된 답은 쓰지 않습니다.',
@@ -566,7 +573,9 @@ async function feedback(request, env, origin) {
 function reportDeps(s, env) {
   const via = env && env.CLAUDE ? function (u, init) { return env.CLAUDE.fetch(u, init); } : null;
   return { claudeCall: function (key, body, onText) { return claudeCall(key, body, onText, via); },
-    key: s.api_key, model: s.report_model || s.model, effort: s.report_effort || 'medium' };
+    key: s.api_key, model: s.report_model || s.model, effort: s.report_effort || 'medium',
+    dailyModel: s.report_daily_model || s.report_model || s.model, weeklyDay: s.report_weekly_day == null ? 1 : Number(s.report_weekly_day),
+    dutyModels: s.report_duty_models || {} };
 }
 /* 실패도 마지막 실행 기록에 남긴다 (관리자 화면에서 보이게) */
 async function saveRunError(env, trigger, by, message) {
@@ -688,10 +697,84 @@ async function settings(request, env, origin, test) {
   if (typeof body.report_enabled === 'boolean') next.report_enabled = body.report_enabled;
   if (typeof body.report_model === 'string' && (body.report_model === '' || MODELS.some(function (m) { return m.id === body.report_model; }))) next.report_model = body.report_model;
   if (typeof body.report_effort === 'string' && ['low', 'medium', 'high'].indexOf(body.report_effort) !== -1) next.report_effort = body.report_effort;
+  if (typeof body.report_daily_model === 'string' && (body.report_daily_model === '' || MODELS.some(function (m) { return m.id === body.report_daily_model; }))) next.report_daily_model = body.report_daily_model;
+  if (body.report_weekly_day != null && [0, 1, 2, 3, 4, 5, 6].indexOf(Number(body.report_weekly_day)) !== -1) next.report_weekly_day = Number(body.report_weekly_day);
+  if (body.report_duty_models && typeof body.report_duty_models === 'object') {
+    const dm = {};
+    ['president', 'clerk', 'treasurer', 'staff', 'minutes', 'vice_president', 'vice_clerk', 'officer'].forEach(function (k) {
+      const v = body.report_duty_models[k];
+      if (typeof v === 'string' && v && MODELS.some(function (m) { return m.id === v; })) dm[k] = v;
+    });
+    next.report_duty_models = dm;
+  }
   next.updated_at = new Date().toISOString();
   next.updated_by = me.name || me.id;
   await env.AI_KV.put('settings', JSON.stringify(next));
   return reply(publicSettings(next, { saved: true, usage: await usageToday(env, me.id) }), 200, origin);
+}
+
+/* ---------- 회의자료 책자 쪽 읽기 (관리자) ----------
+ * 홈페이지(presbytery-report.html)가 PDF 한 쪽(펼침면)을 그림으로 바꿔 보내면,
+ * Claude 가 왼쪽·오른쪽 면을 나누어 인쇄 쪽 번호·제목·글을 그대로 받아 적는다. */
+const OCR_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    pages: { type: 'array', items: { type: 'object', additionalProperties: false,
+      properties: {
+        no: { type: ['integer', 'null'], description: '그 면에 인쇄된 쪽 번호. 없으면 null' },
+        heading: { type: ['string', 'null'], description: '그 면의 큰 제목 (예: 서기 사무보고, 재정부 보고). 없으면 null' },
+        text: { type: 'string', description: '그 면의 글 전부. 줄마다 줄바꿈 문자로 나눈다. 제목은 "## 제목", 표는 마크다운 표(| 칸 | 칸 |)로 적는다. 빈 면이면 빈 글' }
+      }, required: ['no', 'heading', 'text'] } },
+    toc: { type: 'array', description: '이 면이 차례(목차)면 그 항목들. 아니면 빈 배열', items: { type: 'object', additionalProperties: false,
+      properties: { title: { type: 'string' }, page: { type: 'integer' }, level: { type: 'integer', description: '1=큰 항목, 2=작은 항목' } },
+      required: ['title', 'page', 'level'] } }
+  },
+  required: ['pages', 'toc']
+};
+const OCR_PROMPT =
+  '이 그림은 대한예수교장로회 시화산노회 정기노회 회의자료 책자의 한 쪽을 스캔한 것입니다. 보통 왼쪽 면과 오른쪽 면이 함께 보입니다(펼침면). ' +
+  '면마다 따로, 인쇄된 쪽 번호(보통 아래 가운데 동그라미 안 숫자), 그 면의 큰 제목, 그리고 글 전부를 받아 적어 주세요. ' +
+  '글자를 바꾸거나 요약하지 말고 보이는 그대로 적습니다. 이름·교회 이름·숫자·날짜·금액은 특히 정확하게 적습니다. ' +
+  '적는 법: ' +
+  '(1) 줄과 줄은 반드시 줄바꿈 문자로 나눕니다. 줄을 " | " 나 다른 기호로 잇지 않습니다. 다만 문단 글은 인쇄된 줄바꿈을 따라 자르지 않고, 한 문장·한 항목이 두 줄에 걸쳐 있으면 한 줄로 이어 적습니다. ' +
+  '(2) heading 에는 그 면의 큰 제목만 적습니다(예: "제20회 정기회 소집 통지서", "서기 사무 보고"). 기관 이름("대한예수교장로회 시화산노회")·문서 번호·날짜는 제목이 아니므로 heading 에 넣지 않고 보통 줄로 적습니다. ' +
+  'text 의 첫 줄은 heading 과 같은 "## 제목" 한 줄이고, 그 아래 작은 제목(예: "## 3. 유의사항", "## 북부시찰")에만 "## "를 씁니다. 번호 항목(1. / 가. / 1) / ◈ / ※)은 한 항목이 한 줄이며 "## "를 붙이지 않습니다. ' +
+  '(3) 표는 마크다운 표로 적습니다: 첫 줄이 머리글 "| 역대 | 년도 | 회기 |", 둘째 줄이 "|---|---|---|", 그다음은 줄마다 한 행. ' +
+  '모든 행의 칸 수를 머리글과 똑같이 맞추고 빈 칸은 빈 채로 둡니다("|  |"). 한 칸에 이름이 둘 이상 겹쳐 있으면 그 한 칸 안에 "·"로 이어 적습니다(예: "김종택·이성팔"). ' +
+  '표 밖의 합계·비고 줄(예: "부목사 8명중( 명 참석)")은 표 다음에 따로 한 줄로 적습니다. 나란히 놓인 두 표는 따로따로 적습니다. ' +
+  '(4) 점선(……·----)으로 이어진 차례·순서 줄은 "항목 …… 쪽" 꼴로 점선을 남기고 한 줄에 하나씩 적습니다. ' +
+  '빈 면이나 그림만 있는 면은 text 를 빈 글로 두고 no 는 null 로 둡니다. 차례(목차) 면이면 toc 에 항목과 쪽 번호를 적습니다. 왼쪽 면을 먼저, 오른쪽 면을 다음에 둡니다.';
+
+async function ocrPage(request, env, origin) {
+  const me = await whoIs(request, env);
+  if (!me) return reply({ error: '로그인이 확인되지 않았습니다.' }, 401, origin);
+  if (ADMIN_ROLES.indexOf(me.role) === -1) return reply({ error: '관리자만 책자를 읽힐 수 있습니다.' }, 403, origin);
+  const s = await getSettings(env);
+  if (!s.api_key) return reply({ error: 'AI 열쇠(API 키)가 아직 등록되지 않았습니다.' }, 503, origin);
+  const body = await request.json().catch(function () { return null; });
+  if (!body || !body.image) return reply({ error: '그림이 없습니다.' }, 400, origin);
+  if (String(body.image).length > 9 * 1024 * 1024) return reply({ error: '그림이 너무 큽니다.' }, 400, origin);
+  const mt = ['image/jpeg', 'image/png', 'image/webp'].indexOf(body.media_type) !== -1 ? body.media_type : 'image/jpeg';
+  const req = {
+    model: s.model,
+    max_tokens: 8000,
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: OCR_SCHEMA } },
+    messages: [{ role: 'user', content: [
+      { type: 'image', source: { type: 'base64', media_type: mt, data: String(body.image) } },
+      { type: 'text', text: OCR_PROMPT + (body.hint ? ' (책자: ' + String(body.hint).slice(0, 80) + ', PDF ' + (body.pdf_page || '?') + '쪽)' : '') }
+    ] }]
+  };
+  try {
+    const res = await claudeCall(s.api_key, req, null);
+    if (res.stop_reason === 'refusal') return reply({ error: '이 쪽은 읽을 수 없다고 응답했습니다.' }, 200, origin);
+    const text = res.content.filter(function (b) { return b.type === 'text'; }).map(function (b) { return b.text; }).join('');
+    let out = null;
+    try { out = JSON.parse(text); } catch (e) { return reply({ error: '읽은 결과를 해석하지 못했습니다.' }, 200, origin); }
+    out.model = res.model; out.usage = res.usage ? { input_tokens: res.usage.input_tokens, output_tokens: res.usage.output_tokens } : null;
+    return reply(out, 200, origin);
+  } catch (e) {
+    return reply({ error: (e && e.message) || String(e) }, 502, origin);
+  }
 }
 
 export default {
@@ -712,6 +795,7 @@ export default {
       if (path === '/feedback' && request.method === 'POST') return await feedback(request, env, origin);
       if (path === '/reports/run' && request.method === 'POST') return await reportsRun(request, env, ctx, origin);
       if (path === '/history' || path.indexOf('/history/') === 0) return await historyApi(request, env, origin, path);
+      if (path === '/ocr' && request.method === 'POST') return await ocrPage(request, env, origin);
       if (path === '/settings' && (request.method === 'GET' || request.method === 'POST')) return await settings(request, env, origin, false);
       if (path === '/settings/test' && request.method === 'POST') return await settings(request, env, origin, true);
       return reply({ error: '없는 주소입니다.' }, 404, origin);

@@ -126,6 +126,11 @@ var SHSRules = (function () {
           container.querySelectorAll('.tab-panel').forEach(function (p) {
             p.classList.toggle('active', p.id === b.dataset.tab);
           });
+          /* 주소 해시를 탭에 맞추고, 왼쪽 묶음 메뉴(각종 내규의 가지)도 따라 켜지게 */
+          if (b.dataset.tab && history.pushState && location.hash !== '#' + b.dataset.tab) {
+            history.pushState(null, '', '#' + b.dataset.tab);
+            window.dispatchEvent(new Event('hashchange'));
+          }
         });
       });
 

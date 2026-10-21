@@ -104,6 +104,33 @@ var SHSAI = (function () {
   }
 
   /* ---------- 화면 ---------- */
+  /* 보기 질문(칩) — 회원들이 가장 많이 물은 질문을 많이 물은 순서로 보인다 (133 sql: ai_popular_questions).
+   * 아직 기록이 적으면 미리 적어 둔 보기로 채운다. */
+  function bindChips() {
+    box.querySelectorAll('.aih-chip').forEach(function (b) {
+      b.addEventListener('click', function () { ask(b.dataset.q); });
+    });
+  }
+  function renderChips(list, learned) {
+    var wrap = box.querySelector('#aih-chips');
+    if (!wrap) return;
+    wrap.innerHTML = (learned ? '<span class="aih-chips-t">자주 묻는 질문</span>' : '') +
+      list.map(function (q) { return '<button type="button" class="aih-chip" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('');
+    bindChips();
+  }
+  function loadPopular() {
+    if (!(window.SHSCloud && SHSCloud.init)) return;
+    SHSCloud.init().then(function (c) {
+      return c.rpc('ai_popular_questions', { n: 6, days: 180 });
+    }).then(function (r) {
+      if (!r || r.error || !Array.isArray(r.data)) return;        /* 133 sql 전이면 조용히 보기 질문 그대로 */
+      var seen = {}, list = [];
+      r.data.forEach(function (x) { var q = String(x.question || '').trim(); if (q && !seen[q]) { seen[q] = 1; list.push(q); } });
+      if (list.length < 3) return;
+      EXAMPLES.forEach(function (q) { if (list.length < 6 && !seen[q]) { seen[q] = 1; list.push(q); } });
+      renderChips(list.slice(0, 6), true);
+    }).catch(function () {});
+  }
   function mount(el, u) {
     box = el; user = u;
     if (!box) return;
@@ -137,9 +164,8 @@ var SHSAI = (function () {
       var q = box.querySelector('#aih-q').value.trim();
       if (q) ask(q);
     });
-    box.querySelectorAll('.aih-chip').forEach(function (b) {
-      b.addEventListener('click', function () { ask(b.dataset.q); });
-    });
+    bindChips();
+    loadPopular();
     var mic = box.querySelector('#aih-mic');
     if (mic) mic.addEventListener('click', toggleVoice);
     box.addEventListener('click', function (ev) {

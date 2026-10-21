@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>임원방 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20261020fb">
+<link rel="stylesheet" href="css/style.css?v=20261021w">
 </head>
 <body>
 
@@ -30,6 +30,7 @@
 <script src="js/ledger.js?v=20260911d"></script>
 <script src="js/church-report.js?v=20260903a"></script>
 <script src="js/absence.js?v=20261021a"></script>
+<script src="js/dues-notice.js?v=20261021dn"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  /* 노회 재정부 장부를 볼 수 있는가 — 회계·부회계(와 총관리자)는 바로 알 수 있고,
@@ -1198,6 +1199,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* ----- 시찰별 진행 그래프 ----- */
     h += sichalChartHtml();
+    /* 노회규칙 제29조 적용 현황 — 그린 뒤 loadRule29 가 채운다 */
+    h += '<div id="du-r29"></div>';
+    /* 3개월 이상 미납 — 납부촉구 공문·월례회 보고서 (js/dues-notice.js · 137 sql) */
+    h += '<div id="du-notice"></div>';
 
     /* ----- 완납/미납 필터와 검색 ----- */
     var elNow = duesElapsed();
@@ -1273,6 +1278,89 @@ document.addEventListener('DOMContentLoaded', function () {
     bindDuesHead();
     bindDuesCells();
     bindDuesFilter();
+    loadRule29();
+    if (window.SHSDuesNotice) SHSDuesNotice.mount(document.getElementById('du-notice'), { year: duesYear, user: user });
+  }
+
+  /* ----- 노회규칙 제29조 적용 현황 (supabase/135_dues_rule29.sql) -----
+   * 기한(그 달 말)이 지난 상회비 미납이 있는 교회와, 그 교회 소속으로 노회 임원·총회 총대·
+   * 시찰 임원·상비부 임원(부장·서기·회계)을 맡은 분. 세례의무금은 세지 않는다.
+   * 관리자·회계는 <미납 안내 알림 보내기>로 당사자에게 알림을 보낸다 (자동으로도 달마다 한 번 나간다). */
+  function loadRule29() {
+    var slot = document.getElementById('du-r29');
+    if (!slot) return;
+    SHSCloud.init().then(function (c) {
+      return Promise.all([
+        c.rpc('dues29_churches', { p_year: duesYear }),
+        c.rpc('dues29_affected', { p_year: duesYear })
+      ]);
+    }).then(function (rs) {
+      if (rs[0].error) throw rs[0].error;
+      var churches = rs[0].data || [];
+      var people = (rs[1] && rs[1].data) || [];
+      var h = '<div class="admin-card" style="margin:14px 0 18px;border-left:4px solid ' +
+        (churches.length ? 'var(--red)' : '#2c7a3f') + '">' +
+        '<h4 style="margin:0 0 6px">노회규칙 제29조 적용 현황 ' +
+        '<span style="font-weight:400;font-size:0.84rem;color:var(--gray-5)">기한(그 달 말)이 지난 상회비 미납 기준 · 세례의무금은 제외</span></h4>';
+      if (!churches.length) {
+        h += '<p class="mydues-ok" style="margin:0">' + duesYear + '년 회기에 기한 지난 미납 교회가 없습니다.</p></div>';
+        slot.innerHTML = h;
+        return;
+      }
+      h += '<p style="margin:0 0 10px;font-size:0.9rem">미납 교회 <strong>' + churches.length + '곳</strong> · ' +
+        '임원·총대 자격 제한(제3항) 해당 <strong>' + people.length + '명</strong>. ' +
+        '미납 교회 회원은 서류 발급 신청과 청원서 전달이 막혀 있습니다(제1항). 상비부 부원은 임원이 아니므로 세지 않습니다.</p>';
+      h += '<div style="overflow-x:auto"><table class="tbl"><thead><tr>' +
+        '<th style="width:90px">시찰</th><th>교회</th><th style="width:190px">기한 지난 미납</th>' +
+        '<th>제3항 해당자 (맡은 직책)</th><th style="width:110px">마지막 안내</th></tr></thead><tbody>';
+      churches.forEach(function (ch) {
+        var ps = people.filter(function (p) { return p.out_church === ch.out_church; });
+        h += '<tr><td>' + e(ch.out_sichal) + '</td>' +
+          '<td class="left"><strong>' + e(ch.out_church) + '</strong>' +
+          (ch.out_pastor ? ' <span style="color:var(--gray-5);font-size:0.84rem">' + e(ch.out_pastor) + '</span>' : '') + '</td>' +
+          '<td><span style="color:var(--red);font-weight:700">' + (ch.out_late_months || []).join('·') + '월</span> · ' +
+          ch.out_late_count + '개월 ' + manwon(ch.out_late_amount) + '원' +
+          (ch.out_cur_unpaid ? ' <span style="font-size:0.78rem;color:var(--gray-5)">(이번 달분도 미납·기한 전)</span>' : '') + '</td>' +
+          '<td class="left">' + (ps.length
+            ? ps.map(function (p) {
+                return '<div>' + e(p.out_name) +
+                  (p.out_category ? ' <span style="color:var(--gray-5);font-size:0.84rem">' + e(p.out_category) + '</span>' : '') +
+                  ' — ' + e((p.out_roles || []).join(', ')) +
+                  (p.out_user_id ? '' : ' <span style="font-size:0.78rem;color:var(--gray-5)">(계정 없음 — 알림 못 받음)</span>') + '</div>';
+              }).join('')
+            : '<span style="color:var(--gray-5)">해당 없음</span>') + '</td>' +
+          '<td style="font-size:0.84rem">' + (ch.out_notified_at ? e(String(ch.out_notified_at).slice(0, 10)) : '-') + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+      if (canDues) {
+        h += '<p style="margin:10px 0 0"><button class="btn sm" id="du-r29-send">미납 안내 알림 보내기</button> ' +
+          '<span style="font-size:0.82rem;color:var(--gray-5)">미납 교회의 담임목사·장로와 직책을 맡은 분에게 알림함으로 보내고, ' +
+          '회계·서기·노회장·간사에게 요약을 보냅니다. 자동으로도 달마다 한 번(유예일 뒤) 나갑니다.</span>' +
+          '<span class="form-msg" id="du-r29-msg"></span></p>';
+      }
+      h += '</div>';
+      slot.innerHTML = h;
+      var sb = document.getElementById('du-r29-send');
+      if (sb) sb.addEventListener('click', function () {
+        if (!confirm('미납 교회 ' + churches.length + '곳의 담임목사·장로와 직책을 맡은 분에게 상회비 미납 안내 알림을 보냅니다.\n' +
+          '오늘 이미 받은 분에게는 다시 가지 않습니다.\n\n보내시겠습니까?')) return;
+        sb.disabled = true;
+        SHSCloud.init().then(function (c) {
+          return c.rpc('notify_dues_rule29', { p_manual: true });
+        }).then(function (r) {
+          if (r.error) throw r.error;
+          document.getElementById('du-r29-msg').textContent = ' ' + r.data + '명에게 보냈습니다.';
+          SHSCloud.log('create', '상회비 미납 안내 알림', r.data + '명');
+          loadRule29();
+        }).catch(function (err) {
+          sb.disabled = false;
+          document.getElementById('du-r29-msg').textContent = ' 보내지 못했습니다: ' + (err.message || err);
+        });
+      });
+    }).catch(function (err) {
+      slot.innerHTML = '<p style="font-size:0.84rem;color:var(--gray-5)">제29조 적용 현황을 불러오지 못했습니다' +
+        ' (135_dues_rule29.sql 을 아직 실행하지 않았을 수 있습니다): ' + e(err.message || err) + '</p>';
+    });
   }
 
   function bindDuesFilter() {
