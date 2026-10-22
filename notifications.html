@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
-<script src="js/main.js?v=20261022m"></script>
+<script src="js/main.js?v=20261022n"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -160,6 +160,14 @@ document.addEventListener('DOMContentLoaded', function () {
       function itemHtml(n, isOld) {
           /* 알림마다 갈 곳이 있으면 <바로 가기>(문의는 <답장하기>)를 붙인다 */
           var goTo = SHS.notiTargetOf ? SHS.notiTargetOf(n, user) : null;
+          /* 청빙 임기 알림(139) — 글 끝의 주소 줄은 글에서 빼고 <청원서 작성>·<교인 청빙서 작성> 단추로 보인다 */
+          var callTerm = String(n.dedupe_key || '').indexOf('callterm-') === 0;
+          var body = String(n.body || ''), extraBtn = '';
+          if (callTerm) {
+            var lm = body.match(/교인 청빙서 작성 : (petition\.html\S*)/);
+            if (lm) extraBtn = '<a class="btn ghost sm" href="' + e(lm[1]) + '" style="margin-right:6px">교인 청빙서 작성</a>';
+            body = body.replace(/\n*청원서 작성 바로 가기 : \S+/, '').replace(/\n*교인 청빙서 작성 : \S+/, '');
+          }
           return '<div class="noti-item' + (isOld ? ' old' : (n.read_at ? '' : ' unread')) + '">' +
             '<div class="n-head"><span class="n-kind">' + e(n.kind) + '</span>' +
             (isOld ? '<span class="n-past">기간 지남</span>' : '') +
@@ -167,11 +175,12 @@ document.addEventListener('DOMContentLoaded', function () {
             '<span class="n-date">' + e(String(n.created_at).replace('T', ' ').slice(0, 16)) + '</span></div>' +
             (n.sent_by_name
               ? '<div class="n-from">보낸이 ' + e(n.sent_by_name) + '</div>' : '') +
-            '<div class="n-body">' + e(n.body || '') + '</div>' +
+            '<div class="n-body">' + e(body) + '</div>' +
             '<p style="margin:10px 0 0">' +
             (goTo
               ? '<a class="btn sm" href="' + e(goTo) + '" style="margin-right:6px">' +
-                (n.kind === '문의' ? '답장하기' : '바로 가기') + '</a>' : '') +
+                (n.kind === '문의' ? '답장하기' : callTerm ? '청원서 작성' : '바로 가기') + '</a>' : '') +
+            extraBtn +
             (n.read_at ? '' : '<button class="btn ghost sm" data-ntread="' + n.id + '" style="margin-right:6px">읽음</button>') +
             '<button class="btn danger sm" data-ntdel="' + n.id + '">삭제</button>' +
             '</p>' +

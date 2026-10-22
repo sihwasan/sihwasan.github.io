@@ -671,6 +671,8 @@
                 c.rpc('run_elder_term_notice').then(quiet, quiet),
                 /* 상회비 미납 안내 — 노회규칙 제29조, 달마다 한 번 (135 sql 을 실행하기 전이면 조용히 건너뛴다) */
                 c.rpc('notify_dues_rule29', { p_manual: false }).then(quiet, quiet),
+                /* 청빙 임기 40일 전 — 부목사는 당회장에게, 시무목사는 시찰장·서기에게 (139 sql 전이면 조용히 건너뛴다) */
+                c.rpc('run_call_term_notice').then(quiet, quiet),
                 /* 날짜가 지난 임직식을 회원 명단에 반영 (121 sql 을 실행하기 전이면 조용히 건너뛴다) */
                 c.rpc('apply_ordinations').then(quiet, quiet),
                 /* 보안 점검 — 예약(pg_cron)이 안 될 때의 대비, 20시간 안에 했으면 서버가 건너뛴다 (126 sql) */
@@ -870,6 +872,11 @@
     if (key.indexOf('elder-term-') === 0) {
       return 'elder-notice.html';
     }
+    /* 청빙 임기 40일 전(139) — 글 안의 청원서 작성 주소(칸을 미리 채운 청빙청원서)로 */
+    if (key.indexOf('callterm-') === 0) {
+      var pl = String(n.body || '').match(/petition\.html[^\s]*/);
+      return pl ? pl[0] : 'petition.html?form=call';
+    }
     if (n.kind === '서류') {
       if (key.indexOf('docissue-') === 0) {
         return 'certificate.html?id=' + key.slice(9);
@@ -955,7 +962,9 @@
         '<strong class="nt-title">' + SHS.esc(n.title || '') + '</strong>' +
         '<span class="nt-body">' + SHS.esc(String(n.body || '').slice(0, 90)) + '</span>' +
         '<span class="nt-go">' +
-        (n.kind === '문의' ? '답장하기' : (n.kind === '서류' || n.kind === '총대 안내' || n.kind === '일정' || n.kind === '보안') ? '바로 가기' : '알림함에서 보기') +
+        (n.kind === '문의' ? '답장하기'
+          : String(n.dedupe_key || '').indexOf('callterm-') === 0 ? '청원서 작성'
+          : (n.kind === '서류' || n.kind === '총대 안내' || n.kind === '일정' || n.kind === '보안') ? '바로 가기' : '알림함에서 보기') +
         '</span>' +
         '</a>';
       setTimeout(function () { wrap.appendChild(card); }, i * 250);

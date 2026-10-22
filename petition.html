@@ -244,7 +244,7 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
-<script src="js/main.js?v=20261022m"></script>
+<script src="js/main.js?v=20261022n"></script>
 <script>
 (function () {
   'use strict';
@@ -1939,6 +1939,13 @@ body.pt-view.pt-embed { background: var(--paper, #fcfbf9); }
     var f0 = FORMS.filter(function (x) { return x.id === fm[1]; })[0];
     if (f0) cur = f0;
   }
+  /* 알림의 <청원서 작성>(?form=call&v_kind=부목사계속&v_name=…)으로 들어오면 그 서식의 칸을 미리 채운다
+   * (139 청빙 임기 40일 전 알림 — 청빙 구분·대상자·교회명·당회장) */
+  location.search.replace(/[?&]v_([a-z]+)=([^&]*)/g, function (m0, k, v) {
+    if (!cur.fields.some(function (f) { return f.k === k; })) return m0;
+    try { data[k] = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (x) { /* 깨진 주소는 건너뛴다 */ }
+    return m0;
+  });
 
   /* 시찰 화면에서 ?sichal=이름 으로 들어오면 시찰보고서에 그 시찰을 미리 채운다 */
   var sm0 = location.search.match(/[?&]sichal=([^&]*)/);
