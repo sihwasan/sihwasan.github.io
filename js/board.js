@@ -78,6 +78,7 @@ var SHSBoard = (function () {
       schedmgr: hicon('<rect x="8" y="12" width="32" height="28" rx="3"/><path d="M8 20h32M16 8v8M32 8v8"/><path d="M24 26v8M20 30h8"/>'),
       assembly: hicon('<path d="M6 18 24 8l18 10"/><path d="M11 22v14M19 22v14M29 22v14M37 22v14"/><path d="M6 40h36"/><path d="M8 18h32"/>'),
       audit: hicon('<path d="M13 8h22v32H13z"/><path d="M19 8V5h10v3"/><path d="M19 18h10M19 24h10M19 30h6"/><path d="M28 34l3 3 6-7"/>'),
+      call: hicon('<circle cx="24" cy="26" r="14"/><path d="M24 18v8l6 4"/><path d="M19 6h10M24 6v6"/>'),
       oreport: hicon('<rect x="10" y="7" width="28" height="34" rx="3"/><path d="M16 16h16M16 22h16M16 28h9"/><path d="M28 33l3 3 6-7"/>')
     };
 
@@ -109,6 +110,8 @@ var SHSBoard = (function () {
         cards += hubCard('sichal', '나의 시찰');
         /* 상회비를 볼 수 있는 분에게만 연다 (duesGate 가 확인한 뒤 보인다) */
         cards += hubCard('mydues', '나의 상회비', '상회비 · 세례의무금', { cid: 'hub-card-mydues', hidden: true, badge: 'hub-badge-mydues' });
+        /* 부목사·시무목사에게만 — 나의 남은 청빙 임기 (loadCallTerm 이 열고 채운다) */
+        cards += hubCard('call', '나의 청빙 임기', '', { cid: 'hub-card-call', hidden: true, badge: 'hub-badge-call' });
         cards += hubCard('com', '상비부', '');
       }
       cards += hubCard('doc', '서류 발급', '');
@@ -125,6 +128,8 @@ var SHSBoard = (function () {
         /* 서기 알림 카드 자리 — 정기노회 4주 전 총대 장로 임기 확인 (js/elder-notice.js) */
         /* 상회비 미납 안내 자리 — 노회규칙 제29조 (loadRule29 가 채운다) */
         '<div id="hub-dues29"></div>' +
+        /* 청빙 임기 안내 자리 — 부목사·시무목사 본인의 임기가 넉 달 안이거나 끝났을 때 (loadCallTerm) */
+        '<div id="hub-call"></div>' +
         '<div id="hub-elder"></div>' +
         '<div id="hub-home" class="dash-hub">' +
         '<div class="hub-left">' +
@@ -190,6 +195,8 @@ var SHSBoard = (function () {
         if (elderSlot) elderSlot.classList.toggle('hidden', !!panel);
         var d29Slot = document.getElementById('hub-dues29');
         if (d29Slot) d29Slot.classList.toggle('hidden', !!panel);
+        var callSlot = document.getElementById('hub-call');
+        if (callSlot) callSlot.classList.toggle('hidden', !!panel);
         if (!panel) {
           document.getElementById('hub-detail').classList.add('hidden');
           document.getElementById('hub-home').classList.remove('hidden');
@@ -364,6 +371,8 @@ var SHSBoard = (function () {
           if (b.dataset.hub === 'oreport') { location.href = 'officer-report.html'; return; }
           /* 내 정보는 내 정보 화면으로 바로 간다 */
           if (b.dataset.hub === 'me') { location.href = 'mypage.html'; return; }
+          /* 나의 청빙 임기는 내 정보의 청빙 칸으로 바로 간다 */
+          if (b.dataset.hub === 'call') { location.href = 'mypage.html#call'; return; }
           /* 나의 시찰은 그 시찰 화면으로 바로 간다 */
           if (b.dataset.hub === 'sichal' && hubSicLink) { location.href = hubSicLink; return; }
           location.hash = 'hub-' + b.dataset.hub;
@@ -377,6 +386,66 @@ var SHSBoard = (function () {
       hubFromHash();
       loadAudit();
       loadRule29();
+      loadCallTerm();
+    }
+
+    /* ---------- 나의 청빙 임기 ----------
+     * 부목사(1년)·시무목사(3년) 본인에게 남은 청빙 임기를 카드로 보이고,
+     * 넉 달 안으로 줄었거나 이미 끝났으면 맨 위에 안내를 띄운다.
+     * 셈은 관리자 명단과 같은 SHS.callTerm (명단의 call_on·call_until) */
+    function loadCallTerm() {
+      var CALL_NOTICE_DAYS = 120;   /* 넉 달 */
+      if (!user.cloud || isSuper || !SHS.callTerm) return;
+      SHSCloud.init().then(function (c) { return c.rpc('my_member'); }).then(function (r) {
+        var m = r && !r.error && r.data && r.data[0];
+        if (!m) return;
+        var t = SHS.callTerm({
+          category: m.out_category, position: m.out_position,
+          call_on: m.out_call_on, call_until: m.out_call_until
+        });
+        if (!t.kind) return;   /* 위임목사·장로 등 — 청빙 임기가 없다 */
+        var card = document.getElementById('hub-card-call');
+        if (card) {
+          var sub = card.querySelector('.hc-s');
+          if (!sub) {
+            sub = document.createElement('span');
+            sub.className = 'hc-s';
+            card.querySelector('.hc-t > span').appendChild(sub);
+          }
+          sub.textContent = t.state === 'none' ? '기록 없음 · 노회 서기에게 문의' : t.left + ' (' + t.until + ' 만료)';
+          card.classList.remove('hidden');
+        }
+        var near = t.state !== 'none' && t.days !== null && t.days <= CALL_NOTICE_DAYS;
+        var badge = document.getElementById('hub-badge-call');
+        if (badge && near) {
+          badge.textContent = t.days < 0 ? '임기 끝남' : '곧 만료';
+          badge.classList.remove('hidden');
+        }
+        var top = document.getElementById('hub-call');
+        if (top && near) top.innerHTML = callNoticeHtml(t, m.out_call_acting);
+      }).catch(function () {});
+    }
+    function callNoticeHtml(t, acting) {
+      var assoc = t.kind === 'assoc';
+      var over = t.days < 0;
+      var color = over ? 'var(--red)' : '#b0731f';
+      return '<div class="notice-banner" style="border-left:4px solid ' + color + ';margin:0 0 18px">' +
+        '<strong style="color:' + color + '">' + esc(t.kindName) + ' 청빙 임기 ' +
+        (over ? '— 임기가 끝났습니다' : '— 넉 달 안으로 끝납니다') + '</strong><br>' +
+        esc(t.on) + ' 허락 · <strong>' + esc(t.until) + ' 만료</strong> · ' +
+        '<strong style="color:' + color + '">' + esc(t.left) + '</strong>' +
+        '<p style="margin:8px 0 0;font-size:0.9rem">' +
+        (assoc
+          ? '부목사는 시무 기간이 ' + SHS.ASSOC_YEARS + '년입니다. 정기노회에서 <strong>부목사 계속 청빙청원</strong>이 ' +
+            '가결되어야 다시 ' + SHS.ASSOC_YEARS + '년을 시무합니다. 당회장과 함께 청원을 준비해 주세요.'
+          : '시무목사는 ' + SHS.CALL_YEARS + '년마다 <strong>시무목사 청빙청원</strong>을 해야 합니다. ' +
+            '다가오는 정기노회에 청원을 올려 주세요.' +
+            (acting ? ' (임시당회장 ' + esc(acting) + ' 목사)' : '')) +
+        '</p>' +
+        '<p style="margin:8px 0 0;font-size:0.84rem;color:var(--gray-7)">' +
+        '청원이 가결되어 노회 서기가 날짜를 고치면 이 안내가 사라집니다. 기록이 사실과 다르면 노회 서기에게 문의해 주세요. ' +
+        '<a class="btn sm" href="petition.html" style="margin-left:6px">청빙청원서 작성</a>' +
+        '<a class="btn ghost sm" href="mypage.html#call" style="margin-left:6px">내 정보에서 보기</a></p></div>';
     }
 
     /* ---------- 감사함 ----------

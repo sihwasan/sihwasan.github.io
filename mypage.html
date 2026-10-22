@@ -231,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function () {
             '</tbody></table>';
         }
 
-        return '<div class="field"><label>' +
+        return '<div class="field" id="call"><label>' +
           (t.state === 'done' ? '청빙 기록' : t.kindName + ' 청빙 (' + t.years + '년 임기)') + '</label>' +
           '<input type="text" value="' + e(head) + '" disabled>' +
           (t.label
@@ -372,6 +372,16 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>';
 
     area.innerHTML = html;
+    /* 대시보드의 <나의 청빙 임기>(mypage.html#call)로 왔으면 청빙 칸으로 내려가 잠깐 테를 두른다 */
+    if (location.hash === '#call') {
+      var callBox = document.getElementById('call');
+      if (callBox) setTimeout(function () {
+        callBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        callBox.style.transition = 'box-shadow 0.4s';
+        callBox.style.boxShadow = '0 0 0 3px #e3c98f';
+        setTimeout(function () { callBox.style.boxShadow = ''; }, 2500);
+      }, 150);
+    }
     if (window.SHSMfa) SHSMfa.mountSettings(document.getElementById('mfa-section'), p);
     SHSDate.attachAll(area);   /* 생년월일 — 손으로 적거나 굴려서 고른다 */
     setupPhoto();
