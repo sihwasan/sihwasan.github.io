@@ -71,8 +71,11 @@ document.addEventListener('DOMContentLoaded', function () {
    * 이 부서 달력에서 올린 것(committee_event_id)은 evs 에 이미 있으므로 뺀다. */
   var pres = [];
   var accReqs = [];
+  var retreats = [];   /* 이 부서가 여는 수양회 (140 sql) — 있으면 「수양회」 탭이 생긴다 */
   var view = new Date(); view.setDate(1);
-  var tab = location.hash === '#lg' ? 'lg' : 'cal';   /* 감사함·알림에서 #lg 로 오면 회계 장부 탭 */
+  var tab = location.hash === '#lg' ? 'lg'
+          : location.hash === '#retreat' ? 'retreat'
+          : 'cal';   /* 감사함·알림에서 #lg 로 오면 회계 장부 탭, 수양회 안내에서 #retreat */
 
   function db() { return SHSCloud.init(); }
   function ymd(d) {
@@ -89,6 +92,10 @@ document.addEventListener('DOMContentLoaded', function () {
         c.rpc('my_committees'),
         c.from('access_requests').select('*').eq('committee', NAME).order('created_at', { ascending: false }),
         c.from('site_schedule').select('*').eq('meta->>dept', NAME)
+          .then(null, function () { return { data: [] }; }),
+        /* 140 sql 을 아직 실행하지 않아 표가 없으면 빈 목록 */
+        c.from('retreats').select('id,title,start_date,end_date,place,stage,status')
+          .eq('committee', NAME).order('start_date', { ascending: false })
           .then(null, function () { return { data: [] }; })
       ]);
     }).then(function (rs) {
@@ -112,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function () {
       isAuditor = SHSAuth.canManageMembers(user) ||
                   mine.some(function (m) { return m.committee === '감사헌의부' && m.is_officer; });
       accReqs = (rs[3] && rs[3].data) || [];
+      retreats = ((rs[5] && rs[5].data) || []).filter(function (r) { return r.status !== 'closed'; });
       var linked = {};
       evs.forEach(function (v) { if (v.schedule_id) linked[v.schedule_id] = 1; });
       pres = ((rs[4] && rs[4].data) || []).filter(function (s) {
@@ -145,6 +153,9 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<div class="tabs" id="cm-tabs">' +
       '<button class="' + (tab === 'cal' ? 'active' : '') + '" data-t="cal">일정 달력</button>' +
       '<button class="' + (tab === 'list' ? 'active' : '') + '" data-t="list">활동 내역</button>' +
+      (retreats.length
+        ? '<button class="' + (tab === 'retreat' ? 'active' : '') + '" data-t="retreat">수양회</button>'
+        : '') +
       '<button class="' + (tab === 'mem' ? 'active' : '') + '" data-t="mem">부원 명단</button>' +
       '<button class="' + (tab === 'min' ? 'active' : '') + '" data-t="min">회의록</button>' +
       '<button class="' + (tab === 'lg' ? 'active' : '') + '" data-t="lg">회계 장부</button>' +
@@ -162,6 +173,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (tab === 'cal') drawCal();
     else if (tab === 'list') drawList();
+    else if (tab === 'retreat') drawRetreat();
     else if (tab === 'mem') drawMem();
     else if (tab === 'min') drawMinutes();
     else if (tab === 'lg') drawLedger();
@@ -552,6 +564,36 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       });
     }
+  }
+
+  /* ---------- 수양회 (140 sql) ----------
+   * 참가자 안내·선택·진행 관리는 수양회 화면(retreat.html)에서 한다. 여기서는 들어가는 문만 둔다. */
+  function drawRetreat() {
+    var box = document.getElementById('cm-body');
+    var h = '<div class="notice-banner">' +
+      (isOfficer
+        ? '단계를 열고 명단·일정을 고치는 일은 수양회 화면의 <strong>진행 관리</strong>에서 합니다. ' +
+          '단계를 열면 참가자 「내 안내」에 나타나고 알림이 갑니다.'
+        : '좌석·숙소와 골라야 할 것(카페 메뉴 등)은 수양회 화면의 <strong>내 안내</strong>에 있습니다.') +
+      '</div>';
+    h += '<table class="tbl"><thead><tr><th>수양회</th><th style="width:220px">기간</th>' +
+      '<th style="width:160px">장소</th><th style="width:80px">상태</th><th style="width:250px">열기</th></tr></thead><tbody>';
+    retreats.forEach(function (r) {
+      var base = 'retreat.html?id=' + r.id;
+      h += '<tr><td class="left"><strong>' + e(r.title) + '</strong></td>' +
+        '<td style="white-space:nowrap">' + e(rangeText(r.start_date, r.end_date)) + '</td>' +
+        '<td>' + e(r.place || '-') + '</td>' +
+        '<td><span class="role-badge">' + e(r.stage) + '</span></td>' +
+        '<td><a class="btn sm" href="' + base + '#me">내 안내</a> ' +
+        '<a class="btn ghost sm" href="' + base + '#prog">일정</a> ' +
+        (isOfficer ? '<a class="btn ghost sm" href="' + base + '#ops">진행 관리</a>' : '') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    if (isOfficer) {
+      h += '<p style="font-size:0.84rem;color:var(--gray-5)">새 수양회는 서기가 140 sql 의 시드처럼 ' +
+        '<code>retreats</code> 표에 한 줄 넣으면 이 탭에 나타납니다. 기간은 부서 달력의 일정과 맞춥니다.</p>';
+    }
+    box.innerHTML = h;
   }
 
   /* ---------- 부원 명단 ---------- */

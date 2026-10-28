@@ -131,6 +131,8 @@ var SHSBoard = (function () {
         /* 청빙 임기 안내 자리 — 부목사·시무목사 본인의 임기가 넉 달 안이거나 끝났을 때 (loadCallTerm) */
         '<div id="hub-call"></div>' +
         '<div id="hub-elder"></div>' +
+        /* 수양회 참가자 안내 자리 — 내 좌석·숙소·골라야 할 것 (js/retreat-card.js, 140 sql) */
+        '<div id="hub-retreat"></div>' +
         '<div id="hub-home" class="dash-hub">' +
         '<div class="hub-left">' +
         '<div id="hub-photo" class="hidden" style="margin-bottom:16px"></div>' +
@@ -197,6 +199,8 @@ var SHSBoard = (function () {
         if (d29Slot) d29Slot.classList.toggle('hidden', !!panel);
         var callSlot = document.getElementById('hub-call');
         if (callSlot) callSlot.classList.toggle('hidden', !!panel);
+        var rtSlot = document.getElementById('hub-retreat');
+        if (rtSlot) rtSlot.classList.toggle('hidden', !!panel);
         if (!panel) {
           document.getElementById('hub-detail').classList.add('hidden');
           document.getElementById('hub-home').classList.remove('hidden');
@@ -229,6 +233,8 @@ var SHSBoard = (function () {
 
       /* 서기에게 — 정기노회 4주 전부터 남은 임기 1년 미만 장로 총대와 공문 안내 */
       if (window.SHSElderNotice) SHSElderNotice.dashCard(document.getElementById('hub-elder'), user);
+      /* 수양회 참가자(와 그 부서 임원)에게 — 2주 전부터 끝나는 날까지 (js/retreat-card.js) */
+      if (window.SHSRetreat) SHSRetreat.dashCard(document.getElementById('hub-retreat'), user);
 
       /* 업무 보고서 카드: 오늘 보고서가 있으면 그 요약을 부제로 */
       (function () {
