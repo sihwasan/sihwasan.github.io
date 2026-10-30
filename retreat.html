@@ -382,7 +382,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }).join('') +
       '<div class="rt-chip"><span>숙소</span><strong>' + (me.room_no ? e(me.room_no) + '호' : (me.room_group ? me.room_group + '번 방' : '-')) + '</strong>' +
       '<span>' + (roommates.length ? '함께: ' + roommates.map(function (q) { return e(q.name); }).join(', ') : '호수는 체크인 뒤') + '</span></div>' +
-      '<div class="rt-chip"><span>회비</span><strong>' + e(won(people.reduce(function (a, p) { return a + Number(p.paid || 0); }, 0))) + '</strong><span>납부 확인</span></div>' +
+      /* 회비 납부는 관리자·임원(진행 담당 포함)만 본다 (150 sql 이 회원에게는 납부액을 보내지 않는다) */
+      (isOfficer ? '<div class="rt-chip"><span>회비</span><strong>' + e(won(people.reduce(function (a, p) { return a + Number(p.paid || 0); }, 0))) + '</strong><span>납부 확인</span></div>' : '') +
       '</div>' +
       '<p class="rt-muted">좌석·방이 다르면 ' + e(R.committee) + ' 임원에게 말씀해 주세요. 방 번호는 호텔 체크인 뒤에 적힙니다.</p></div>';
 
