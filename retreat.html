@@ -75,6 +75,10 @@
   .rt-order-row strong { font-size: 1.3rem; }
 }
 .rt-count { font-size: 0.8rem; color: var(--gray-5); }
+.rt-face { display: inline-block; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; vertical-align: middle;
+           margin-right: 8px; background: var(--gray-1); cursor: zoom-in; }
+.rt-face[hidden] { display: none; }   /* 공통 CSS 의 img { display: block } 이 hidden 을 덮지 않게 */
+.rt-face.lg { width: 72px; height: 72px; margin: 0; cursor: default; }
 @media (max-width: 640px) {
   .rt-stop { grid-template-columns: 50px 1fr; }
   .rt-card { padding: 16px; }
@@ -756,9 +760,10 @@ document.addEventListener('DOMContentLoaded', function () {
     var p = vList[vIdx] || {};
     viewer.querySelector('.rt-view').innerHTML =
       '<img src="' + e(p.image_url) + '" alt="" style="max-width:100%;max-height:80vh">' +
-      '<div style="color:#dfe4ee;font-size:0.88rem;margin-top:10px">' + e(p.title || '') + ' · ' + e(dayName(p.day_no)) +
+      '<div style="color:#dfe4ee;font-size:0.88rem;margin-top:10px">' + e(p.title || '') + (p.face ? '' : ' · ' + e(dayName(p.day_no))) +
       (vList.length > 1 ? '   (' + (vIdx + 1) + ' / ' + vList.length + ')' : '') + '</div>' +
-      (canEditMedia(p) ? '<button class="btn ghost sm" style="margin-top:10px;color:#fff;border-color:#fff" id="rt-view-del">이 사진 지우기</button>' : '');
+      /* 명단 얼굴 사진은 사진·영상 칸의 사진이 아니므로 여기서 지우지 않는다 (명단 「수정」에서 바꾼다) */
+      (!p.face && canEditMedia(p) ? '<button class="btn ghost sm" style="margin-top:10px;color:#fff;border-color:#fff" id="rt-view-del">이 사진 지우기</button>' : '');
     var d = document.getElementById('rt-view-del');
     if (d) d.addEventListener('click', function () { removeMedia(p); });
   }
@@ -786,6 +791,42 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 명단 ---------- */
+  /* 얼굴 사진 (144 sql) — 명단 표와 따로 두고 명단 탭을 열 때만 읽는다.
+   * 300px 사진을 그대로 담아 두므로 사진 보관소를 거치지 않는다. */
+  var FACES = null, FACE_W = 300;
+
+  function loadFaces() {
+    if (FACES) return Promise.resolve(FACES);
+    var ids = (S.participants || []).map(function (p) { return p.id; });
+    if (!ids.length) return Promise.resolve(FACES = {});
+    return db().then(function (c) {
+      return c.from('retreat_photos').select('participant_id, photo').in('participant_id', ids);
+    }).then(function (r) {
+      FACES = {};
+      ((r && r.data) || []).forEach(function (x) { FACES[x.participant_id] = x.photo; });
+      return FACES;
+    }, function () { return (FACES = {}); });
+  }
+
+  /* 얼굴이 가운데 오도록 정사각형으로 자르고 300px 로 줄인다 (세로 사진은 위쪽을 살린다) */
+  function faceData(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        var s = Math.min(w, h), n = Math.min(FACE_W, s);
+        var sx = (w - s) / 2, sy = h > w ? (h - s) * 0.25 : (h - s) / 2;
+        var cv = document.createElement('canvas'); cv.width = n; cv.height = n;
+        var cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, n, n);
+        cx.drawImage(img, sx, sy, s, s, 0, 0, n, n);
+        resolve(cv.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('사진을 읽지 못했습니다: ' + file.name)); };
+      img.src = url;
+    });
+  }
+
   function drawList() {
     var box = document.getElementById('rt-body');
     var ps = S.participants || [];
@@ -797,7 +838,8 @@ document.addEventListener('DOMContentLoaded', function () {
       '</tr></thead><tbody>';
     ps.forEach(function (p) {
       h += '<tr' + (S.me && p.id === S.me.id ? ' style="background:var(--gray-1)"' : '') + '><td>' + p.seq + '</td>' +
-        '<td class="left"><strong>' + e(p.name) + '</strong>' + (p.companion_of ? ' <span class="rt-count">배우자</span>' : '') +
+        '<td class="left"><img class="rt-face" data-face="' + p.id + '" alt="" hidden>' +
+        '<strong>' + e(p.name) + '</strong>' + (p.companion_of ? ' <span class="rt-count">배우자</span>' : '') +
         (isOfficer && p.note ? '<div class="rt-count">' + e(p.note) + '</div>' : '') + '</td>' +
         '<td>' + e(p.role || '') + '</td><td>' + e(p.church || '-') + '</td>' +
         '<td>' + (p.bus_seat || '-') + '</td><td>' + (p.van_seat || '-') + '</td>' +
@@ -819,6 +861,18 @@ document.addEventListener('DOMContentLoaded', function () {
         b.addEventListener('click', function () { fillEditor(byId(ps, b.dataset.edit)); });
       });
     }
+    /* 얼굴 사진은 표를 먼저 보여 준 뒤 채운다 — 누르면 크게 */
+    loadFaces().then(function (f) {
+      box.querySelectorAll('img[data-face]').forEach(function (img) {
+        var src = f[img.dataset.face];
+        if (!src) return;
+        img.src = src; img.hidden = false;
+        img.addEventListener('click', function () {
+          var p = byId(ps, img.dataset.face);
+          openPhoto([{ image_url: src, title: p ? personLabel(p) : '', face: true }], 0);
+        });
+      });
+    });
   }
 
   function editorHtml() {
@@ -847,6 +901,12 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field" style="flex:0 0 190px"><label>생년월일 (사모님 · 임원만 봄)</label><input type="date" id="pf-birth"></div>' +
       '<div class="field"><label>메모 (임원만 봄)</label><input type="text" id="pf-note"></div>' +
       '</div>' +
+      '<div class="inline-form" style="margin-bottom:8px;align-items:flex-end">' +
+      '<div class="field" style="flex:0 0 auto"><label>얼굴 사진</label><img class="rt-face lg" id="pf-face-prev" alt="" hidden></div>' +
+      '<div class="field"><label>사진 바꾸기 (정사각형으로 잘라 줄여서 넣습니다)</label><input type="file" id="pf-face" accept="image/*"></div>' +
+      '<label style="flex:0 0 auto;display:flex;gap:6px;align-items:center;font-size:0.92rem;cursor:pointer;padding-bottom:10px">' +
+      '<input type="checkbox" id="pf-face-del" style="width:auto"> 사진 지우기</label>' +
+      '</div>' +
       '<label style="display:flex;gap:8px;align-items:center;margin:2px 0 12px;font-size:0.92rem;cursor:pointer">' +
       '<input type="checkbox" id="pf-present" style="width:auto"> 도착 확인</label>' +
       '<button class="btn" id="pf-save">저장</button> ' +
@@ -874,6 +934,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('pf-note').value = p.note || '';
     document.getElementById('pf-birth').value = p.birth_date || '';
     document.getElementById('pf-present').checked = !!p.present;
+    var face = (FACES && FACES[p.id]) || '', prev = document.getElementById('pf-face-prev');
+    prev.src = face; prev.hidden = !face;
+    document.getElementById('pf-face').value = '';
+    document.getElementById('pf-face-del').checked = false;
     document.getElementById('pf-title').textContent = '수정 : ' + p.seq + '. ' + p.name;
     document.getElementById('pf-new').classList.remove('hidden');
     document.getElementById('pf-del').classList.remove('hidden');
@@ -903,17 +967,33 @@ document.addEventListener('DOMContentLoaded', function () {
       var birth = document.getElementById('pf-birth').value || null;
       var before = id ? byId(S.participants, id) : null;
       var birthChanged = (birth || null) !== ((before && before.birth_date) || null);
+      var faceFile = (document.getElementById('pf-face').files || [])[0] || null;
+      var faceDel = document.getElementById('pf-face-del').checked;
       msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
       db().then(function (c) {
         var save = id ? c.from('retreat_participants').update(d).eq('id', id).select('id').single()
                       : c.from('retreat_participants').insert(d).select('id').single();
         return save.then(function (r) {
-          if (r.error || !birthChanged) return r;
+          if (r.error) return r;
+          var pid = r.data.id, more = [];
           /* 생년월일은 임원만 보는 표(retreat_births)에 따로 둔다 (142 sql) */
-          var pid = r.data.id;
-          return birth
-            ? c.from('retreat_births').upsert({ participant_id: pid, birth_date: birth, updated_at: new Date().toISOString() })
-            : c.from('retreat_births').delete().eq('participant_id', pid);
+          if (birthChanged) {
+            more.push(birth
+              ? c.from('retreat_births').upsert({ participant_id: pid, birth_date: birth, updated_at: new Date().toISOString() })
+              : c.from('retreat_births').delete().eq('participant_id', pid));
+          }
+          /* 얼굴 사진은 retreat_photos (144 sql) */
+          if (faceFile) {
+            more.push(faceData(faceFile).then(function (photo) {
+              return c.from('retreat_photos').upsert({ participant_id: pid, photo: photo, updated_at: new Date().toISOString() });
+            }));
+          } else if (faceDel) {
+            more.push(c.from('retreat_photos').delete().eq('participant_id', pid));
+          }
+          if (faceFile || faceDel) FACES = null;
+          return Promise.all(more).then(function (rs) {
+            return rs.filter(function (x) { return x && x.error; })[0] || r;
+          });
         });
       }).then(function (r) {
         if (r.error) { msg.className = 'form-msg err'; msg.textContent = r.error.message; return; }
@@ -928,6 +1008,9 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('pf-paid').value = 0;
       document.getElementById('pf-comp').value = '';
       document.getElementById('pf-present').checked = false;
+      document.getElementById('pf-face').value = '';
+      document.getElementById('pf-face-del').checked = false;
+      document.getElementById('pf-face-prev').hidden = true;
       document.getElementById('pf-title').textContent = '참가자 등록';
       this.classList.add('hidden');
       document.getElementById('pf-del').classList.add('hidden');
