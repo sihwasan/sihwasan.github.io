@@ -1,5 +1,5 @@
 -- =====================================================================
---  147. 수양회 카페 메뉴 최신본 · 부부 중 누구든 두 사람 몫 주문 · 총무 임원 지정 (2026-10-30)
+--  147. 수양회 카페 메뉴 최신본 · 부부 중 누구든 두 사람 몫 주문 (2026-10-30)
 --
 --  1) 카페 주문 단계(cafe1~4)의 메뉴·갈래(ICE/HOT/디카페인)·안내 첫 줄을 교육친교부 총무
 --     (이동진 목사님)가 가이드북 앱에서 고친 최신본으로 맞춘다.
@@ -7,9 +7,8 @@
 --     이미 누가 고른 단계는 메뉴 목록을 바꾸지 않고 알려 준다 (고른 것이 엉뚱한 메뉴를 가리키지 않게).
 --  2) 부부: 지금까지는 남편(회원) 화면에서만 사모님 몫까지 고를 수 있었다. 이제 사모님 화면에서도
 --     남편 몫을 함께 고른다 — retreat_can_act 와 retreat_state(142)의 「배우자」를 양쪽으로.
---  3) 주문을 모으는 총무가 「진행 관리 → 현황표·주문서」를 볼 수 있게, 교육친교부 지정 임원
---     (committee_officers)에 이동진 목사님을 「총무」로 넣는다. 같은 이름 계정이 여럿이면
---     동탄영광교회 계정만, 그래도 여럿이면 넣지 않는다 (맨 아래 결과로 확인).
+--  3) 주문을 모으는 총무가 「진행 관리 → 현황표·주문서」를 보는 권한은 148 sql 이 준다
+--     (부서 임원이 아니라 이 수양회만 관리하는 「진행 담당」).
 --
 --  실행: Supabase → SQL Editor → 전체 붙여넣고 Run.  여러 번 실행해도 안전합니다.
 --  ※ 142 · 145 sql 이후에 실행.
@@ -301,15 +300,8 @@ revoke all on function public.retreat_state(bigint) from public;
 grant execute on function public.retreat_state(bigint) to authenticated;
 
 
--- 3. 총무(이동진 목사님)를 교육친교부 지정 임원으로 --------------------------------
-insert into public.committee_officers (committee, user_id, position, created_by)
-select '교육친교부', p.id, '총무', '147 sql'
-  from public.profiles p
- where p.name = '이동진'
-   and ((select count(*) from public.profiles x where x.name = '이동진') = 1
-        or (p.church like '%동탄영광%'
-            and (select count(*) from public.profiles x where x.name = '이동진' and x.church like '%동탄영광%') = 1))
-on conflict (committee, user_id) do nothing;
+-- 3. (148 sql 로 옮김) 총무는 부서 지정 임원이 아니라 이 수양회의 「진행 담당」으로 넣는다.
+--    부서 임원은 수양회 밖의 부서 장부·회의록까지 쓰므로, 수양회만 관리하도록 148 이 따로 둔다.
 
 
 -- 확인
@@ -321,9 +313,3 @@ select s.seq, s.title as "카페",
   from public.retreat_steps s join public.retreats r on r.id = s.retreat_id and r.title = '2026 제주 부부수양회'
  where s.key like 'cafe%'
  order by s.seq;
-
-select p.name as "이름", p.church as "교회", o.position as "교육친교부 임원"
-  from public.profiles p
-  left join public.committee_officers o on o.user_id = p.id and o.committee = '교육친교부'
- where p.name = '이동진';
-

@@ -301,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var h = headHtml();
     h += '<div class="notice-banner">' +
       (isOfficer
-        ? '<strong>' + e(SHS.honorific(user)) + '</strong>은 ' + e(R.committee) + ' 임원이시므로 단계를 열고 명단·일정을 고치실 수 있습니다.'
+        ? '<strong>' + e(SHS.honorific(user)) + '</strong>은 ' + e(R.committee) + ' 임원(또는 수양회 진행 담당)이시므로 단계를 열고 명단·일정을 고치실 수 있습니다.'
         : (S.me
             ? '<strong>' + e(S.member === false ? S.me.name + ' ' + (S.me.role || '') + '님' : SHS.honorific(user)) +
               '</strong>의 좌석·숙소와 골라야 할 것이 「내 안내」에 있습니다. ' +
