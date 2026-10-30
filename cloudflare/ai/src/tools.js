@@ -205,7 +205,7 @@ export const TOOL_DEFS = {
   get_retreat: {
     description: '노회 수양회(예: 2026 제주 부부수양회) 안내를 수양회 화면(retreat.html)과 같은 자료에서 가져온다: 날짜별 일정(시각·장소·식당과 메뉴·가격·이동), ' +
       '날짜별 안내 멘트(장소 설명·버스 안내), 카페 주문 단계의 메뉴, 질문한 분과 배우자의 좌석·숙소·회비·고른 메뉴, 개회 예배 순서와 기도 순서, 항공·숙소. ' +
-      '"내일 일정", "점심 식당·메뉴", "카페 메뉴", "내 좌석·방", "예배 순서" 같은 질문에 쓴다. day 를 주면 그날만 가져온다.',
+      '"내일 일정", "점심 식당·메뉴", "카페 메뉴", "내 좌석·방", "예배 순서" 같은 질문에 쓴다. day 를 주면 그날만 가져온다. 그 수양회 참가자와 진행 임원에게만 자료를 준다.',
     input_schema: S({
       day: { type: 'integer', description: '몇 일차인가 (1·2·3). 날짜로 물으면 결과의 days[].date 와 맞춰 고른다. 비우면 모든 날' },
       part: { type: 'string', enum: ['all', 'schedule', 'cafe', 'me', 'worship'], description: '필요한 부분만 (기본 all)' }
@@ -712,6 +712,11 @@ const RUN = {
     if (S.error) return { error: S.error };
     const R = S && S.retreat;
     if (!R) return { items: [], note: '지금 볼 수 있는 수양회가 없습니다 (등록된 수양회가 없거나, 정회원·참가자가 아닙니다).' };
+    /* 수양회 안내는 그 수양회 참가자(본인·배우자)와 진행하는 임원(부서 임원·진행 담당)에게만 답한다.
+     * 수양회 화면은 정회원이면 열 수 있지만, AI 검색으로는 참가하지 않는 회원에게 내놓지 않는다. */
+    if (!S.me && !S.officer) {
+      return { items: [], note: R.title + ' 안내는 이 수양회 참가자와 진행하는 임원만 AI 검색으로 볼 수 있습니다. 질문하신 분은 참가자 명단에 없습니다.' };
+    }
     return retreatDigest(S, input, ctx);
   }
 };
