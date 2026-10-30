@@ -19,7 +19,7 @@ if errorlevel 1 (
 findstr /C:"KV_ID_HERE" wrangler.toml > nul
 if not errorlevel 1 (
   echo.
-  echo   설정 보관함(KV)을 만듭니다...
+  echo   설정 보관함 KV 를 만듭니다...
   powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$out = (npx --yes wrangler kv namespace create AI_KV 2>&1 | Out-String);" ^
     "$m = [regex]::Match($out, 'id\s*=\s*\"([0-9a-f]{32})\"');" ^
