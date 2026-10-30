@@ -34,7 +34,7 @@
  *   자료는 질문한 분의 증표로 읽으므로 그분이 볼 수 없는 자료(예: 회의록은 임원만)는 Claude 도 보지 못한다.
  */
 import { Index } from './search.js';
-import { Cites, toolsFor, runTool, TOOL_STATUS } from './tools.js';
+import { Cites, toolsFor, runTool, TOOL_STATUS, TOOL_DEFS } from './tools.js';
 import { runReports } from './reports.js';
 
 const ALLOW_ORIGINS = [
@@ -830,7 +830,9 @@ export default {
         let idx = null;
         try { idx = await getIndex(env); } catch (e) {}
         return reply({ ok: true, service: '시화산노회 AI 자료 검색', ready: !!s.api_key && s.enabled, model: s.model,
-                       index: idx ? { chunks: idx.N, built: INDEX_BUILT } : null, colo: (request.cf && request.cf.colo) || null }, 200, origin);
+                       index: idx ? { chunks: idx.N, built: INDEX_BUILT } : null, colo: (request.cf && request.cf.colo) || null,
+                       /* 지금 올라가 있는 도구 — 배포가 됐는지 브라우저로 이 주소만 열어 확인한다 */
+                       tools: Object.keys(TOOL_DEFS) }, 200, origin);
       }
       if (path === '/ask' && request.method === 'POST') return await answer(request, env, ctx, origin);
       if (path === '/feedback' && request.method === 'POST') return await feedback(request, env, origin);
