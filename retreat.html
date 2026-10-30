@@ -192,8 +192,14 @@ document.addEventListener('DOMContentLoaded', function () {
         S = r.data || {};
         if (S.login === false) { location.href = 'login.html'; return; }
         R = S.retreat;
+        /* 정회원이라도 참가자 명단에 없으면 열지 않는다 (149 sql) */
+        if (!R && S.not_participant && S.member !== false) {
+          area.innerHTML = '<div class="notice-banner">수양회 화면은 <strong>수양회 참가자</strong>(배우자 포함)와 진행하는 임원만 보실 수 있습니다.<br>' +
+            '참가하시는데 이 안내가 보이면 교육친교부 임원에게 참가자 명단을 확인해 달라고 말씀해 주세요.</div>';
+          return;
+        }
         if (!R && S.member === false) {
-          area.innerHTML = '<div class="notice-banner">수양회 화면은 정회원과 <strong>수양회 참가자</strong>가 보실 수 있습니다.<br>' +
+          area.innerHTML = '<div class="notice-banner">수양회 화면은 <strong>수양회 참가자</strong>가 보실 수 있습니다.<br>' +
             '함께 가시는 사모님은 홈페이지에 가입하실 때 <strong>명단과 같은 이름·생년월일</strong>을 적으시면 이 화면이 열립니다. ' +
             '그래도 열리지 않으면 교육친교부 임원에게 생년월일 등록을 부탁해 주세요.</div>';
           return;

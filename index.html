@@ -83,7 +83,7 @@
       <!-- 예배가 진행 중이면 예배 화면으로 바로 (146 sql) -->
       <a class="ht-go hidden" id="hero-retreat-worship" href="#" style="margin-top:0;background:var(--red)">예배 화면</a>
     </div>
-    <!-- AI 자료 검색 — 로그인한 정회원 이상에게만 보인다 (js/ai-chat.js) -->
+    <!-- AI 자료 검색 — 로그인한 정회원 이상에게, 수양회 참가자(사모님 등)에게는 수양회 질문 전용으로 (js/ai-chat.js) -->
     <div id="ai-hero" class="ai-hero hidden" aria-label="AI 자료 검색"></div>
   </div>
 </section>
@@ -142,7 +142,7 @@
 <script src="js/elder-notice.js?v=20261003f"></script>
 <script src="js/absence.js?v=20261021a"></script>
 <script src="js/board.js?v=20261022a"></script>
-<script src="js/ai-chat.js?v=20261021a"></script>
+<script src="js/ai-chat.js?v=20261030a"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var e = SHS.esc;

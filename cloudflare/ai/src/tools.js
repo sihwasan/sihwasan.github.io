@@ -232,6 +232,11 @@ export function toolsFor(role) {
   });
 }
 
+/* 정회원이 아닌 수양회 참가자(사모님 등)에게 주는 도구 — 수양회 안내만 (149 sql) */
+export function retreatTools() {
+  return [{ name: 'get_retreat', description: TOOL_DEFS.get_retreat.description, input_schema: TOOL_DEFS.get_retreat.input_schema }];
+}
+
 /* 화면에 보여 줄 "찾는 중…" 글 */
 export const TOOL_STATUS = {
   search_verified_answers: '확인된 답을 찾는 중',

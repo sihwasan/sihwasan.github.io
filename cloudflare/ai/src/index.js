@@ -34,7 +34,7 @@
  *   자료는 질문한 분의 증표로 읽으므로 그분이 볼 수 없는 자료(예: 회의록은 임원만)는 Claude 도 보지 못한다.
  */
 import { Index } from './search.js';
-import { Cites, toolsFor, runTool, TOOL_STATUS, TOOL_DEFS } from './tools.js';
+import { Cites, toolsFor, retreatTools, runTool, TOOL_STATUS, TOOL_DEFS } from './tools.js';
 import { runReports } from './reports.js';
 
 const ALLOW_ORIGINS = [
@@ -334,7 +334,20 @@ function roleName(r) {
   return { superadmin: '최고관리자', president: '노회장', clerk: '서기', staff: '간사', officer: '임원', member: '정회원',
            associate: '준회원', advisory: '언권회원', general: '일반회원', pending: '승인대기' }[r] || r;
 }
-function systemPrompt(me, built) {
+/* 지금 수양회에 참가(또는 진행)하는가 — 질문한 분의 증표로 묻는다 */
+async function isRetreatParticipant(env, me) {
+  try {
+    const r = await fetch(env.SUPABASE_URL + '/rest/v1/rpc/retreat_my_info', {
+      method: 'POST', body: '{}',
+      headers: { Authorization: me.auth, apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }
+    });
+    if (!r.ok) return false;
+    const j = await r.json().catch(function () { return null; });
+    return !!(j && j.id);
+  } catch (e) { return false; }
+}
+
+function systemPrompt(me, built, retreatOnly) {
   const isOfficer = ['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(me.role) !== -1;
   const isAdmin = ADMIN_ROLES.indexOf(me.role) !== -1;
   const who = (me.name || '회원') + (me.position ? ' ' + me.position : '') + (me.church ? ' (' + me.church + ')' : '') +
@@ -343,6 +356,7 @@ function systemPrompt(me, built) {
     '당신은 대한예수교장로회(합동) 시화산노회 홈페이지의 자료 검색 도우미입니다.',
     '질문한 분: ' + who + '.',
     '오늘: ' + kstDate() + ' (한국 시각). 총회 자료 색인 기준일: ' + (built || '-') + '.',
+    (retreatOnly ? '이 분은 수양회 참가자로서 수양회 안내만 물을 수 있습니다. get_retreat 로 찾은 수양회 자료로만 답하고, 노회·총회 자료나 그 밖의 질문에는 "이 검색창은 수양회 안내만 답합니다"라고 짧게 말합니다.' : ''),
     '',
     '자료를 찾는 법',
     '- 반드시 도구로 찾은 자료만 근거로 답합니다. 기억에 있는 내용으로 답하지 않습니다.',
@@ -393,8 +407,11 @@ async function answer(request, env, ctx, origin) {
   const s = await getSettings(env);
   if (!s.enabled) return reply({ error: 'AI 검색이 지금은 꺼져 있습니다. (관리자가 「AI 검색·API 설정」에서 켤 수 있습니다)' }, 503, origin);
   if (!s.api_key) return reply({ error: 'AI 검색 열쇠(API 키)가 아직 등록되지 않았습니다. 관리자가 「AI 검색·API 설정」에서 넣어 주셔야 합니다.' }, 503, origin);
+  /* 허용 등급이 아니어도 수양회 참가자(사모님 등)면 수양회 질문만 받는다 (149 sql 의 retreat_my_info) */
+  let retreatOnly = false;
   if (me.suspended || (s.roles || DEFAULTS.roles).indexOf(me.role) === -1) {
-    return reply({ error: 'AI 검색은 ' + (s.roles || DEFAULTS.roles).map(roleName).join('·') + ' 등급이 이용할 수 있습니다. (현재 등급: ' + roleName(me.role) + ')' }, 403, origin);
+    if (!me.suspended && await isRetreatParticipant(env, me)) retreatOnly = true;
+    else return reply({ error: 'AI 검색은 ' + (s.roles || DEFAULTS.roles).map(roleName).join('·') + ' 등급이 이용할 수 있습니다. (현재 등급: ' + roleName(me.role) + ')' }, 403, origin);
   }
   const body = await request.json().catch(function () { return null; });
   const question = body && String(body.question || '').trim();
@@ -422,7 +439,7 @@ async function answer(request, env, ctx, origin) {
   const { readable, writable } = new TransformStream();
   const out = sse(writable.getWriter());
   const cites = new Cites();
-  const tools = toolsFor(me.role);
+  const tools = retreatOnly ? retreatTools() : toolsFor(me.role);
   const messages = history.concat([{ role: 'user', content: question }]);
   const started = Date.now();
   const toolsUsed = [];
@@ -469,7 +486,7 @@ async function answer(request, env, ctx, origin) {
         const req = {
           model: useModel,
           max_tokens: MAX_OUT,
-          system: [{ type: 'text', text: systemPrompt(me, INDEX_BUILT), cache_control: { type: 'ephemeral' } }],
+          system: [{ type: 'text', text: systemPrompt(me, INDEX_BUILT, retreatOnly), cache_control: { type: 'ephemeral' } }],
           tools: tools,
           messages: messages,
           output_config: { effort: s.effort || 'medium' }

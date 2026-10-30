@@ -25,6 +25,16 @@ var SHSAI = (function () {
     '노회규칙에서 서기의 직무는?'
   ];
 
+  /* 정회원이 아닌 수양회 참가자(사모님 등)에게는 수양회 질문 전용으로 연다 (149 sql 의 retreat_my_info).
+   * 창구도 같은 함수로 다시 확인하고, 그분에게는 수양회 도구만 준다. */
+  var RETREAT_EXAMPLES = [
+    '내일 일정을 알려 주세요',
+    '오늘 점심 식당과 메뉴는?',
+    '내 버스 좌석과 방은?',
+    '개회 예배 순서를 알려 주세요'
+  ];
+  var retreatMode = null;
+
   var box = null, user = null, convo = [], busy = false, drawer = null;
   /* 내 질문 내역 — 창구 KV 에 대화별로 저장된다 (본인만 보고 지운다).
    * hist = [{ id, title, n, updated, preview }] (최근 것이 앞), thread = 지금 화면의 대화 번호 */
@@ -134,7 +144,17 @@ var SHSAI = (function () {
   function mount(el, u) {
     box = el; user = u;
     if (!box) return;
-    if (!u || !u.cloud || ROLES.indexOf(u.role) === -1) { box.innerHTML = ''; box.classList.add('hidden'); return; }
+    box.innerHTML = ''; box.classList.add('hidden');
+    if (!u || !u.cloud) return;
+    if (ROLES.indexOf(u.role) !== -1) { build(); return; }
+    /* 정회원이 아니면 — 수양회 참가자일 때만 수양회 질문 전용으로 */
+    if (!(window.SHSCloud && SHSCloud.init)) return;
+    SHSCloud.init().then(function (c) { return c ? c.rpc('retreat_my_info') : null; }).then(function (r) {
+      if (r && !r.error && r.data && r.data.id) { retreatMode = r.data; build(); }
+    }, function () {});
+  }
+  function build() {
+    var ex = retreatMode ? RETREAT_EXAMPLES : EXAMPLES;
     box.classList.remove('hidden');
     box.innerHTML =
       '<div class="aih-wrap" id="aih-wrap">' +
@@ -150,12 +170,14 @@ var SHSAI = (function () {
       '<div class="aih-main">' +
       '<form class="aih-form" id="aih-form" autocomplete="off">' +
       '<span class="aih-tag"><span class="aih-tag-ai">AI </span>검색</span>' +
-      '<input type="text" id="aih-q" maxlength="1500" placeholder="노회·총회 자료에 대해 물어보세요 (예: 권징조례에서 해벌 절차는?)">' +
+      '<input type="text" id="aih-q" maxlength="1500" placeholder="' + (retreatMode
+        ? esc(retreatMode.title || '수양회') + ' 일정·식당·메뉴·좌석을 물어보세요'
+        : '노회·총회 자료에 대해 물어보세요 (예: 권징조례에서 해벌 절차는?)') + '">' +
       (SR ? '<button type="button" class="aih-mic" id="aih-mic" title="음성으로 묻기 (누르고 말씀하세요)" aria-label="음성으로 묻기">' + MIC_SVG + '</button>' : '') +
       '<button type="submit" class="aih-go" id="aih-go">묻기</button></form>' +
       '<div class="aih-voice hidden" id="aih-voice"></div>' +
       '<div class="aih-chips" id="aih-chips">' +
-      EXAMPLES.map(function (q) { return '<button type="button" class="aih-chip" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') +
+      ex.map(function (q) { return '<button type="button" class="aih-chip" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('') +
       '</div>' +
       '<div class="aih-panel hidden" id="aih-panel"></div>' +
       '</div></div>';
@@ -165,7 +187,7 @@ var SHSAI = (function () {
       if (q) ask(q);
     });
     bindChips();
-    loadPopular();
+    if (!retreatMode) loadPopular();   /* 자주 묻는 질문은 노회 자료 질문이라 수양회 전용 창에는 띄우지 않는다 */
     var mic = box.querySelector('#aih-mic');
     if (mic) mic.addEventListener('click', toggleVoice);
     box.addEventListener('click', function (ev) {
