@@ -21,6 +21,7 @@ Claude 에게 묻고, Claude 가 총회 자료와 노회 자료를 도구로 찾
 | 노회 일정 · 공지 · 결의사항 | `site_schedule` / `meetings` / `site_notices` / `resolutions` | 모두 |
 | 시찰 자료실·게시판·청원서 | `sichal_docs` / `sichal_posts` / `petition_submissions` | 자기 시찰 |
 | 상비부 일정·공지 | `committee_events` | 회원 |
+| 수양회 일정·안내 멘트·카페 메뉴·내 자리·고른 메뉴·예배 순서 (`get_retreat`) | `retreat_state` RPC (140·142·147 sql) | 정회원·참가자 (자리·주문은 본인과 배우자 몫만, 임원은 전체) |
 | 노회 회의록 · 임원 자료실 | `minutes_board` / `officer_docs` | 임원만 |
 
 노회 자료는 **질문한 분의 로그인 증표로** 읽습니다. 그래서 홈페이지에서 볼 수 없는 자료는

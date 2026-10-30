@@ -202,6 +202,15 @@ export const TOOL_DEFS = {
       only_unpaid: { type: 'boolean', description: 'true 면 미납이 있는 교회만' }
     })
   },
+  get_retreat: {
+    description: '노회 수양회(예: 2026 제주 부부수양회) 안내를 수양회 화면(retreat.html)과 같은 자료에서 가져온다: 날짜별 일정(시각·장소·식당과 메뉴·가격·이동), ' +
+      '날짜별 안내 멘트(장소 설명·버스 안내), 카페 주문 단계의 메뉴, 질문한 분과 배우자의 좌석·숙소·회비·고른 메뉴, 개회 예배 순서와 기도 순서, 항공·숙소. ' +
+      '"내일 일정", "점심 식당·메뉴", "카페 메뉴", "내 좌석·방", "예배 순서" 같은 질문에 쓴다. day 를 주면 그날만 가져온다.',
+    input_schema: S({
+      day: { type: 'integer', description: '몇 일차인가 (1·2·3). 날짜로 물으면 결과의 days[].date 와 맞춰 고른다. 비우면 모든 날' },
+      part: { type: 'string', enum: ['all', 'schedule', 'cafe', 'me', 'worship'], description: '필요한 부분만 (기본 all)' }
+    })
+  },
   search_committee: {
     description: '상비부(감사헌의부·정치부·고시규칙부·재정부·교육친교부·전도선교부·사회복지부·미래교회자립위원회)의 일정·공지 기록을 찾는다. 부서 조직(부장·서기·부원)은 get_organization 에 있다.',
     input_schema: S({
@@ -216,7 +225,7 @@ export function toolsFor(role) {
   const officer = ['superadmin', 'president', 'clerk', 'staff', 'officer'].indexOf(role) !== -1;
   const names = ['search_verified_answers', 'search_assembly', 'get_assembly_article', 'search_presbytery_rules', 'get_organization',
     'search_members', 'search_churches', 'search_schedule', 'search_notices', 'search_presbytery_resolutions',
-    'search_sichal', 'search_committee', 'search_presbytery_reports', 'search_directory'];
+    'search_sichal', 'search_committee', 'search_presbytery_reports', 'search_directory', 'get_retreat'];
   if (officer) names.push('search_minutes', 'search_officer_docs', 'search_dues');
   return names.map(function (n) {
     return { name: n, description: TOOL_DEFS[n].description, input_schema: TOOL_DEFS[n].input_schema };
@@ -241,7 +250,8 @@ export const TOOL_STATUS = {
   search_committee: '상비부 기록을 찾는 중',
   search_dues: '상회비 납부 현황을 확인하는 중',
   search_presbytery_reports: '노회 회의자료 책자를 찾는 중',
-  search_directory: '노회 주소록을 찾는 중'
+  search_directory: '노회 주소록을 찾는 중',
+  get_retreat: '수양회 안내를 확인하는 중'
 };
 
 /* ---------- 도구 실행 ---------- */
@@ -694,5 +704,93 @@ const RUN = {
       const ref = ctx.cites.add({ title: r.committee + ' ' + (r.kind || '') + ': ' + r.title, url: 'committee.html?c=' + enc(r.committee), kind: '상비부', snippet: (r.event_date || '') + ' ' + r.title + '\n' + (r.body || '') });
       return { ref: ref, committee: r.committee, kind: r.kind, title: r.title, date: r.event_date, place: r.place, body: String(r.body || '').slice(0, 400), done: r.done };
     }) };
+  },
+  /* 수양회 — 수양회 화면과 같은 retreat_state(140·142·147 sql)를 질문한 분의 증표로 읽는다.
+   * 그래서 참가자는 자기(와 배우자) 자리·고른 것을, 임원은 아직 닫힌 단계까지 본다. */
+  async get_retreat(input, ctx) {
+    const S = await sbRpc(ctx.env, ctx.auth, 'retreat_state', { p_retreat: null });
+    if (S.error) return { error: S.error };
+    const R = S && S.retreat;
+    if (!R) return { items: [], note: '지금 볼 수 있는 수양회가 없습니다 (등록된 수양회가 없거나, 정회원·참가자가 아닙니다).' };
+    return retreatDigest(S, input, ctx);
   }
 };
+
+/* 수양회 상태 → Claude 에게 줄 요약 (근거 번호는 날짜별 일정·카페 단계·내 자리·예배 순서에 하나씩) */
+const RETREAT_TAIL = /\n\n(퀴즈|게임|예배|진행 계획[^:\n]*):[\s\S]*$/;
+export function retreatDigest(S, input, ctx) {
+  const R = S.retreat, st = R.settings || {}, part = input.part || 'all';
+  const want = function (p) { return part === 'all' || part === p; };
+  const base = 'retreat.html?id=' + R.id;
+  const day0 = new Date(R.start_date + 'T00:00:00Z');
+  const dateOf = function (n) { return new Date(day0.getTime() + (n - 1) * 86400000).toISOString().slice(0, 10); };
+  const nDays = R.end_date && R.end_date > R.start_date
+    ? Math.round((new Date(R.end_date + 'T00:00:00Z') - day0) / 86400000) + 1 : 1;
+  const todayNo = S.today ? Math.round((new Date(S.today + 'T00:00:00Z') - day0) / 86400000) + 1 : null;
+  const out = {
+    retreat: { title: R.title, committee: R.committee, start_date: R.start_date, end_date: R.end_date, place: R.place,
+      stage: R.stage, flight: st.flight_out || undefined, hotel: st.hotel || undefined, verse: R.verse || undefined },
+    today: S.today, today_day_no: todayNo,
+    days: []
+  };
+  const prog = S.program || [];
+  const days = input.day ? [Number(input.day)] : Array.from({ length: nDays }, function (_, i) { return i + 1; });
+
+  if (want('schedule')) {
+    days.forEach(function (n) {
+      const stops = prog.filter(function (g) { return g.day_no === n && g.kind !== 'ment'; });
+      const ments = prog.filter(function (g) { return g.day_no === n && g.kind === 'ment'; });
+      if (!stops.length && !ments.length) return;
+      const lines = stops.map(function (g) {
+        return (g.time || '') + ' ' + g.title + (g.body ? ' — ' + g.body.replace(/\n/g, ' ') : '') +
+          (g.place ? ' · 장소 ' + g.place : '') + (g.depart ? ' · ' + g.depart + ' 출발' : '') + (g.move ? ' · 다음 이동 ' + g.move : '') +
+          (g.status && g.status !== '예정' ? ' [' + g.status + ']' : '');
+      });
+      const ref = ctx.cites.add({ title: R.title + ' ' + n + '일차 일정 (' + dateOf(n) + ')', url: base + '#prog', kind: '수양회 일정',
+        snippet: lines.join('\n') });
+      out.days.push({ ref: ref, day_no: n, date: dateOf(n), schedule: lines,
+        guide: ments.map(function (g) {
+          return { title: g.title, text: String(g.body || '').replace(RETREAT_TAIL, '').slice(0, 900) };
+        }) });
+    });
+  }
+
+  if (want('cafe')) {
+    out.cafe = (S.steps || []).filter(function (s) { return s.kind === '선택' && (s.options || []).length; }).map(function (s) {
+      const ref = ctx.cites.add({ title: R.title + ' ' + s.title, url: base + '#me', kind: '수양회 주문',
+        snippet: (s.body || '') + '\n' + s.options.map(function (o) { return o.label; }).join(' / ') });
+      return { ref: ref, title: s.title, when: String(s.body || '').split('\n')[0], status: s.status,
+        choices_for_temperature: s.variants || undefined, menu: s.options.map(function (o) { return o.label; }) };
+    });
+    if (!out.cafe.length) out.cafe_note = '열린 주문 단계가 없습니다 (임원이 주문 단계를 열면 보입니다).';
+  }
+
+  if (want('me') && S.me) {
+    const people = [S.me].concat(S.companions || []);
+    const chosen = function (p) {
+      return (S.choices || []).filter(function (c) { return c.participant_id === p.id; }).map(function (c) {
+        const s = (S.steps || []).filter(function (x) { return x.id === c.step_id; })[0];
+        return (s ? s.title : '') + ': ' + (c.option_label || '') + (c.variant ? ' (' + c.variant + ')' : '') + (c.note ? ' — ' + c.note : '');
+      });
+    };
+    const rows = people.map(function (p) {
+      return { name: p.name, role: p.role, list_no: p.seq,
+        seat: p.bus_seat ? '버스 ' + p.bus_seat + '번' : (p.van_seat ? '쏠라티 ' + p.van_seat + '번' : '미정'),
+        room: p.room_no ? p.room_no + '호' : (p.room_group ? p.room_group + '번 방' : '미정'),
+        my_orders: chosen(p) };
+    });
+    const ref = ctx.cites.add({ title: R.title + ' 내 자리·주문', url: base + '#me', kind: '수양회 내 안내',
+      snippet: rows.map(function (x) { return x.name + ' ' + (x.role || '') + ' · ' + x.seat + ' · ' + x.room + (x.my_orders.length ? ' · ' + x.my_orders.join(', ') : ''); }).join('\n') +
+        ((S.roommates || []).length ? '\n같은 방: ' + S.roommates.map(function (q) { return q.name; }).join(', ') : '') });
+    out.me = { ref: ref, people: rows, roommates: (S.roommates || []).map(function (q) { return q.name + ' ' + (q.role || ''); }) };
+  }
+
+  if (want('worship') && (st.worship || st.prayers)) {
+    const w = (st.worship || []).map(function (x) { return x.k + ': ' + x.v; });
+    const pr = (st.prayers || []).filter(function (x) { return x.v; }).map(function (x) { return x.k + ': ' + x.v; });
+    const ref = ctx.cites.add({ title: R.title + ' 개회 예배 순서 · 기도 순서', url: base + '#prog', kind: '수양회 예배',
+      snippet: w.join('\n') + (pr.length ? '\n\n기도 순서\n' + pr.join('\n') : '') });
+    out.worship = { ref: ref, order: w, prayers: pr };
+  }
+  return out;
+}
