@@ -78,6 +78,31 @@
 .rt-face { display: inline-block; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; vertical-align: middle;
            margin-right: 8px; background: var(--gray-1); cursor: zoom-in; }
 .rt-face[hidden] { display: none; }   /* 공통 CSS 의 img { display: block } 이 hidden 을 덮지 않게 */
+/* 예배 화면 (146 sql) — 진행자가 넘기면 따라 넘어간다 */
+.wv-live { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: #fdf3f3; border: 1px solid var(--red);
+           border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
+.wv-live .sec { color: var(--gray-7); font-size: 0.9rem; flex: 1 1 auto; }
+.wv-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; animation: wv-blink 1.4s infinite; }
+@keyframes wv-blink { 50% { opacity: 0.25; } }
+.wv-order { margin: 0 0 10px; padding-left: 22px; line-height: 1.9; }
+.wv { position: fixed; inset: 0; z-index: 1000; background: #111; color: #fff; display: none; flex-direction: column; }
+.wv.open { display: flex; }
+.wv-top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); }
+.wv-sec { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wv-n { color: #bbb; font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.wv-x { background: none; border: 1px solid #777; color: #fff; border-radius: 8px; padding: 5px 12px; font-size: 0.9rem; }
+.wv-stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.wv-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.wv-tap { position: absolute; top: 0; bottom: 0; width: 35%; background: none; border: 0; }
+.wv-tap.prev { left: 0; }
+.wv-tap.next { right: 0; }
+.wv-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; padding: 12px 14px;
+          padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.wv-b { background: #333; color: #fff; border: 1px solid #555; border-radius: 10px; padding: 12px 18px; font-size: 1rem; min-width: 92px; }
+.wv-b.go { background: #1f7a3a; border-color: #1f7a3a; }
+.wv-b.stop { background: #7a1f1f; border-color: #7a1f1f; }
+.wv-note { color: #bbb; font-size: 0.86rem; flex-basis: 100%; text-align: center; }
+.wv-note.on { color: #fff; }
 .rt-face.lg { width: 72px; height: 72px; margin: 0; cursor: default; }
 @media (max-width: 640px) {
   .rt-stop { grid-template-columns: 50px 1fr; }
@@ -141,12 +166,14 @@ document.addEventListener('DOMContentLoaded', function () {
   function msgBox(id) { return document.getElementById(id); }
 
   /* 열 수 있는 탭 — 진행 관리는 임원만, 명단은 정회원만 */
-  var TABS = ['me', 'prog', 'media', 'list', 'ops'];
+  var TABS = ['me', 'prog', 'worship', 'media', 'list', 'ops'];
   function okTab(t) {
-    return TABS.indexOf(t) >= 0 && !(t === 'ops' && !isOfficer) && !(t === 'list' && S && S.member === false);
+    return TABS.indexOf(t) >= 0 && !(t === 'ops' && !isOfficer) && !(t === 'list' && S && S.member === false) &&
+      !(t === 'worship' && !WORSHIP.length);
   }
-  /* 브라우저 「뒤로」 — 사진·영상 창이 열려 있으면 그 창만 닫고, 아니면 이전 탭으로 */
+  /* 브라우저 「뒤로」 — 예배 화면·사진·영상 창이 열려 있으면 그 창만 닫고, 아니면 이전 탭으로 */
   window.addEventListener('popstate', function () {
+    if (wvEl && wvEl.classList.contains('open')) { closeWorship(true); return; }
     if (viewer && viewer.classList.contains('open')) { closeViewer(true); return; }
     if (!S || !R) return;
     var t = (location.hash || '').replace('#', '');
@@ -192,12 +219,18 @@ document.addEventListener('DOMContentLoaded', function () {
         document.title = R.title + ' - 시화산노회';
         var cl = document.getElementById('rt-crumb-com');
         cl.textContent = R.committee; cl.href = 'committee.html?c=' + encodeURIComponent(R.committee);
-        /* 모르는 탭·볼 수 없는 탭으로 오면 내 안내(참가자가 아니면 일정)로 */
-        if (!okTab(tab)) tab = S.me ? 'me' : 'prog';
         /* 수양회 기간이면 오늘 날짜의 날을 먼저 편다 */
         var dn = dayNo(S.today);
         if (dn >= 1 && dn <= totalDays()) day = dn;
-        draw();
+        /* 예배 화면(146 sql)이 있어야 「예배」 탭이 생기므로 먼저 읽는다 */
+        loadWorship().then(function () {
+          /* 모르는 탭·볼 수 없는 탭으로 오면 내 안내(참가자가 아니면 일정)로 */
+          if (!okTab(tab)) tab = S.me ? 'me' : 'prog';
+          draw();
+          watchLive();
+          /* 메인 화면·대시보드의 「예배 화면」 단추(?wv=1)로 왔으면 진행 중인 예배를 바로 연다 */
+          if (/[?&]wv=1/.test(location.search) && liveOne() && !(wvEl && wvEl.classList.contains('open'))) openWorship(liveOne());
+        });
         SHS.logAction('view', '수양회 열람', R.title);
       });
   }
@@ -276,9 +309,10 @@ document.addEventListener('DOMContentLoaded', function () {
             : '참가자 명단에서 회원님을 찾지 못했습니다. 참가하시는데 보이지 않으면 ' + e(R.committee) + ' 임원에게 말씀해 주세요.')) +
       '</div>';
 
-    h += '<div class="tabs" id="rt-tabs">' +
+    h += '<div id="rt-live"></div><div class="tabs" id="rt-tabs">' +
       '<button class="' + (tab === 'me' ? 'active' : '') + '" data-t="me">내 안내' + openCountBadge() + '</button>' +
       '<button class="' + (tab === 'prog' ? 'active' : '') + '" data-t="prog">일정</button>' +
+      (WORSHIP.length ? '<button class="' + (tab === 'worship' ? 'active' : '') + '" data-t="worship">예배</button>' : '') +
       '<button class="' + (tab === 'media' ? 'active' : '') + '" data-t="media">사진·영상</button>' +
       /* 참가자 전체 명단은 정회원에게만 */
       (S.member === false ? '' : '<button class="' + (tab === 'list' ? 'active' : '') + '" data-t="list">명단</button>') +
@@ -292,8 +326,10 @@ document.addEventListener('DOMContentLoaded', function () {
         tab = b.dataset.t; history.pushState({ rtTab: tab }, '', '#' + tab); draw();
       });
     });
+    paintLive();
     if (tab === 'me') drawMe();
     else if (tab === 'prog') drawProg();
+    else if (tab === 'worship') drawWorship();
     else if (tab === 'media') drawMedia();
     else if (tab === 'list') drawList();
     else drawOps();
@@ -788,6 +824,236 @@ document.addEventListener('DOMContentLoaded', function () {
       '<a href="' + e(m.image_url) + '" target="_blank" rel="noopener" style="color:#dfe4ee;font-size:0.82rem;text-decoration:underline">유튜브에서 보기</a>';
     markViewer();
     v.classList.add('open');
+  }
+
+  /* ---------- 예배 (146 sql) ----------
+   * 운평교회 「오늘의 예배」처럼 예배 시간에 휴대폰에 예배 화면을 띄운다.
+   * 진행하는 임원이 「다음」을 누르면 retreat_worship.slide 가 바뀌고,
+   * 예배 화면을 연 참가자 휴대폰은 2초마다 확인해 같은 장으로 넘어간다.
+   * 참가자가 손으로 넘기면 따라가기를 멈추고, 「다시 따라가기」로 돌아온다. */
+  var WORSHIP = [], wvEl = null, wv = null, wvTimer = null, wvLock = null, liveTimer = null;
+
+  function loadWorship() {
+    return db().then(function (c) {
+      return c.from('retreat_worship').select('id, title, slides, sections, live, slide, updated_at')
+        .eq('retreat_id', R.id).order('id');
+    }).then(function (r) { WORSHIP = (r && !r.error && r.data) || []; }, function () { WORSHIP = []; });
+  }
+  function slidesOf(w) { return Array.isArray(w.slides) ? w.slides : []; }
+  function sectionOf(w, n) {
+    var lab = '';
+    (Array.isArray(w.sections) ? w.sections : []).forEach(function (s) { if (s.from <= n) lab = s.label; });
+    return lab;
+  }
+  function liveOne() { return WORSHIP.filter(function (w) { return w.live; })[0] || null; }
+
+  /* 탭 위 띠 — 지금 예배 중이면 누구에게나 */
+  function paintLive() {
+    var el = document.getElementById('rt-live');
+    if (!el) return;
+    var w = liveOne();
+    el.innerHTML = w ? '<div class="wv-live"><span class="wv-dot"></span><strong>지금 ' + e(w.title) + ' 중입니다</strong>' +
+      '<span class="sec">' + e(sectionOf(w, w.slide)) + '</span>' +
+      '<button class="btn sm" data-wopen="' + w.id + '">예배 화면 열기</button></div>' : '';
+    var b = el.querySelector('[data-wopen]');
+    if (b) b.addEventListener('click', function () { openWorship(w); });
+  }
+
+  /* 예배 화면을 열지 않았을 때도 20초마다 진행 여부를 살펴 띠를 켜고 끈다 */
+  function watchLive() {
+    if (liveTimer || !WORSHIP.length) return;
+    liveTimer = setInterval(function () {
+      if (document.hidden || (wvEl && wvEl.classList.contains('open'))) return;
+      db().then(function (c) {
+        return c.from('retreat_worship').select('id, live, slide, updated_at').eq('retreat_id', R.id);
+      }).then(function (r) {
+        if (!r || r.error || !r.data) return;
+        var changed = false;
+        r.data.forEach(function (x) {
+          var w = byId(WORSHIP, x.id);
+          if (!w) return;
+          if (w.live !== x.live) changed = true;
+          w.live = x.live; w.slide = x.slide; w.updated_at = x.updated_at;
+        });
+        paintLive();
+        if (changed && tab === 'worship') drawWorship();
+      }, function () {});
+    }, 20000);
+  }
+
+  function drawWorship() {
+    var box = document.getElementById('rt-body');
+    var h = '<p class="rt-muted">예배 시간에 「예배 화면」을 열어 두시면, 진행하시는 분이 넘기는 대로 찬양 가사·성경 본문·순서가 ' +
+      '휴대폰에 따라 나옵니다. 휴대폰을 가로로 돌리면 크게 보입니다.</p>';
+    WORSHIP.forEach(function (w) {
+      h += '<div class="rt-card"><h3>' + e(w.title) + ' ' +
+        (w.live ? '<span class="rt-badge live">진행 중</span>' : '<span class="rt-badge">대기</span>') + '</h3>' +
+        '<ol class="wv-order">' + (Array.isArray(w.sections) ? w.sections : []).map(function (s) {
+          return '<li><a href="#" data-wgo="' + w.id + ':' + Number(s.from) + '">' + e(s.label) + '</a></li>';
+        }).join('') + '</ol>' +
+        '<p class="rt-muted">화면 ' + slidesOf(w).length + '장' +
+        (w.live ? ' · 지금 ' + w.slide + '번째 장 · ' + e(sectionOf(w, w.slide)) : '') + '</p>' +
+        '<button class="btn" data-wopen="' + w.id + '">예배 화면 열기</button>' +
+        (isOfficer ? '<p class="rt-muted" style="margin-top:10px">임원은 예배 화면 아래의 「진행 시작」을 누른 뒤 다음·이전으로 넘깁니다. ' +
+          '노트북을 세미나실 화면에 이어 같은 화면을 띄우셔도 됩니다 (키보드 ← → 로 넘김).</p>' : '') +
+        '</div>';
+    });
+    box.innerHTML = h;
+    box.querySelectorAll('[data-wopen]').forEach(function (b) {
+      b.addEventListener('click', function () { openWorship(byId(WORSHIP, b.dataset.wopen)); });
+    });
+    box.querySelectorAll('[data-wgo]').forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var p = a.dataset.wgo.split(':');
+        openWorship(byId(WORSHIP, p[0]), Number(p[1]));
+      });
+    });
+  }
+
+  function wvBuild() {
+    if (wvEl) return wvEl;
+    wvEl = document.createElement('div');
+    wvEl.className = 'wv';
+    wvEl.innerHTML =
+      '<div class="wv-top"><span class="wv-sec"></span><span class="wv-n"></span><button class="wv-x">닫기</button></div>' +
+      '<div class="wv-stage"><img class="wv-img" alt="">' +
+      '<button class="wv-tap prev" aria-label="이전 장"></button><button class="wv-tap next" aria-label="다음 장"></button></div>' +
+      '<div class="wv-bar"></div>';
+    document.body.appendChild(wvEl);
+    wvEl.querySelector('.wv-x').addEventListener('click', function () { closeWorship(); });
+    wvEl.querySelector('.wv-tap.prev').addEventListener('click', function () { wvStep(-1); });
+    wvEl.querySelector('.wv-tap.next').addEventListener('click', function () { wvStep(1); });
+    /* 손가락으로 밀어 넘기기 */
+    var sx = null, stage = wvEl.querySelector('.wv-stage');
+    stage.addEventListener('touchstart', function (ev) { sx = ev.touches[0].clientX; }, { passive: true });
+    stage.addEventListener('touchend', function (ev) {
+      if (sx == null) return;
+      var dx = ev.changedTouches[0].clientX - sx; sx = null;
+      if (Math.abs(dx) > 50) wvStep(dx < 0 ? 1 : -1);
+    });
+    document.addEventListener('keydown', function (ev) {
+      if (!wvEl.classList.contains('open')) return;
+      if (ev.key === 'Escape') closeWorship();
+      else if (ev.key === 'ArrowRight' || ev.key === 'PageDown' || ev.key === ' ') { ev.preventDefault(); wvStep(1); }
+      else if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') { ev.preventDefault(); wvStep(-1); }
+    });
+    /* 다른 앱을 보다 돌아오면 바로 지금 장을 확인하고, 화면 꺼짐 막기를 다시 건다 */
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden || !wvEl.classList.contains('open')) return;
+      keepAwake(); wvPoll();
+    });
+    return wvEl;
+  }
+  /* 예배 동안 화면이 꺼지지 않게 (되는 휴대폰만) */
+  function keepAwake() {
+    try {
+      if (navigator.wakeLock && !wvLock) navigator.wakeLock.request('screen').then(function (l) {
+        wvLock = l; l.addEventListener('release', function () { wvLock = null; });
+      }, function () {});
+    } catch (x) {}
+  }
+
+  function openWorship(w, at) {
+    if (!w) return;
+    wvBuild();
+    var already = wvEl.classList.contains('open');
+    wv = { w: w, n: at || (w.live ? w.slide : 1), follow: !!w.live && !at, wroteAt: 0, sig: '' };
+    if (!already) history.pushState({ rtWorship: 1, rtTab: tab }, '', location.href);
+    wvEl.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    wvShow();
+    clearInterval(wvTimer); wvTimer = setInterval(wvPoll, 2000);
+    keepAwake();
+  }
+  function closeWorship(fromPop) {
+    if (!wvEl || !wvEl.classList.contains('open')) return;
+    wvEl.classList.remove('open');
+    document.body.style.overflow = '';
+    clearInterval(wvTimer); wvTimer = null;
+    try { if (wvLock) wvLock.release(); } catch (x) {}
+    wvLock = null; wv = null;
+    if (fromPop !== true && history.state && history.state.rtWorship) history.back();
+    paintLive();
+    if (tab === 'worship') drawWorship();
+  }
+
+  function wvShow() {
+    var w = wv.w, list = slidesOf(w);
+    wv.n = Math.max(1, Math.min(list.length || 1, wv.n));
+    var n = wv.n, sig = [n, w.live, wv.follow, w.slide].join('|');
+    if (sig === wv.sig) return;            /* 바뀐 것이 없으면 단추를 다시 그리지 않는다 */
+    wv.sig = sig;
+    var img = wvEl.querySelector('.wv-img');
+    if (img.getAttribute('src') !== list[n - 1]) img.src = list[n - 1] || '';
+    [n, n - 2].forEach(function (i) { if (list[i]) { var p = new Image(); p.src = list[i]; } });   /* 앞뒤 장을 미리 받아 둔다 */
+    wvEl.querySelector('.wv-sec').textContent = sectionOf(w, n) || w.title;
+    wvEl.querySelector('.wv-n').textContent = n + ' / ' + list.length;
+    var bar = wvEl.querySelector('.wv-bar');
+    if (isOfficer) {
+      bar.innerHTML = '<button class="wv-b" data-wv="-1">&lsaquo; 이전</button>' +
+        '<button class="wv-b ' + (w.live ? 'stop' : 'go') + '" data-wv="live">' + (w.live ? '진행 마침' : '진행 시작') + '</button>' +
+        '<button class="wv-b" data-wv="1">다음 &rsaquo;</button>' +
+        '<span class="wv-note">' + (w.live ? '넘기면 참가자 화면이 따라 넘어갑니다.' : '진행 시작 전에는 이 기기에서만 넘어갑니다.') + '</span>';
+    } else if (w.live) {
+      bar.innerHTML = wv.follow
+        ? '<span class="wv-note on"><span class="wv-dot"></span> 진행하시는 분을 따라가는 중입니다</span>'
+        : '<button class="wv-b go" data-wv="follow">다시 따라가기 (지금 ' + w.slide + '번째 장)</button>';
+    } else {
+      bar.innerHTML = '<span class="wv-note">지금은 진행 중이 아닙니다. 앞뒤로 넘겨 보실 수 있습니다.</span>';
+    }
+    bar.querySelectorAll('[data-wv]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var a = b.dataset.wv;
+        if (a === 'follow') { wv.follow = true; wv.n = w.slide; wvShow(); }
+        else if (a === 'live') wvSetLive(!w.live);
+        else wvStep(Number(a));
+      });
+    });
+  }
+
+  function wvStep(d) {
+    if (!wv) return;
+    var w = wv.w, n = Math.max(1, Math.min(slidesOf(w).length, wv.n + d));
+    if (n === wv.n) return;
+    wv.n = n;
+    if (isOfficer && w.live) wvWrite({ slide: n });
+    else if (!isOfficer) wv.follow = false;
+    wvShow();
+  }
+
+  /* 진행하는 임원만 — 바꾼 것을 화면에 먼저 보이고 서버에 적는다 */
+  function wvWrite(patch) {
+    var w = wv.w;
+    patch.updated_at = new Date().toISOString();
+    patch.updated_by = user.id;
+    wv.wroteAt = Date.now();
+    Object.keys(patch).forEach(function (k) { w[k] = patch[k]; });
+    return db().then(function (c) { return c.from('retreat_worship').update(patch).eq('id', w.id); })
+      .then(function (r) { if (r && r.error) alert('진행 화면을 바꾸지 못했습니다: ' + r.error.message); },
+            function () { alert('진행 화면을 바꾸지 못했습니다. 인터넷 연결을 확인해 주세요.'); });
+  }
+  function wvSetLive(on) {
+    var w = wv.w;
+    if (!on && !confirm(w.title + ' 진행을 마칠까요? 참가자 화면의 따라가기가 멈춥니다.')) return;
+    wvWrite(on ? { live: true, slide: wv.n } : { live: false });
+    SHSCloud.log('update', '수양회 예배 ' + (on ? '진행 시작' : '진행 마침'), R.title + ' / ' + w.title);
+    wvShow(); paintLive();
+  }
+
+  function wvPoll() {
+    if (!wv || document.hidden) return;
+    var w = wv.w;
+    db().then(function (c) { return c.from('retreat_worship').select('live, slide, updated_at').eq('id', w.id).single(); })
+      .then(function (r) {
+        if (!wv || wv.w !== w || !r || r.error || !r.data) return;
+        if (Date.now() - wv.wroteAt < 3000) return;     /* 방금 이 기기에서 바꾼 것이 아직 안 돌아왔을 수 있다 */
+        var x = r.data, was = w.live;
+        w.live = x.live; w.slide = x.slide; w.updated_at = x.updated_at;
+        if (w.live && !was) wv.follow = true;           /* 진행이 시작되면 따라간다 */
+        if (w.live && (wv.follow || isOfficer)) wv.n = w.slide;
+        wvShow();
+      }, function () {});
   }
 
   /* ---------- 명단 ---------- */

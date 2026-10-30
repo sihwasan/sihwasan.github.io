@@ -121,6 +121,19 @@ var SHSRetreat = (function () {
       (!d.inDays ? '<button type="button" class="btn ghost sm" data-rt-hide>그만 보기</button>' : '') +
       '</div>';
     slot.innerHTML = h;
+    /* 수양회 기간에 예배가 진행 중이면 (146 sql) 예배 화면으로 바로 가는 줄을 맨 위에 */
+    if (d.inDays) {
+      SHSCloud.init().then(function (c) {
+        return c ? c.from('retreat_worship').select('id, title').eq('retreat_id', R.id).eq('live', true).limit(1) : null;
+      }).then(function (r) {
+        var w = r && !r.error && r.data && r.data[0], box = slot.querySelector('.rt-dash');
+        if (!w || !box) return;
+        var a = document.createElement('div');
+        a.className = 'dash-alert';
+        a.innerHTML = '<strong>지금 ' + esc(w.title) + ' 중입니다</strong> — <a href="' + base + '&wv=1#worship">예배 화면 열기</a>';
+        box.insertBefore(a, box.children[2] || null);
+      }, function () {});
+    }
     var hb = slot.querySelector('[data-rt-hide]');
     if (hb) hb.addEventListener('click', function () {
       try { localStorage.setItem(hideKey, '1'); } catch (x) {}
@@ -148,6 +161,13 @@ var SHSRetreat = (function () {
       /* 가이드북 — 교육친교부가 적어 둔 주소를 그대로 연다 (가이드북을 고치면 이 단추도 고친 것을 연다) */
       var gb = document.getElementById('hero-retreat-guide');
       if (gb && d.guide_url) { gb.href = d.guide_url; gb.classList.remove('hidden'); }
+      /* 지금 진행 중인 예배가 있으면 (146 sql) 예배 화면을 바로 연다 */
+      var wb = document.getElementById('hero-retreat-worship');
+      if (wb && d.worship) {
+        wb.href = 'retreat.html?id=' + d.id + '&wv=1#worship';
+        wb.textContent = '지금 ' + (d.worship.title || '예배') + ' 중 · 예배 화면';
+        wb.classList.remove('hidden');
+      }
       card.classList.remove('hidden');
     }, function () {});
   }
