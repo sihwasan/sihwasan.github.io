@@ -31,7 +31,11 @@
     </div>
     <div class="field">
       <label for="reg-pos">직분</label>
-      <select id="reg-pos"><option>목사</option><option>위임목사</option><option>부목사</option><option>장로</option><option>간사</option></select>
+      <select id="reg-pos"><option>목사</option><option>위임목사</option><option>부목사</option><option>장로</option><option>간사</option><option>사모</option><option>권사</option><option>집사</option></select>
+      <span class="hidden" id="reg-pos-note" style="display:block;font-size:0.82rem;color:var(--gray-5);margin-top:5px">
+        수양회 등에 함께 가시는 <strong>사모님·권사님·집사님</strong>은 아래 소속 교회로 <strong>남편 목사님·장로님의 교회</strong>를 골라 주세요.
+        가입하시면 승인대기로 시작하고, 수양회 참가자 명단과 이름·교회가 맞으면 수양회 화면이 바로 열리며 일반회원이 됩니다.
+      </span>
     </div>
     <div class="field">
       <label for="reg-church">소속 교회</label>
@@ -150,6 +154,13 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('reg-etc-wrap').classList.toggle('hidden', this.value !== '__etc');
   });
 
+  /* 사모·권사·집사 — 노회 회원 명단이 아니라 수양회 참가자 명단(배우자 줄)으로 확인한다 (152 sql) */
+  var SPOUSE_POS = ['사모', '권사', '집사'];
+  function isSpouse() { return SPOUSE_POS.indexOf(document.getElementById('reg-pos').value) >= 0; }
+  document.getElementById('reg-pos').addEventListener('change', function () {
+    document.getElementById('reg-pos-note').classList.toggle('hidden', !isSpouse());
+  });
+
   function churchValue() {
     var v = sel.value;
     return v === '__etc' ? document.getElementById('reg-etc').value.trim() : v;
@@ -187,6 +198,8 @@ document.addEventListener('DOMContentLoaded', function () {
       return null;
     }
     if (adj.note) alert(adj.note);
+    /* 가입을 마치면 수양회 화면으로 — 그 화면이 명단 줄에 잇고 일반회원으로 바꾼다 */
+    if (isSpouse()) { try { sessionStorage.setItem('shs_next', 'retreat.html'); } catch (x) {} }
     return {
       name: name, church: church, position: adj.position, birth: birth,
       phone: document.getElementById('reg-phone').value.trim()
@@ -294,6 +307,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (cr.ok && cr.role && cr.role !== 'pending') {
           msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하여 ' +
             (cr.title ? cr.title + '(' + cr.roleName + ')' : cr.roleName) + ' 등급으로 가입되었습니다.';
+        } else if (isSpouse()) {
+          msg.textContent = '가입이 완료되었습니다. 수양회 화면으로 이동합니다. ' +
+            '참가자 명단과 이름·교회가 맞으면 수양회 안내가 열리고 일반회원이 됩니다.';
         } else {
           msg.textContent = '가입이 완료되었습니다. 노회 명단과 일치하지 않아 승인대기 상태입니다. ' +
             '서기·간사 확인 후 정회원으로 전환됩니다.';

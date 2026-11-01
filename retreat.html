@@ -1064,6 +1064,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   /* ---------- 명단 ---------- */
+  /* 배우자 줄의 직분 — 남편에게 묶이지 않았어도 이 직분이면 배우자 줄로 본다 (152 sql 과 같다) */
+  var SPOUSE_ROLES = ['사모', '권사', '집사', '배우자'];
   /* 얼굴 사진 (144 sql) — 명단 표와 따로 두고 명단 탭을 열 때만 읽는다.
    * 300px 사진을 그대로 담아 두므로 사진 보관소를 거치지 않는다. */
   var FACES = null, FACE_W = 300;
@@ -1119,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '<td>' + (p.room_no ? e(p.room_no) : (p.room_group ? p.room_group + '번' : '-')) + '</td>' +
         (isOfficer
           ? '<td>' + e(won(p.paid)) + '</td><td>' + (p.linked ? '연결'
-              : (p.role === '사모' || p.role === '배우자'
+              : (p.companion_of || SPOUSE_ROLES.indexOf(p.role) >= 0   /* 배우자 줄 (152 sql) */
                   ? (p.birth_date ? '<span class="rt-count">생일 있음</span>' : '<span class="rt-count">생일 없음</span>')
                   : '<span style="color:var(--red)">없음</span>')) + '</td>' +
             '<td><button class="btn ghost sm" data-edit="' + p.id + '">수정</button></td>'
@@ -1156,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<div class="field" style="flex:0 0 80px"><label>번호</label><input type="number" id="pf-seq"></div>' +
       '<div class="field"><label>성명</label><input type="text" id="pf-name"></div>' +
       '<div class="field" style="flex:0 0 120px"><label>직분</label><select id="pf-role">' +
-      ['목사', '장로', '원로목사', '사모', '배우자'].map(function (v) { return '<option>' + v + '</option>'; }).join('') + '</select></div>' +
+      ['목사', '장로', '원로목사'].concat(SPOUSE_ROLES).map(function (v) { return '<option>' + v + '</option>'; }).join('') + '</select></div>' +
       '<div class="field" style="flex:0 0 160px"><label>교회</label><input type="text" id="pf-church"></div>' +
       '</div>' +
       '<div class="inline-form" style="margin-bottom:8px">' +
@@ -1187,8 +1189,10 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button class="btn danger hidden" id="pf-del">삭제</button>' +
       '<div class="form-msg" id="pf-msg"></div>' +
       '<p class="rt-muted" style="margin-top:10px">회원(목사·장로)은 이름이 같은 정회원 계정에 저절로 이어집니다. ' +
-      '<strong>사모님</strong>은 생년월일을 적어 두시면, 사모님이 홈페이지에 가입할 때 같은 이름·생년월일을 적었을 때 ' +
-      '수양회 화면이 열리고 일반회원이 됩니다. 동명이인이거나 이름이 다르면 서기가 SQL로 잇습니다.</p></div>';
+      '<strong>사모님·권사님·집사님</strong>(배우자 줄)은 홈페이지에 가입할 때 같은 이름을 적고, ' +
+      '<strong>소속 교회로 남편의 교회</strong>를 고르시면 수양회 화면이 열리고 일반회원이 됩니다. ' +
+      '여기에 생년월일을 적어 두시면 교회 대신 생년월일로 확인합니다(더 엄격). ' +
+      '동명이인이거나 이름이 다르면 서기가 SQL로 잇습니다.</p></div>';
   }
 
   function fillEditor(p) {
