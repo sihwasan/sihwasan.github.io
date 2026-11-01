@@ -78,6 +78,10 @@
 .rt-face { display: inline-block; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: 50% 25%; vertical-align: middle;
            margin-right: 8px; background: var(--gray-1); cursor: zoom-in; }
 .rt-face[hidden] { display: none; }
+.rt-menu-pics { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 6px 0 14px; }
+.rt-menu-pics figure { margin: 0; cursor: zoom-in; }
+.rt-menu-pics img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #111; }
+.rt-menu-pics figcaption { font-size: 0.86rem; text-align: center; margin-top: 4px; color: var(--gray-7); }
 .rt-endbar { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--gray-2); text-align: right; }
 .rt-tally { margin-top: 14px; border-top: 1px dashed var(--gray-3); padding-top: 10px; }
 .rt-tally summary { cursor: pointer; font-weight: 700; color: var(--navy); }
@@ -443,6 +447,11 @@ document.addEventListener('DOMContentLoaded', function () {
     box.querySelectorAll('[data-end-step]').forEach(function (b) {
       b.addEventListener('click', function () { endStep(b.dataset.endStep); });
     });
+    box.querySelectorAll('[data-menu-pic]').forEach(function (f) {
+      f.addEventListener('click', function () {
+        openPhoto([{ image_url: f.dataset.menuPic, title: f.dataset.menuName, face: true }], 0);
+      });
+    });
   }
 
   /* 「내 안내」 화면 — 참가자 본인 화면과 진행 관리의 미리 보기가 함께 쓴다.
@@ -509,6 +518,14 @@ document.addEventListener('DOMContentLoaded', function () {
       (s.due ? ' <span class="rt-count">' + e(kdate(s.due)) + '까지</span>' : '') + '</h3>';
     if (s.body) h += '<p class="body">' + e(s.body) + '</p>';
     if (s.kind === '선택') {
+      /* 메뉴 사진 (155 sql) — 사진이 있는 메뉴는 이름과 함께 보이고, 누르면 크게 */
+      var pics = (s.options || []).filter(function (o) { return o.image_url; });
+      if (pics.length) {
+        h += '<div class="rt-menu-pics">' + pics.map(function (o) {
+          return '<figure data-menu-pic="' + e(o.image_url) + '" data-menu-name="' + e(o.label) + '">' +
+            '<img src="' + e(o.image_url) + '" alt="' + e(o.label) + '" loading="lazy"><figcaption>' + e(o.label) + '</figcaption></figure>';
+        }).join('') + '</div>';
+      }
       if (people.length > 1) h += '<p class="rt-muted">부부가 한 분씩 따로 고르십니다. 각자 고르고 「저장」을 눌러 주세요.</p>';
       h += personRows(s, people, people.length > 1 ? function (p, i) { return i === 0 ? '본인' : '배우자'; } : null);
       if (isOfficer) h += tallyHtml(s);
