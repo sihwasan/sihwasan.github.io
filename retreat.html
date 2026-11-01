@@ -77,7 +77,10 @@
 .rt-count { font-size: 0.8rem; color: var(--gray-5); }
 .rt-face { display: inline-block; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: 50% 25%; vertical-align: middle;
            margin-right: 8px; background: var(--gray-1); cursor: zoom-in; }
-.rt-face[hidden] { display: none; }   /* 공통 CSS 의 img { display: block } 이 hidden 을 덮지 않게 */
+.rt-face[hidden] { display: none; }
+.rm-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--gray-2); }
+.rm-who { flex: 1; font-size: 0.92rem; line-height: 1.5; }
+.rm-no { flex: 0 0 110px; width: 110px; font-size: 1rem; padding: 8px 10px; border: 1px solid var(--gray-3); border-radius: 8px; }   /* 공통 CSS 의 img { display: block } 이 hidden 을 덮지 않게 */
 /* 예배 화면 (146 sql) — 진행자가 넘기면 따라 넘어간다 */
 .wv-live { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: #fdf3f3; border: 1px solid var(--red);
            border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; }
@@ -339,6 +342,63 @@ document.addEventListener('DOMContentLoaded', function () {
     else if (tab === 'media') drawMedia();
     else if (tab === 'list') drawList();
     else drawOps();
+  }
+
+  /* ---------- 호실 입력 (체크인) ----------
+   * 호텔에서 방을 받으면 진행 담당·임원이 「방 번호」(명단의 방 묶음)마다 호수를 적는다.
+   * 한 방에 묶인 분 모두에게 같은 호수가 들어가고, 참가자 「내 자리」의 숙소 칸이 호수로 바뀐다.
+   * 방 묶음이 없는 분은 한 분씩 적는다. */
+  function roomsHtml(ps) {
+    var groups = {}, singles = [];
+    ps.forEach(function (p) {
+      if (p.room_group) (groups[p.room_group] = groups[p.room_group] || []).push(p);
+      else singles.push(p);
+    });
+    var keys = Object.keys(groups).map(Number).sort(function (a, b) { return a - b; });
+    var done = ps.filter(function (p) { return p.room_no; }).length;
+    var row = function (attr, label, people, val) {
+      return '<div class="rm-row"><div class="rm-who"><strong>' + e(label) + '</strong> ' +
+        e(people.map(function (p) { return p.name; }).join(', ')) + '</div>' +
+        '<input type="text" class="rm-no" ' + attr + ' value="' + e(val || '') + '" placeholder="호수" inputmode="text"></div>';
+    };
+    return '<div class="admin-card" id="rm-card" style="margin-top:16px"><h3 style="margin-top:0">호실 입력 (체크인)</h3>' +
+      '<p class="rt-muted" style="margin-top:0">호텔에서 받은 방 호수를 방마다 적고 「모두 저장」을 누르세요. 같은 방 분들께 함께 들어가고, ' +
+      '참가자 「내 자리」의 숙소 칸에 바로 보입니다. 다 적은 뒤 진행 관리의 「숙소 배정」 단계를 열면 참가자에게 알림이 갑니다. ' +
+      '(입력 ' + done + ' / ' + ps.length + '명)</p>' +
+      keys.map(function (k) {
+        var people = groups[k];
+        var cur = people.map(function (p) { return p.room_no || ''; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+        return row('data-rg="' + k + '"', k + '번 방', people, cur.length === 1 ? cur[0] : '');
+      }).join('') +
+      singles.map(function (p) { return row('data-pid="' + p.id + '"', '방 묶음 없음', [p], p.room_no); }).join('') +
+      '<button class="btn" id="rm-save">모두 저장</button><div class="form-msg" id="rm-msg"></div></div>';
+  }
+  function bindRooms(ps) {
+    var btn = document.getElementById('rm-save');
+    if (!btn) return;
+    var card = document.getElementById('rm-card');
+    card.querySelectorAll('.rm-no').forEach(function (i) { i.dataset.was = i.value; });
+    btn.addEventListener('click', function () {
+      var msg = msgBox('rm-msg');
+      var changed = Array.prototype.filter.call(card.querySelectorAll('.rm-no'), function (i) { return i.value.trim() !== i.dataset.was; });
+      if (!changed.length) { msg.className = 'form-msg'; msg.textContent = '바뀐 호수가 없습니다.'; return; }
+      btn.disabled = true; msg.className = 'form-msg'; msg.textContent = '저장 중입니다...';
+      db().then(function (c) {
+        return Promise.all(changed.map(function (i) {
+          var q = c.from('retreat_participants').update({ room_no: i.value.trim() || null, updated_at: new Date().toISOString() })
+            .eq('retreat_id', R.id);
+          return i.dataset.rg ? q.eq('room_group', Number(i.dataset.rg)) : q.eq('id', Number(i.dataset.pid));
+        }));
+      }).then(function (rs) {
+        btn.disabled = false;
+        var bad = rs.filter(function (r) { return r && r.error; })[0];
+        if (bad) { msg.className = 'form-msg err'; msg.textContent = bad.error.message; return; }
+        SHSCloud.log('update', '수양회 호실 입력', R.title + ' / ' + changed.map(function (i) {
+          return (i.dataset.rg ? i.dataset.rg + '번 방' : '1명') + ' ' + (i.value.trim() || '(지움)');
+        }).join(', '));
+        load();
+      }, function () { btn.disabled = false; msg.className = 'form-msg err'; msg.textContent = '저장하지 못했습니다. 인터넷 연결을 확인해 주세요.'; });
+    });
   }
 
   /* 진행 차례의 다음 단계 — 순서(seq)대로, 「배정」 단계는 빼고 (153 sql 의 retreat_set_step 과 같은 규칙) */
@@ -1363,6 +1423,7 @@ document.addEventListener('DOMContentLoaded', function () {
     h += '<label style="display:flex;gap:8px;align-items:center;margin:-10px 0 18px;font-size:0.9rem;cursor:pointer">' +
       '<input type="checkbox" id="op-notify" checked style="width:auto"> 열 때 참가자 회원에게 알림 보내기</label>';
     h += '<div id="op-edit"></div><div id="op-sum"></div>';
+    h += roomsHtml(ps);
 
     /* 참가자 화면 미리 보기 — 고른 참가자의 「내 안내」를 그대로 (부부는 함께) */
     var heads = ps.filter(function (p) { return !p.companion_of; });
@@ -1439,6 +1500,7 @@ document.addEventListener('DOMContentLoaded', function () {
     box.querySelectorAll('button[data-sum]').forEach(function (b) {
       b.addEventListener('click', function () { drawSummary(byId(steps, b.dataset.sum), true); });
     });
+    bindRooms(ps);
     box.querySelectorAll('button[data-edit-step]').forEach(function (b) {
       b.addEventListener('click', function () { editStepId = Number(b.dataset.editStep); drawStepEdit(byId(steps, b.dataset.editStep), ''); });
     });
