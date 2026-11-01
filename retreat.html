@@ -78,10 +78,66 @@
 .rt-face { display: inline-block; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: 50% 25%; vertical-align: middle;
            margin-right: 8px; background: var(--gray-1); cursor: zoom-in; }
 .rt-face[hidden] { display: none; }
-.rt-menu-pics { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 6px 0 14px; }
-.rt-menu-pics figure { margin: 0; cursor: zoom-in; }
-.rt-menu-pics img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; background: #111; }
-.rt-menu-pics figcaption { font-size: 0.86rem; text-align: center; margin-top: 4px; color: var(--gray-7); }
+/* 메뉴 고르기 (156) — 누구 몫인지 누르고, 메뉴를 한 번 누르면 바로 저장 */
+.pk-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin: 4px 0 10px; }
+.pk-head .mn-sub { margin: 0; }
+.pk-mgr { font-size: 0.92rem; color: var(--gray-7); }
+.pk-mgr strong { color: var(--navy); }
+.pk-q { display: block; font-weight: 700; font-size: 0.92rem; margin: 4px 0 8px; color: var(--ink); }
+.pk-who { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.pk-who button { font: inherit; color: var(--ink); background: #fff; border: 2px solid var(--gray-3); border-radius: 12px;
+                 padding: 10px 8px; line-height: 1.35; cursor: pointer; }
+.pk-who .nm { display: block; font-weight: 700; }
+.pk-who .st { display: block; font-size: 0.8rem; color: var(--red); }
+.pk-who .st.ok { color: #2e6b45; }
+.pk-who button.on { border-color: var(--navy); background: var(--navy); color: #fff; }
+.pk-who button.on .st { color: #dfe6f2; }
+.pk-now { background: var(--gray-1); border-radius: 10px; padding: 10px 12px; font-size: 0.92rem; line-height: 1.6; margin-bottom: 12px; }
+.pk-now.ok { background: #eef5f0; }
+.pk-flash { display: block; color: #2e6b45; font-weight: 700; }
+.pk-acts { white-space: nowrap; }
+.lnk { font: inherit; font-size: 0.85rem; background: none; border: 0; padding: 0 4px; color: var(--navy); text-decoration: underline; cursor: pointer; }
+.pk-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 640px) { .pk-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); } }
+.pk-opt { position: relative; display: flex; flex-direction: column; font: inherit; color: var(--ink); text-align: left; background: #fff;
+          border: 2px solid var(--gray-3); border-radius: 12px; padding: 0 0 10px; overflow: hidden; cursor: pointer; }
+.pk-opt img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #111; }
+.pk-opt .nm { padding: 8px 10px 0; font-weight: 700; font-size: 0.95rem; line-height: 1.35; }
+.pk-grid.txt .pk-opt .nm { padding: 10px 38px 0 12px; }
+.pk-opt .pr { padding: 2px 10px 0; font-size: 0.78rem; color: var(--gray-5); }
+.pk-grid.txt .pk-opt .pr { padding-left: 12px; }
+.pk-opt .sel { padding: 4px 10px 0; font-size: 0.8rem; font-weight: 700; color: var(--navy); }
+.pk-grid.txt .pk-opt .sel { padding-left: 12px; }
+.pk-opt.on { border-color: var(--navy); background: #eef2f9; box-shadow: 0 0 0 1px var(--navy); }
+/* 고른 메뉴 오른쪽 위의 동그란 체크 */
+.pk-opt.on::after { content: ''; position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%;
+                    background: var(--navy); box-shadow: 0 0 0 2px #fff; }
+.pk-opt.on::before { content: ''; position: absolute; z-index: 1; top: 13px; right: 17px; width: 6px; height: 12px;
+                     border: solid #fff; border-width: 0 3px 3px 0; transform: rotate(45deg); }
+.pk-opt .zoom { position: absolute; left: 6px; top: 6px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.74rem;
+                padding: 3px 9px; border-radius: 99px; }
+.pk-opt.busy { opacity: 0.5; }
+.pk-opt:disabled, .pk-who button:disabled { cursor: default; }
+.pk-done { font-size: 0.92rem; line-height: 1.8; }
+/* 카페 — 메뉴를 누르면 아래에서 올라오는 창 (차갑게/따뜻하게·요청) */
+.pk-sheet { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: flex-end; justify-content: center; }
+.pk-back { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+.pk-panel { position: relative; width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; background: #fff;
+            border-radius: 16px 16px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); animation: pk-up 0.18s ease-out; }
+@keyframes pk-up { from { transform: translateY(40px); opacity: 0.6; } }
+.pk-for { font-size: 0.86rem; color: var(--gray-5); }
+.pk-h { font-size: 1.25rem; font-weight: 700; color: var(--navy); margin-top: 2px; }
+.pk-sub { font-size: 0.86rem; color: var(--gray-5); }
+.pk-panel .pk-q { margin-top: 16px; }
+.pk-vars { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pk-vars button { font: inherit; font-size: 0.95rem; font-weight: 700; color: var(--ink); background: #fff; border: 2px solid var(--gray-3);
+                  border-radius: 10px; padding: 12px 8px; cursor: pointer; }
+.pk-vars button.on { border-color: var(--navy); background: var(--navy); color: #fff; }
+.pk-note { width: 100%; box-sizing: border-box; font-size: 1rem; padding: 10px 12px; border: 1px solid var(--gray-3); border-radius: 8px; }
+.pk-msg { min-height: 1.3em; font-size: 0.88rem; color: var(--red); margin: 8px 0 4px; }
+.pk-btns { display: flex; gap: 8px; }
+.pk-btns .btn { flex: 1; padding: 12px; font-size: 1rem; }
+.pk-btns .btn.pk-ok { flex: 2; }
 .rt-endbar { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--gray-2); text-align: right; }
 .rt-tally { margin-top: 14px; border-top: 1px dashed var(--gray-3); padding-top: 10px; }
 .rt-tally summary { cursor: pointer; font-weight: 700; color: var(--navy); }
@@ -119,11 +175,61 @@
   .rt-stop { grid-template-columns: 50px 1fr; }
   .rt-card { padding: 16px; }
 }
+
+/* ---------- 제주 테마 (156 sql: settings.theme = 'jeju') ----------
+ * 복숭아빛 노을 하늘 · 귤색 · 풀빛 — 이 수양회 화면에만 입힌다 (누리집 다른 곳은 그대로).
+ * 그림은 images/retreat/jeju-2026/theme.png 이고, 없으면 하늘 빛깔만 남는다. */
+body.rt-jeju .page-head, body.rt-jeju main, body.rt-jeju .pk-sheet {
+  --navy: #2f6b4a; --navy-dark: #22513a; --navy-light: #4a8a63;
+  --accent: #e07a3f; --gold: #e9a44a;
+  --ink: #3b3129; --gray-7: #5c4e42; --gray-5: #8f7d6c;
+  --gray-3: #dcc4ae; --gray-2: #f0dfcc; --gray-1: #fbf1e6;
+  --paper: #fff7ee; --cream: #fff9f2; --white: #ffffff;
+}
+body.rt-jeju { background: #fff7ee; }
+body.rt-jeju .page-head { position: relative; overflow: hidden; color: #4a3426; padding: 0;
+  background: linear-gradient(180deg, #fde9d8 0%, #f9cfae 100%); }
+body.rt-jeju .page-head .rt-jeju-art { display: none; position: absolute; inset: 0;
+  background: url(images/retreat/jeju-2026/theme.png) center bottom / cover no-repeat; }
+body.rt-jeju-art .page-head .rt-jeju-art { display: block; }
+body.rt-jeju .page-head .container { position: relative; z-index: 1; padding-top: 28px; padding-bottom: 26px; padding-right: 96px; }
+body.rt-jeju-art .page-head .container { padding-bottom: 150px; }
+body.rt-jeju .page-head h1 { color: #4a3426; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55); }
+body.rt-jeju .page-head .crumb, body.rt-jeju .page-head .crumb a { color: #7a5540; }
+body.rt-jeju .rt-jeju-mark { position: absolute; right: 20px; top: 22px; z-index: 1; text-align: center; color: #5a3a28;
+  font-family: 'Noto Serif KR', serif; letter-spacing: 6px; font-size: 1.1rem; line-height: 1.3; }
+body.rt-jeju .rt-jeju-mark small { display: block; letter-spacing: 2px; font-size: 0.72rem; color: #8a5a42; }
+body.rt-jeju .page-body { padding-top: 28px; }
+body.rt-jeju .notice-banner { background: #fdeedd; border: 1px solid #f0d2b6; border-left: 3px solid var(--accent); }
+body.rt-jeju .rt-head { border-color: #f0d2b6; }
+body.rt-jeju .rt-kicker { color: var(--accent); }
+body.rt-jeju .rt-verse { background: #fdf2e6; }
+body.rt-jeju .tabs { border-bottom-color: #f0d2b6; }
+body.rt-jeju .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+body.rt-jeju .rt-card { border-color: #eed8c2; }
+body.rt-jeju .rt-chip.big { background: var(--accent); color: #fff4e8; }
+body.rt-jeju .rt-chip.big strong { color: #fff; }
+body.rt-jeju .rt-badge.on { background: #e9f4ea; color: #2f6b4a; border-color: #9ccaa8; }
+body.rt-jeju .rt-badge.live { background: #fdeedd; color: #c8552e; border-color: #e07a3f; }
+body.rt-jeju .mn-sub { border-bottom-color: #f0d2b6; }
+body.rt-jeju .pk-opt.on { background: #eaf3e6; }
+body.rt-jeju .pk-now.ok { background: #eaf3e6; }
+body.rt-jeju .pk-who button.on, body.rt-jeju .pk-vars button.on { background: var(--accent); border-color: var(--accent); }
+body.rt-jeju .pk-who button.on .st { color: #ffe6d2; }
+body.rt-jeju .rt-stop.now { background: #fdeedd; }
+body.rt-jeju .wv-live { background: #fdeedd; border-color: var(--accent); }
+body.rt-jeju .wv-dot { background: var(--accent); }
+@media (min-width: 900px) {
+  body.rt-jeju-art .page-head .container { padding-bottom: 300px; }
+  body.rt-jeju .page-head .rt-jeju-art { background-position: center 40%; }
+}
 </style>
 </head>
 <body>
 
 <div class="page-head">
+  <div class="rt-jeju-art" aria-hidden="true"></div>
+  <div class="rt-jeju-mark" aria-hidden="true">JEJU<small>제주</small></div>
   <div class="container">
     <h1 id="rt-title">수양회</h1>
     <div class="crumb">홈 &gt; 조직 &gt; <a href="dashboard.html">상비부 대시보드</a> &gt; <a id="rt-crumb-com" href="committee.html?c=%EA%B5%90%EC%9C%A1%EC%B9%9C%EA%B5%90%EB%B6%80">교육친교부</a> &gt; <span id="rt-crumb">수양회</span></div>
@@ -146,6 +252,20 @@ document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
   var area = document.getElementById('rt-area');
   var e = SHS.esc;
+
+  /* 수양회마다 테마 (156 sql: settings.theme). 지난번 테마를 기억해 두었다가 읽기 전에 먼저 입힌다. */
+  var ART = 'images/retreat/jeju-2026/theme.png';
+  function setTheme(t) {
+    document.body.classList.toggle('rt-jeju', t === 'jeju');
+    try { if (t) localStorage.setItem('rt-theme', t); else localStorage.removeItem('rt-theme'); } catch (x) {}
+    if (t === 'jeju' && !document.body.classList.contains('rt-jeju-art')) {
+      /* 그림 파일이 있을 때만 머리띠를 그림 높이로 키운다 */
+      var im = new Image();
+      im.onload = function () { document.body.classList.add('rt-jeju-art'); };
+      im.src = ART;
+    }
+  }
+  try { if (localStorage.getItem('rt-theme') === 'jeju') document.body.classList.add('rt-jeju'); } catch (x) {}
 
   /* ?id=수양회번호 — 없으면 서버가 오늘·다가오는·최근 순으로 고른다 */
   var RID = Number((location.search.match(/[?&]id=(\d+)/) || [])[1]) || null;
@@ -231,6 +351,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }, function () {});
         }
         isOfficer = !!S.officer;
+        setTheme((R.settings || {}).theme || (/제주/.test(R.title || '') ? 'jeju' : ''));
         document.getElementById('rt-title').textContent = R.title;
         document.getElementById('rt-crumb').textContent = R.title;
         document.title = R.title + ' - 시화산노회';
@@ -440,18 +561,35 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     box.innerHTML = meHtml(S.me, S.companions || [], S.roommates || [], false);
-    bindChoices(box);
-    box.querySelectorAll('[data-tally-refresh]').forEach(function (b) {
+    box.querySelectorAll('.rt-card[data-step]').forEach(bindCard);
+  }
+
+  function myPeople() { return S.me ? [S.me].concat(S.companions || []) : []; }
+
+  /* 카드 하나의 단추들 — 주문 현황 새로 고침, 종료, 메뉴 고르기 */
+  function bindCard(card) {
+    card.querySelectorAll('[data-tally-refresh]').forEach(function (b) {
       b.addEventListener('click', function (ev) { ev.preventDefault(); load(); });
     });
-    box.querySelectorAll('[data-end-step]').forEach(function (b) {
+    card.querySelectorAll('[data-end-step]').forEach(function (b) {
       b.addEventListener('click', function () { endStep(b.dataset.endStep); });
     });
-    box.querySelectorAll('[data-menu-pic]').forEach(function (f) {
-      f.addEventListener('click', function () {
-        openPhoto([{ image_url: f.dataset.menuPic, title: f.dataset.menuName, face: true }], 0);
-      });
-    });
+    var pk = card.querySelector('[data-pk]');
+    if (pk) bindPicker(pk);
+  }
+
+  /* 저장 뒤에는 그 카드만 다시 그린다 (화면이 튀지 않게) */
+  function repaintCard(stepId) {
+    var s = byId(S.steps, stepId);
+    var old = document.querySelector('#rt-body .rt-card[data-step="' + stepId + '"]');
+    if (!s || !old) { if (tab === 'me') drawMe(); return; }
+    var tmp = document.createElement('div');
+    tmp.innerHTML = stepCard(s, myPeople());
+    var nu = tmp.firstElementChild;
+    old.parentNode.replaceChild(nu, old);
+    bindCard(nu);
+    var tb = document.querySelector('button[data-t="me"]');
+    if (tb) tb.innerHTML = '내 안내' + openCountBadge();
   }
 
   /* 「내 안내」 화면 — 참가자 본인 화면과 진행 관리의 미리 보기가 함께 쓴다.
@@ -481,7 +619,9 @@ document.addEventListener('DOMContentLoaded', function () {
       /* 열린 단계를 먼저 「다음 일정 안내」로, 끝난 단계는 아래 「지난 안내」로 (153 sql) */
       var open = steps.filter(function (s) { return s.status === '열림'; });
       var past = steps.filter(function (s) { return s.status === '마감'; });
-      if (open.length) h += '<h3 class="mn-sub" style="margin:4px 0 10px">다음 일정 안내</h3>';
+      var mgr = (R.settings || {}).manager;   /* 담당자 (156 sql) */
+      if (open.length) h += '<div class="pk-head"><h3 class="mn-sub">다음 일정 안내</h3>' +
+        (mgr ? '<span class="pk-mgr">담당 · <strong>' + e(mgr) + '</strong></span>' : '') + '</div>';
       open.forEach(function (s) { h += stepCard(s, people); });
       if (past.length) h += '<h3 class="mn-sub" style="margin:18px 0 10px;color:var(--gray-5)">지난 안내</h3>';
       past.forEach(function (s) { h += stepCard(s, people); });
@@ -518,16 +658,8 @@ document.addEventListener('DOMContentLoaded', function () {
       (s.due ? ' <span class="rt-count">' + e(kdate(s.due)) + '까지</span>' : '') + '</h3>';
     if (s.body) h += '<p class="body">' + e(s.body) + '</p>';
     if (s.kind === '선택') {
-      /* 메뉴 사진 (155 sql) — 사진이 있는 메뉴는 이름과 함께 보이고, 누르면 크게 */
-      var pics = (s.options || []).filter(function (o) { return o.image_url; });
-      if (pics.length) {
-        h += '<div class="rt-menu-pics">' + pics.map(function (o) {
-          return '<figure data-menu-pic="' + e(o.image_url) + '" data-menu-name="' + e(o.label) + '">' +
-            '<img src="' + e(o.image_url) + '" alt="' + e(o.label) + '" loading="lazy"><figcaption>' + e(o.label) + '</figcaption></figure>';
-        }).join('') + '</div>';
-      }
-      if (people.length > 1) h += '<p class="rt-muted">부부가 한 분씩 따로 고르십니다. 각자 고르고 「저장」을 눌러 주세요.</p>';
-      h += personRows(s, people, people.length > 1 ? function (p, i) { return i === 0 ? '본인' : '배우자'; } : null);
+      /* 열린 동안은 누르는 판, 마감 뒤에는 고른 것만 짧게 (156) */
+      h += s.status === '열림' ? pickerHtml(s, people) : pickedHtml(s, people);
       if (isOfficer) h += tallyHtml(s);
     } else if (s.kind === '배정') {
       h += '<p class="rt-muted">위 「내 자리」에 적혀 있습니다.</p>';
@@ -582,6 +714,191 @@ document.addEventListener('DOMContentLoaded', function () {
         : '<p class="rt-muted">아직 고른 분이 없습니다.</p>') +
       (none.length ? '<p class="rt-muted">아직 안 고른 분 (' + none.length + '): ' + e(none.join(', ')) + '</p>' : '') +
       '</details>';
+  }
+
+  /* ---------- 메뉴 고르기 (156) ----------
+   * 부부는 위의 이름 단추로 누구 몫인지 고르고, 메뉴를 한 번 누르면 바로 저장된다.
+   * 카페처럼 차갑게/따뜻하게가 있는 단계는 누르면 아래에서 창이 올라와 그것을 고른다. */
+  var pickWho = {};     /* 단계별로 지금 누구 몫을 고르는 중인지 */
+  var pickFlash = {};   /* 단계별 「저장했습니다」 한 줄 */
+
+  /* "아메리카노 HOT 5,000 / ICE 5,500" → 이름 「아메리카노」 + 아래 작은 글 「HOT 5,000 / ICE 5,500」 */
+  function optParts(label) {
+    var m = String(label || '').match(/^(.*?)\s+((?:\((?:HOT|ICE)\)|HOT|ICE)?\s*[\d,]{3,}.*)$/);
+    return m ? { name: m[1], sub: m[2] } : { name: String(label || ''), sub: '' };
+  }
+  function choiceText(c) {
+    if (!c) return '';
+    return (c.option_label ? optParts(c.option_label).name : '요청만') + (c.variant ? ' · ' + c.variant : '') + (c.note ? ' · ' + c.note : '');
+  }
+  function pickPerson(s, people) {
+    var p = pickWho[s.id] && byId(people, pickWho[s.id]);
+    if (p) return p;
+    return people.filter(function (q) { return !choiceOf(s.id, q.id); })[0] || people[0];
+  }
+
+  function pickerHtml(s, people) {
+    var who = pickPerson(s, people), cur = choiceOf(s.id, who.id);
+    var hasVar = !!(s.variants && s.variants.length);
+    var opts = s.options || [];
+    var h = '<div class="pk" data-pk="' + s.id + '">';
+    if (people.length > 1) {
+      h += '<span class="pk-q">누구 메뉴를 고르시나요?</span><div class="pk-who">' + people.map(function (p) {
+        var c = choiceOf(s.id, p.id);
+        return '<button type="button" data-pk-who="' + p.id + '" class="' + (String(p.id) === String(who.id) ? 'on' : '') + '">' +
+          '<span class="nm">' + e(p.name) + ' ' + e(p.role || '') + '</span>' +
+          '<span class="st' + (c ? ' ok' : '') + '">' + (c ? '고름 · ' + e(c.option_label ? optParts(c.option_label).name : '요청만') : '아직 안 고름') + '</span></button>';
+      }).join('') + '</div>';
+    }
+    var who2 = e(who.name) + ' ' + e(who.role || '') + ' 님';
+    h += '<div class="pk-now' + (cur ? ' ok' : '') + '">' +
+      (pickFlash[s.id] ? '<span class="pk-flash">' + e(pickFlash[s.id]) + '</span>' : '') +
+      (cur
+        ? '<strong>' + who2 + '</strong> 고른 메뉴: <strong>' + e(choiceText(cur)) + '</strong> ' +
+          '<span class="pk-acts">' + (cur.option_id ? '<button type="button" class="lnk" data-pk-note>요청 적기</button>' : '') +
+          '<button type="button" class="lnk" data-pk-clear>취소</button></span>' +
+          (hasVar && cur.option_id && !cur.variant ? '<br><span style="color:var(--red)">차갑게/따뜻하게를 아직 안 고르셨습니다. 메뉴를 다시 눌러 골라 주세요.</span>' : '')
+        : '<strong>' + who2 + '</strong> 메뉴를 아래에서 ' + (hasVar ? '눌러 주세요.' : '한 번 눌러 주세요. 누르면 바로 저장됩니다.')) +
+      '</div>';
+    if (!opts.length) return h + '<p class="rt-muted">메뉴가 아직 올라오지 않았습니다.</p></div>';
+    var photo = opts.some(function (o) { return o.image_url; });
+    h += '<div class="pk-grid' + (photo ? '' : ' txt') + '">' + opts.map(function (o) {
+      var on = !!(cur && String(cur.option_id) === String(o.id));
+      var pp = optParts(o.label);
+      return '<button type="button" class="pk-opt' + (on ? ' on' : '') + '" data-pk-opt="' + o.id + '" aria-pressed="' + on + '">' +
+        (o.image_url ? '<img src="' + e(o.image_url) + '" alt="" loading="lazy">' +
+          '<span class="zoom" data-pk-zoom="' + e(o.image_url) + '" data-name="' + e(o.label) + '">크게</span>' : '') +
+        '<span class="nm">' + e(pp.name) + '</span>' + (pp.sub ? '<span class="pr">' + e(pp.sub) + '</span>' : '') +
+        (on ? '<span class="sel">선택됨' + (cur.variant ? ' · ' + e(cur.variant) : '') + '</span>' : '') + '</button>';
+    }).join('') + '</div>';
+    return h + '</div>';
+  }
+
+  /* 마감된 단계 — 고른 것만 */
+  function pickedHtml(s, people) {
+    return '<div class="pk-done">' + people.map(function (p) {
+      var c = choiceOf(s.id, p.id);
+      return '<div><strong>' + e(p.name) + ' ' + e(p.role || '') + '</strong> · ' +
+        (c ? e(choiceText(c)) : '<span class="rt-muted">고르지 않은 채 마감되었습니다</span>') + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function bindPicker(pk) {
+    var s = byId(S.steps, pk.dataset.pk);
+    if (!s) return;
+    pk.addEventListener('click', function (ev) {
+      var z = ev.target.closest('[data-pk-zoom]');
+      if (z) { ev.stopPropagation(); openPhoto([{ image_url: z.dataset.pkZoom, title: z.dataset.name, face: true }], 0); return; }
+      var people = myPeople();
+      var w = ev.target.closest('[data-pk-who]');
+      if (w) { pickWho[s.id] = w.dataset.pkWho; delete pickFlash[s.id]; repaintCard(s.id); return; }
+      var who = pickPerson(s, people), cur = choiceOf(s.id, who.id);
+      var b = ev.target.closest('[data-pk-opt]');
+      if (b) {
+        var o = byId(s.options, b.dataset.pkOpt);
+        if (!o) return;
+        if (s.variants && s.variants.length) { openSheet(s, who, o); return; }
+        if (cur && String(cur.option_id) === String(o.id)) return;   /* 이미 고른 메뉴 */
+        pk.querySelectorAll('.pk-opt').forEach(function (x) { x.disabled = true; });
+        b.classList.add('busy');
+        saveChoice(s, who, o, null, null).then(function (err) {
+          if (err) { alert(err); repaintCard(s.id); }
+        });
+        return;
+      }
+      if (ev.target.closest('[data-pk-note]')) {
+        var o2 = cur && byId(s.options, cur.option_id);
+        if (o2) openSheet(s, who, o2);
+        return;
+      }
+      if (ev.target.closest('[data-pk-clear]')) {
+        if (!confirm(who.name + ' 님이 고른 「' + choiceText(cur) + '」를 취소할까요?')) return;
+        saveChoice(s, who, null, null, null).then(function (err) { if (err) alert(err); });
+      }
+    });
+  }
+
+  /* 아래에서 올라오는 창 — 차갑게/따뜻하게와 요청 사항 */
+  function closeSheet() {
+    var el = document.querySelector('.pk-sheet');
+    if (el) el.remove();
+    document.body.style.overflow = '';
+    document.removeEventListener('keydown', sheetKey);
+  }
+  function sheetKey(ev) { if (ev.key === 'Escape') closeSheet(); }
+  function openSheet(s, who, o) {
+    closeSheet();
+    var cur = choiceOf(s.id, who.id);
+    var same = !!(cur && String(cur.option_id) === String(o.id));
+    var vars = s.variants || [];
+    var v = same ? (cur.variant || '') : '';
+    var pp = optParts(o.label);
+    var el = document.createElement('div');
+    el.className = 'pk-sheet';
+    el.innerHTML = '<div class="pk-back" data-pk-close></div>' +
+      '<div class="pk-panel" role="dialog" aria-modal="true" aria-label="' + e(pp.name) + '">' +
+      '<div class="pk-for">' + e(who.name) + ' ' + e(who.role || '') + ' 님 메뉴</div>' +
+      '<div class="pk-h">' + e(pp.name) + '</div>' + (pp.sub ? '<div class="pk-sub">' + e(pp.sub) + '</div>' : '') +
+      (vars.length ? '<span class="pk-q">어떻게 드릴까요?</span><div class="pk-vars">' + vars.map(function (x) {
+        return '<button type="button" data-v="' + e(x) + '" class="' + (x === v ? 'on' : '') + '">' + e(x) + '</button>';
+      }).join('') + '</div>' : '') +
+      '<label class="pk-q" for="pk-note">요청 사항 <span class="rt-muted" style="font-weight:400">(없으면 비워 두세요)</span></label>' +
+      '<input id="pk-note" type="text" class="pk-note" maxlength="60" placeholder="' + (vars.length ? '예: 연하게, 시럽 빼고' : '예: 덜 맵게') + '" value="' + e(same && cur.note || '') + '">' +
+      '<div class="pk-msg"></div>' +
+      '<div class="pk-btns"><button type="button" class="btn ghost" data-pk-close>닫기</button>' +
+      '<button type="button" class="btn pk-ok">이 메뉴로 저장</button></div></div>';
+    document.body.appendChild(el);
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', sheetKey);
+    var msg = el.querySelector('.pk-msg');
+    el.addEventListener('click', function (ev) {
+      if (ev.target.closest('[data-pk-close]')) { closeSheet(); return; }
+      var vb = ev.target.closest('[data-v]');
+      if (vb) {
+        v = vb.dataset.v; msg.textContent = '';
+        el.querySelectorAll('[data-v]').forEach(function (x) { x.classList.toggle('on', x === vb); });
+        return;
+      }
+      var ok = ev.target.closest('.pk-ok');
+      if (!ok) return;
+      if (vars.length && !v) { msg.textContent = '차갑게/따뜻하게 가운데 하나를 먼저 눌러 주세요.'; return; }
+      ok.disabled = true; ok.textContent = '저장 중입니다...';
+      saveChoice(s, who, o, v || null, el.querySelector('.pk-note').value.trim() || null).then(function (err) {
+        if (!err) { closeSheet(); return; }
+        ok.disabled = false; ok.textContent = '이 메뉴로 저장'; msg.textContent = err;
+      });
+    });
+  }
+
+  /* 저장 — 서버(retreat_choose)에 쓰고, 내려받은 상태도 맞춘 뒤 카드만 다시 그린다.
+   * 부부 가운데 아직 안 고른 분이 있으면 그분 차례로 넘어간다. 실패하면 오류 글을 돌려준다. */
+  function saveChoice(s, who, o, variant, note) {
+    var pay = {
+      step_id: s.id, participant_id: who.id,
+      option_id: o ? o.id : null, option_label: o ? o.label : null,
+      variant: variant || null, note: note || null
+    };
+    return db().then(function (c) {
+      return c.rpc('retreat_choose', {
+        p_step: Number(s.id), p_participant: Number(who.id),
+        p_option: pay.option_id ? Number(pay.option_id) : null, p_variant: pay.variant, p_note: pay.note
+      });
+    }).then(function (r) {
+      if (r.error) return r.error.message;
+      SHSCloud.log(pay.option_id ? 'update' : 'delete', '수양회 선택', R.title + ' / 단계 ' + s.id);
+      S.choices = (S.choices || []).filter(function (x) {
+        return !(String(x.step_id) === String(s.id) && String(x.participant_id) === String(who.id));
+      });
+      if (pay.option_id || pay.note) S.choices.push(pay);
+      var people = myPeople();
+      var next = pay.option_id ? people.filter(function (p) { return !choiceOf(s.id, p.id); })[0] : null;
+      if (next) pickWho[s.id] = next.id;
+      pickFlash[s.id] = pay.option_id
+        ? '저장했습니다.' + (next ? ' 이제 ' + next.name + ' ' + (next.role || '') + ' 님 메뉴를 골라 주세요.' : '')
+        : '선택을 취소했습니다.';
+      repaintCard(s.id);
+      return null;
+    }, function () { return '저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요.'; });
   }
 
   /* 사람마다 따로 고르는 줄 — 부부도 한 사람씩 각각 고른다.
