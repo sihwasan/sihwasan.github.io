@@ -78,6 +78,10 @@
 .rt-face { display: inline-block; width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: 50% 25%; vertical-align: middle;
            margin-right: 8px; background: var(--gray-1); cursor: zoom-in; }
 .rt-face[hidden] { display: none; }
+.rt-endbar { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--gray-2); text-align: right; }
+.rt-tally { margin-top: 14px; border-top: 1px dashed var(--gray-3); padding-top: 10px; }
+.rt-tally summary { cursor: pointer; font-weight: 700; color: var(--navy); }
+.rt-tally .tbl { width: 100%; }
 .rm-row { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--gray-2); }
 .rm-who { flex: 1; font-size: 0.92rem; line-height: 1.5; }
 .rm-no { flex: 0 0 110px; width: 110px; font-size: 1rem; padding: 8px 10px; border: 1px solid var(--gray-3); border-radius: 8px; }   /* 공통 CSS 의 img { display: block } 이 hidden 을 덮지 않게 */
@@ -433,6 +437,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     box.innerHTML = meHtml(S.me, S.companions || [], S.roommates || [], false);
     bindChoices(box);
+    box.querySelectorAll('[data-tally-refresh]').forEach(function (b) {
+      b.addEventListener('click', function (ev) { ev.preventDefault(); load(); });
+    });
+    box.querySelectorAll('[data-end-step]').forEach(function (b) {
+      b.addEventListener('click', function () { endStep(b.dataset.endStep); });
+    });
   }
 
   /* 「내 안내」 화면 — 참가자 본인 화면과 진행 관리의 미리 보기가 함께 쓴다.
@@ -501,10 +511,60 @@ document.addEventListener('DOMContentLoaded', function () {
     if (s.kind === '선택') {
       if (people.length > 1) h += '<p class="rt-muted">부부가 한 분씩 따로 고르십니다. 각자 고르고 「저장」을 눌러 주세요.</p>';
       h += personRows(s, people, people.length > 1 ? function (p, i) { return i === 0 ? '본인' : '배우자'; } : null);
+      if (isOfficer) h += tallyHtml(s);
     } else if (s.kind === '배정') {
       h += '<p class="rt-muted">위 「내 자리」에 적혀 있습니다.</p>';
     }
+    /* 진행자(진행 담당·임원)는 카드에서 바로 종료 → 다음 코스가 열린다 (153 sql) */
+    if (isOfficer && s.status === '열림') {
+      var nx = nextStep(s);
+      h += '<div class="rt-endbar"><button type="button" class="btn sm" data-end-step="' + s.id + '">종료' +
+        (nx && nx.status === '닫힘' ? ' → 다음 「' + e(shortTitle(nx.title)) + '」 열기' : '') + '</button></div>';
+    }
     return h + '</div>';
+  }
+  function shortTitle(t) { return String(t || '').replace(/^(카페|식사) 주문 · /, ''); }
+
+  /* 카드의 「종료」 — 진행 관리의 종료와 같다: 마감하고, 다음 단계가 닫혀 있으면 열고 알린다 */
+  function endStep(id) {
+    var cur = byId(S.steps, id), nx = cur ? nextStep(cur) : null;
+    if (nx && nx.status !== '닫힘') nx = null;
+    if (!confirm('「' + (cur ? cur.title : '') + '」를 종료할까요?' +
+        (nx ? '\n다음 단계 「' + nx.title + '」가 열리고 참가자에게 「다음 일정 안내」 알림이 갑니다.' : ''))) return;
+    db().then(function (c) { return c.rpc('retreat_set_step', { p_step: Number(id), p_status: '마감', p_notify: false }); })
+      .then(function (r) {
+        if (r.error) { alert(r.error.message); return; }
+        SHSCloud.log('update', '수양회 단계 마감', R.title + ' / ' + (cur ? cur.title : id) + (nx ? ' → ' + nx.title + ' 열림' : ''));
+        alert('종료했습니다.' + (nx ? ' 다음 단계 「' + nx.title + '」를 열고 ' + (r.data || 0) + '명에게 알림을 보냈습니다.' : ''));
+        load();
+      });
+  }
+
+  /* 진행 담당·임원에게는 메뉴 카드 안에 지금까지의 주문 현황 — 메뉴별 수와 이름, 아직 안 고른 분.
+   * (임원은 retreat_state 가 모든 참가자의 고른 것을 준다. 주문서·대신 고르기는 진행 관리 → 현황) */
+  function tallyHtml(s) {
+    var ps = S.participants || [];
+    if (!ps.length) return '';
+    var rows = {}, order = [], seqOf = {}, none = [];
+    (s.options || []).forEach(function (o) { seqOf[o.id] = o.seq; });
+    ps.forEach(function (p) {
+      var c = choiceOf(s.id, p.id);
+      if (!c) { none.push(p.name); return; }
+      var k = (c.option_label || '(요청만)') + (c.variant ? ' · ' + c.variant : '');
+      if (!rows[k]) { rows[k] = { n: 0, who: [], seq: seqOf[c.option_id] || 9999 }; order.push(k); }
+      rows[k].n++; rows[k].who.push(p.name + (c.note ? '(' + c.note + ')' : ''));
+    });
+    order.sort(function (a, b) { return rows[a].seq - rows[b].seq || (a < b ? -1 : 1); });
+    return '<details class="rt-tally" open><summary>주문 현황 · ' + (ps.length - none.length) + ' / ' + ps.length + '명 고름 ' +
+      '<button type="button" class="btn ghost sm" data-tally-refresh>새로 고침</button></summary>' +
+      (order.length
+        ? '<table class="tbl" style="margin-top:8px"><thead><tr><th>메뉴</th><th style="width:44px">수</th><th>이름</th></tr></thead><tbody>' +
+          order.map(function (k) {
+            return '<tr><td class="left">' + e(k) + '</td><td>' + rows[k].n + '</td><td class="left" style="font-size:0.86rem">' + e(rows[k].who.join(', ')) + '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : '<p class="rt-muted">아직 고른 분이 없습니다.</p>') +
+      (none.length ? '<p class="rt-muted">아직 안 고른 분 (' + none.length + '): ' + e(none.join(', ')) + '</p>' : '') +
+      '</details>';
   }
 
   /* 사람마다 따로 고르는 줄 — 부부도 한 사람씩 각각 고른다.
