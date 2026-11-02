@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function () {
             : '참가자 명단에서 회원님을 찾지 못했습니다. 참가하시는데 보이지 않으면 ' + e(R.committee) + ' 임원에게 말씀해 주세요.')) +
       '</div>';
 
-    h += '<div id="rt-live"></div><div class="tabs" id="rt-tabs">' +
+    h += '<div id="rt-live"></div><div id="rt-prog-live"></div><div class="tabs" id="rt-tabs">' +
       '<button class="' + (tab === 'me' ? 'active' : '') + '" data-t="me">내 안내' + openCountBadge() + '</button>' +
       '<button class="' + (tab === 'prog' ? 'active' : '') + '" data-t="prog">일정</button>' +
       (WORSHIP.length ? '<button class="' + (tab === 'worship' ? 'active' : '') + '" data-t="worship">예배</button>' : '') +
@@ -465,6 +465,8 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
     paintLive();
+    paintProgLive();
+    watchNow();
     if (tab === 'me') drawMe();
     else if (tab === 'prog') drawProg();
     else if (tab === 'worship') drawWorship();
@@ -563,7 +565,6 @@ document.addEventListener('DOMContentLoaded', function () {
     box.innerHTML = meHtml(S.me, S.companions || [], S.roommates || [], false);
     box.querySelectorAll('.rt-card[data-step]').forEach(bindCard);
     bindNow(box);
-    watchNow();
   }
 
   function myPeople() { return S.me ? [S.me].concat(S.companions || []) : []; }
@@ -671,6 +672,24 @@ document.addEventListener('DOMContentLoaded', function () {
       (next ? row(next, '다음') : '') +
       '<p style="margin:10px 0 0"><button type="button" class="btn ghost sm" data-go-prog>오늘 일정 전체 보기</button></p></div>';
   }
+  /* 탭 위 띠 — 일정에서 「진행」으로 표시한 순서가 있으면 어느 탭에서든 「지금 ○○ 진행 중입니다」 */
+  function paintProgLive() {
+    var el = document.getElementById('rt-prog-live');
+    if (!el) return;
+    var dn = dayNo(S.today);
+    var cur = (S.program || []).filter(function (g) { return g.day_no === dn && g.kind !== 'ment' && g.status === '진행'; });
+    if (!cur.length) { el.innerHTML = ''; return; }
+    el.innerHTML = cur.map(function (g) {
+      var name = String(g.title || '').split(/\s+·\s+/)[0];
+      var sub = [g.place && g.place !== name ? g.place : '', g.depart ? g.depart + ' 출발' : ''].filter(Boolean).join(' · ');
+      return '<div class="wv-live"><span class="wv-dot"></span><strong>지금 ' + e(name) + ' 진행 중입니다</strong>' +
+        (sub ? '<span class="sec">' + e(sub) + '</span>' : '<span class="sec"></span>') +
+        (tab !== 'prog' ? '<button class="btn sm" data-go-prog>일정 보기</button>' : '') + '</div>';
+    }).join('');
+    el.querySelectorAll('[data-go-prog]').forEach(function (b) {
+      b.addEventListener('click', function () { tab = 'prog'; history.pushState({ rtTab: tab }, '', '#' + tab); draw(); });
+    });
+  }
   function bindNow(root) {
     var b = root && root.querySelector('[data-go-prog]');
     if (b) b.addEventListener('click', function () { tab = 'prog'; draw(); });
@@ -681,7 +700,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function watchNow() {
     if (nowTimer) return;
     nowTimer = setInterval(function () {
-      if (document.hidden || tab !== 'me' || !R) return;
+      if (document.hidden || !R) return;
       db().then(function (c) { return c.rpc('retreat_state', { p_retreat: RID }); })
         .then(function (r) {
           if (!r || r.error || !r.data || !r.data.program) return;
@@ -689,8 +708,9 @@ document.addEventListener('DOMContentLoaded', function () {
           if (r.data.today) S.today = r.data.today;
           var el = document.getElementById('rt-now');
           if (el && tab === 'me') { el.innerHTML = nowHtml(); bindNow(el); }
+          paintProgLive();
         }, function () {});
-    }, 60000);
+    }, 30000);
   }
 
   /* 미리 보기 상자 — 누를 수 없게 (저장 단추를 빼고 칸을 잠근다) */
@@ -1079,6 +1099,7 @@ document.addEventListener('DOMContentLoaded', function () {
           var g = byId(S.program, id); if (g) g.status = v;
           SHSCloud.log('update', '수양회 일정 진행', R.title + ' / ' + (g ? g.title : id) + ' → ' + v);
           drawProg();
+          paintProgLive();
         });
       });
     });
