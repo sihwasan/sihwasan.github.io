@@ -562,6 +562,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     box.innerHTML = meHtml(S.me, S.companions || [], S.roommates || [], false);
     box.querySelectorAll('.rt-card[data-step]').forEach(bindCard);
+    bindNow(box);
+    watchNow();
   }
 
   function myPeople() { return S.me ? [S.me].concat(S.companions || []) : []; }
@@ -612,6 +614,9 @@ document.addEventListener('DOMContentLoaded', function () {
       '</div>' +
       '<p class="rt-muted">좌석·방이 다르면 ' + e(R.committee) + ' 임원에게 말씀해 주세요. 방 번호는 호텔 체크인 뒤에 적힙니다.</p></div>';
 
+    /* 지금 일정 — 일정 탭에서 「진행」으로 표시한 순서와 그다음 순서를 참가자 화면 맨 위쪽에 */
+    if (!withClosed) h += '<div id="rt-now">' + nowHtml() + '</div>';
+
     /* 단계 */
     var steps = (S.steps || []).filter(function (s) { return withClosed || s.status !== '닫힘'; });
     if (!steps.length) h += '<div class="rt-card"><h3>안내</h3><p class="rt-muted">아직 열린 안내가 없습니다. 임원이 열면 알림으로 알려 드립니다.</p></div>';
@@ -636,6 +641,56 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
     return h;
+  }
+
+  /* 「내 안내」의 지금 일정 카드 — 수양회 기간에만. 진행 중인 순서가 있으면 그것과 다음 순서,
+   * 없으면 오늘 남은 첫 순서를 「다음 일정」으로 보여 준다. */
+  function nowHtml() {
+    var dn = dayNo(S.today), n = totalDays();
+    if (!(dn >= 1 && dn <= n)) return '';
+    var stops = (S.program || []).filter(function (g) { return g.day_no === dn && g.kind !== 'ment'; });
+    if (!stops.length) return '';
+    var cur = stops.filter(function (g) { return g.status === '진행'; });
+    var lastIdx = -1;
+    stops.forEach(function (g, i) { if (g.status === '진행' || g.status === '끝') lastIdx = i; });
+    var next = stops.slice(lastIdx + 1).filter(function (g) { return g.status !== '끝' && g.status !== '진행'; })[0] || null;
+    if (!cur.length && !next) return '';
+    function row(g, label) {
+      return '<div class="rt-stop' + (g.status === '진행' ? ' now' : '') + '"><div class="t">' + e(g.time || '') + '</div>' +
+        '<div><div class="h">' + e(g.title) +
+        (label === '지금' ? ' <span class="rt-badge on">지금</span>' : ' <span class="rt-badge">다음</span>') +
+        (g.status === '변경' ? ' <span class="rt-badge live">변경</span>' : '') + '</div>' +
+        (g.body ? '<div class="d">' + e(g.body) + '</div>' : '') +
+        ((g.place || g.depart || g.move)
+          ? '<div class="m">' + [g.place, g.depart ? g.depart + ' 출발' : '', g.move].filter(Boolean).map(e).join(' · ') + '</div>'
+          : '') + '</div></div>';
+    }
+    return '<div class="rt-card"><h3>' + (cur.length ? '지금 일정' : '다음 일정') +
+      ' <span class="rt-count">' + dn + '일차</span></h3>' +
+      cur.map(function (g) { return row(g, '지금'); }).join('') +
+      (next ? row(next, '다음') : '') +
+      '<p style="margin:10px 0 0"><button type="button" class="btn ghost sm" data-go-prog>오늘 일정 전체 보기</button></p></div>';
+  }
+  function bindNow(root) {
+    var b = root && root.querySelector('[data-go-prog]');
+    if (b) b.addEventListener('click', function () { tab = 'prog'; draw(); });
+  }
+  /* 「내 안내」를 보고 있는 동안 1분마다 일정 진행 표시만 새로 받아 지금 일정 카드를 바꾼다
+   * (메뉴를 고르는 중이어도 화면 나머지는 건드리지 않는다) */
+  var nowTimer = null;
+  function watchNow() {
+    if (nowTimer) return;
+    nowTimer = setInterval(function () {
+      if (document.hidden || tab !== 'me' || !R) return;
+      db().then(function (c) { return c.rpc('retreat_state', { p_retreat: RID }); })
+        .then(function (r) {
+          if (!r || r.error || !r.data || !r.data.program) return;
+          S.program = r.data.program;
+          if (r.data.today) S.today = r.data.today;
+          var el = document.getElementById('rt-now');
+          if (el && tab === 'me') { el.innerHTML = nowHtml(); bindNow(el); }
+        }, function () {});
+    }, 60000);
   }
 
   /* 미리 보기 상자 — 누를 수 없게 (저장 단추를 빼고 칸을 잠근다) */
