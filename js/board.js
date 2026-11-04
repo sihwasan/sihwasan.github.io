@@ -233,8 +233,11 @@ var SHSBoard = (function () {
 
       /* 서기에게 — 정기노회 4주 전부터 남은 임기 1년 미만 장로 총대와 공문 안내 */
       if (window.SHSElderNotice) SHSElderNotice.dashCard(document.getElementById('hub-elder'), user);
-      /* 수양회 참가자(와 그 부서 임원)에게 — 2주 전부터 끝나는 날까지 (js/retreat-card.js) */
-      if (window.SHSRetreat) SHSRetreat.dashCard(document.getElementById('hub-retreat'), user);
+      /* 수양회 카드는 2026 교육부 수양회를 마치고 대시보드에서 내렸다 (js/retreat-card.js 는 그대로 둔다).
+       * 다음 수양회 때 다시 띄우려면 아래 줄의 주석을 풀면 된다. */
+      // if (window.SHSRetreat) SHSRetreat.dashCard(document.getElementById('hub-retreat'), user);
+      /* 수양회를 마친 뒤 일주일(2026-11-04 ~ 11-11) — 수고 인사와 사진 갤러리·올리기 안내 */
+      retreatThanksCard(document.getElementById('hub-retreat'));
 
       /* 업무 보고서 카드: 오늘 보고서가 있으면 그 요약을 부제로 */
       (function () {
@@ -399,7 +402,32 @@ var SHSBoard = (function () {
      * 부목사(1년)·시무목사(3년) 본인에게 남은 청빙 임기를 카드로 보이고,
      * 넉 달 안으로 줄었거나 이미 끝났으면 맨 위에 안내를 띄운다.
      * 셈은 관리자 명단과 같은 SHS.callTerm (명단의 call_on·call_until) */
-    function loadCallTerm() {
+    /* 수양회를 마친 뒤 일주일 동안 대시보드 맨 위에 보이는 인사 카드.
+   * 날짜가 지나면 저절로 사라진다. 「그만 보기」를 누르면 이 기기에서는 다시 안 뜬다. */
+  function retreatThanksCard(slot) {
+    if (!slot) return;
+    var until = '2026-11-11';
+    var today = new Date(); today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    if (today.toISOString().slice(0, 10) > until) return;
+    var key = 'shs_retreat_thanks_2026';
+    try { if (localStorage.getItem(key)) return; } catch (x) {}
+    slot.innerHTML = '<div class="admin-card rt-dash" style="border-left:4px solid var(--navy);margin-bottom:18px">' +
+      '<h3 style="margin:0 0 8px">2026 제주 부부수양회를 마치며 — 모두 수고하셨습니다 🙏</h3>' +
+      '<p style="margin:0 0 8px;line-height:1.7">함께해 주신 모든 분들과 준비·진행을 맡아 주신 교육부 임원들께 감사드립니다. ' +
+      '하나님의 은혜 가운데 모든 일정을 잘 마쳤습니다.</p>' +
+      '<p style="margin:0 0 10px;line-height:1.7"><strong>사진</strong>은 수양회 페이지의 「사진·영상」 탭(갤러리)에 모아 두었습니다. ' +
+      '각자 찍으신 사진도 같은 탭의 「사진 올리기」에서 여러 장을 한꺼번에 고르면 자동으로 웹 크기로 줄여 올라갑니다. ' +
+      '<span style="color:var(--gray-5)">올리기는 정회원 로그인 후 가능합니다.</span></p>' +
+      '<a class="btn" href="retreat.html#media">사진 보기 · 올리기</a> ' +
+      '<button type="button" class="btn ghost sm" data-rt-thanks-hide>그만 보기</button></div>';
+    var hb = slot.querySelector('[data-rt-thanks-hide]');
+    if (hb) hb.addEventListener('click', function () {
+      try { localStorage.setItem(key, '1'); } catch (x) {}
+      slot.innerHTML = '';
+    });
+  }
+
+  function loadCallTerm() {
       var CALL_NOTICE_DAYS = 120;   /* 넉 달 */
       if (!user.cloud || isSuper || !SHS.callTerm) return;
       SHSCloud.init().then(function (c) { return c.rpc('my_member'); }).then(function (r) {
