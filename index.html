@@ -308,9 +308,10 @@ document.addEventListener('DOMContentLoaded', function () {
   /* 대시보드를 보지 않는 수양회 참가자(일반회원 사모님 등)에게도 「내 수양회」 카드를 띄운다.
    * 정회원은 대시보드 허브 위에서 같은 카드를 본다 (js/board.js). 142 sql */
   SHS.getUser().then(function (me) {
-    if (me && me.cloud && !SHSBoard.can(me) && window.SHSRetreat) {
-      SHSRetreat.dashCard(document.getElementById('home-retreat'), me);
-    }
+    /* 2026 제주 부부수양회를 마쳐 내렸다 — 다음 수양회 때 주석을 풀면 된다 */
+    // if (me && me.cloud && !SHSBoard.can(me) && window.SHSRetreat) {
+    //   SHSRetreat.dashCard(document.getElementById('home-retreat'), me);
+    // }
   });
 
   /* 정기노회 날(노회 운영 → 노회 일정 설정에 정해진 날)에는 히어로에
@@ -335,7 +336,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* 수양회 기간(140 sql retreat_today)에는 로그인한 회원에게 히어로에 「수양회」 창을 띄운다.
    * 정기노회 날 창이 켜져 있으면 그쪽이 우선한다. */
-  if (window.SHSRetreat) SHS.getUser().then(function (me) { SHSRetreat.hero(me); });
+  /* 2026 제주 부부수양회를 마쳐 내렸다 — 다음 수양회 때 주석을 풀면 된다 */
+  // if (window.SHSRetreat) SHS.getUser().then(function (me) { SHSRetreat.hero(me); });
 
   /* 우선 내장 자료로 표시 */
   renderNotices(SHSData.notices);

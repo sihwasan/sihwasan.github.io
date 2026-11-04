@@ -412,7 +412,7 @@ var SHSBoard = (function () {
     var key = 'shs_retreat_thanks_2026';
     try { if (localStorage.getItem(key)) return; } catch (x) {}
     slot.innerHTML = '<div class="admin-card rt-dash" style="border-left:4px solid var(--navy);margin-bottom:18px">' +
-      '<h3 style="margin:0 0 8px">교육부 수양회를 마치며 — 모두 수고하셨습니다 🙏</h3>' +
+      '<h3 style="margin:0 0 8px">2026 제주 부부수양회를 마치며 — 모두 수고하셨습니다 🙏</h3>' +
       '<p style="margin:0 0 8px;line-height:1.7">함께해 주신 모든 분들과 준비·진행을 맡아 주신 교육부 임원들께 감사드립니다. ' +
       '하나님의 은혜 가운데 모든 일정을 잘 마쳤습니다.</p>' +
       '<p style="margin:0 0 10px;line-height:1.7"><strong>사진</strong>은 수양회 페이지의 「사진·영상」 탭(갤러리)에 모아 두었습니다. ' +
