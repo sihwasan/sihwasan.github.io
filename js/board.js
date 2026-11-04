@@ -233,8 +233,9 @@ var SHSBoard = (function () {
 
       /* 서기에게 — 정기노회 4주 전부터 남은 임기 1년 미만 장로 총대와 공문 안내 */
       if (window.SHSElderNotice) SHSElderNotice.dashCard(document.getElementById('hub-elder'), user);
-      /* 수양회 참가자(와 그 부서 임원)에게 — 2주 전부터 끝나는 날까지 (js/retreat-card.js) */
-      if (window.SHSRetreat) SHSRetreat.dashCard(document.getElementById('hub-retreat'), user);
+      /* 수양회 카드는 2026 교육부 수양회를 마치고 대시보드에서 내렸다 (js/retreat-card.js 는 그대로 둔다).
+       * 다음 수양회 때 다시 띄우려면 아래 줄의 주석을 풀면 된다. */
+      // if (window.SHSRetreat) SHSRetreat.dashCard(document.getElementById('hub-retreat'), user);
 
       /* 업무 보고서 카드: 오늘 보고서가 있으면 그 요약을 부제로 */
       (function () {
