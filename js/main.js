@@ -1800,11 +1800,14 @@
     return '노회규칙 제29조 제1항에 따라 상회비 미납 중에는 서류 발급 신청과 청원서 접수가 중지됩니다. (' +
       st.church + ' — ' + st.fy + '년 회기 ' + dues29Months(st) + '분 미납, ' +
       Number(st.late_amount || 0).toLocaleString('ko-KR') + '만원) 납부 뒤 다시 신청해 주세요. ' +
+      '납부 계좌: ' + duesPayNow.bank + ' ' + duesPayNow.account + ' (예금주 ' + duesPayNow.holder + '). ' +
       '이미 납부하셨다면 노회 회계에게 납부 확인을 요청해 주세요.';
   }
   function dues29Html(st, opts) {
     var top = !!(opts && opts.where === 'top');
     var roles = (st && st.roles) || [];
+    /* 납부 안내 상자(계좌·토스)는 이 글이 화면에 들어간 다음에 채운다 */
+    setTimeout(function () { mountDuesPay(document); }, 0);
     return '<div class="notice-banner dues29-banner" style="border-left:4px solid var(--red);margin:' +
       (top ? '0 0 18px' : '10px 0 0') + '">' +
       '<strong style="color:var(--red)">상회비 미납 안내 — 노회규칙 제29조 적용 중</strong><br>' +
@@ -1821,10 +1824,146 @@
       (st.cur_unpaid
         ? '<p style="margin:8px 0 0;font-size:0.9rem">이번 달(' + st.cur_month + '월)분도 아직 납부 전입니다. 이번 달 말일까지 납부해 주세요.</p>'
         : '') +
+      duesPaySlot(Number(st.late_amount || 0) * 10000, st.church) +
       '<p style="margin:8px 0 0;font-size:0.84rem;color:var(--gray-7)">납부하시면 노회 회계가 확인한 뒤 이 안내가 사라집니다. ' +
       '이미 납부하셨는데도 보인다면 노회 회계에게 납부 확인을 요청해 주세요.' +
       (top ? ' <a href="dashboard.html#hub-mydues" style="text-decoration:underline">나의 상회비 보기</a>' : '') +
       '</p></div>';
+  }
+
+  /* ---------- 상회비 납부 안내 — 계좌 + 토스 송금 (2026-11-11) ----------
+   * 상회비 미납 안내(알림함의 [상회비] 알림, 대시보드·서류 신청 화면의 제29조 안내)에 붙는 상자.
+   * 계좌는 site_settings 'dues_pay'(137 — 임원방 납부촉구 공문 화면에서 고칠 수 있다), 못 읽으면 아래 기본값.
+   * 자리는 duesPaySlot(원, 교회)로 두고 mountDuesPay(root)가 채운다(이미 채운 자리는 건너뜀).
+   * 토스: 안드로이드는 intent://(토스가 없으면 플레이 스토어), 아이폰은 supertoss://,
+   *       PC 는 휴대폰에서 열라는 안내. 송금 주소는 토스 송금 QR 과 같은 꼴(send?bank=&accountNo=&amount=&origin=qr). */
+  var DUES_PAY_DEFAULT = { bank: 'NH농협', account: '3511015867663', holder: '시화산노회' };
+  var duesPayNow = DUES_PAY_DEFAULT;
+  var duesPayP = null;
+  function duesPay() {
+    if (duesPayP) return duesPayP;
+    if (!(window.SHSCloud && SHSCloud.enabled && SHSCloud.enabled())) return Promise.resolve(duesPayNow);
+    duesPayP = SHSCloud.init().then(function (c) {
+      if (!c) return duesPayNow;
+      return c.from('site_settings').select('value').eq('key', 'dues_pay').then(function (r) {
+        var v = r && !r.error && r.data && r.data[0] && r.data[0].value;
+        if (v && String(v.account || '').replace(/\D/g, '')) {
+          duesPayNow = { bank: String(v.bank || ''), account: String(v.account), holder: String(v.holder || '시화산노회') };
+        }
+        return duesPayNow;
+      }, function () { return duesPayNow; });
+    }).catch(function () { return duesPayNow; });
+    return duesPayP;
+  }
+  function payDevice() {
+    var ua = navigator.userAgent || '';
+    if (/Android/i.test(ua)) return 'android';
+    if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
+    return 'pc';
+  }
+  /* 토스가 알아보는 은행 이름 — 'NH농협'·'농협은행' → '농협', '국민은행' → '국민' */
+  function tossBank(bank) {
+    return String(bank || '').replace(/\s/g, '').replace(/^NH/i, '').replace(/은행$/, '');
+  }
+  function tossHref(pay, amt) {
+    var q = 'send?bank=' + encodeURIComponent(tossBank(pay.bank)) +
+      '&accountNo=' + String(pay.account || '').replace(/\D/g, '') +
+      (amt > 0 ? '&amount=' + Math.round(amt) : '') + '&origin=qr';
+    if (payDevice() === 'android') return 'intent://' + q + '#Intent;scheme=supertoss;package=viva.republica.toss;end';
+    return 'supertoss://' + q;
+  }
+  function duesPaySlot(amt, church) {
+    return '<div class="dues-pay" data-amt="' + (Math.round(Number(amt) || 0)) + '" data-church="' + d29esc(church || '') + '" ' +
+      'style="border:1px solid var(--gray-3,#d8dbe2);border-radius:6px;padding:12px 14px;margin:10px 0 0;background:#fff;color:var(--gray-9,#222)"></div>';
+  }
+  function duesPayBox(pay, amt, church) {
+    var e = d29esc;
+    var acct = String(pay.account || '');
+    var digits = acct.replace(/\D/g, '');
+    if (!digits) return '';
+    var canToss = !!tossBank(pay.bank);
+    var pc = payDevice() === 'pc';
+    var won = amt > 0 ? Number(amt).toLocaleString('ko-KR') + '원' : '';
+    return '<div style="font-size:0.8rem;color:var(--gray-5)">상회비 납부 계좌</div>' +
+      '<div style="font-size:1rem;font-weight:700;margin:2px 0 8px;color:var(--navy)">' +
+      e((pay.bank ? pay.bank + ' ' : '') + acct) +
+      ' <span style="font-weight:400;font-size:0.86rem;color:var(--gray-7);white-space:nowrap">예금주 ' + e(pay.holder || '시화산노회') + '</span></div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+      (canToss
+        ? '<a class="btn sm" data-dptoss="1" href="' + e(tossHref(pay, amt)) + '" ' +
+          'style="background:#3182f6;border-color:#3182f6;color:#fff">토스로 납부하기</a>'
+        : '') +
+      '<button type="button" class="btn ghost sm" data-dpcopy="' + e(digits) + '">계좌번호 복사</button></div>' +
+      '<p style="margin:8px 0 0;font-size:0.8rem;color:var(--gray-7);line-height:1.6">' +
+      (canToss
+        ? (pc
+          ? '토스로 보내시려면 토스 앱이 설치된 휴대폰에서 이 화면을 열고 <strong>토스로 납부하기</strong>를 눌러 주세요. '
+          : '<strong>토스로 납부하기</strong>를 누르면 토스 앱이 열리고 ' +
+            (won ? '받는 계좌와 미납액 ' + won + '이 미리 채워집니다(금액은 바꿀 수 있습니다). '
+                 : '받는 계좌가 미리 채워집니다. '))
+        : '') +
+      '보내는 분 이름에 <span style="white-space:nowrap"><strong>교회 이름' + (church ? '(' + e(church) + ')' : '') +
+      '</strong>을</span> 적어 주시면 확인이 빠릅니다.</p>' +
+      '<p data-dpmsg="1" style="display:none;margin:6px 0 0;font-size:0.8rem;color:var(--red)"></p>';
+  }
+  var duesPayBound = false;
+  function bindDuesPay() {
+    if (duesPayBound) return;
+    duesPayBound = true;
+    document.addEventListener('click', function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var cp = t.closest('[data-dpcopy]');
+      if (cp) {
+        ev.preventDefault();
+        var no = cp.getAttribute('data-dpcopy');
+        var label = '계좌번호 복사';
+        var ok = function () {
+          cp.textContent = '복사되었습니다';
+          setTimeout(function () { cp.textContent = label; }, 1600);
+        };
+        var manual = function () { window.prompt('계좌번호를 복사하세요', no); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(no).then(ok, manual);
+        else manual();
+        return;
+      }
+      var ts = t.closest('[data-dptoss]');
+      if (!ts) return;
+      var box = ts.closest('.dues-pay');
+      var msg = box && box.querySelector('[data-dpmsg]');
+      var say = function (s) { if (msg) { msg.textContent = s; msg.style.display = ''; } };
+      if (payDevice() === 'pc') {
+        ev.preventDefault();
+        say('토스 송금은 휴대폰에서만 열립니다. PC 에서는 계좌번호를 복사해 인터넷 뱅킹으로 보내 주세요.');
+        return;
+      }
+      /* 토스가 열리지 않고 이 화면에 그대로 머물면 다른 방법을 알려 준다 */
+      var left = false;
+      var gone = function () { left = true; };
+      document.addEventListener('visibilitychange', gone, { once: true });
+      window.addEventListener('pagehide', gone, { once: true });
+      window.addEventListener('blur', gone, { once: true });
+      setTimeout(function () {
+        if (left || document.hidden) return;
+        say('토스 앱이 열리지 않으면 계좌번호를 복사해 쓰시는 은행 앱에서 보내 주세요.');
+      }, 2500);
+    });
+  }
+  function mountDuesPay(root) {
+    root = root || document;
+    if (!root.querySelectorAll) return;
+    var slots = root.querySelectorAll('.dues-pay:not([data-done])');
+    if (!slots.length) return;
+    bindDuesPay();
+    duesPay().then(function (pay) {
+      Array.prototype.forEach.call(slots, function (el) {
+        if (el.getAttribute('data-done')) return;
+        el.setAttribute('data-done', '1');
+        var html = duesPayBox(pay, Number(el.getAttribute('data-amt') || 0), el.getAttribute('data-church') || '');
+        if (!html) { el.style.display = 'none'; return; }
+        el.innerHTML = html;
+      });
+    });
   }
 
   /* 상회비를 볼 수 없는 분에게는 임원방의 <상회비 관리>·<세례의무금 관리> 메뉴를 감춘다 */
@@ -2161,6 +2300,8 @@
     paysDues: paysDues,
     dues29Text: dues29Text,
     dues29Html: dues29Html,
+    duesPaySlot: duesPaySlot,
+    mountDuesPay: mountDuesPay,
     managesDues: managesDues,
     duesAccess: duesAccess,
     DUES_NOTICE: DUES_NOTICE,
