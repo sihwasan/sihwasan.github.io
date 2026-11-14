@@ -872,6 +872,10 @@
     if (key.indexOf('elder-term-') === 0) {
       return 'elder-notice.html';
     }
+    /* 증경부노회장 장로님 예우 입장 안내(159) — 「오늘의 노회」로 */
+    if (key.indexOf('honor-vp-') === 0) {
+      return 'today.html';
+    }
     /* 청빙 임기 40일 전(139) — 글 안의 청원서 작성 주소(칸을 미리 채운 청빙청원서)로 */
     if (key.indexOf('callterm-') === 0) {
       var pl = String(n.body || '').match(/petition\.html[^\s]*/);

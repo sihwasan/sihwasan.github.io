@@ -97,7 +97,9 @@
    * 서버가 seat 를 내려 주면 그대로 따른다: vote(표결: 정회원 목사·총대 장로) / speak(언권) / observe(참관).
    * 서버가 아직 옛 판이라 seat 가 없으면 예전처럼(정회원이면 투표) 동작한다.
    * 증경부노회장 장로님(veteran)은 서버가 사이트 관리의 증경노회장단 명단(site_settings 'veterans')과
-   * 이름·교회를 맞춰 확인해 준다. 화면은 그분께 예우의 인사와 참관 안내를 드린다. */
+   * 이름·교회를 맞춰 확인해 준다. 화면은 그분께 예우의 인사와 참관 안내를 드린다.
+   * 159 부터는 은퇴하신 장로님·승인대기·직분 칸이 빈 계정도, 역대 임원의 부노회장도 예우로 확인하고,
+   * 증경단 줄에 계정(user_id)이 이어져 있으면 그 계정은 교회 표기와 상관없이 모신다. */
   function mySeat() {
     if (S.my && S.my.seat) return S.my.seat;
     return S.me && S.me.seat_known ? (S.me.seat || null) : undefined;
@@ -124,10 +126,17 @@
       '<h3>' + e(me.name || '') + ' 장로님, 귀한 걸음 해 주셔서 감사합니다</h3>' +
       '<div class="ta-honor-msg">' +
       '<p>' + e(served(v)) + '으로 섬겨 주신 노고를 기억하며, 오늘 노회에 예우를 갖추어 모십니다.</p>' +
-      '<p>장로님께서는 <strong>참관</strong>으로 함께해 주시며, 회의 중 발언과 표결은 총대께서 하시게 됩니다. ' +
+      '<p>증경부노회장을 지내신 장로님은 은퇴하신 뒤에도 노회가 예우로 모십니다. ' +
+      '장로님께서는 <strong>참관</strong>으로 함께해 주시며, 회의 중 발언과 표결은 총대께서 하시게 됩니다. ' +
       '기도로 함께해 주시면 큰 힘이 되겠습니다.</p></div>' +
       '<div class="ta-sub">' + e(String(me.church || '').trim() ? me.church + ' · ' : '') + e(me.name || '') + ' 장로님</div>' +
       btn + '</div>';
+  }
+  /* 입장하지 못하는 장로님께 — 증경부노회장을 지내신 분은 은퇴하셨어도 예우로 모신다는 안내 (159) */
+  function vpNote() {
+    return '<div class="ta-honor-msg"><p>' +
+      '<strong>증경부노회장</strong>을 지내신 장로님은 은퇴하셨더라도 노회의 예우로 <strong>참관 입장</strong>하실 수 있습니다. ' +
+      '부노회장을 지내셨는데 이 안내가 보이시면 서기에게 말씀해 주세요. 바로 확인해 정중히 모시겠습니다.</p></div>';
   }
   /* 입장 뒤 — 내 정보 자리에 드리는 인사 */
   function honorBox(name, v) {
@@ -502,12 +511,13 @@
           h = '<div class="ta-card ta-center">' +
             '<h3>' + e(me.name || '') + ' 장로님, 찾아 주셔서 감사합니다</h3>' +
             '<p>노회에는 각 교회 당회에서 <strong>총대로 파송된 장로님</strong>께서 회원으로 입장하십니다.<br>' +
-            '총대로 파송되셨는데 이 안내가 보이시면 서기에게 말씀해 주세요. 바로 확인해 드리겠습니다.</p></div>';
+            '총대로 파송되셨는데 이 안내가 보이시면 서기에게 말씀해 주세요. 바로 확인해 드리겠습니다.</p>' +
+            vpNote() + '</div>';
         } else {
           h = '<div class="ta-card ta-center">' +
             '<h3>' + e(me.name || '') + '님, 환영합니다</h3>' +
             idCard(me.name, me.position, me.church, g0) +
-            (!can ? '' : enterBtn) +
+            (!can ? (known && me.kind === '장로' ? vpNote() : '') : enterBtn) +
             '</div>';
         }
       }

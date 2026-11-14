@@ -106,6 +106,8 @@ var SHSOfficersPanel = (function () {
             '<td><button class="btn sm" data-vtedit="' + i + '">수정</button></td></tr>';
         });
         html += '</tbody></table>' +
+          '<p style="font-size:0.86rem;color:var(--gray-6)">※ 부노회장을 지내신 장로님은 구분을 <strong>증경부노회장</strong>으로 올려 주세요. ' +
+          '은퇴하신 뒤에도 「오늘의 노회」에 예우 참관으로 입장하십니다.</p>' +
           '<p><button class="btn ghost sm" id="vt-add">증경단 추가</button></p>' +
           '<div class="form-msg" id="of-msg"></div>';
         box.innerHTML = html;
@@ -154,17 +156,29 @@ var SHSOfficersPanel = (function () {
             if (!hit) return;
             mo.ov.querySelector('#vtm-pos').value = hit.position || hit.category || '';
             mo.ov.querySelector('#vtm-church').value = hit.church || '';
+            /* 장로님은 노회장이 아니라 부노회장을 지내신다 — 구분을 맞춰 준다 */
+            if (/장로/.test(hit.position || hit.category || '')) mo.ov.querySelector('#vtm-role').value = '증경부노회장';
           });
           mo.ov.querySelector('#vtm-save').addEventListener('click', function () {
             var name = mo.ov.querySelector('#vtm-name').value.trim();
             if (!name) { alert('성명을 적어 주세요.'); return; }
+            var role = mo.ov.querySelector('#vtm-role').value;
+            var pos = mo.ov.querySelector('#vtm-pos').value.trim();
+            if (role === '증경노회장' && /장로/.test(pos) && !/목사/.test(pos) &&
+                confirm('직분이 장로이십니다. 구분을 「증경부노회장」으로 바꿔 저장할까요?\n(증경부노회장 장로님은 은퇴하신 뒤에도 노회에 예우 참관으로 입장하십니다)')) {
+              role = '증경부노회장';
+            }
             var item = {
-              role: mo.ov.querySelector('#vtm-role').value,
+              role: role,
               name: name,
-              position: mo.ov.querySelector('#vtm-pos').value.trim(),
+              position: pos,
               church: mo.ov.querySelector('#vtm-church').value.trim(),
               session_no: parseInt(mo.ov.querySelector('#vtm-ses').value, 10) || null
             };
+            /* 서기가 이어 둔 계정(user_id, 159 — 예우 입장 승인)은 같은 분이면 지킨다 */
+            if (!isNew && v0.user_id && String(v0.name || '').replace(/\s/g, '') === name.replace(/\s/g, '')) {
+              item.user_id = v0.user_id;
+            }
             if (isNew) veterans.push(item); else veterans[idx] = item;
             mo.close();
             saveVeterans(drawOfficers);
