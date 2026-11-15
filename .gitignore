@@ -6,7 +6,9 @@ private/
 .wrangler/
 
 # 작업용 도구 설정 (미리보기 서버 등)
-.claude/
+# 단, 공유 설정 파일(ECC 플러그인 사용 설정)은 저장소에 올린다
+.claude/*
+!.claude/settings.json
 
 # 워커 로컬 시험용 비밀값 (wrangler dev)
 .dev.vars
