@@ -272,6 +272,17 @@ var SHSCert = (function () {
     return h;
   }
 
+  /* 증명서를 인쇄할 때 종이 여백은 0 이다 (여백은 시트 안쪽 padding 이 맡는다).
+   * style.css 에는 다른 화면(명단 인쇄 등)을 위한 @page 여백이 있어, 그것이
+   * 증명서에 끼어들면 인쇄본만 그만큼 밀려 PDF 와 달라진다. 증명서를 쓰는
+   * 화면에서만, 맨 뒤에 붙여 확실히 이기게 한다. */
+  if (typeof document !== 'undefined' && document.head && !document.getElementById('shs-cert-page')) {
+    var pg = document.createElement('style');
+    pg.id = 'shs-cert-page';
+    pg.textContent = '@media print{@page{size:A4 portrait;margin:0}}';
+    document.head.appendChild(pg);
+  }
+
   /* 파일 이름: 소속증명서_홍길동_20260816 (날짜는 발급일 기준) */
   function fileName(rec) {
     var src = rec.issued_on || rec.date;

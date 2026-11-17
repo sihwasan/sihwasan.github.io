@@ -1018,7 +1018,6 @@ td.sat .cal-d { color: #2a4d8f; }
 @media print {
   .topbar, .site-header, .gnb, .page-head, .site-footer, .no-print { display: none !important; }
   .page-body { padding: 0; }
-  .cert-sheet { border: 2px solid #000; margin: 0 auto; }
 }
 
 /* 새로 올라온 글 표시 */
@@ -1492,42 +1491,26 @@ input.dp-bad { border-color: var(--red); }
   letter-spacing: 20px; pointer-events: none; z-index: 2;
 }
 
-@media print {
-  /* 증명서는 A4 한 장에 그대로 앉힌다 */
-  @page { size: A4; margin: 0; }
-  html, body { background: #fff; }
-  .notice-banner, .form-msg, .admin-card, .tbl, h2 { display: none !important; }
-  #cert-print, #cert-area { display: block !important; }
-  .cert-sheet {
-    display: block !important;
-    box-sizing: border-box;
-    width: 210mm; min-height: 297mm; max-width: none;
-    margin: 0; padding: 18mm 24mm 20mm;
-    border: none;
-    page-break-after: always;
-  }
-  .cert-sheet h2 { display: block !important; }
-  .cert-sheet .c-body, .cert-sheet .c-body tbody,
-  .cert-sheet .c-body tr, .cert-sheet .c-body td { display: revert !important; }
-  .cert-sheet .cert-foot { position: absolute; left: 24mm; right: 24mm; bottom: 14mm; }
-  .cert-verify img { width: 15mm; height: 15mm; }
-  .cert-verify .t { font-size: 2.4mm; }
-}
+/* 증명서 제목은 본문 제목(.page-body h2)의 꾸밈(색·밑줄 막대)을 물려받지 않는다.
+ * PDF 는 본문 밖에서 그리므로, 이것이 남아 있으면 화면·인쇄와 PDF 가 달라진다. */
+.cert-sheet h2 { color: inherit; position: static; }
+.cert-sheet h2::after { content: none; }
 
 /* 자간 때문에 마지막 글자 뒤 여백이 생겨 제목이 오른쪽으로 밀리는 것을 바로잡는다 */
 .cert-sheet h2 { text-indent: 12px; }
 .cert-sheet .c-issuer { text-indent: 6px; }
 
-@media print {
-  /* 증명 문구와 발급 명의를 종이 가운데 아래쪽에 앉힌다 */
-  .cert-sheet .c-text { margin: 22mm 0 0; }
-  .cert-sheet .c-date { margin: 20mm 0 10mm; }
-}
-
-/* PDF 내려받기용: 인쇄 양식과 같은 A4 세로(794 x 1123px = 210 x 297mm)
- * 크기로 화면 밖에 그려 놓고 html2pdf.js가 사진을 찍어 간다.
- * (html2pdf가 시트만 떼어 자기 상자로 옮겨 가므로,
- *  A4 모양은 무대가 아니라 시트 자신의 클래스에 붙인다) */
+/* ---------- 증명서 A4 앉히기: 인쇄와 PDF 내려받기는 같은 자리 ----------
+ * 증명서가 종이에 나가는 길은 둘이다.
+ *   (1) 인쇄 단추 → 브라우저 인쇄 (@media print)
+ *   (2) PDF 다운로드 → 화면 밖에 A4(794 x 1123px = 210 x 297mm)로 그려 놓고
+ *       html2pdf.js 가 사진을 찍는다 (.cert-pdf-a4). 노회 보관소의 보관본도 이것이다.
+ *       (html2pdf 가 시트만 떼어 자기 상자로 옮겨 가므로, A4 모양은 무대가
+ *        아니라 시트 자신의 클래스에 붙인다)
+ * 두 길의 여백·간격은 반드시 같은 값이어야 한다. 한쪽만 고치면 같은 증명서가
+ * 인쇄본과 PDF 에서 서로 다른 자리에 찍힌다. 아래 두 묶음은 값을 똑같이 둔다.
+ * 종이 여백(@page)은 certificate.js 가 0 으로 정한다 — 이 파일의 다른 화면용
+ * @page 여백이 증명서에 끼어들지 않게 하려는 것. */
 .cert-pdf-stage {
   position: fixed; left: -9999px; top: 0;
   width: 794px; background: #fff; z-index: -1;
@@ -1545,6 +1528,37 @@ input.dp-bad { border-color: var(--red); }
 }
 .cert-sheet.cert-pdf-a4 .cert-verify img { width: 58px; height: 58px; }
 .cert-sheet.cert-pdf-a4 .cert-verify .t { font-size: 9px; }
+
+@media print {
+  html, body { background: #fff; margin: 0; padding: 0; }
+  .notice-banner, .form-msg, .admin-card, .tbl, h2 { display: none !important; }
+  #cert-print, #cert-area { display: block !important; }
+  /* 발급 화면(documents)에서는 증명서만 종이에 나간다. 발급 양식·신청 목록·대장이
+   * 남아 있으면 그것이 첫 장을 차지해 증명서가 둘째 장으로 밀린다. */
+  #doc-area { display: none !important; }
+  /* 시트를 종이 왼쪽 위 모서리에 붙인다 (본문 틀의 여백·가운데 정렬을 없앤다) */
+  body:has(.cert-sheet) main, body:has(.cert-sheet) .page-body, body:has(.cert-sheet) .container,
+  #cert-print, #cert-area {
+    margin: 0 !important; padding: 0 !important; max-width: none !important; width: auto !important;
+  }
+  .cert-sheet {
+    display: block !important; box-sizing: border-box;
+    width: 794px; min-height: 1116px; max-width: none;
+    margin: 0; padding: 64px 91px 76px; border: none;
+    background: #fff; position: relative;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .cert-sheet h2 { display: block !important; }
+  .cert-sheet .c-body, .cert-sheet .c-body tbody,
+  .cert-sheet .c-body tr, .cert-sheet .c-body td { display: revert !important; }
+  .cert-sheet .c-text { margin: 64px 0 0; }
+  .cert-sheet .c-date { margin: 58px 0 32px; }
+  .cert-sheet .cert-foot {
+    position: absolute; left: 91px; right: 91px; bottom: 53px; margin-top: 0;
+  }
+  .cert-sheet .cert-verify img { width: 58px; height: 58px; }
+  .cert-sheet .cert-verify .t { font-size: 9px; }
+}
 
 /* 로그인 옵션 (아이디 저장 / 로그인 상태 유지) */
 .login-opts { display: flex; gap: 18px; flex-wrap: wrap; }
@@ -2015,7 +2029,6 @@ td[data-duch]:hover { background: #eef2f8; }
   display: flex; align-items: center; justify-content: center;
 }
 .c-sealbox-b img { max-height: 148px; max-width: 92%; object-fit: contain; }
-@media print { .c-sealbox-b { height: 44mm; } }
 
 /* 직인증명서는 직인 상자가 커서 항목 표를 조금 촘촘하게 둔다 */
 .cert-sheet.cert-sealdoc .c-body td { padding: 7px 8px; }
