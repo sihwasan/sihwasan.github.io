@@ -904,11 +904,15 @@ td.sat .cal-d { color: #2a4d8f; }
 .cert-issuer-wrap .c-issuer { left: auto; transform: none; }
 /* 발급 명의 둘째 줄(노회장 성명)은 첫 줄과 간격을 둔다 */
 .cert-issuer-wrap + .cert-issuer-wrap { margin-top: 18px; }
-.cert-seal.sm { width: 56px; height: 56px; right: -62px; }
-/* 직인은 발급 명의 끝에 겹쳐 찍는다 */
+/* 직인·도장은 발급 명의 끝에 실물 크기로 찍는다.
+ * 크기(mm)는 도장마다 certificate.js 가 줄 안에 적어 준다(직인 21mm, 도장 15mm 기본).
+ * 화면 px 이 아니라 mm 로 두어야 인쇄·PDF 에서 실물과 같은 크기가 된다.
+ * 브라우저는 인쇄할 때 그림 상자를 1px(0.26mm) 단위로 맞추어 버리므로,
+ * 상자를 4배로 잡고 1/4 로 줄여 그려서 그 오차를 0.07mm 아래로 줄인다. */
 .cert-seal {
-  position: absolute; right: -74px; top: 50%; transform: translateY(-50%);
-  width: 72px; height: 72px; object-fit: contain;
+  position: absolute; right: -21.6mm; top: 50%;
+  width: 84mm; height: 84mm; max-width: none; object-fit: contain;
+  transform: translateY(-50%) scale(0.25); transform-origin: 100% 50%;
   mix-blend-mode: multiply; opacity: 0.92; pointer-events: none;
 }
 .cert-signs { margin-top: 30px; text-align: center; }
@@ -916,17 +920,12 @@ td.sat .cal-d { color: #2a4d8f; }
   display: inline-block; position: relative; margin: 0 18px;
   font-size: 1rem; letter-spacing: 2px;
 }
-.cert-signs .row img {
-  position: absolute; right: -58px; top: 50%; transform: translateY(-50%);
-  width: 54px; height: 54px; object-fit: contain;
-  mix-blend-mode: multiply; opacity: 0.92;
-}
 .seal-pick { display: flex; flex-wrap: wrap; gap: 16px; margin: 10px 0 4px; font-size: 0.9rem; }
 .seal-pick label { display: flex; align-items: center; gap: 6px; }
 .seal-pick input { width: auto; }
 
 @media print {
-  .cert-seal, .cert-signs img {
+  .cert-seal {
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }

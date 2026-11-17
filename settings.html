@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>직인·도장 - 시화산노회</title>
-<link rel="stylesheet" href="css/style.css?v=20261021w">
+<link rel="stylesheet" href="css/style.css?v=20261117a">
 </head>
 <body>
 
@@ -145,11 +145,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ---------- 직인·도장 ---------- */
   var sealFiles = {};
+  /* 증명서에 찍히는 도장의 실물 크기(mm). 긴 변(원형은 지름, 사각은 한 변) 기준.
+   * 단체 사각 직인은 7푼(21mm)·8푼(24mm), 개인 도장은 5푼(15mm)이 흔하다. */
+  var sealSizes = {};
+  var SIZE_DEF = { '노회직인': 21, '노회장': 15, '서기': 15, '회록서기': 15 };
 
   function loadSeals() {
     var box = document.getElementById('st-seal');
     SHSCloud.init().then(function (c) {
-      return c.from('seals').select('*').order('sort');
+      return c.from('site_settings').select('*').eq('key', 'seal_sizes')
+        .then(function (x) { return x; }, function () { return { data: [] }; })
+        .then(function (z) {
+          sealSizes = (((z && z.data) || [])[0] || {}).value || {};
+          return c.from('seals').select('*').order('sort');
+        });
     }).then(function (r) {
       if (r.error) {
         box.innerHTML = '<div class="notice-banner">직인 정보를 불러오지 못했습니다: ' + e(r.error.message) +
@@ -163,7 +172,12 @@ document.addEventListener('DOMContentLoaded', function () {
         '배경이 없는 <strong>PNG 파일</strong>(투명 배경)로 올리시면 서류에 깔끔하게 찍힙니다.<br>' +
         '<span style="font-size:0.85rem;color:var(--gray-5)">' +
         '<strong>감사부장·감사부 서기</strong> 도장은 봄·가을 감사에서 회의록과 회계 장부에 ' +
-        '감사필을 찍을 때 쓰입니다. 도장 대신 사인 그림을 올리셔도 됩니다.</span></div>';
+        '감사필을 찍을 때 쓰입니다. 도장 대신 사인 그림을 올리셔도 됩니다.</span><br>' +
+        '<span style="font-size:0.85rem;color:var(--gray-5)">' +
+        '증명서에는 직인·도장이 <strong>실물과 같은 크기</strong>로 찍힙니다. 실물 도장의 긴 변(원형은 지름, ' +
+        '사각은 한 변)을 자로 재어 <strong>실물 크기(mm)</strong>에 적어 주세요. ' +
+        '보통 단체 사각 직인은 21mm(7푼)나 24mm(8푼), 개인 도장은 15mm(5푼)입니다. ' +
+        '그림 둘레의 빈 여백은 자동으로 잘라 내므로 여백이 있는 스캔을 올려도 됩니다.</span></div>';
 
       /* 항목별 이름란 안내
        * 임원은 회기마다 바뀌므로 사람 이름을 예시로 두지 않는다.
@@ -191,6 +205,11 @@ document.addEventListener('DOMContentLoaded', function () {
           '<div class="field"><label>' + e(h.label) + '</label>' +
           '<input type="text" data-sholder="' + e(s.key) + '" value="' + e(val) + '"' +
           (h.ph ? ' placeholder="' + e(h.ph) + '"' : '') + '></div>' +
+          (SIZE_DEF[s.key]
+            ? '<div class="field"><label>실물 크기 (mm)</label>' +
+              '<input type="number" min="5" max="60" step="0.5" data-ssize="' + e(s.key) + '" value="' +
+              Number(sealSizes[s.key] >= 5 && sealSizes[s.key] <= 60 ? sealSizes[s.key] : SIZE_DEF[s.key]) + '"></div>'
+            : '') +
           '<div class="field"><label>이미지 파일 (PNG 권장)</label>' +
           '<input type="file" accept="image/*" data-sfile="' + e(s.key) + '"></div>' +
           '<button class="btn sm" data-ssave="' + e(s.key) + '">저장</button> ' +
@@ -231,6 +250,13 @@ document.addEventListener('DOMContentLoaded', function () {
           var msg = box.querySelector('[data-smsg="' + key + '"]');
           var holder = box.querySelector('input[data-sholder="' + key + '"]').value.trim();
           var file = sealFiles[key];
+          var sizeEl = box.querySelector('input[data-ssize="' + key + '"]');
+          var size = sizeEl ? Number(sizeEl.value) : null;
+          if (sizeEl && !(size >= 5 && size <= 60)) {
+            msg.className = 'form-msg err';
+            msg.textContent = '실물 크기는 5~60mm 사이로 적어 주세요.';
+            return;
+          }
           msg.className = 'form-msg';
           msg.textContent = '저장 중입니다...';
 
@@ -249,10 +275,22 @@ document.addEventListener('DOMContentLoaded', function () {
               var d = { holder: holder, updated_at: new Date().toISOString(), updated_by: user.name };
               if (path) d.file_path = path;
               return c.from('seals').update(d).eq('key', key);
+            }).then(function (res) {
+              if (res.error || !sizeEl) return res;
+              var next = {};
+              Object.keys(sealSizes).forEach(function (k) { next[k] = sealSizes[k]; });
+              next[key] = size;
+              return c.from('site_settings').upsert([
+                { key: 'seal_sizes', value: next, updated_at: new Date().toISOString() }
+              ]).then(function (r4) {
+                if (!r4.error) sealSizes = next;
+                return r4;
+              });
             });
           }).then(function (res) {
             if (res.error) { msg.className = 'form-msg err'; msg.textContent = res.error.message; return; }
-            SHSCloud.log('update', '직인 등록·수정', key + (file ? ' (이미지 교체)' : ' (정보 수정)'));
+            SHSCloud.log('update', '직인 등록·수정', key + (file ? ' (이미지 교체)' : ' (정보 수정)') +
+              (sizeEl ? ' · 실물 크기 ' + size + 'mm' : ''));
             sealFiles[key] = null;
             loadSeals();
           }).catch(function (err) {
