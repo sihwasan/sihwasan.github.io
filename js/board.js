@@ -128,6 +128,7 @@ var SHSBoard = (function () {
         /* 서기 알림 카드 자리 — 정기노회 4주 전 총대 장로 임기 확인 (js/elder-notice.js) */
         /* 상회비 미납 안내 자리 — 노회규칙 제29조 (loadRule29 가 채운다) */
         '<div id="hub-dues29"></div>' +
+        '<div id="hub-bapdue"></div>' +
         /* 청빙 임기 안내 자리 — 부목사·시무목사 본인의 임기가 넉 달 안이거나 끝났을 때 (loadCallTerm) */
         '<div id="hub-call"></div>' +
         '<div id="hub-elder"></div>' +
@@ -197,6 +198,8 @@ var SHSBoard = (function () {
         if (elderSlot) elderSlot.classList.toggle('hidden', !!panel);
         var d29Slot = document.getElementById('hub-dues29');
         if (d29Slot) d29Slot.classList.toggle('hidden', !!panel);
+        var bapSlot = document.getElementById('hub-bapdue');
+        if (bapSlot) bapSlot.classList.toggle('hidden', !!panel);
         var callSlot = document.getElementById('hub-call');
         if (callSlot) callSlot.classList.toggle('hidden', !!panel);
         var rtSlot = document.getElementById('hub-retreat');
@@ -804,6 +807,31 @@ var SHSBoard = (function () {
             ? '<span style="color:#b0731f">일부 납부 — ' + paidAmt.toLocaleString('ko-KR') + '원 / 잔액 ' +
               Math.max(0, target - paidAmt).toLocaleString('ko-KR') + '원</span>'
             : '<span class="mydues-late" style="display:inline;margin:0">미납</span>');
+        /* 미납·일부 납부 교회에는 납부 안내와 계좌·토스 송금 상자를 붙인다.
+         * 계좌는 세례의무금 계좌(bapdues_pay), 비어 있으면 상회비 계좌(main.js duesPay). */
+        var remain = Math.max(0, target - paidAmt);
+        var owes = target > 0 && remain > 0;
+        var payOpts = { label: '세례의무금 납부 계좌', word: part ? '잔액' : '미납액',
+          bank: pay.bank, account: pay.account, holder: pay.holder };
+        var hasSlot = owes && !!SHS.duesPaySlot;
+        function bapGuide(top) {
+          var dl0 = deadlines[String(bapYr)];
+          var over = dl0 && new Date(dl0 + 'T00:00:00') < new Date().setHours(0, 0, 0, 0);
+          return '<div class="notice-banner" style="border-left:4px solid #b0731f;margin:' + (top ? '0 0 18px' : '10px 0 0') + '">' +
+            '<strong style="color:#b0731f">세례의무금 납부 안내</strong><br>' +
+            '<strong>' + SHS.esc(mine.church) + '</strong>의 ' + bapYr + '년 세례의무금(총회 세례교인헌금)이 ' +
+            (part ? '일부만 납부되었습니다. 배정액 ' + target.toLocaleString('ko-KR') + '원 가운데 <strong>잔액 ' +
+                    remain.toLocaleString('ko-KR') + '원</strong>이 남아 있습니다.'
+                  : '아직 납부되지 않았습니다. 배정액은 <strong>' + target.toLocaleString('ko-KR') + '원</strong>입니다.') +
+            (over ? ' 총회 시행기한이 지났으니 빠른 시일 안에 납부해 주시기 바랍니다.' : ' 기한 안에 납부해 주시기 바랍니다.') +
+            SHS.duesPaySlot(remain, mine.church, payOpts) +
+            '<p style="margin:8px 0 0;font-size:0.84rem;color:var(--gray-7)">납부하시면 노회 회계가 확인한 뒤 이 안내가 사라집니다. ' +
+            '이미 납부하셨는데도 보인다면 노회 회계에게 납부 확인을 요청해 주세요.' +
+            (top ? ' <a href="dashboard.html#hub-mydues" style="text-decoration:underline">나의 세례의무금 보기</a>' : '') +
+            '</p></div>';
+        }
+        var topBap = document.getElementById('hub-bapdue');
+        if (topBap) topBap.innerHTML = hasSlot ? bapGuide(true) : '';
         el.innerHTML =
           '<div class="mydues-head"><strong>' + SHS.esc(mine.church) + '</strong>' +
           ' · ' + bapYr + '년' + (bapYr !== calYr ? ' <span style="color:var(--gray-5)">(지난해 배정 기준)</span>' : '') +
@@ -822,12 +850,14 @@ var SHSBoard = (function () {
                 : (left === 0 ? '<strong style="color:#a33">오늘까지</strong>'
                               : '<strong style="color:#a33">' + (-left) + '일 지남</strong>')) + '</p>';
           })() +
-          (pay.account
-            ? '<p style="font-size:0.85rem;margin:4px 0">납부 계좌: <strong>' +
-              SHS.esc((pay.bank || '') + ' ' + pay.account + ' (' + (pay.holder || '') + ')') + '</strong></p>'
-            : '') +
+          (hasSlot ? bapGuide(false)
+            : (pay.account
+              ? '<p style="font-size:0.85rem;margin:4px 0">납부 계좌: <strong>' +
+                SHS.esc((pay.bank || '') + ' ' + pay.account + ' (' + (pay.holder || '') + ')') + '</strong></p>'
+              : '')) +
           '<p class="mydues-sum" style="margin-top:4px"><span class="mydues-note">해마다 한 번 총회에 내는 세례교인헌금입니다. ' +
           '납부 확인이 실제와 다르면 노회 회계에게 알려 주세요.</span></p>';
+        if (hasSlot && SHS.mountDuesPay) SHS.mountDuesPay(document);
       }).catch(function () {
         var el = document.getElementById('dash-mybap');
         if (el) el.innerHTML = '<p class="dash-none">세례의무금 현황을 불러오지 못했습니다.</p>';
