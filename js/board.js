@@ -772,17 +772,18 @@ var SHSBoard = (function () {
         return Promise.all([
           c.from('bapdues').select('*').in('year', [calYr, calYr - 1])
             .then(function (x) { return x; }, function () { return { data: [] }; }),
-          c.from('site_settings').select('*').in('key', ['bapdues_pay', 'bapdues_deadline'])
+          c.from('site_settings').select('*').in('key', ['bapdues_pay', 'bapdues_deadline', 'bapdues_closed'])
             .then(function (x) { return x; }, function () { return { data: [] }; })
         ]);
       }).then(function (rs) {
         var el = document.getElementById('dash-mybap');
         if (!el) return;
         var all = (rs[0] && rs[0].data) || [];
-        var pay = {}, deadlines = {};
+        var pay = {}, deadlines = {}, closedYrs = {};
         ((rs[1] && rs[1].data) || []).forEach(function (x) {
           if (x.key === 'bapdues_pay' && x.value) pay = x.value;
           if (x.key === 'bapdues_deadline' && x.value) deadlines = x.value;
+          if (x.key === 'bapdues_closed' && x.value) closedYrs = x.value;
         });
         function key(s) { return String(s || '').replace(/\s|교회$/g, ''); }
         var myKey = key(user.church || '');
@@ -816,14 +817,24 @@ var SHSBoard = (function () {
         var hasSlot = owes && !!SHS.duesPaySlot;
         function bapGuide(top) {
           var dl0 = deadlines[String(bapYr)];
-          var over = dl0 && new Date(dl0 + 'T00:00:00') < new Date().setHours(0, 0, 0, 0);
+          /* 납부 마감 시한이 지났는가 — 총회 시행기한이 지났거나 노회가 그 해를 마감했을 때 */
+          var over = !!closedYrs[String(bapYr)] ||
+            (dl0 && new Date(dl0 + 'T00:00:00') < new Date().setHours(0, 0, 0, 0));
           return '<div class="notice-banner" style="border-left:4px solid #b0731f;margin:' + (top ? '0 0 18px' : '10px 0 0') + '">' +
             '<strong style="color:#b0731f">세례의무금 납부 안내</strong><br>' +
             '<strong>' + SHS.esc(mine.church) + '</strong>의 ' + bapYr + '년 세례의무금(총회 세례교인헌금)이 ' +
             (part ? '일부만 납부되었습니다. 배정액 ' + target.toLocaleString('ko-KR') + '원 가운데 <strong>잔액 ' +
                     remain.toLocaleString('ko-KR') + '원</strong>이 남아 있습니다.'
                   : '아직 납부되지 않았습니다. 배정액은 <strong>' + target.toLocaleString('ko-KR') + '원</strong>입니다.') +
-            (over ? ' 총회 시행기한이 지났으니 빠른 시일 안에 납부해 주시기 바랍니다.' : ' 기한 안에 납부해 주시기 바랍니다.') +
+            (over ? ' 납부 마감 시한이 지났으니 빠른 시일 안에 납부해 주시기 바랍니다.' : ' 기한 안에 납부해 주시기 바랍니다.') +
+            /* 노회규칙 제29조 제3항 — 마감 시한을 넘긴 미납 교회의 자격 제한 안내 */
+            (over
+              ? '<p style="margin:8px 0 0;padding:8px 10px;background:#fbf1ee;border-radius:4px;font-size:0.9rem;line-height:1.65">' +
+                '<strong style="color:var(--red)">자격 제한 안내</strong> — 노회규칙 제29조 제3항에 따라 세례의무금(총회 세례교인헌금) ' +
+                '납부 마감 시한을 넘긴 미납 교회는 <strong>총회 총대 및 상비부 임원 자격이 제한</strong>됩니다. ' +
+                '<span style="color:var(--gray-7)">(제29조 3항: 상회비 및 총회 세례교인헌금 미납교회는 노회 임원 및 총대, ' +
+                '시찰·상비부 임원을 할 수 없다.)</span></p>'
+              : '') +
             SHS.duesPaySlot(remain, mine.church, payOpts) +
             '<p style="margin:8px 0 0;font-size:0.84rem;color:var(--gray-7)">납부하시면 노회 회계가 확인한 뒤 이 안내가 사라집니다. ' +
             '이미 납부하셨는데도 보인다면 노회 회계에게 납부 확인을 요청해 주세요.' +
