@@ -1996,6 +1996,9 @@ document.addEventListener('DOMContentLoaded', function () {
         '<div style="margin-top:6px">확정 납부 실적 <strong style="color:#2a7a2a">' +
         wonf(closed.paid) + '원</strong> / 목표 ' + wonf(closed.target) + '원 (' + cPct + '%)' +
         ' · 납부 ' + Number(closed.join || 0) + '곳 · 미납 ' + cUnpaid + '곳' +
+        (Number(closed.late_paid || 0) > 0
+          ? ' <span style="color:var(--gray-5)">· 마감 후 추가 납부 ' + Number(closed.late_join || 0) + '곳 ' +
+            wonf(closed.late_paid) + '원 포함</span>' : '') +
         (closed.by ? ' <span style="color:var(--gray-5)">· 마감 ' + e(closed.by) + '</span>' : '') +
         '</div>' +
         (SHSAuth.canManageMembers(user)
@@ -2139,9 +2142,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
       /* ----- 교회별 표 ----- */
       var canEdit = canDues && !provisional && !closed;
+      /* 마감한 뒤에도 늦게 낸 교회는 완납 처리만 할 수 있다 (금액 수정·삭제는 마감 해제 뒤에) */
+      var canLate = canDues && !provisional && !!closed;
       h += '<h3 style="margin:18px 0 8px">교회별 현황</h3>';
       h += '<p style="font-size:0.82rem;color:var(--gray-5);margin:0 0 8px">담임교역자는 ' +
-        '회원 명단(노회 명단)과 자동으로 연동됩니다.</p>';
+        '회원 명단(노회 명단)과 자동으로 연동됩니다.' +
+        (canLate ? ' 마감 뒤에 납부한 교회는 <strong>완납</strong> 단추로 처리하면 확정 납부 실적에 함께 반영됩니다.' : '') +
+        '</p>';
       /* 납부한 교회와 미납 교회를 갈라 볼 수 있는 탭 */
       var paidCnt = 0;
       rows.forEach(function (r) { if (Number(r.paid || 0) > 0) paidCnt++; });
@@ -2159,7 +2166,7 @@ document.addEventListener('DOMContentLoaded', function () {
       h += '<div style="overflow-x:auto"><table class="tbl" style="max-width:900px"><thead><tr>' +
         '<th class="left">교회명</th><th>시찰</th><th>담임교역자</th><th style="width:90px">세례교인수</th>' +
         '<th style="width:120px">목표금액</th><th style="width:120px">납입금액</th><th>납입</th>' +
-        (canEdit ? '<th style="width:120px">관리</th>' : '') +
+        (canEdit || canLate ? '<th style="width:120px">관리</th>' : '') +
         '</tr></thead><tbody>';
       shownRows.forEach(function (r) {
         var done = Number(r.paid || 0) > 0 && Number(r.paid) >= Number(r.target || 0) && Number(r.target || 0) > 0;
@@ -2195,12 +2202,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 (!done && Number(r.target || 0) > 0
                   ? ' <button class="btn sm" data-bpfull="' + r.id + '">완납</button>'
                   : '') + '</td>'
-              : '') +
+              : (canLate
+                ? '<td>' + (!done && Number(r.target || 0) > 0
+                    ? '<button class="btn sm" data-bpfull="' + r.id + '">완납</button>' : '') + '</td>'
+                : '')) +
             '</tr>';
         }
       });
       if (!shownRows.length) {
-        h += '<tr><td colspan="' + (canEdit ? 8 : 7) + '" style="text-align:center;color:var(--gray-5);padding:18px">' +
+        h += '<tr><td colspan="' + (canEdit || canLate ? 8 : 7) + '" style="text-align:center;color:var(--gray-5);padding:18px">' +
           (bapFilter === 'paid' ? '아직 납부한 교회가 없습니다.' : '미납 교회가 없습니다.') + '</td></tr>';
       }
       var vM = 0, vT = 0, vP = 0;
@@ -2211,7 +2221,7 @@ document.addEventListener('DOMContentLoaded', function () {
         (bapFilter === 'paid' ? '납부 교회 합계' : (bapFilter === 'unpaid' ? '미납 교회 합계' : '합계')) +
         '</th><th></th><th></th><th style="text-align:right">' + wonf(vM) + '</th>' +
         '<th style="text-align:right">' + wonf(vT) + '</th><th style="text-align:right">' + wonf(vP) + '</th><th></th>' +
-        (canEdit ? '<th></th>' : '') + '</tr>';
+        (canEdit || canLate ? '<th></th>' : '') + '</tr>';
       h += '</tbody></table></div>';
       if (canEdit) {
         h += '<div class="inline-form" style="margin-top:8px;max-width:820px">' +
@@ -2348,20 +2358,42 @@ document.addEventListener('DOMContentLoaded', function () {
       b.addEventListener('click', function () {
         var r = bapRows.filter(function (x) { return String(x.id) === b.dataset.bpfull; })[0];
         if (!r) return;
-        if (!confirm(r.church + ' — 목표 금액 ' + wonf(r.target) + '원 전액을 납입 완료로 저장할까요?')) return;
+        /* 마감한 해라면 마감 뒤 추가 납부로 적고, 확정 납부 실적(마감 기록)도 함께 맞춘다 */
+        var cl = bapClosed[String(bapYear)] || null;
+        var add = Math.max(0, Number(r.target || 0) - Number(r.paid || 0));
+        var wasJoin = Number(r.paid || 0) > 0;
+        if (!confirm(r.church + ' — 목표 금액 ' + wonf(r.target) + '원 전액을 납입 완료로 저장할까요?' +
+          (cl ? '\n\n' + bapYear + '년은 마감되었습니다. 마감 후 추가 납부로 기록하고 확정 납부 실적에 ' +
+                wonf(add) + '원을 더합니다.' : ''))) return;
         b.disabled = true;
+        var cli;
         SHSCloud.init().then(function (c) {
+          cli = c;
           return c.from('bapdues').update({
             paid: r.target,
             paid_on: r.paid_on || new Date().toISOString().slice(0, 10),
             updated_at: new Date().toISOString()
           }).eq('id', r.id);
         }).then(function (res) {
-          if (res.error) { b.disabled = false; alert(res.error.message); return; }
+          if (res.error) { b.disabled = false; alert(res.error.message); return null; }
           bapEditing = null;
-          SHSCloud.log('update', '세례의무금 완납 처리', bapYear + '년 ' + r.church + ' ' + r.target + '원');
-          loadBap();
-        });
+          SHSCloud.log('update', '세례의무금 완납 처리' + (cl ? ' (마감 후)' : ''),
+            bapYear + '년 ' + r.church + ' ' + r.target + '원');
+          if (!cl) return true;
+          var rec = {};
+          Object.keys(cl).forEach(function (k) { rec[k] = cl[k]; });
+          rec.paid = Number(cl.paid || 0) + add;
+          rec.join = Number(cl.join || 0) + (wasJoin ? 0 : 1);
+          rec.late_paid = Number(cl.late_paid || 0) + add;
+          rec.late_join = Number(cl.late_join || 0) + 1;
+          var next = {};
+          Object.keys(bapClosed).forEach(function (k) { next[k] = bapClosed[k]; });
+          next[String(bapYear)] = rec;
+          return cli.from('site_settings').upsert({ key: 'bapdues_closed', value: next }).then(function (r2) {
+            if (r2.error) alert('완납은 저장했지만 마감 기록의 확정 실적을 고치지 못했습니다: ' + r2.error.message);
+            return true;
+          });
+        }).then(function (ok) { if (ok) loadBap(); });
       });
     });
 
