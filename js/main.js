@@ -869,6 +869,10 @@
     if (key.indexOf('dues29-') === 0) {
       return 'dashboard.html#hub-mydues';
     }
+    /* 세례의무금 납부 안내(160) — 대시보드 <나의 상회비 · 세례의무금>으로 */
+    if (key.indexOf('bapdue-') === 0) {
+      return 'dashboard.html#hub-mydues';
+    }
     if (key.indexOf('elder-term-') === 0) {
       return 'elder-notice.html';
     }
@@ -1855,6 +1859,25 @@
     }).catch(function () { return duesPayNow; });
     return duesPayP;
   }
+  /* 세례의무금 계좌(site_settings 'bapdues_pay') — 비어 있으면 상회비 계좌를 쓴다 */
+  var bapPayP = null;
+  function bapPay() {
+    if (bapPayP) return bapPayP;
+    bapPayP = duesPay().then(function (base) {
+      if (!(window.SHSCloud && SHSCloud.enabled && SHSCloud.enabled())) return base;
+      return SHSCloud.init().then(function (c) {
+        if (!c) return base;
+        return c.from('site_settings').select('value').eq('key', 'bapdues_pay').then(function (r) {
+          var v = r && !r.error && r.data && r.data[0] && r.data[0].value;
+          if (v && String(v.account || '').replace(/\D/g, '')) {
+            return { bank: String(v.bank || ''), account: String(v.account), holder: String(v.holder || '시화산노회') };
+          }
+          return base;
+        }, function () { return base; });
+      }).catch(function () { return base; });
+    });
+    return bapPayP;
+  }
   function payDevice() {
     var ua = navigator.userAgent || '';
     if (/Android/i.test(ua)) return 'android';
@@ -1872,7 +1895,7 @@
     if (payDevice() === 'android') return 'intent://' + q + '#Intent;scheme=supertoss;package=viva.republica.toss;end';
     return 'supertoss://' + q;
   }
-  /* opts(선택): { label: 상자 제목, word: 금액을 부르는 말('미납액'·'잔액'), bank·account·holder: 이 상자만 쓰는 계좌 }
+  /* opts(선택): { kind: 'bap' 이면 세례의무금 계좌(bapdues_pay), label: 상자 제목, word: 금액을 부르는 말('미납액'·'잔액'), bank·account·holder: 이 상자만 쓰는 계좌 }
    * — 세례의무금 안내(board.js)가 쓴다. 계좌를 주지 않으면 상회비 계좌(dues_pay)로 간다. */
   function duesPaySlot(amt, church, opts) {
     opts = opts || {};
@@ -1880,6 +1903,7 @@
     return '<div class="dues-pay" data-amt="' + (Math.round(Number(amt) || 0)) + '" data-church="' + d29esc(church || '') + '" ' +
       (opts.label ? 'data-label="' + d29esc(opts.label) + '" ' : '') +
       (opts.word ? 'data-word="' + d29esc(opts.word) + '" ' : '') +
+      (opts.kind ? 'data-kind="' + d29esc(opts.kind) + '" ' : '') +
       (own ? 'data-bank="' + d29esc(own.bank || '') + '" data-account="' + d29esc(own.account) +
              '" data-holder="' + d29esc(own.holder || '') + '" ' : '') +
       'style="border:1px solid var(--gray-3,#d8dbe2);border-radius:6px;padding:12px 14px;margin:10px 0 0;background:#fff;color:var(--gray-9,#222)"></div>';
@@ -1963,8 +1987,10 @@
     var slots = root.querySelectorAll('.dues-pay:not([data-done])');
     if (!slots.length) return;
     bindDuesPay();
-    duesPay().then(function (pay) {
+    var anyBap = Array.prototype.some.call(slots, function (el) { return el.getAttribute('data-kind') === 'bap'; });
+    Promise.all([duesPay(), anyBap ? bapPay() : null]).then(function (ps) {
       Array.prototype.forEach.call(slots, function (el) {
+        var pay = el.getAttribute('data-kind') === 'bap' && ps[1] ? ps[1] : ps[0];
         if (el.getAttribute('data-done')) return;
         el.setAttribute('data-done', '1');
         var own = el.getAttribute('data-account')

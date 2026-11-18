@@ -23,7 +23,7 @@
 <script src="js/data.js"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/supabase-auth.js?v=20261020za"></script>
-<script src="js/main.js?v=20261118a"></script>
+<script src="js/main.js?v=20261118b"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
  SHS.getUser().then(function (user) {
@@ -174,6 +174,13 @@ document.addEventListener('DOMContentLoaded', function () {
             var am = body.match(/\(\d+개월, (\d+)만원\)/);
             var ch = (String(n.title || '').match(/^\[상회비\]\s*(.+?)\s+[\d·]+월분/) || [])[1] || '';
             payBox = SHS.duesPaySlot(am ? Number(am[1]) * 10000 : 0, ch);
+          }
+          /* 세례의무금 납부 안내(160) — 글 아래에 세례의무금 계좌와 <토스로 납부하기> 상자 */
+          if (/^bapdue-/.test(String(n.dedupe_key || '')) && SHS.duesPaySlot) {
+            var bm = body.match(/미납액 ([\d,]+)원/);
+            var bch = (String(n.title || '').match(/^\[세례의무금\]\s*(.+?)\s+\d{4}년/) || [])[1] || '';
+            payBox = SHS.duesPaySlot(bm ? Number(bm[1].replace(/,/g, '')) : 0, bch,
+              { kind: 'bap', label: '세례의무금 납부 계좌', word: '미납액' });
           }
           return '<div class="noti-item' + (isOld ? ' old' : (n.read_at ? '' : ' unread')) + '">' +
             '<div class="n-head"><span class="n-kind">' + e(n.kind) + '</span>' +
